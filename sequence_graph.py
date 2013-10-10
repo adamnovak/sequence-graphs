@@ -16,6 +16,9 @@ Breakpoints that connect two Reference sites in the reference order and
 orientation are reference Breakpoints, whilke other breakpoints are non-
 reference.
 
+Contig Ends and Telomeres are special single-ended AlleleGroup-type things that
+occupy their own Sites.
+
 A Genome is incompletely specified if it contains any allele groups or
 breakpoints with a ploidy that is unknown or greater than one. A Genome is fully
 specified if all of the ploidies of its AlleleGroups and Breakpoints are either
@@ -27,7 +30,7 @@ versions of each Genome that are mutually consistent.
 
 """
 
-import sys, logging
+import sys, logging, math
 import pulp
 
 class PenaltyTree(object):
@@ -251,474 +254,212 @@ class SequenceGraphLpProblem(object):
         
         if status != pulp.constants.LpStatusOptimal:
             raise Exception("Unable to solve problem optimally.")
-        
 
-class MeasurementLocation(object):
+class Entity(object):
     """
-    Represents a location where copy number has been (ambiguously) measured.
-    Keeps track of a string measurement identifier, the mapping location in the
-    genome, and the relative contribution of this location to the measurement.
+    Represents an Entity in a sequence graph. It has a series of Components that
+    determine what it is actually like. It also has a unique ID.
+    
+    An AlleleGroup has a SequenceComponent, two EndComponents, and a
+    PloidyComponent.
+    
+    An Adjacency has a PloidyComponent and two EndComponents.
+    
+    Telomeres and Contig Ends both have a PloidyComponent and one EndComponent.
+    """
+    
+    def __init__(self):
+        """
+        Make a new Entity.
+        
+        """
+        
+        # Keep our ID integer
+        self.id = get_id()
+        
+        # Make a place to store our components. It needs to be in an order so we
+        # can have a 5' and 3' end if necessary.
+        self.components = []
+        
+    def add_component(self, component):
+        """
+        Add the given Component to this Entity.
+        
+        """
+        
+        # Put the component in our list
+        self.components.append(component)
+        
+        # Make the component know it belongs to us
+        component.entity = self
+        
+    def __str__(self):
+        """
+        Represent this Entity as a human-readable string.
+        
+        """
+        
+        return "<Entity #{}>".format(self.id)
+        
+class Component(object):
+    """
+    Represents a component that can be part of an Entity. Knows which Entity it
+    has been attached to, after it is attached.
+    
+    Must be attached to an Entity with Entity.add_component()
     
     """
     
-    def __init__(self, measurement, contig, start, end, affinity):
+    def __init__(self):
         """
-        Make a new MeasurementLocation, representing the mapping of the given
-        probe to the region between the given start and end positions, with the
-        given relative affinity.
-        
-        If affinity is a callable, it will be called once if the affinity of
-        this MeasurementLocation is requested. Otherwise, it will
-        be used as the actual affinity value.
+        Make a new Component not attached to any Entity.
         
         """
         
-        # Save the measurement name
-        self.measurement = measurement
-        # And the contig
-        self.contig = contig
-        # And the start position
-        self.start = start
-        # And the end position
-        self.end = end
+        # When we are attached to an entity, this will hold that entity. For now
+        # it holds None.
+        self.entity = None
         
-        if callable(affinity):
-            # We've been given a function to lazily call when someone asks for
-            # our affinity. Remember it.
-            self.affinity_function = affinity
-            
-            # Make a place to cache the affinity value we get when we call the
-            # above function.
-            self.affinity = None
-            
-        else:
-            # Just use the given affinity as our actual affinity value.
-            self.affinity = affinity
-            
-    def get_affinity(self):
-        """
-        Return the affinity of this MeasurementLocation: the weight with which
-        the AlleleGroup it is in contributes to the total measurement.
-        
-        If there is no affinity stored, call the affinity function and cache its
-        result. Otherwise, return the stored affinity.
-        
-        """
-        
-        if self.affinity is None:
-            # Go calculate the affinity. This is expensive and probably goes and
-            # calls out to R
-            logging.debug("Calculating affinity for {} at {}:{}-{}".format(
-                self.measurement, self.contig, self.start, self.end))
-            self.affinity = self.affinity_function()
-            
-        return self.affinity
-        
-class AlleleGroup(object):
+class PloidyComponent(Component):
     """
-    Represents an AlleleGroup. Has a ploidy, and maintains a list of
-    MeasurementLocations inside it.
+    Allows an Entity to have a ploidy value (represented by an LP variable).
     
     """
     
-    def __init__(self, contig, start, end, min_ploidy=0):
+    def __init__(self):
         """
-        Make a new AlleleGroup, with an integer LP variable to represent its
-        ploidy. 
-        
-        contig, start, and end specify this AlleleGroup's position in the linear
-        reference; they must all be None for contigs that are not present in the
-        reference.
-        
-        min_ploidy, if specified, gives a minimum ploidy for the allele
-        group.
+        Make a new PloidyComponent attached to no entity.
         
         """
         
-        # Save our reference chromosome
-        self.contig = contig
-        # And reference start position (0-based)
-        self.start = start
-        # And reference end position (1-past-the-end)
-        self.end = end
+        # Initialize the base class
+        super(PloidyComponent, self).__init__()
         
-        # This holds the ploidy LP variable
-        self.ploidy = pulp.LpVariable("AG_{}".format(get_id()), 
-            min_ploidy, cat="Integer")
-            
-        # Keep a list of measurements that measure us
-        self.measurements = []
-            
-            
+        # Make the LP variable
+        self.variable = pulp.LpVariable("Ploidy_".format(get_id()), 
+            cat="Integer")
             
     def get_ploidy(self):
         """
-        Return the ploidy of this allele group as an integer. The relavent
+        Return the ploidy as an integer. The relavent
         Linear Programing problem must be solved first.
         
         """
         
         # Go get the value from pulp
-        return pulp.value(self.ploidy)
-        
-    def add_measurement(self, measurement_location):
-        """
-        Add a MeasurementLocation to this AlleleGroup's measurements list.
-        
-        The MeasurementLocation should be contained within the AlleleGroup in
-        the genome.
-        
-        """
-        
-        # Add it to the list
-        self.measurements.append(measurement_location)
-        
-class Model(object):
+        return pulp.value(self.variable)
+
+class EndComponent(Component):
     """
-    Represents a Sequence Graph model of the copy number of a genome. It
-    contains lists of AlleleGroups with reference genome locations, separated
-    out by contig. New AlleleGroups can be inserted, and, when all AlleleGroups
-    have been made, approximate-equality constraints can be generated tying
-    AlleleGroup copy numbers to those of their neighbors.
+    Allows an Entity to connect to another Entity. Contains a reference to one
+    or more other EndComponents that it is connected to, and to the "other"
+    EndComponent of the entity it belongs to, which may or may not actually be
+    this EndComponent.
     
-    All constraints and penalty terms are automatically added to the
-    SequenceGraphLpProblem to which the Model is attached (specified on
-    construction).
+    EndComponents on AlleleGroups, Contig Ends, and Telomeres should connect to
+    EndComponents on one or more Adjacencies. EndComponents on Adjacencies
+    should connect to exactly one EndComponent on an AlleleGroup, Contig End, or
+    Telomere.
     
     """
     
-    def __init__(self, problem):
+    def __init__(self):
         """
-        Make a new Model attached to the given SequenceGraphLpProblem. Once the
-        problem is solved, the Model will have copy number values available from
-        its AlleleGroups.
+        Make a new EndComponent attached to no entity.
         
         """
+        # Initialize the base class
+        super(EndComponent, self).__init__()
         
-        # We need a place to keep our AlleleGroup lists
-        self.allele_groups = collections.defaultdict(list)
+        # Make a set of connected EndComponents
+        self.connections = set()
         
-        # We need to remember the problem we're attached to
-        self.problem = problem
+        # Make a spot to put the other end of the thing we are attached to. For
+        # now assume it's us.
+        self.other_end = self
         
-    def constrain_approximately_equal(self, var_a, var_b, penalty=1):
+        
+        
+    def connect(self, other):
         """
-        Constrain the two LP variables (or constants) var_a and var_b to be
-        approximately equal, subject to the given penalty.
-        
-        Adds the appropriate constraints and penalties to the Model's
-        SequenceGraphLpProblem.
-        
-        This method is a convenience function, so that you can add constraints
-        to a Model when you have only the Model, without poking around inside
-        it.
+        Connect this EndComponent to another EndComponent. Only needs to be
+        called one way.
         
         """
         
-        # Just forward the call on to the problem.
-        self.problem.constrain_approximately_equal(var_a, var_b, 
-            penalty=penalty)
-            
-    def add_constraint(self, constraint):
-        """
-        Add the given constraint to the problem this Model is attached to.
+        # Save our reference to them
+        self.connections.add(other)
+        # Give them a reference to us
+        other.connections.add(self)
+                
         
-        This method is a convenience function, so that you can add constraints
-        to a Model when you have only the Model, without poking around inside
-        it.
         
-        """
-        
-        self.problem.add_constraint(constraint)
+class AlleleGroup(Entity):
+    """
+    Represents an AlleleGroup. An Entity with a Ploidy and two Ends.
     
-    def add_penalty(self, penalty): 
+    """
+    
+    def __init__(self):
         """
-        Add the given penalty term to the problem this Model is attached to.
-        
-        This method is a convenience function, so that you can add constraints
-        to a Model when you have only the Model, without poking around inside
-        it.
+        Make a new AlleleGroup. Add all the components.
         
         """
         
-        self.problem.add_penalty(penalty)
+        # Initialize the base class
+        super(AlleleGroup, self).__init__()
         
-    def add_allele_group(self, allele_group):
+        # Add the ploidy component
+        self.add_component(PloidyComponent())
+        
+        # TODO: We're not supposed to really have any logic here. We should have
+        # just one Graph Member component or something to represent a two-sided
+        # graph node.
+        
+        # Make the two EndComponents
+        end_1 = EndComponent()
+        end_2 = end_component()
+        
+        # Point them at each other
+        end_1.other_end = end_2
+        end_2.other_end = end_1
+        
+        # Add the end components
+        self.add_component(end_1)
+        self.add_component(end_2)
+        
+class Adjacency(Entity):
+    """
+    Represents an Adjacency. An Entity with a Ploidy and two Ends.
+    
+    """
+    
+    def __init__(self):
         """
-        Given an AlleleGroup with its reference position defined, put it in the
-        Model.
-        
-        Sticks it at the end of the appropriate allele group list, so the list
-        may no longer be sorted.
+        Make a new AlleleGroup. Add all the components.
         
         """
         
-        # Put the allele group in the right list
-        self.allele_groups[allele_group.contig].append(allele_group)
+        # Initialize the base class
+        super(Adjacency, self).__init__()
         
-    def get_allele_groups(self):
-        """
-        Iterate through all AlleleGroups in the model.
+        # Add the ploidy component
+        self.add_component(PloidyComponent())
         
-        """
+        # Make the two EndComponents
+        end_1 = EndComponent()
+        end_2 = EndComponent()
         
-        for allele_group_list in self.allele_groups.itervalues():
-            # For each list of AlleleGroups on a contig
-            for allele_group in allele_group_list:
-                # For each AlleleGroup on that contig, yield it.
-                yield allele_group
+        # Point them at each other
+        end_1.other_end = end_2
+        end_2.other_end = end_1
         
-        
-        
-    def sort_allele_groups(self):
-        """
-        Sort all the Model's allele group lists into genome coordinate order.
-        
-        """
-        
-        for allele_group_list in self.allele_groups.itervalues():
-            # Sort each list in place, by start coordinate and then end
-            # coordinate
-            allele_group_list.sort(key=lambda group: (group.start, group.end))
+        # Add the end components
+        self.add_component(end_1)
+        self.add_component(end_2)
+    
             
-    def build_aliasing_model(self):
-        """
-        Takes a Model and adds measurement aliasing LP variables to it.
-        
-        Returns a dict of LP variables representing total hybridization (where
-        1.0 = 1 perfect match copy) by probe name.
-        
-        Assumes we're using microarray data, where MeasurementLocations are
-        probe mappings.
-        
-        """
-        
-        # This dict holds probe hybridization expressions by probe name
-        hybridization_expressions = collections.defaultdict(list) 
-        
-        logging.info("Scanning for mapping locations")
-        
-        for allele_group in self.get_allele_groups():
-            for measurement in allele_group.measurements:
-                # Work out this measurement location's hybridization
-                # contribution expression
-                contribution = (measurement.get_affinity() *
-                    allele_group.ploidy)
-                
-                # Add it in to the appropriate probe hybridization expression
-                hybridization_expressions[measurement.measurement] = \
-                    hybridization_expressions[measurement.measurement] + \
-                    contribution
-            
-        # This holds hybridization LP variables by probe name
-        hybridizations = {}
-        
-        logging.info("Creating hybridization variables")
-                
-        for probe, hybridization_expression in \
-            hybridization_expressions.iteritems():
-            
-            # Make an LP variable for each of these hybridization expressions
-            probe_hybridization = pulp.LpVariable(
-                "{}_hybridization_{}".format(probe, get_id()), 0)
-                
-            # Set it equal to its expression
-            self.add_constraint(hybridization_expression == 
-                probe_hybridization)
-            
-            # Add the LP variable to the dict we're building
-            hybridizations[probe] = probe_hybridization
-        
-        # Give back the completed dict of probe hybridization LP variables
-        return hybridizations
-            
-    def add_constraints(self, genome_length, dna_penalty=0, end_penalty=1E9,
-        default_ploidy=2, breakpoint_weight=1):
-        """
-        Must be called after all add_allele_group() calls, and after the allele
-        group lists have been sorted with sort_allele_groups(). Constrains
-        adjacent allele groups together, and puts those constraints in the
-        attached SequenceGraphLpProblem.
-        
-        This function may only be called once.
-        
-        genome_length is the number of potential breakpoint positions (i.e.
-        bases) in the genome.
-        
-        dna_penalty is how much to charge per base of gained/lost DNA.
-        
-        end_penalty is the penalty to charge per duplicated/deleted AlleleGroup
-        at the end of a contig.
-        
-        default_ploidy specifies what copy number to charge for variations
-        from.
-        
-        breakpoint_weight is a factor by which to multiply the distance-
-        determined breakpoint penalty.
-        
-        """
-        
-        for allele_group_list in self.allele_groups.itervalues():
-            # This holds the previous allele group we visited
-            last_group = None
-            
-            for group in allele_group_list:
-                if last_group is None:
-                    # This is the first group. Constrain it to the default copy
-                    # number (i.e. the assumed number of telomeres).
-                    
-                    self.constrain_approximately_equal(group.ploidy, 
-                        default_ploidy, penalty=end_penalty)
-                    
-                else:
-                
-                    # What's the end-end distance from the last thing? Since the
-                    # end location is really 1-past-the-end, we need to subtract
-                    # 1 from it to get the last base actually included in the
-                    # previous region.
-                    distance = group.start - (last_group.end - 1)
-                
-                    if distance <= 0:
-                        # There is at least 1 base of overlap. They must be
-                        # equal.
-                        self.add_constraint(group.ploidy == last_group.ploidy)
-                    else:
-                        # There is no overlap. Allow them to vary.
-                        
-                        # We want to charge for the gained/lost DNA.
-                        
-                        # How much do we need to charge for a copy number change
-                        # on either side of this stretch of DNA? Assume we have
-                        # to charge for half the bases between the centers.
-                        penalty = float(group.start + group.end - 
-                            last_group.start - last_group.end) / 2 * dna_penalty
-                        
-                        # If the last probe changes copy number from 2, charge
-                        # it for half the DNA between it and here.
-                        self.constrain_approximately_equal(last_group.ploidy, 
-                            default_ploidy, penalty=penalty)
-                        # Charge us for the other half
-                        self.constrain_approximately_equal(group.ploidy, 
-                            default_ploidy, penalty=penalty)
-                        
-                        # The copy number change penalty is the negative log
-                        # likelihood of a break between them, which is the
-                        # negative log of the probability that a breakpoint
-                        # would hit here rather than anywhere else in the
-                        # genome. We're really just adding/subtracting a
-                        # constant to the breakpoint_penalty, so we take it from
-                        # the user so that our breakpoint penalty is consistent
-                        # for different probe sets. TODO: We don't properly
-                        # account for longer genomes picking up more
-                        # breakpoints.
-                        breakpoint_penalty = -math.log(float(distance) / 
-                            genome_length) * breakpoint_weight
-                        
-                        # Add the breakpoint constriant: charge the breakpoint
-                        # penalty for any copy number difference between the
-                        # previous allele group and this one.
-                        self.constrain_approximately_equal(last_group.ploidy, 
-                            group.ploidy, penalty=breakpoint_penalty)
-                
-                # Now we're done with this group, so it's the last
-                last_group = group
-                
-            if len(allele_group_list) > 1:
-                # Constrain the last allele group in a contig (if it isn't also
-                # the first) to the default ploidy, so contigs have a cost to
-                # duplicate or delete in their entirety.
-                self.constrain_approximately_equal(last_group.ploidy, 
-                    default_ploidy, penalty=end_penalty)
-                    
-    def save_map(self, stream, measured_ratios=None, 
-        reference_hybridizations=None):
-        """
-        Save this Model to the given stream as a human-readable copy number map.
-        
-        The SequenceGraphLpProblem that the Model is attached to must be solved.
-        
-        measured_ratios is an optional dict of the sample/normal ratios for each
-        MeasurementLocation measurement name (i.e. probe name).
-        
-        reference_hybridizations is an optional dict of the total effective
-        perfect match copy number of the reference genome for each probe.
-        
-        """
-        
-        for contig, allele_groups in self.allele_groups.iteritems():
-            # Print the normal copy number for each allele group
-            stream.write("{}:\n".format(contig))
-            for allele_group in allele_groups:
-                
-                # Print the copy number for the region. These may disagree where
-                # probes overlap.
-                stream.write("\t{} ({}:{}-{})".format(allele_group.get_ploidy(),
-                    allele_group.contig, allele_group.start, allele_group.end))
-                
-                for mapping in allele_group.measurements:
-                    # Put the probe that maps here    
-                    stream.write(" ")
-                    stream.write(mapping.measurement)
-                    
-                    
-                    if measured_ratios is not None: 
-                        #  Put the ratio
-                        stream.write(" R: {}".format(measured_ratios[
-                            mapping.measurement]))
-                    
-                    if reference_hybridizations is not None:
-                        # Put the hybridization here vs. the total
-                        stream.write(" A:{}/{}".format(mapping.get_affinity(),
-                        reference_hybridizations[mapping.measurement]))
-                    
-                stream.write("\n")
-                
-    def save_bedgraph(self, stream, track_name="copyNumber",
-        track_description=None):
-        """
-        Save the Model's copy numbers as a BEDgraph-format file (BED file where
-        the feature names are really values to plot, with an appropriate browser
-        track header) written to the given stream.
-        
-        The SequenceGraphLpProblem that the Model is attached to must be solved.
-        
-        track_name is an optional name for the track in the browser.
-        
-        track_description is an optional description for the track, also
-        displayed in the browser.
-        
-        Automatically quotes name and description.
-        
-        """
-        
-        # If there's no description, use the track's name
-        if track_description is None:
-            track_description = track_name
-        
-        # Find the maximum copy number used, or use 2 if it's smaller than that.
-        max_copy_number = 2
-        
-        for allele_groups in self.allele_groups.itervalues():
-            for allele_group in allele_groups:
-                # Scan through all the allele groups looking for the highest
-                # ploidy we called anywhere.
-                if allele_group.get_ploidy() > max_copy_number:
-                    # This is the new highest copy number observed.
-                    max_copy_number = allele_group.get_ploidy()
-        
-        # Save the copy number map as a BEDgraph.
-        # Start with the appropriate header.
-        stream.write("track type=bedGraph name=\"{}\" description=\"{}\" "
-            "viewLimits=0:{} autoScale=off yLineMark=2 yLineOnOff=on\n".format(
-            track_name, track_description, max_copy_number))
-        
-        for contig, allele_groups in self.allele_groups.iteritems():
-            for group in allele_groups:
-                
-                # Say that the copy number under the group is what we've
-                # guessed.
-                stream.write("{}\t{}\t{}\t{}\n".format(contig, 
-                    group.start, group.end, group.get_ploidy()))
+    
         
 def get_id():
     """
