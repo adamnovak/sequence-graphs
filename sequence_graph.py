@@ -31,7 +31,7 @@ versions of each Genome that are mutually consistent.
 """
 
 import sys, logging, math
-import pulp
+import pulp, networkx
 
 class PenaltyTree(object):
     """
@@ -254,213 +254,7 @@ class SequenceGraphLpProblem(object):
         
         if status != pulp.constants.LpStatusOptimal:
             raise Exception("Unable to solve problem optimally.")
-
-class Entity(object):
-    """
-    Represents an Entity in a sequence graph. It has a series of Components that
-    determine what it is actually like. It also has a unique ID.
-    
-    An AlleleGroup has a SequenceComponent, two EndComponents, and a
-    PloidyComponent.
-    
-    An Adjacency has a PloidyComponent and two EndComponents.
-    
-    Telomeres and Contig Ends both have a PloidyComponent and one EndComponent.
-    """
-    
-    def __init__(self):
-        """
-        Make a new Entity.
-        
-        """
-        
-        # Keep our ID integer
-        self.id = get_id()
-        
-        # Make a place to store our components. It needs to be in an order so we
-        # can have a 5' and 3' end if necessary.
-        self.components = []
-        
-    def add_component(self, component):
-        """
-        Add the given Component to this Entity.
-        
-        """
-        
-        # Put the component in our list
-        self.components.append(component)
-        
-        # Make the component know it belongs to us
-        component.entity = self
-        
-    def __str__(self):
-        """
-        Represent this Entity as a human-readable string.
-        
-        """
-        
-        return "<Entity #{}>".format(self.id)
-        
-class Component(object):
-    """
-    Represents a component that can be part of an Entity. Knows which Entity it
-    has been attached to, after it is attached.
-    
-    Must be attached to an Entity with Entity.add_component()
-    
-    """
-    
-    def __init__(self):
-        """
-        Make a new Component not attached to any Entity.
-        
-        """
-        
-        # When we are attached to an entity, this will hold that entity. For now
-        # it holds None.
-        self.entity = None
-        
-class PloidyComponent(Component):
-    """
-    Allows an Entity to have a ploidy value (represented by an LP variable).
-    
-    """
-    
-    def __init__(self):
-        """
-        Make a new PloidyComponent attached to no entity.
-        
-        """
-        
-        # Initialize the base class
-        super(PloidyComponent, self).__init__()
-        
-        # Make the LP variable
-        self.variable = pulp.LpVariable("Ploidy_".format(get_id()), 
-            cat="Integer")
             
-    def get_ploidy(self):
-        """
-        Return the ploidy as an integer. The relavent
-        Linear Programing problem must be solved first.
-        
-        """
-        
-        # Go get the value from pulp
-        return pulp.value(self.variable)
-
-class EndComponent(Component):
-    """
-    Allows an Entity to connect to another Entity. Contains a reference to one
-    or more other EndComponents that it is connected to, and to the "other"
-    EndComponent of the entity it belongs to, which may or may not actually be
-    this EndComponent.
-    
-    EndComponents on AlleleGroups, Contig Ends, and Telomeres should connect to
-    EndComponents on one or more Adjacencies. EndComponents on Adjacencies
-    should connect to exactly one EndComponent on an AlleleGroup, Contig End, or
-    Telomere.
-    
-    """
-    
-    def __init__(self):
-        """
-        Make a new EndComponent attached to no entity.
-        
-        """
-        # Initialize the base class
-        super(EndComponent, self).__init__()
-        
-        # Make a set of connected EndComponents
-        self.connections = set()
-        
-        # Make a spot to put the other end of the thing we are attached to. For
-        # now assume it's us.
-        self.other_end = self
-        
-        
-        
-    def connect(self, other):
-        """
-        Connect this EndComponent to another EndComponent. Only needs to be
-        called one way.
-        
-        """
-        
-        # Save our reference to them
-        self.connections.add(other)
-        # Give them a reference to us
-        other.connections.add(self)
-                
-        
-        
-class AlleleGroup(Entity):
-    """
-    Represents an AlleleGroup. An Entity with a Ploidy and two Ends.
-    
-    """
-    
-    def __init__(self):
-        """
-        Make a new AlleleGroup. Add all the components.
-        
-        """
-        
-        # Initialize the base class
-        super(AlleleGroup, self).__init__()
-        
-        # Add the ploidy component
-        self.add_component(PloidyComponent())
-        
-        # TODO: We're not supposed to really have any logic here. We should have
-        # just one Graph Member component or something to represent a two-sided
-        # graph node.
-        
-        # Make the two EndComponents
-        end_1 = EndComponent()
-        end_2 = end_component()
-        
-        # Point them at each other
-        end_1.other_end = end_2
-        end_2.other_end = end_1
-        
-        # Add the end components
-        self.add_component(end_1)
-        self.add_component(end_2)
-        
-class Adjacency(Entity):
-    """
-    Represents an Adjacency. An Entity with a Ploidy and two Ends.
-    
-    """
-    
-    def __init__(self):
-        """
-        Make a new AlleleGroup. Add all the components.
-        
-        """
-        
-        # Initialize the base class
-        super(Adjacency, self).__init__()
-        
-        # Add the ploidy component
-        self.add_component(PloidyComponent())
-        
-        # Make the two EndComponents
-        end_1 = EndComponent()
-        end_2 = EndComponent()
-        
-        # Point them at each other
-        end_1.other_end = end_2
-        end_2.other_end = end_1
-        
-        # Add the end components
-        self.add_component(end_1)
-        self.add_component(end_2)
-    
-            
-    
-        
 def get_id():
     """
     Return a unique integer ID (for this execution). Use this to ensure your LP
@@ -476,3 +270,161 @@ def get_id():
     # Advance the ID and return the fresh one.
     get_id.last_id += 1
     return get_id.last_id
+
+class Genome(object):
+    """
+    Represents an (incompletley specified) genome as a sequence graph. Wraps all
+    access to the internal graph data structures, which the user never gets to
+    hear about.
+    """
+    
+    def __init__(self):
+        """
+        Make a new Genome sequence graph.
+        
+        """
+        
+    def add_site(self, reference_contig=None, reference_start=None, 
+        reference_end=None):
+        """
+        Add a new Site to the sequence graph, with an optional reference
+        position.
+        
+        Returns the ID of the Site added.
+        """
+        
+    def add_breakpoint(self, site_a, side_a, site_b, side_b):
+        """
+        Add a new Breakpoint between the specified site IDs, on the specified
+        side (0 or 1) of each Site. Note that flipping the A and B sites (and
+        their sides) still indicates the same Breakpoint. Note that you can have
+        a Breakpoitn between the two sides of a single Site, or attached to only
+        one side of one Site (in which case it is a self-loop in the underlying
+        graph).
+        
+        Returns the ID of the Breakpoint added. 
+        """
+        
+    def add_allele_group(self, site, sequence=None):
+        """
+        Add a new AlleleGroup to the Site with the given ID. If specified,
+        sequence is a DNA sequence to associate with the allele group in the
+        side 0 to side 1 direction.
+        
+        Returns the ID of the AlleleGroup added.
+        
+        """
+        
+    def add_adjacency(self, breakpoint, allele_group_a, allege_group_b):
+        """
+        Add a new Adjacency to the Breakpoint with the given ID, connecting the
+        given pair of Allele Groups (also specified by ID). The order of the
+        AlleleGroups does not matter. The ends that the Adjacency connects are
+        specified by the Breakpoint to which it is added.
+        
+        Returns the ID of the Adjacency added.
+        
+        """
+        
+    def get_sites(self):
+        """
+        Iterate over Site IDs in an arbitrary order.
+        
+        """
+    
+    def get_allele_groups(self, site):
+        """
+        Iterate over AlleleGroup IDs in a Site specitfied by ID in arbitrary
+        order.
+        
+        """
+        
+    def get_breakpoints(self):
+        """
+        Iterate over Breakpoint IDs in an arbitrary order.
+        
+        """
+        
+    def get_adjacencies(self, breakpoint):
+        """
+        Iterate over Adjacency IDs in a Breakpoint specified by ID in arbitrary
+        order.
+        
+        """
+        
+    def set_constraint(self, to_constrain, min_ploidy, max_ploidy):
+        """
+        Set the minimum and maximum integer ploidy on an AlleleGroup or
+        Adjacency.
+        
+        """
+        
+    def solutions():
+        """
+        Iterate over solutions to the ploidy constraints that have been
+        specified. Solutions are Solution objects with a get_ploidy method that
+        returns the ploidies of AlleleGroups and Adjacencies by ID.
+        
+        """
+        
+class Solution(object):
+    """
+    Represents a complete ploidy specification for an incompletely specified
+    genome. Just a collection of ploidies by AlleleGroup or Adjacency ID.
+    
+    """
+    
+    def __init__(self):
+        """
+        Make a new Solution.
+        
+        """
+        
+    def get_ploidy(self, to_get):
+        """
+        Given the ID of an AlleleGroup or Adjacency, get the ploidy of that
+        AlleleGroup or Adjacency under this Solution.
+        
+        """
+        
+# Test code
+if __name__ == "__main__":
+    # Test out the API
+    
+    # Make a Genome
+    genome = Genome()
+    
+    # Add some Sites
+    site_a = genome.add_site("chr1", 0, 9)
+    site_b = genome.add_site()
+    site_c = genome.add_site("chr1", 10, 19)
+    
+    # Add some Breakpoints
+    break_ab = genome.add_breakpoint(site_a, 1, site_b, 0)
+    break_bc = genome.add_breakpoint(site_b, 1, site_c, 0)
+    break_ac = genome.add_breakpoint(site_a, 1, site_c, 0)
+    
+    # Add some AlleleGroups
+    group_a = genome.add_allele_group(site_a, "AACTGGCACC")
+    group_b = genome.add_allele_group(site_b, "CCAG")
+    group_c = genome.add_allele_group(site_c, "CTTACGGATG")
+    
+    # Add some Adjacencies
+    adj_ab = genome.add_adjacency(break_ab, group_a, group_b)
+    adj_bc = genome.add_adjacency(break_bc, group_b, group_c)
+    adj_ac = genome.add_adjacency(break_ac, group_a, group_c)
+    
+    # Add some ploidy constraints
+    genome.set_constraint(adj_ab, 1, 2)
+    genome.set_constraint(adj_bc, 1, 2)
+    genome.set_constriant(adj_ac, 1, 2)
+    
+    for solution in genome.solutions():
+        # For each solution
+        for site in genome.get_sites():
+            # For each site
+            print "Site {}".format(site)
+            for allele_group in genome.get_allele_groups(site):
+                # Print the solution's ploidy for each AlleleGroup
+                print "AlleleGroup {}: {}".format(allele_group, 
+                    solution.get_ploidy(site))
