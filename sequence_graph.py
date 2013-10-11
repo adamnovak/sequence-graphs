@@ -284,6 +284,10 @@ class Genome(object):
         
         """
         
+        # To actually implement this API, including the ability to look up, say,
+        # Adjacencies by both Breakpoint they belong to and their own ID, we're
+        # going to need a proper database.
+        
     def add_site(self, reference_contig=None, reference_start=None, 
         reference_end=None):
         """
