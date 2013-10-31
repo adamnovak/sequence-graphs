@@ -31,7 +31,7 @@ versions of each Genome that are mutually consistent.
 """
 
 import sys, logging, math
-import pulp, networkx
+import pulp
 
 class PenaltyTree(object):
     """
@@ -276,6 +276,10 @@ class Genome(object):
     Represents an (incompletley specified) genome as a sequence graph. Wraps all
     access to the internal graph data structures, which the user never gets to
     hear about.
+    
+    Walking the graph is deliberately hard. Don't walk the graph; it is a serial
+    operation that you should not have to do.
+    
     """
     
     def __init__(self):
@@ -330,12 +334,25 @@ class Genome(object):
         
         """
         
-    def get_sites(self):
+    def get_all_sites(self):
         """
         Iterate over Site IDs in an arbitrary order.
         
         """
-    
+        
+    def get_site(self, allele_group):
+        """
+        Return the Site ID for a given AlleleGroup ID.
+        
+        """
+        
+    def get_sites(self, breakpoint):
+        """
+        Return the pair of Site IDs connected by the Breakpoint with the given
+        ID, as a tuple in arbitrary order.
+        
+        """
+        
     def get_allele_groups(self, site):
         """
         Iterate over AlleleGroup IDs in a Site specitfied by ID in arbitrary
@@ -343,9 +360,29 @@ class Genome(object):
         
         """
         
-    def get_breakpoints(self):
+    def get_allele_groups_for(self, adjacency):
+        """
+        Return a tuple of two (not necessarily distinct) AlleleGroup IDs
+        connected by the given Adjacency ID.
+        
+        """
+        
+    def get_all_breakpoints(self):
         """
         Iterate over Breakpoint IDs in an arbitrary order.
+        
+        """
+        
+    def get_breakpoint(self, adjacency):    
+        """
+        Return the Breakpoint ID for a given Adjacency ID.
+        
+        """
+        
+    def get_breakpoints(self, site, side):
+        """
+        Iterate over the Breakpoint IDs on the specified side (0 or 1) of the
+        Site with the given ID.
         
         """
         
@@ -355,15 +392,22 @@ class Genome(object):
         order.
         
         """
+    
+    def get_adjacencies_for(self, allele_group, side):
+        """
+        Iterate over Adjacency IDs for Adjacencies attached to the given
+        AlleleGroup on the given side (0 or 1)
+        
+        """
         
     def set_constraint(self, to_constrain, min_ploidy, max_ploidy):
         """
         Set the minimum and maximum integer ploidy on an AlleleGroup or
-        Adjacency.
+        Adjacency, specified by ID.
         
         """
         
-    def solutions():
+    def solutions(self):
         """
         Iterate over solutions to the ploidy constraints that have been
         specified. Solutions are Solution objects with a get_ploidy method that
@@ -421,7 +465,7 @@ if __name__ == "__main__":
     # Add some ploidy constraints
     genome.set_constraint(adj_ab, 1, 2)
     genome.set_constraint(adj_bc, 1, 2)
-    genome.set_constriant(adj_ac, 1, 2)
+    genome.set_constraint(adj_ac, 1, 2)
     
     for solution in genome.solutions():
         # For each solution
