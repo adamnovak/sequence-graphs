@@ -1,33 +1,9 @@
-// AVRO schema for sequence graph
-{
-    "name": "Region",
-    "type": "record",
-    "fields": [
-        {"name": "contig", "type": "string"},
-        {"name": "start", "type": "long"},
-        {"name": "end", "type": "long"}
-    ]
-}
-
-{
-    "name": "Site",
-    "type": "record",
-    "fields": [
-        {"name": "reference_region", "type": "Region"}
-    ]
-}
-
-{
-    "name": "AlleleGroup",
-    "type": "record",
-    "fields": [
-        {"name": "site", "type": "Site"},
-        {"name": "sequence", "type": "string"}
-    ]
-}
-
-{
-    "name": "Breakpoint",
-    "type": "record",
-    "fields": 
+{"namespace": "example.avro",
+ "type": "record",
+ "name": "User",
+ "fields": [
+     {"name": "name", "type": "string"},
+     {"name": "favorite_number",  "type": ["int", "null"]},
+     {"name": "favorite_color", "type": ["string", "null"]}
+ ]
 }
