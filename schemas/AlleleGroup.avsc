@@ -1,0 +1,40 @@
+// AVRO schema for an AlleleGroup. Has a copy number, some sequence, and covers a Region.
+{
+    "name": "AlleleGroup",
+    "type": "record",
+    "fields": [
+        // We have a globally unique ID to reference.
+        {"name": "id", "type": "string"},
+        // And two globally unique endpoint IDs: 5' and 3'
+        {
+            "name": "ends", 
+            "type": {
+                "type": "record", 
+                "fields": [
+                    {"name": "fivePrime", "type": "string"},
+                    {"name": "threePrime", "type": "string"}
+                ]
+            }
+        },
+        // And a region that we occupy
+        {
+            "name": "region", 
+            "type": {
+                // We define a named Region type, which we could factor out and
+                // reuse later.
+                "name": "Region",
+                "type": "record",
+                "fields": [
+                    {"name": "contig", "type": "string"},
+                    {"name": "start", "type": "long"},
+                    {"name": "end", "type": "long"}
+                ]
+            }
+        },
+        // And a sequence that we represent as being in that region (which may 
+        // not be the same length as the region)
+        {"name": "sequence", "type": "string"},
+        // And an optional copy number count. TODO: Add support for ranges.
+        {"name": "ploidy", "type": ["integer", "null"]}
+    ]
+}

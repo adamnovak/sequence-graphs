@@ -1,0 +1,22 @@
+// AVRO schema for an adjacency between two AlleleGroups.
+{
+    "name": "AlleleGroup",
+    "type": "record",
+    "fields": [
+        // We have a globally unique ID to reference.
+        {"name": "id", "type": "string"},
+        // And an ordered pair of AlleleGroup endpoint IDs. If one of these
+        // references a fivePrime endpoint, our corresponding position is the
+        // start of that AlleleGroup's region, whereas if it references a
+        // threePrime endpoint, it is the end of that AlleleGroup's region.
+        {"name": "endpoints", "type": {
+            "type": "record", 
+            "fields": [
+                {"name": "first", "type": "string"},
+                {"name": "second", "type": "string"}
+            ]
+        }
+        // And an optional copy number count. TODO: Add support for ranges.
+        {"name": "ploidy", "type": ["integer", "null"]}
+    ]
+}
