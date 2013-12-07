@@ -1,40 +1,15 @@
-// AVRO schema for an AlleleGroup. Has a copy number, some sequence, and covers a Region.
 {
+    "doc": "AVRO schema for an AlleleGroup. Has a copy number, some sequence, and covers a Region. It has to be flat, because Impala and various other Avro-in-database-with-queriable-fields things say so.",
     "name": "AlleleGroup",
     "type": "record",
     "fields": [
-        // We have a globally unique ID to reference.
-        {"name": "id", "type": "string"},
-        // And two globally unique endpoint IDs: 5' and 3'
-        {
-            "name": "ends", 
-            "type": {
-                "type": "record", 
-                "fields": [
-                    {"name": "fivePrime", "type": "string"},
-                    {"name": "threePrime", "type": "string"}
-                ]
-            }
-        },
-        // And a region that we occupy
-        {
-            "name": "region", 
-            "type": {
-                // We define a named Region type, which we could factor out and
-                // reuse later.
-                "name": "Region",
-                "type": "record",
-                "fields": [
-                    {"name": "contig", "type": "string"},
-                    {"name": "start", "type": "long"},
-                    {"name": "end", "type": "long"}
-                ]
-            }
-        },
-        // And a sequence that we represent as being in that region (which may 
-        // not be the same length as the region)
-        {"name": "sequence", "type": "string"},
-        // And an optional copy number count. TODO: Add support for ranges.
-        {"name": "ploidy", "type": ["integer", "null"]}
+        {"name": "id", "type": "string", "doc": "We have a globally unique ID to reference."},
+        {"name": "fivePrime", "type": "string", "doc": "And a global 5' end identifier to reference"},
+        {"name": "threePrime", "type": "string", "doc": "And a global 3' end identifier to reference"},
+        {"name": "contig", "type": "string", "doc": "And a contig we are on in the reference (or some auxilliary coordinate space)"},
+        {"name": "start", "type": "long", "doc": "Start position on the contig"},
+        {"name": "end", "type": "long", "doc": "End position on the contig"},
+        {"name": "sequence", "type": ["string", "null"], "doc": " And a sequence that we represent as being in that region (which may not be the same length as the region). A null sequence means it's the same as the reference."},
+        {"name": "ploidy", "type": ["int", "null"], "doc": "And an optional copy number count. TODO: Add support for ranges."}
     ]
 }

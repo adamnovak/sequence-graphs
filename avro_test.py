@@ -2,21 +2,26 @@ import avro.schema
 from avro.datafile import DataFileReader, DataFileWriter
 from avro.io import DatumReader, DatumWriter
 
-schema = avro.schema.parse(open("user.avsc").read())
+schema = avro.schema.parse(open("schemas/AlleleGroup.avsc").read())
 
-writer = DataFileWriter(open("users.avro", "w"), DatumWriter(), schema)
+writer = DataFileWriter(open("allelegroups.avro", "w"), DatumWriter(), schema)
 
-alyssa = {"name": "Alyssa", "favorite_number": 256}
-ben = {"name": "Ben", "favorite_number": 7, "favorite_color": "red"}
-
-alyssa["favorite_user"] = ben
-ben["favorite_user"] = alyssa
-
-writer.append(alyssa)
-writer.append(ben)
+# Make a minimal AlleleGroup
+ag = {
+    "id": "ag1",
+    "fivePrime": "ag1-5'",
+    "threePrime": "ag1-3'",
+    "contig": "chr1",
+    "start": 0,
+    "end": 10
+    # No sequence, so we're the same as the reference.
+}
+    
+    
+writer.append(ag)
 writer.close()
 
-reader = DataFileReader(open("users.avro", "r"), DatumReader())
-for user in reader:
-    print user
+reader = DataFileReader(open("allelegroups.avro", "r"), DatumReader())
+for group in reader:
+    print group
 reader.close()
