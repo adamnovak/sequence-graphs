@@ -6,6 +6,6 @@
         {"name": "id", "type": "string", "doc": "We have a globally unique ID to reference."},
         {"name": "first", "type": "string", "doc": "And an ordered pair of AlleleGroup endpoint IDs. If one of these references a fivePrime endpoint, our corresponding position is the start of that AlleleGroup's region, whereas if it references a threePrime endpoint, it is the end of that AlleleGroup's region."},
         {"name": "second", "type": "string", "doc": "And an ordered pair of AlleleGroup endpoint IDs. If one of these references a fivePrime endpoint, our corresponding position is the start of that AlleleGroup's region, whereas if it references a threePrime endpoint, it is the end of that AlleleGroup's region."},
-        {"name": "ploidy", "type": ["integer", "null"], "doc": "And an optional copy number count. TODO: Add support for ranges."}
+        {"name": "ploidy", "type": ["int", "null"], "doc": "And an optional copy number count. TODO: Add support for ranges."}
     ]
 }

@@ -35,9 +35,9 @@ def parse_args(args):
         formatter_class=argparse.RawDescriptionHelpFormatter)
     
     # General options
-    parser.add_argument("vcf", type=argparse.FileType("r")
+    parser.add_argument("vcf", type=argparse.FileType("r"),
         help="VCF file to read")
-    parser.add_argument("allelegroup_file", type=argparse.FileType("w"),
+    parser.add_argument("allele_group_file", type=argparse.FileType("w"),
         help="output file for allele groups")
     parser.add_argument("adjacency_file", type=argparse.FileType("w"),
         help="output file for adjacencies")
@@ -79,7 +79,7 @@ def set_loglevel(loglevel):
     # Set the log level to the correct numeric value
     logging.basicConfig(format="%(levelname)s:%(message)s", level=numeric_level)
 
-def AlleleGroup(dict):
+class AlleleGroup(dict):
     """
     Make a new AlleleGroup, which is a dict with some structure to it.
     
@@ -125,10 +125,10 @@ def AlleleGroup(dict):
         """
         
         # Grab the next ID string
-        to_return = "ag-{}".format(next_id)
+        to_return = "ag-{}".format(AlleleGroup.next_id)
         
         # Advance the next ID
-        next_id += 1
+        AlleleGroup.next_id += 1
         
         # Return the generated ID
         return to_return
@@ -141,7 +141,7 @@ def AlleleGroup(dict):
         """
         
         # Set up unique IDs
-        self["id"] = get_id()
+        self["id"] = AlleleGroup.get_id()
         self["fivePrime"] = "{}-5'".format(self["id"])
         self["threePrime"] = "{}-3'".format(self["id"])
         
@@ -166,7 +166,7 @@ def main(args):
     
     try:
         # This holds the schema for AlleleGroups
-        allelegroup_schema = avro.schema.parse(
+        allele_group_schema = avro.schema.parse(
             open(options.allele_group_schema).read())
     except IOError:
         logging.critical("Could not load Avro AlleleGroup schema {}".format(
@@ -210,7 +210,7 @@ def main(args):
         last_constant_segment = None
         
         if (len(last_allele_groups) > 0 and 
-            last_alle_groups[0]["contig"] == reference_contig):
+            last_allele_groups[0]["contig"] == reference_contig):
             # We had a previous variant on this chromosome. We need adjacencies
             # tying it to an AlleleGroup for the intervening reference DNA, and
             # then later we'll need some adjacencies tying the intervening
