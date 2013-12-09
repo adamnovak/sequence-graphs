@@ -117,18 +117,18 @@ class AlleleGroup(dict):
     
     # Class-level things for generating IDs
     next_id = 0
-    @staticmethod
-    def get_id():
+    @classmethod
+    def get_id(cls):
         """
         Get the next available unique string ID for AlleleGroups.
         
         """
         
         # Grab the next ID string
-        to_return = "ag-{}".format(AlleleGroup.next_id)
+        to_return = "ag-{}".format(cls.next_id)
         
         # Advance the next ID
-        AlleleGroup.next_id += 1
+        cls.next_id += 1
         
         # Return the generated ID
         return to_return
@@ -149,6 +149,64 @@ class AlleleGroup(dict):
         self["contig"] = contig
         self["start"] = start
         self["end"] = end
+        
+class Adjacency(dict):
+    """
+    Make a new Adjacency, which is a dict with some structure to it.
+    
+    An Adjacency must have the following keys:
+        
+        "id": a unique string ID tof the Adjacency.
+        
+        "first": a reference to a "threePrime" or "fivePrime" ID from an
+        AlleleGroup, from which the adjacency comes.
+        
+        "second": a reference to a "threePrime" or "fivePrime" ID from an
+        AlleleGroup, to which the adjacency goes.
+        
+    An AlleleGroup may have the following optional keys:
+        
+        "ploidy": an integer describing the number of copies of this Adjacency
+        that are present. May be None.
+              
+    Adjacencies can be hapily serialized to Avro records. The Avro records will
+    deserialize back to normal dicts, though, so don't rely on this class having
+    any attributes or methods; it's just here to provide a fancy constructor.
+    
+    """
+    
+    # Class-level things for generating IDs
+    next_id = 0
+    @classmethod
+    def get_id(cls):
+        """
+        Get the next available unique string ID for AlleleGroups.
+        
+        """
+        
+        # Grab the next ID string
+        to_return = "adj-{}".format(cls.next_id)
+        
+        # Advance the next ID
+        cls.next_id += 1
+        
+        # Return the generated ID
+        return to_return
+    
+    def __init__(self, first, second):
+        """
+        Make a new Adjacency representing an adjacency between the two endpoint
+        IDs in the given order.
+        
+        """
+        
+        # Set up unique IDs
+        self["id"] = Adjacency.get_id()
+        
+        # Save the AlleleGroup ends we tie together
+        self["first"] = first
+        self["second"] = second
+        
 
 def main(args):
     """
@@ -216,13 +274,48 @@ def main(args):
             # then later we'll need some adjacencies tying the intervening
             # reference DNA to our new AlleleGroups for this current variant.
             
-            # TODO: implement adjacencies
-            pass
+            # Make an AlleleGroup for the intervening reference DNA, running
+            # from the end of the last variant to the start of this one.
+            constant_segment = AlleleGroup(reference_contig, 
+                last_allele_groups[0]["end"], reference_start)
+                
+            # Set its ploidy to 2, since it represents both chromosomes
+            constant_segment["ploidy"] = 2
+                
+            # Write the AlleleGroup to the file
+            allele_group_writer.append(constant_segment)
+            
+            for previous_variant in last_allele_groups:
+                # Make an Adjacency from the end of the variant's AlleleGroup to
+                # the start of the constant one.
+                adjacency = Adjacency(previous_variant["threePrime"],
+                    constant_segment["fivePrime"])
+                    
+                # Set its ploidy to 1 since we're splitting into phased
+                # chromosomes.
+                adjacency["ploidy"] = 1
+                
+                # Save it
+                adjacency_writer.append(adjacency)
+                
+            # Now the last constant segment is this constant segment we just
+            # made.
+            last_constant_segment = constant_segment
+            
+            
         
         # Throw out the last pair of AlleleGroups created
         last_allele_groups = []
         
-        for allele_sequence in record.samples[0].gt_bases.split("|/"):
+        if record.samples[0].phased:
+            # We need to split the genotype sequences with | because they are
+            # phased
+            separator = "|"
+        else:
+            # We need to split with / because genotypes are unphased.
+            separator = "/"
+        
+        for allele_sequence in record.samples[0].gt_bases.split(separator):
             # For each allele base string in the first sample's genotype at this
             # location
             
@@ -241,14 +334,22 @@ def main(args):
             # Write the AlleleGroup to the file
             allele_group_writer.append(allele_group)
             
-        if last_constant_segment is not None:
-            # Add Adjacencies between the previous non-variant AlleleGroup and
-            # the two variant AlleleGroups just created.
+            if last_constant_segment is not None:
+                # We need to tie this AlleleGroup to the previous constant
+                # segment AlleleGroup with an Adjacency.
+                
+                # Make an adjacency from the previous constant segment to the
+                # variant.
+                adjacency = Adjacency(last_constant_segment["threePrime"],
+                    allele_group["fivePrime"])
+                    
+                # Set its ploidy to 1 since we're splitting into phased
+                # chromosomes.
+                adjacency["ploidy"] = 1
+                
+                # Save it
+                adjacency_writer.append(adjacency)
             
-            # TODO: implement this
-            pass
-            
-    
     # Close up the files
     allele_group_writer.close()
     adjacency_writer.close()
