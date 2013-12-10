@@ -10,6 +10,7 @@
         {"name": "start", "type": "long", "doc": "Start position on the contig"},
         {"name": "end", "type": "long", "doc": "End position on the contig"},
         {"name": "sequence", "type": ["string", "null"], "doc": " And a sequence that we represent as being in that region (which may not be the same length as the region). A null sequence means it's the same as the reference."},
-        {"name": "ploidy", "type": ["int", "null"], "doc": "And an optional copy number count. TODO: Add support for ranges."}
+        {"name": "ploidy", "type": ["int", "null"], "doc": "And an optional copy number count. TODO: Add support for ranges."},
+        {"name": "sample", "type": ["string", "null"], "doc": "Optional sample tag, so you can restrict queries to one sample"}
     ]
 }

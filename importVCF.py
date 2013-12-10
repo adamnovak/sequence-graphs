@@ -111,6 +111,9 @@ class AlleleGroup(dict):
         
         "ploidy": an integer describing the number of copies of this AlleleGroup
         that are present. May be None.
+        
+        "sample": a string identifying what sample or individual this
+        AlleleGroup belongs to. May be None.
               
     AlleleGroups can be hapily serialized to Avro records. The Avro records will
     deserialize back to normal dicts, though, so don't rely on this class having
@@ -171,6 +174,9 @@ class Adjacency(dict):
         
         "ploidy": an integer describing the number of copies of this Adjacency
         that are present. May be None.
+        
+        "sample": a string identifying what sample or individual this Adjacency
+        belongs to. May be None.
               
     Adjacencies can be hapily serialized to Avro records. The Avro records will
     deserialize back to normal dicts, though, so don't rely on this class having
@@ -210,6 +216,199 @@ class Adjacency(dict):
         self["first"] = first
         self["second"] = second
         
+def import_sample(vcf_records, sample_name, allele_group_writer,
+    adjacency_writer):
+    """
+    Given a list of VCF records sorted in contig/coordinate order, a sample
+    name, an Avro allele group writer, and an Avro adjacency writer, create Avro
+    sequence graph records for the sample with the given name, describing its
+    variation, and write those records to the writers.
+    
+    """
+    
+    logging.info("Importing sample {}".format(sample_name))
+    
+    # We would like to do this without all sorts of special cases for phasing.
+    
+    # We keep track of the last 3' ID on each of the two chromosomes. They are
+    # both None when we start a chromosome, and both the same when we're going
+    # through an area with no phasing.
+    last_ends = [None, None]
+    
+    # We have some functions to manipulate these.
+    def add_allele_group(allele_group, chromosome):
+        """
+        Take the given AlleleGroup, and create adjacencies to append it to the
+        given chromosome (0 or 1). Updates the last end of that chromosome.
+        
+        """
+        
+        logging.debug("Appending {} onto chromosome {}".format(
+            allele_group["id"], chromosome))
+        
+        if last_ends[chromosome] is not None:
+            # We have something to append to
+        
+            # Make the adjacency tying the last 3' end to the new thing's 5'
+            # end.
+            adjacency = Adjacency(last_ends[chromosome],
+                allele_group["fivePrime"])
+                            
+            # Set its ploidy to 1. If we append the same thing on both
+            # chromosomes, and both chromosomes were unphased to begin with, we
+            # end up with 2 ploidy-1 edges.
+            adjacency["ploidy"] = 1
+            
+            # Tag with the sample's ID
+            adjacency["sample"] = sample_name
+            
+            # Save the adjacency
+            adjacency_writer.append(adjacency)
+        
+        # Update the chromosome end
+        last_ends[chromosome] = allele_group["threePrime"]
+        
+    def new_contig():
+        """
+        Start a new contig. Clear the saved last endpoints.
+        
+        """
+        
+        last_ends = [None, None]
+        
+    # We keep track of the last call (sample's entry for a record), which lets
+    # us know whether we need to have a phased or unphased intermediate region.
+    last_call = None
+    
+    for record in vcf_records:
+        # Read through the VCF a record at a time
+        
+        # Work out the reference position for this variant.
+        # What contig is it on?
+        reference_contig = record.CHROM
+        # Where does it start?
+        reference_start = record.POS
+        # Where does it end? Depends on the length of the reference allele.
+        reference_end = reference_start + len(record.REF)
+        
+        # Pull out the call we want. See
+        # <http://pyvcf.readthedocs.org/en/latest/INTRO.html>. 
+        # TODO: what if there's no call for this sample?
+        call = record.genotype(sample_name)
+        
+        if last_call is not None:
+            if last_call.site.CHROM == reference_contig:
+                # It's on the same contig. Make an AlleleGroup for the region
+                # between the last call and this one (the "intermediate"
+                # region).
+            
+                # Where should it start? At the after-the-end position for the
+                # last variant.
+                intermediate_start = (last_call.site.POS +
+                    len(last_call.site.REF))
+                
+                # Where should it end? At the start position for this variant.
+                intermediate_end = reference_start
+                
+                # And it should obviously be on our contig.
+            
+                if last_call.phased and call.phased:
+                    # It should be phased. We need to make two
+                    
+                    logging.debug("Intermediate sequence is phased.")
+                    
+                    for chromosome_number in [0, 1]:
+                        # Make an AlleleGroup for each chromosome
+                        allele_group = AlleleGroup(reference_contig,
+                            intermediate_start, intermediate_end)
+                
+                        # Set the ploidy to 1 (since it's phased)
+                        allele_group["ploidy"] = 1
+                        
+                        # Tag with the sample's ID
+                        allele_group["sample"] = sample_name
+                        
+                        # Attach it to the correct chromosome.
+                        add_allele_group(allele_group, chromosome_number)
+                        
+                        # Write the AlleleGroup to the file
+                        allele_group_writer.append(allele_group)
+                    
+                else:
+                    # It should be unphased.
+                    
+                    logging.debug("Intermediate sequence is unphased.")
+                    
+                    # Make one AlleleGroup for both chromosomes
+                    allele_group = AlleleGroup(reference_contig,
+                        intermediate_start, intermediate_end)
+            
+                    # Set the ploidy to 2 (since it's unphased)
+                    allele_group["ploidy"] = 2
+                    
+                    # Tag with the sample's ID
+                    allele_group["sample"] = sample_name
+                    
+                    for chromosome_number in [0, 1]:
+                        # Attach it to both chromosomes
+                        add_allele_group(allele_group, chromosome_number)
+                        
+                    # Write the AlleleGroup to the file
+                    allele_group_writer.append(allele_group)
+            else:
+                # The last call was on a different contig than this one. Reset
+                # our chromosome end tracker.
+                logging.debug("New contig: {}".format(reference_contig))
+                new_contig()
+        
+        
+        # Now we can do this next variant.
+        
+        if call.phased:
+            # We need to split the genotype sequences with | because they are
+            # phased
+            separator = "|"
+            
+            logging.debug("Call at {}:{}-{} is phased".format(reference_contig,
+                reference_start, reference_end))
+        else:
+            # We need to split with / because genotypes are unphased.
+            separator = "/"
+            
+            logging.debug("Call at {}:{}-{} is unphased".format(
+                reference_contig, reference_start, reference_end))
+        
+        for chromosome_number, allele_sequence in enumerate(
+            call.gt_bases.split(separator)):
+            
+            # For each allele base string in the first sample's genotype at this
+            # location (along with the number of the chromosome it goes on, 0 or
+            # 1)
+            
+            # Make an AlleleGroup (really just a dict that can generate its own
+            # unique IDs.
+            allele_group = AlleleGroup(reference_contig, reference_start, 
+                reference_end)
+                
+            # Set the sequence
+            allele_group["sequence"] = allele_sequence
+            
+            # Set the ploidy
+            allele_group["ploidy"] = 1
+            
+            # Tag with the sample's ID
+            allele_group["sample"] = sample_name
+            
+            # Add the AlleleGroup to the appropriate chromosome. If the sample
+            # is homozygous we still end up with two AlleleGroups, they just say
+            # the same allele.
+            add_allele_group(allele_group, chromosome_number)
+            
+            # Write the AlleleGroup to the file
+            allele_group_writer.append(allele_group)
+            
+        # Remember this call as the last one for the next time we go through
+        last_call = call
 
 def main(args):
     """
@@ -252,157 +451,16 @@ def main(args):
     adjacency_writer = avro.datafile.DataFileWriter(options.adjacency_file,
         avro.io.DatumWriter(), adjacency_schema)
     
-    # This list holds the two AlleleGroups from the last variant, if any
-    last_allele_groups = []
+    # Make a VCF reader to read the input VCF
+    vcf_reader = vcf.Reader(options.vcf)
     
-    # This holds the last VCF record processed, if any
-    last_record = None
+    # Load all the VCF records into memory. TODO: implement streaming with state
+    # for each sample.
+    records = list(vcf_reader)
     
-    for record in vcf.Reader(options.vcf):
-        # Read through the VCF a record at a time
-        
-        # Work out the reference position for this variant.
-        # What contig is it on?
-        reference_contig = record.CHROM
-        # Where does it start?
-        reference_start = record.POS
-        # Where does it end? Depends on the length of the reference allele.
-        reference_end = reference_start + len(record.REF)
-        
-        # This holds a list of reference-matching AlleleGroups that the next
-        # pair of (phased) variant AlleleGroiups should come after, in order. If
-        # phasing isn't known, this will just be the same AlleleGroup twice. If
-        # there is no reference-matching AlleleGroup that the next pair of
-        # variant AlleleGroups should come after, this will be two Nones.
-        last_constant_segments = []
-        
-        if (len(last_allele_groups) > 0 and 
-            last_allele_groups[0]["contig"] == reference_contig):
-            # We had a previous variant on this chromosome. We need adjacencies
-            # tying it to a AlleleGroup(s) for the intervening reference DNA,
-            # and then later we'll need some adjacencies tying the intervening
-            # reference DNA to our new AlleleGroups for this current variant.
-            
-            if last_record.samples[0].phased and record.samples[0].phased:
-                # We need to preserve phasing
-                for previous_variant in last_allele_groups:
-                    # Make an AlleleGroup for the intervening reference DNA,
-                    # running from the end of the last variant's AlleleGroup
-                    # (which we are iterating over) to the start of the variant
-                    # we are about to do.
-                    constant_segment = AlleleGroup(reference_contig, 
-                        previous_variant["end"], reference_start)
-                        
-                    # Set its ploidy to 1, since it represents only one
-                    # chromosome
-                    constant_segment["ploidy"] = 1
-                        
-                    # Write the AlleleGroup to the file
-                    allele_group_writer.append(constant_segment)
-                 
-                    # Make an Adjacency from the end of the variant's
-                    # AlleleGroup to the start of the constant one.
-                    adjacency = Adjacency(previous_variant["threePrime"],
-                        constant_segment["fivePrime"])
-                        
-                    # Set its ploidy to 1 since we're keeping the phasing.
-                    adjacency["ploidy"] = 1
-                    
-                    # Save it
-                    adjacency_writer.append(adjacency)
-                    
-                    # Keep the constant segment in the list so we can attach to
-                    # it later.
-                    last_constant_segments.append(constant_segment)
-            else:
-                # We need to discard phasing
-            
-                # Make an AlleleGroup for the intervening reference DNA, running
-                # from the end of the last variant to the start of this one.
-                constant_segment = AlleleGroup(reference_contig, 
-                    last_allele_groups[0]["end"], reference_start)
-                    
-                # Set its ploidy to 2, since it represents both chromosomes
-                constant_segment["ploidy"] = 2
-                    
-                # Write the AlleleGroup to the file
-                allele_group_writer.append(constant_segment)
-                
-                for previous_variant in last_allele_groups:
-                    # Make an Adjacency from the end of the variant's
-                    # AlleleGroup to the start of the constant one.
-                    adjacency = Adjacency(previous_variant["threePrime"],
-                        constant_segment["fivePrime"])
-                        
-                    # Set its ploidy to 1 since we're splitting into phased
-                    # chromosomes.
-                    adjacency["ploidy"] = 1
-                    
-                    # Save it
-                    adjacency_writer.append(adjacency)
-                    
-                    # TODO: this code is a bit repetitive. Can we condense it
-                    # with the pahse case above?
-                
-                # Now the last constant segments are this one constant segment
-                # we just made, twice.
-                last_constant_segments = [constant_segment, constant_segment]
-                
-        else:
-            # We had no previous variant, so there are no intervening constant
-            # segments.
-            last_constant_segments = [None, None]
-            
-        # Throw out the last pair of AlleleGroups created
-        last_allele_groups = []
-        
-        if record.samples[0].phased:
-            # We need to split the genotype sequences with | because they are
-            # phased
-            separator = "|"
-        else:
-            # We need to split with / because genotypes are unphased.
-            separator = "/"
-        
-        for constant_segment, allele_sequence in itertools.izip(
-            last_constant_segments, 
-            record.samples[0].gt_bases.split(separator)):
-            # For each allele base string in the first sample's genotype at this
-            # location
-            
-            # Make an AlleleGroup (really just a dict that can generate its own
-            # unique IDs.
-            allele_group = AlleleGroup(reference_contig, reference_start, 
-                reference_end)
-                
-            # Set the sequence
-            allele_group["sequence"] = allele_sequence
-            
-            # Keep the AlleleGroup for us to attach our next between-variants
-            # segment to.
-            last_allele_groups.append(allele_group)
-            
-            # Write the AlleleGroup to the file
-            allele_group_writer.append(allele_group)
-            
-            if constant_segment is not None:
-                # We need to tie this AlleleGroup to the previous constant
-                # segment AlleleGroup with an Adjacency.
-                
-                # Make an adjacency from the previous constant segment to the
-                # variant.
-                adjacency = Adjacency(constant_segment["threePrime"],
-                    allele_group["fivePrime"])
-                    
-                # Set its ploidy to 1 since at least the variant end is phased.
-                adjacency["ploidy"] = 1
-                
-                # Save it
-                adjacency_writer.append(adjacency)
-                
-        # Remember that we just did this record, so for the next record we can
-        # look and see if we need to keep phasing.
-        last_record = record
+    for sample in vcf_reader.samples:
+        # Process each sample one at a time
+        import_sample(records, sample, allele_group_writer, adjacency_writer)
             
     # Close up the files
     allele_group_writer.close()
