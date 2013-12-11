@@ -104,22 +104,35 @@ def main(args):
             continue
     
         # Make a node for each end
-        graph.add_node(allele_group["fivePrime"])
-        graph.add_node(allele_group["threePrime"])
+        graph.add_node(allele_group["fivePrime"], label="5'", shape="point")
+        graph.add_node(allele_group["threePrime"], label="3'", shape="point")
         
-        # Make an edge representing the sequence, with a unique key.
-        graph.add_edge(allele_group["fivePrime"], allele_group["threePrime"], 
+        # Work out what to label the sequence node
+        label = "{}:{:,}-{:,}".format(allele_group["contig"], 
+            allele_group["start"], allele_group["end"])
+        
+        if allele_group["sequence"] is not None:
+            # This is a non-reference site (or an insert). Use the DNA as the
+            # label.
+            label = "{}\n{}".format(label, allele_group["sequence"])
+        elif allele_group["end"] == allele_group["start"]:
+            # It's 0-length, so it's the lack of an insert. Don't say anything.
+            label = ""
+        else:
+            # It's a piece of reference DNA. Just say the coordinates.
+            pass
+            
+        
+        # Make a node to represent the sequence itself.
+        graph.add_node(allele_group["id"], label=label, shape="box")
+        
+        # Make edges connecting the sequence to its ends, with the AlleleGroup
+        # ID as the key.
+        graph.add_edge(allele_group["fivePrime"], allele_group["id"], 
+            key=allele_group["id"], color="blue")
+        graph.add_edge(allele_group["id"], allele_group["threePrime"], 
             key=allele_group["id"], color="blue")
         
-            
-        if allele_group["sequence"] is not None:
-            # Grab the edge out
-            edge = graph.get_edge(allele_group["fivePrime"],
-                allele_group["threePrime"], key=allele_group["id"])
-            
-            # Label the edge with sequence
-            edge.attr["label"] = allele_group["sequence"]
-            
     for adjacency in adjacency_reader:
         if (options.samples is not None and 
             adjacency["sample"] not in options.samples):
