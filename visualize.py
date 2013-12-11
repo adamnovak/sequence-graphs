@@ -104,23 +104,26 @@ def main(args):
             continue
     
         # Make a node for each end
-        graph.add_node(allele_group["fivePrime"], label="5'", shape="point")
-        graph.add_node(allele_group["threePrime"], label="3'", shape="point")
+        graph.add_node(allele_group["fivePrime"], label="5'", shape="circle")
+        graph.add_node(allele_group["threePrime"], label="3'", shape="circle")
         
         # Work out what to label the sequence node
-        label = "{}:{:,}-{:,}".format(allele_group["contig"], 
-            allele_group["start"], allele_group["end"])
-        
         if allele_group["sequence"] is not None:
             # This is a non-reference site (or an insert). Use the DNA as the
             # label.
-            label = "{}\n{}".format(label, allele_group["sequence"])
-        elif allele_group["end"] == allele_group["start"]:
-            # It's 0-length, so it's the lack of an insert. Don't say anything.
-            label = ""
+            label = allele_group["sequence"]
         else:
-            # It's a piece of reference DNA. Just say the coordinates.
-            pass
+            # This is a reference site. Say how long it is.
+            label = "{:,} bp".format(allele_group["end"] - 
+                allele_group["start"])
+                
+        if allele_group["ploidy"] is not None:
+            # Tack on ploidy
+            label += "\nx{}".format(allele_group["ploidy"])
+            
+        if allele_group["sample"] is not None:
+            # Tack on sample
+            label = allele_group["sample"] + "\n" + label
             
         
         # Make a node to represent the sequence itself.
@@ -139,11 +142,18 @@ def main(args):
             
             # We want to skip this, it's not in the right sample
             continue
+        
+        if adjacency["ploidy"] is not None:
+            # Label with the ploidy
+            label = "x{}".format(adjacency["ploidy"])
+        else:
+            # Don't label the edge.
+            label = ""
     
         # Make an edge for this adjacency, with a unique key.
         graph.add_edge(adjacency["first"], adjacency["second"], 
-            key=adjacency["id"], color="red")
-        
+            key=adjacency["id"], color="red", label=label)
+            
             
     # Close up the files
     allele_group_reader.close()
