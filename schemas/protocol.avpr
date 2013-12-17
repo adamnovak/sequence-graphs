@@ -1,0 +1,170 @@
+@namespace("edu.ucsc.soe.sequence-graphs")
+protocol SequenceGraphs {
+    
+    record Region {
+        // Identifies a genomic region. Fields should not be null unless you are
+        // doing a projection.
+        
+        // What contig is it on? "chr1", "chr2", "chrM", etc. "novel" is used 
+        // for novel insertions.
+        union { null, string } = null;
+        // Where does the region start (inclusive)?
+        union { null, int } start = null;
+        // Where does the region end (exclusive)?
+        union { null, int } end = null; 
+    }
+    
+    record PloidyBounds {
+        // Upper and lower bounds on ploidy.
+        
+        // A lower bound on the ploidy. null means the lower bound is 1.
+        union { null, int } lower = null;
+        // An upper bound on the ploidy. null means the upper bound is the same
+        // as the lower bound.
+        union { null, int } upper = null;
+    }
+    
+    record Site {
+        // Represents a Site which AlleleGroups can occupy. Fields should not be
+        // null unless you are doing a projection.
+        
+        // A unique ID for the Site to be referenced by.
+        union { null, string } id = null;
+        
+        // Where is the site?
+        union { null, Region } region = null;
+    }
+    
+    record Endpoint {
+        // Represents an AlleleGroup endpoint, or a node in the graph where
+        // AlleleGroups and Adjacencies are edges.
+        
+        // A unique ID for the Endpoint
+        union { null, string } id = null;
+    }
+    
+    record AlleleGroup {
+        // AVRO schema for an AlleleGroup. Fields except sequence should not be
+        // null unless you are doing a projection.
+        
+        // A unique ID for the AlleleGroup
+        union { null, string } id = null;
+        // The ID of the five-prime Endpoint
+        union { null, string } left = null;
+        // The ID of the three-prime Endpoint
+        union { null, string } right = null;
+        
+        // The Site that this AlleleGroup is in
+        union { null, string } siteId = null;
+        // The Sample that this AlleleGroup belongs to
+        union { null, string } sampleId = null;
+        
+        // The sequence string, or null for an AlleleGroup that maches the
+        // reference.
+        union { null, string } sequence = null;
+        
+        // The ploidy bounds on this AlleleGroup
+        union { null, PloidyBounds } ploidy = null;
+        
+    }
+    
+    record Adjacency {
+        // AVRO schema for an Adjacency. Fields except sequence should not be
+        // null unless you are doing a projection.
+        
+        // A unique ID for the Adjacency
+        union { null, string } id = null;
+        // The ID of the first Endpoint
+        union { null, string } first = null;
+        // The ID of the second Endpoint
+        union { null, string } second = null;
+        
+        // The Sample that this Adjacency belongs to
+        union { null, string } sampleId = null;
+        
+        // The ploidy bounds on this Adjacency
+        union { null, PloidyBounds } ploidy = null;
+        
+    }
+    
+    record Reference {
+        // Identifies a reference genome
+        union { null, int } id = null;
+        union { null, string } name = null;
+        union { null, long } length = null;
+        union { null, string } url = null;
+    }
+    
+    record SiteSampleAnnotation {
+        // Annotation for a certain Site in a certain Sample. Based on
+        // ADAMGenotype.
+        
+        // What Site does this belong to?
+        union { null, string } siteId = null;
+        
+        // What Sample does this belong to?
+        union { null, string } sampleId = null;
+        
+        // Annotations
+
+        // expected value of number of chromosomes with this allele at this 
+        // site.
+        union { null, double } expectedAlleleDosage = null;
+        // coverage at genotype site
+        union { null, int } depth = null;
+        // RMS base quality score for reads aligned to genotyped site
+        union { null, int } rmsBaseQuality = null;
+        // RMS mapping quality for reads aligned to genotyped site
+        union { null, int } rmsMappingQuality = null;
+        // number of reads mapped at site on forward strand
+        union { null, int } readsMappedForwardStrand = null;
+        // number of reads mapped with mapq = 0
+        union { null, int } readsMappedMapQ0 = null;
+
+        
+
+        
+    }
+
+    record VariantSiteAnnotation {
+        // Holds metadata for a Site which is variant (not fixed)
+        
+        // What Site are we annotating?
+        union { null, string } siteId = null;
+        
+        // Annotations
+
+        // fields denote whether variant has been seen in dbSNP, Hapmap2/3, or 1000 genomes
+        union { boolean, null } inDbSNP = false;
+        union { boolean, null } inHM2 = false;
+        union { boolean, null } inHM3 = false;
+        union { boolean, null } in1000G = false;
+    }
+
+    record SampleAnnotation {
+        // Holds metadata for a Sample
+        
+        // What sample are we annotating?
+        union { null, string } sampleId = null;
+        
+        // Annotations
+
+        // identifiers for sample cohort and sample ethnicity
+        union { null, string } sampleEthnicity = null;
+        union { null, string } sampleCohort = null;
+
+        // record group identifer from sequencing run
+        union { null, string } recordGroupSequencingCenter = null;
+        union { null, string } recordGroupDescription = null;
+        union { null, long } recordGroupRunDateEpoch = null;
+        union { null, string } recordGroupFlowOrder = null;
+        union { null, string } recordGroupKeySequence = null;
+        union { null, string } recordGroupLibrary = null;
+        union { null, int } recordGroupPredictedMedianInsertSize = null;
+        union { null, string } recordGroupPlatform = null;
+        union { null, string } recordGroupPlatformUnit = null;
+        union { null, string } recordGroupSample = null;
+
+    }    
+    
+}
