@@ -192,6 +192,11 @@ protocol SequenceGraph {
         union { null, string } genomeEthnicity = null;
         union { null, string } genomeCohort = null;
         
+        // Min fraction of the genome in the sample.
+        union { null, double } minFraction = null;
+        
+        // Max fraction of the genome in the sample.
+        union { null, double } maxFraction = null;
         
     }    
     
