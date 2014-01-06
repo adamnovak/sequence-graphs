@@ -117,6 +117,13 @@ protocol SequenceGraph {
         // reference genome. Fields should not be null unless you are doing a
         // projection. Stored in a Locus, which provides a unique ID.
         
+        // Putting two AlleleGroups in the same Site asserts that they are
+        // aligned together. For single-base AlleleGroups in single-base Sites
+        // this means that that opne base in the sample corresponds to that one
+        // base in the reference. For multi-base AlleleGroups or Sites, it means
+        // that the two chunks of sequence are homologous, but does not assert
+        // an alignment between the chunks, even if they are the same length.
+        
         // Where is the site?
         union { null, Region } region = null;
         
