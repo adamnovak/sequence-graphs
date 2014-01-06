@@ -50,13 +50,27 @@ protocol SequenceGraph {
         union { null, string } genome = null;
     }
     
+    record Allele {
+        // Holds a piece of sequence data to be referenced by ID. TODO: if most
+        // AlleleGroups are now one base, isn't storing that one-base string by
+        // ID horribly inefficient?
+        
+        // What's the allele's unique ID?
+        union { null, string } id = null;
+        
+        // What Site is the allele from?
+        union { null, string } site = null;
+        
+        // What non-unique string of bases does the allele represent?
+        union { null, string } bases = null;
+    }
+    
     record AlleleGroup {
         // AVRO schema for an AlleleGroup. AlleleGroups are contained within
         // SequenceGraphEdges, which specify the Sides they link.
         
-        // The sequence string, or null for an AlleleGroup that maches the
-        // reference.
-        union { null, string } sequence = null;
+        // The ID for the Allele giving the sequence for this AlleleGroup
+        union { null, string } allele = null;
     }
     
     record Adjacency {
@@ -107,7 +121,7 @@ protocol SequenceGraph {
         union { null, Region } region = null;
         
         // What reference is it defined on?
-        union { null, string } reference = null;
+        union { null, string } reference = nullunion { null, string } referenceName = null;;
         
     }
     
@@ -143,8 +157,17 @@ protocol SequenceGraph {
         
         // What Site locus are we annotating?
         union { null, string } site = null;
+    }
+    
+    record VariantAnnotation {
+        // Annotations for a particular Allele at a particular Site.
         
-        // Annotations
+        // What site are we talking about?
+        union { null, string } site = null;
+        
+        // And what allele's presence at that site are we annotating? Holds an
+        // allele ID, not sequence.
+        union { null, string } allele = null;
 
         // fields denote whether variant has been seen in dbSNP, Hapmap2/3, or
         // 1000 genomes
@@ -192,30 +215,35 @@ protocol SequenceGraph {
         
     }    
     
-    record SiteGenomeAnnotation {
-        // Annotation for a certain Site in a certain Genome. Based on
-        // ADAMGenotype.
+    record AlleleCoverage {
+        // Annotation for a certain Allele in a certain Site in a certain
+        // Sample. Based on ADAMGenotype.
         
         // What Site does this belong to (Locus ID)?
         union { null, string } site = null;
         
-        // What Genome does this belong to?
-        union { null, string } genome = null;
+        // What Sample does this belong to?
+        union { null, string } sample = null;
+        
+        // What Allele (ID) is being annotated in that Site and Sample? An
+        // allele ID of "<ambiguous>" means that the annotation is for the
+        // unmapped reads known to belong to the site.
+        union { null, string } allele = null;
         
         // Annotations
 
         // expected value of number of chromosomes with this allele at this 
         // site.
         union { null, double } expectedAlleleDosage = null;
-        // coverage at genotype site
+        // read depth for this Allele at this Site
         union { null, int } depth = null;
-        // RMS base quality score for reads aligned to genotyped site
+        // RMS base quality score for reads aligned to this Allele in this Site
         union { null, int } rmsBaseQuality = null;
-        // RMS mapping quality for reads aligned to genotyped site
+        // RMS mapping quality for reads aligned to this Allele in this Site
         union { null, int } rmsMappingQuality = null;
-        // number of reads mapped at site on forward strand
+        // number of reads mapped at Site on forward strand of this Allele
         union { null, int } readsMappedForwardStrand = null;
-        // number of reads mapped with mapq = 0
+        // number of reads mapped to this Allele in this Site with mapq = 0
         union { null, int } readsMappedMapQ0 = null;
     }
 }
