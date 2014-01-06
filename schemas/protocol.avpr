@@ -46,8 +46,8 @@ protocol SequenceGraph {
         // A unique ID for the Side
         union { null, string } id = null;
         
-        // What Sample does this belong to?
-        union { null, string } sample = null;
+        // What Genome does this belong to?
+        union { null, string } genome = null;
     }
     
     record AlleleGroup {
@@ -89,8 +89,8 @@ protocol SequenceGraph {
         // The ploidy bounds on this Adjacency or AlleleGroup
         union { null, PloidyBounds } ploidy = null;
         
-        // What Sample does this belong to?
-        union { null, string } sample = null;
+        // What Genome does this belong to?
+        union { null, string } genome = null;
         
         // The Adjacency or AlleleGroup itself
         union { null, AlleleGroup, Adjacency } contents = null;
@@ -129,9 +129,9 @@ protocol SequenceGraph {
         
     }
     
-    // Annotations: keyed by site, sample, or (site, sample) together. Can be
-    // joined against to get annotation information for sites, samples, or
-    // specific sites in specific samples.
+    // Annotations: keyed by site, genome, or (site, genome) together. Can be
+    // joined against to get annotation information for sites, genomes, or
+    // specific sites in specific genomes.
     
     // TODO: Should these be made part of the things they annotate instead?
     
@@ -159,10 +159,6 @@ protocol SequenceGraph {
         
         // Annotations
 
-        // identifiers for sample cohort and sample ethnicity
-        union { null, string } sampleEthnicity = null;
-        union { null, string } sampleCohort = null;
-
         // record group identifer from sequencing run
         union { null, string } recordGroupSequencingCenter = null;
         union { null, string } recordGroupDescription = null;
@@ -175,17 +171,33 @@ protocol SequenceGraph {
         union { null, string } recordGroupPlatformUnit = null;
         union { null, string } recordGroupSample = null;
 
+    }
+    
+    record GenomeAnnotation {
+        // Annotation for a genome, many of which may exist in a Sample.
+    
+        // What genome are we annotating?
+        union { null, string } genome = null;
+        
+        // What sample is it in?
+        union { null, string } sample = null;
+        
+        // identifiers for genome cohort and genome ethnicity
+        union { null, string } genomeEthnicity = null;
+        union { null, string } genomeCohort = null;
+        
+        
     }    
     
-    record SiteSampleAnnotation {
-        // Annotation for a certain Site in a certain Sample. Based on
+    record SiteGenomeAnnotation {
+        // Annotation for a certain Site in a certain Genome. Based on
         // ADAMGenotype.
         
         // What Site does this belong to (Locus ID)?
         union { null, string } site = null;
         
-        // What Sample does this belong to?
-        union { null, string } sample = null;
+        // What Genome does this belong to?
+        union { null, string } genome = null;
         
         // Annotations
 
