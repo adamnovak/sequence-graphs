@@ -6,10 +6,10 @@ protocol SequenceGraph {
     // Adjacencies.
     
     // We also have Loci with IDs, which may be either Sites (containing
-    // AlleleGroups) or Breakpoints (containing Adjacencies); SequenceGraphEdges 
+    // AlleleGroups) or Breakpoints (containing Adjacencies); SequenceGraphEdges
     // can be joined against the Loci to see what Site or Breakpoint each
-    // AlleleGroup or Adjacency to, or to find the SequenceGraphEdges in a set
-    // of Sites or Breakpoints.
+    // AlleleGroup or Adjacency belongs to, or to find the SequenceGraphEdges in
+    // a set of Sites or Breakpoints.
     
     // First, some basic structures to avoid repeating ourselves.
     
@@ -85,7 +85,7 @@ protocol SequenceGraph {
     record SequenceGraphEdge {
         // An edge in the Sequence Graph, representing either an Adjaceny or an
         // AlleleGroup. Fields should not be null unless you are doing a 
-        // projection. We want to use one type here instead of two so that our
+        // projection. We want to use one type here for both things so that our
         // graph only has one type in its edge RDD.
         
         // A unique ID for the edge, used when it is referenced in the
@@ -113,15 +113,15 @@ protocol SequenceGraph {
     // Now Sites and Breakpoints and Loci to hold them.
     
     record Site {
-        // Represents a Site which AlleleGroups can occupy. Fields should not be
-        // null unless you are doing a projection. Stored in a Locus, which
-        // provides a unique ID.
+        // Represents a Site which AlleleGroups can occupy, defined on a certain
+        // reference genome. Fields should not be null unless you are doing a
+        // projection. Stored in a Locus, which provides a unique ID.
         
         // Where is the site?
         union { null, Region } region = null;
         
         // What reference is it defined on?
-        union { null, string } reference = nullunion { null, string } referenceName = null;;
+        union { null, string } reference = null;
         
     }
     
@@ -129,7 +129,9 @@ protocol SequenceGraph {
         // Represents a Breakpoint between two Sites; Adjacencies can occupy it.
         // Stored in a Locus, which provides a unique ID.
         
-        // TODO: do we want a graph of Sites and Breakpoints?
+        // TODO: do we want a graph of Sites and Breakpoints? We would need
+        // endpoint nodes to connect Loci, which touches a bit strongly on the
+        // reference model.
         
     }
     
@@ -142,7 +144,7 @@ protocol SequenceGraph {
         union { null, string } id = null;
         
         // The Site or Breakpoint we represent
-        union { null, Site, Breakpoint } = null;
+        union { null, Site, Breakpoint } contents = null;
         
     }
     
@@ -153,10 +155,13 @@ protocol SequenceGraph {
     // TODO: Should these be made part of the things they annotate instead?
     
     record SiteAnnotation {
-        // Holds metadata for a (variant) Site. Nobody annotates fixed Sites.
+        // Holds metadata for a Site.
         
         // What Site locus are we annotating?
         union { null, string } site = null;
+        
+        // TODO: What might one want to say about a Site itself, instead of one
+        // of the Site's alleles?
     }
     
     record VariantAnnotation {
