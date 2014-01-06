@@ -177,27 +177,7 @@ protocol SequenceGraph {
         union { boolean, null } in1000G = false;
     }
 
-    record SampleAnnotation {
-        // Holds metadata for a Sample
-        
-        // What sample are we annotating?
-        union { null, string } sample = null;
-        
-        // Annotations
-
-        // record group identifer from sequencing run
-        union { null, string } recordGroupSequencingCenter = null;
-        union { null, string } recordGroupDescription = null;
-        union { null, long } recordGroupRunDateEpoch = null;
-        union { null, string } recordGroupFlowOrder = null;
-        union { null, string } recordGroupKeySequence = null;
-        union { null, string } recordGroupLibrary = null;
-        union { null, int } recordGroupPredictedMedianInsertSize = null;
-        union { null, string } recordGroupPlatform = null;
-        union { null, string } recordGroupPlatformUnit = null;
-        union { null, string } recordGroupSample = null;
-
-    }
+    
     
     record GenomeAnnotation {
         // Annotation for a genome, many of which may exist in a Sample.
@@ -248,8 +228,8 @@ protocol SequenceGraph {
     }
     
     record AdjacencyCoverage {
-        // Annotation for coverage of an adjacency (not an Adjacency) between
-        // two Alleles in a Sample.
+        // Annotation for coverage of an adjacency  between two Alleles in a
+        // Sample.
         
         // TODO: Unify this somewhat with the two other coverage annotations.
         
@@ -295,11 +275,10 @@ protocol SequenceGraph {
         // What Sample does this belong to?
         union { null, string } sample = null;
         
-        // What Alleles (ID) are being annotated. An allele ID of "<ambiguous>"
-        // means that the annotation is for the unmapped reads known to belong
-        // to the site.
+        // What Alleles (ID) are being annotated in that Site and Sample? An
+        // allele ID of "<ambiguous>" means that the annotation is for the
+        // unmapped reads known to belong to the site.
         union { null, string } allele1 = null;
-        union { null, string } allele2 = null;
         
         // Annotations
 
