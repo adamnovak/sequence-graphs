@@ -246,4 +246,75 @@ protocol SequenceGraph {
         // number of reads mapped to this Allele in this Site with mapq = 0
         union { null, int } readsMappedMapQ0 = null;
     }
+    
+    record AdjacencyCoverage {
+        // Annotation for coverage of an adjacency (not an Adjacency) between
+        // two Alleles in a Sample.
+        
+        // TODO: Unify this somewhat with the two other coverage annotations.
+        
+        // What Sites does this belong to (Locus IDs)?
+        union { null, string } site1 = null;
+        union { null, string } site2 = null;
+        
+        // What Sample does this belong to?
+        union { null, string } sample = null;
+        
+        // What Alleles (ID) are being annotated in that Site and Sample? An
+        // allele ID of "<ambiguous>" means that the annotation is for the
+        // unmapped reads known to belong to the site.
+        union { null, string } allele1 = null;
+        
+        // Annotations
+
+        // expected value of number of chromosomes with this allele at this 
+        // site.
+        union { null, double } expectedAlleleDosage = null;
+        // read depth for this adjacency between these Sites
+        union { null, int } depth = null;
+        // RMS base quality score for reads aligned to this Allele in this Site
+        union { null, int } rmsBaseQuality = null;
+        // RMS mapping quality for reads aligned to these Alleles in these Sites
+        union { null, int } rmsMappingQuality = null;
+        // number of reads mapped at adjacency on forward strand of this Allele
+        union { null, int } readsMappedForwardStrand = null;
+        // number of reads mapped to these Alleles in these Sites with mapq = 0
+        union { null, int } readsMappedMapQ0 = null;
+    }
+    
+    record LinkCoverage {
+        // Annotation for coverage of a linkage between two Alleles in a
+        // Sample.
+        
+        // TODO: Unify this somewhat with the two other coverage annotations.
+        
+        // What Sites does this belong to (Locus IDs)?
+        union { null, string } site1 = null;
+        union { null, string } site2 = null;
+        
+        // What Sample does this belong to?
+        union { null, string } sample = null;
+        
+        // What Alleles (ID) are being annotated. An allele ID of "<ambiguous>"
+        // means that the annotation is for the unmapped reads known to belong
+        // to the site.
+        union { null, string } allele1 = null;
+        union { null, string } allele2 = null;
+        
+        // Annotations
+
+        // expected value of number of chromosomes with this allele at this 
+        // site.
+        union { null, double } expectedAlleleDosage = null;
+        // read depth for this adjacency between these Sites
+        union { null, int } depth = null;
+        // RMS base quality score for reads aligned to this Allele in this Site
+        union { null, int } rmsBaseQuality = null;
+        // RMS mapping quality for reads aligned to these Alleles in these Sites
+        union { null, int } rmsMappingQuality = null;
+        // number of reads mapped at adjacency on forward strand of this Allele
+        union { null, int } readsMappedForwardStrand = null;
+        // number of reads mapped to these Alleles in these Sites with mapq = 0
+        union { null, int } readsMappedMapQ0 = null;
+    }
 }
