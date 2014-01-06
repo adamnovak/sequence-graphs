@@ -1,7 +1,7 @@
 @namespace("edu.ucsc.soe.sequence-graph")
 protocol SequenceGraph {
     
-    // The schemas here describe a Sequence Graph. In the graph, Endpoints 
+    // The schemas here describe a Sequence Graph. In the graph, Sides 
     // are nodes, linked by SequenceGraphEdges, which may be AlleleGroups or 
     // Adjacencies.
     
@@ -36,14 +36,14 @@ protocol SequenceGraph {
         union { null, int } upper = null;
     }
     
-    // Parts of the sequence graph: Endpoints and SequenceGraphEdges and the
+    // Parts of the sequence graph: Sides and SequenceGraphEdges and the
     // AlleleGroups and Adjacencies they contain
     
-    record Endpoint {
-        // Represents an AlleleGroup endpoint, a node in the graph where
+    record Side {
+        // Represents an AlleleGroup side, a node in the graph where
         // AlleleGroups and Adjacencies are edges.
         
-        // A unique ID for the Endpoint
+        // A unique ID for the Side
         union { null, string } id = null;
         
         // What Sample does this belong to?
@@ -52,7 +52,7 @@ protocol SequenceGraph {
     
     record AlleleGroup {
         // AVRO schema for an AlleleGroup. AlleleGroups are contained within
-        // SequenceGraphEdges, which specify the Endpoints they link.
+        // SequenceGraphEdges, which specify the Sides they link.
         
         // The sequence string, or null for an AlleleGroup that maches the
         // reference.
@@ -62,7 +62,7 @@ protocol SequenceGraph {
     record Adjacency {
         // AVRO schema for an Adjacency. Fields should not be null unless you
         // are doing a projection. Adjacencies are contained within
-        // SequenceGraphEdges, which specify the Endpoints they link.
+        // SequenceGraphEdges, which specify the Sides they link.
         
         // TODO: Do Adjacencies really need anything in them that isn't shared
         // with AlleleGroups?
@@ -77,9 +77,9 @@ protocol SequenceGraph {
         // A unique ID for the edge, used when it is referenced in the
         // annotation raph as a node.
         union { null, string } id = null;
-        // The ID of the first (5') Endpoint
+        // The ID of the first (5') Side
         union { null, string } left = null;
-        // The ID of the second (3') Endpoint
+        // The ID of the second (3') Side
         union { null, string } right = null;
         
         // The ID of the locus (site or breakpoint) where this Adjacency or 
