@@ -106,6 +106,9 @@ protocol SequenceGraph {
         // Where is the site?
         union { null, Region } region = null;
         
+        // What reference is it defined on?
+        union { null, string } reference = null;
+        
     }
     
     record Breakpoint {
