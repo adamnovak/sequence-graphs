@@ -1,3 +1,5 @@
+seq( sbtavro.SbtAvro.avroSettings : _*)
+
 name := "Sequence Graph API"
 
 version := "0.1"

@@ -19,7 +19,7 @@ protocol SequenceGraph {
         
         // What contig is it on? "chr1", "chr2", "chrM", etc. "novel" is used 
         // for novel insertions.
-        union { null, string } = null;
+        union { null, string } contig = null;
         // Where does the region start (inclusive)?
         union { null, int } start = null;
         // Where does the region end (exclusive)?
