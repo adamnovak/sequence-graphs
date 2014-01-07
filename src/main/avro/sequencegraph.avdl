@@ -1,4 +1,4 @@
-@namespace("edu.ucsc.soe.sequence-graph")
+@namespace("edu.ucsc.soe.sequencegraph")
 protocol SequenceGraph {
     
     // The schemas here describe a Sequence Graph. In the graph, Sides 
