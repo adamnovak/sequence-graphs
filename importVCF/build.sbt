@@ -14,4 +14,9 @@ libraryDependencies += "org.apache.spark" %% "spark-core" % "0.9.0-incubating-SN
 
 libraryDependencies += "org.apache.spark" %% "spark-graphx" % "0.9.0-incubating-SNAPSHOT"
 
+// We need command-line options
+
+libraryDependencies += "org.rogach" %% "scallop" % "0.9.4"
+
+
 resolvers += "Akka Repository" at "http://repo.akka.io/releases/"
