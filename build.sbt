@@ -1,4 +1,10 @@
+// Set up the Avro code generator
+
 seq( sbtavro.SbtAvro.avroSettings : _*)
+
+// Set up the native packager to make an application
+
+packageArchetype.java_application
 
 name := "Sequence Graph API"
 
