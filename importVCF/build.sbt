@@ -1,10 +1,10 @@
-// Set up the Avro code generator
+// Build a tool to import a VCF to sequence graph format.
 
-seq( sbtavro.SbtAvro.avroSettings : _*)
+packageArchetype.java_application
 
-// This is a library, not an application, so no native packager setup is needed.
+exportJars := true
 
-name := "Sequence Graph API"
+name := "importVCF"
 
 version := "0.1"
 
@@ -15,6 +15,3 @@ libraryDependencies += "org.apache.spark" %% "spark-core" % "0.9.0-incubating-SN
 libraryDependencies += "org.apache.spark" %% "spark-graphx" % "0.9.0-incubating-SNAPSHOT"
 
 resolvers += "Akka Repository" at "http://repo.akka.io/releases/"
-
-
-
