@@ -34,15 +34,20 @@ object IDMaker {
     be the same Side for both copies of a chromosome in an area with no phasing
     information). New AlleleGroups can be added to the end of each copy of each
     chromosome.
+    
+    Operates on a given genome/sample name, and a given reference name.
 
 */
-class SequenceGraphBuilder(sample: String) {
+class SequenceGraphBuilder(sample: String, reference: String) {
     // This holds all the Sites and Breakpoints we have created inside Loci, by
     // ID
     val loci = HashMap.empty[String, Locus]
     
     // This holds all the Sides we have created, by ID
     val sides = HashMap.empty[String, Side]
+    
+    // This holds all the SequenceGraphEdges we have created, by ID
+    val edges = HashMap.empty[String, SequenceGraphEdge]
     
     // This holds all the Alleles we have created, by ID
     val alleles = HashMap.empty[String, Allele]
@@ -52,10 +57,10 @@ class SequenceGraphBuilder(sample: String) {
     val ends = HashMap.empty[(String, Int), String]
     
     /**
-        Make sure that a Site for the given region in the given reference
-        exists, and return the ID of its Locus.
+        Make sure that a Site for the given region exists, and return the ID of
+        its Locus.
     */
-    def getSite(region: Region, reference: String): String = {
+    def getSite(region: Region): String = {
         // We cheat a bit by making Site Locus IDs just be the stringified
         // contents of the Site.
         val id = "%s:%s:%d-%d".format(reference, region.contig, region.start,
@@ -92,24 +97,83 @@ class SequenceGraphBuilder(sample: String) {
         Attach the given AlleleGroup-carrying SequenceGraphEdge to the end of
         the given contig's given phase.
     */
-    def addAlleleGroup(contig: String, phase: Int, 
+    def addAlleleGroupEdge(contig: String, phase: Int, 
         alleleGroup: SequenceGraphEdge) {
         
         ends.get((contig, phase)).foreach { (end) => 
-            // If we do have it already, add an edge to this SequenceGraphEdge's
-            // first Side.
+            // If we do have it already, make an edge to this
+            // SequenceGraphEdge's first Side.
             val newEdge = SequenceGraphEdge.newBuilder()
                 .setId(IDMaker.get())
                 .setLeft(end)
-                .setRight(IDMaker.get())
+                .setRight(alleleGroup.left)
+                .setGenome(sample)
                 // Set ploidy to 1, since we're adding to exactly 1 phase
                 .setPloidy(new PloidyBounds(1, 1))
                 .setContents(new Adjacency())
+                .build()
+                
             // TODO: Set up Breakpoints here, and ploidies.
+            
+            // Add the edge to our collection of edges
+            edges(newEdge.id) = newEdge
+            
         }
         
         // Put this SequenceGraphEdge's second Side as the new trailing end of
         // the chromosome.
         ends((contig, phase)) = alleleGroup.right
+    }
+    
+    /**
+        Make a new Side, with a new unique ID. Return the ID.
+    */
+    def makeSide() : String = {
+        // Make a new Side
+        val side = new Side(IDMaker.get(), sample)
+        
+        // Keep it around
+        sides(side.id) = side
+        
+        // Return its ID
+        side.id
+    }
+    
+    /**
+        Make and add a new SequenceGraphEdge holding a new AlleleGroup. Takes
+        the string of bases the AlleleGroup should hold, the Region of the
+        reference that it corresponds to, and the ploidy of the AlleleGroup.
+        Automatically looks up what Locus ID corresponds to the Site for the
+        given region, and what Allele ID corresponds to the Allele for the given
+        string of bases.
+        
+        Returns an actual SequenceGraphEdge, rather than an ID
+    */
+    def makeAlleleGroupEdge(bases: String, region: Region, ploidy: Int): 
+        SequenceGraphEdge = {
+        
+        // Get the locus ID for the region, creating a new Site if it's new.
+        val locus = getSite(region)
+        
+        // Get the Allele, creating a new one if it's new.
+        val allele = getAllele(locus, bases)
+        
+        // Make an AlleleGroup to wrap the Allele reference
+        val alleleGroup = new AlleleGroup(allele)
+        
+        // Make and return the actual SequenceGraphEdge
+        SequenceGraphEdge.newBuilder()
+            // Give it a new ID
+            .setId(IDMaker.get())
+            // And fresh left and right Sides
+            .setLeft(makeSide())
+            .setRight(makeSide())
+            // Associate it with the right genome
+            .setGenome(sample)
+            // Set ploidy to the single integer we got
+            .setPloidy(new PloidyBounds(ploidy, ploidy))
+            // Put the AlleleGroup in it
+            .setContents(alleleGroup)
+            .build()
     }
 }

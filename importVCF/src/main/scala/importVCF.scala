@@ -50,12 +50,7 @@ object SequenceGraphs {
         
         println(vcfFile)
         
-        // Get the 
-        
-        for (val entry <- vcfFile.iterator()) {
-            println(entry)
-        }
-        
+        importSample(vcfFile, opts.sampleName.get.get)
         
         
         /*    
@@ -76,12 +71,24 @@ object SequenceGraphs {
     
     */
     def importSample(vcf : VCFFileReader, sampleName : String) {
-        // We keep track of the last 3' Side ID on each of the two chromosomes.
-        // They are both null when we start a chromosome, and both the same when
-        // we're going through an area with no phasing.
-        var last_ends = (null, null)
         
+        // Make a SequenceGraphBuilder to build up our sample's graph
+        val builder = new SequenceGraphBuilder(sampleName, "reference")
         
+        for(val entry <- vcf.iterator()) {
+            // For each VCF record
+            for(val genotype <- entry.getGenotypes()) {
+                // For each sample genotype
+                println("Genotype:")
+                
+                for ((field, value) <- entry.getFormat() zip genotype) {
+                    // For each genotype field name and its value
+                    // Print them
+                    println("%s is %s".format(field, value))
+                }
+                
+            }
+        }
         
     }
 }
