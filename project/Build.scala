@@ -13,6 +13,9 @@ object SGBuild extends Build {
     // tool/Yjc5gdejLvU>, instead of just passing the sequencegraphs and
     // importVCF objects to each other's definitions.
     lazy val importVCF = Project(id = "importVCF",
-        base = file("importVCF")) dependsOn(LocalProject("sequencegraphs"))
+        base = file("importVCF")) dependsOn(
+            // We depend on the root sequence graphs library
+            LocalProject("sequencegraphs")
+        )
 
 }

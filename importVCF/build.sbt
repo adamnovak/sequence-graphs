@@ -18,5 +18,8 @@ libraryDependencies += "org.apache.spark" %% "spark-graphx" % "0.9.0-incubating-
 
 libraryDependencies += "org.rogach" %% "scallop" % "0.9.4"
 
+// We get innovativemedicine's vcfimp VCF parser from Github, as defined in the
+// project's root Build.scala
+
 
 resolvers += "Akka Repository" at "http://repo.akka.io/releases/"
