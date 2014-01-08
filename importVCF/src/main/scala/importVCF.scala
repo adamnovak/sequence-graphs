@@ -81,9 +81,9 @@ object SequenceGraphs {
                 // For each sample genotype
                 println("Genotype:")
                 
-                for ((field, value) <- entry.getFormat() zip genotype) {
-                    // For each genotype field name and its value
-                    // Print them
+                for ((field, value) <- entry.getFormat() zip genotype
+                    if field == "GT") {
+                    // For the actual genotype field
                     println("%s is %s".format(field, value))
                 }
                 

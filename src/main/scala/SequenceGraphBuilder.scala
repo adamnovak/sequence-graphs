@@ -147,7 +147,10 @@ class SequenceGraphBuilder(sample: String, reference: String) {
         given region, and what Allele ID corresponds to the Allele for the given
         string of bases.
         
-        Returns an actual SequenceGraphEdge, rather than an ID
+        Returns an actual SequenceGraphEdge, rather than an ID.
+        
+        The bases string may be null, in which case we mean to just use the
+        reference sequence for the region.
     */
     def makeAlleleGroupEdge(bases: String, region: Region, ploidy: Int): 
         SequenceGraphEdge = {
