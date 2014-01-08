@@ -89,7 +89,7 @@ protocol SequenceGraph {
         // graph only has one type in its edge RDD.
         
         // A unique ID for the edge, used when it is referenced in the
-        // annotation raph as a node.
+        // annotation graph as a node.
         union { null, string } id = null;
         // The ID of the first (5') Side
         union { null, string } left = null;

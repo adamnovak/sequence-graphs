@@ -30,7 +30,12 @@ object SequenceGraphs {
                 |Options:
                 |""".stripMargin)
             
-            val vcfFile = trailArg[String](required = true)
+            // What file should we read?
+            val vcfFile = trailArg[String](required = true,
+                descr = "VCF file to open")
+            // What sample should we import?
+            val sampleName = trailArg[String](required = true,
+                descr = "Sample to import")
             
             val version = opt[Boolean](noshort = true, 
                 descr = "Print version")
@@ -45,9 +50,13 @@ object SequenceGraphs {
         
         println(vcfFile)
         
+        // Get the 
+        
         for (val entry <- vcfFile.iterator()) {
             println(entry)
         }
+        
+        
         
         /*    
         val vcfFile = File(args
@@ -58,5 +67,42 @@ object SequenceGraphs {
 
     
     }
+    
+    /**
+    
+    Import a sample from a VCF, creating a list of Sides and a list of
+    SequenceGraphEdges, as well as Sites and Breakpoints for them to be in, and
+    Alleles they contain.
+    
+    */
+    def importSample(vcf : VCFFileReader, sampleName : String) {
+        // We keep track of the last 3' Side ID on each of the two chromosomes.
+        // They are both null when we start a chromosome, and both the same when
+        // we're going through an area with no phasing.
+        var last_ends = (null, null)
+        
+        
+        
+    }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
