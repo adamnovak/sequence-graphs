@@ -2,6 +2,8 @@
 
 seq( sbtavro.SbtAvro.avroSettings : _*)
 
+(stringType in avroConfig) := "String"
+
 // This is a library, not an application, so no native packager setup is needed.
 
 name := "Sequence Graph API"
