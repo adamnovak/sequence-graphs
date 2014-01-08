@@ -8,8 +8,14 @@ import edu.ucsc.soe.sequencegraph._
 import java.io.File
 import java.nio.file.Paths
 
+// We want to read VCF files
 import edu.unc.genomics.io.VCFFileReader
 
+// We want to be able to loop over Java iterators: load a bunch of conversions.
+// See <http://stackoverflow.com/a/1625252/402891>
+import scala.collection.JavaConversions._
+
+// We want to parse command-line arguments
 import org.rogach.scallop._;
 
 object SequenceGraphs {
@@ -39,6 +45,9 @@ object SequenceGraphs {
         
         println(vcfFile)
         
+        for (val entry <- vcfFile.iterator()) {
+            println(entry)
+        }
         
         /*    
         val vcfFile = File(args
