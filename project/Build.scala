@@ -15,7 +15,11 @@ object SGBuild extends Build {
     lazy val importVCF = Project(id = "importVCF",
         base = file("importVCF")) dependsOn(
             // We depend on the root sequence graphs library
-            LocalProject("sequencegraphs")
+            LocalProject("sequencegraphs"),
+            // We also depend on vcfimp (with working build patch) from Github
+            // TODO: point this over to the real vcfimp repository when the
+            // relavent pull request gets merged.
+            RootProject(uri("git://github.com/adamnovak/vcfimp.git"))
         )
 
 }
