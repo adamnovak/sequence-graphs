@@ -6,8 +6,9 @@ import edu.ucsc.soe.sequencegraph
 import edu.ucsc.soe.sequencegraph._
 
 import java.io.File
+import java.nio.file.Paths
 
-//import org.broadinstitute.variant.vcf.VCFFileReader;
+import edu.unc.genomics.io.VCFFileReader
 
 import org.rogach.scallop._;
 
@@ -23,7 +24,7 @@ object SequenceGraphs {
                 |Options:
                 |""".stripMargin)
             
-            val vcfFile = trailArg[File](required = true)
+            val vcfFile = trailArg[String](required = true)
             
             val version = opt[Boolean](noshort = true, 
                 descr = "Print version")
@@ -32,13 +33,12 @@ object SequenceGraphs {
 
         } 
         
-        // Get the actual File or die trying, and then make a Source from it.
-        val vcfFile = scala.io.Source.fromFile(opts.vcfFile.get.get)
+        // Get the actual String or die trying, and then make a Path from it,
+        // and then open that.
+        val vcfFile = new VCFFileReader(Paths.get(opts.vcfFile.get.get))
         
         println(vcfFile)
-        val lines = vcfFile.getLines.toList
         
-        lines.map(println)
         
         /*    
         val vcfFile = File(args
