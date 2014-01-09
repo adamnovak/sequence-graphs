@@ -32,7 +32,7 @@ object SequenceGraphs {
                 |""".stripMargin)
             
             // What file should we read?
-            val vcfFile = trailArg[String](required = true,
+            val vcfFile = trailArg[File](required = true,
                 descr = "VCF file to open")
             // What sample should we import?
             val sampleName = trailArg[String](required = true,
@@ -45,51 +45,58 @@ object SequenceGraphs {
 
         } 
         
-        // Get the actual File or die trying, and then make a VcfParser from
-        // that.
-        val vcfParser = VcfParser.parseFile(opts.vcfFile.get.get)
         
-        println(vcfParser)
+        // Get the actual File or die trying, and then make VcfParser parse
+        // that. We need to invoke the VcfParser functor first for some reason.
+        VcfParser().parseFile(opts.vcfFile.get.get, false) { 
+            (metadata, entries) =>
+            // We get the VCF metadata and an iterator of VCF entries.
+            importSample(metadata, entries, opts.sampleName.get.get)
+            
+        }
         
-        importSample(vcfParser, opts.sampleName.get.get)
-        
-        
-        /*    
-        val vcfFile = File(args
-    
-        final VCFFileReader fileReader = new VCFFileReader(file);
-        final VCFHeader fileHeader = fileReader.getFileHeader();
-        */
-
-    
     }
     
     /**
     
-    Import a sample from a VCF, creating a list of Sides and a list of
-    SequenceGraphEdges, as well as Sites and Breakpoints for them to be in, and
-    Alleles they contain.
+        Import a sample from a VCF, creating a list of Sides and a list of
+        SequenceGraphEdges, as well as Sites and Breakpoints for them to be in,
+        and Alleles they contain.
+        
+        Takes the VCF metadata, an iterator over the VCF's variants, and the
+        name of the sample to import.
     
     */
-    def importSample(vcf : VCFFileReader, sampleName : String) {
+    def importSample(metadata : VcfInfo, 
+        entries : Iterator[(Variant, List[Metadata.Format], 
+        List[List[List[VcfValue]]])], sampleName : String) {
+        // TODO: Can I do something to not have to include this big ugly type?
+        // The vcfimp flatten tool accomplishes this by returning an anonymous
+        // function typed VcfParser.Reader[Either[String, Unit]] which lets the
+        // types on the internal anonymous function be inferred, but I don't
+        // like the wierd partial application format that gives me.
         
         // Make a SequenceGraphBuilder to build up our sample's graph
         val builder = new SequenceGraphBuilder(sampleName, "reference")
         
-        for(val entry <- vcf.iterator()) {
-            // For each VCF record
-            for(val genotype <- entry.getGenotypes()) {
-                // For each sample genotype
-                println("Genotype:")
-                
-                for ((field, value) <- entry.getFormat() zip genotype
-                    if field == "GT") {
-                    // For the actual genotype field
-                    println("%s is %s".format(field, value))
-                }
-                
-            }
+        println(metadata)
+        println("NS is:")
+        println(metadata.getTypedMetadata[Metadata.Info](VcfId("NS")))
+        println("DP is:")
+        println(metadata.getTypedMetadata[Metadata.Info](VcfId("DP")))
+        println("AF is:")
+        println(metadata.getTypedMetadata[Metadata.Info](VcfId("AF")))
+        println("AA is:")
+        println(metadata.getTypedMetadata[Metadata.Info](VcfId("AA")))
+        println("HQ is:")
+        println(metadata.getTypedMetadata[Metadata.Format](VcfId("HQ")))
+        println("DP is:")
+        println(metadata.getTypedMetadata[Metadata.Format](VcfId("DP")))
+        
+        for((variant, formats, sample) <- entries) {
+            println(sample)
         }
+        
         
     }
 }
