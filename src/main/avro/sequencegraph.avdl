@@ -38,7 +38,11 @@ protocol SequenceGraph {
     
     record AlleleGroup {
         // Represents zero or more instances of a certain allele, where no
-        // phasing information is available to distinguish the instances.
+        // phasing information is available to distinguish the instances. An
+        // empty AlleleGroup, sometimes required to discard phasing information
+        // while walking along a chromosome, can be specified by using an Edge
+        // where the Positions of the Sides it connects are identical. Such an
+        // AlleleGroup may not contain a non-empty Allele.
         
         // The Edge that specifies which Sides this AlleleGroup links.
         union { null, edu.ucsc.genome.Edge } edge = null;
