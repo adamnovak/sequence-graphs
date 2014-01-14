@@ -35,40 +35,43 @@ protocol ReferenceGenome {
     }
     
     record Allele {
-        // Holds a piece of sequence data to be referenced by ID.
+        // Holds a piece of sequence data.
         
-        // What's the allele's unique ID?
-        union { null, long } id = null;
-        
-        // What non-unique string of bases does the allele represent?
+        // What string of bases does the allele represent?
         union { null, string } bases = null;
     }
     
+    record Edge {
+        // Represents an edge in the reference graph. Can be part of a Site or
+        // Breakpoint.
+        
+        // A unique ID for the Edge
+        union { null, long } id = null;
+        
+        // The ID of the 5' side of the Edge
+        union { null, long } left = null;
+
+        // The ID of the 3' side of the Edge
+        union { null, long } right = null;
+
+    }
+     
     record Site {
-        // Represents a Site, which contains a list of Allele IDs which may
-        // occupy the Site.
-        
-        union { null, array<long> } alleles = null;
-        
+        // Represents a site in the reference genome, at which any of a set of
+        // Alleles may be present in an individual.
+
+        // A list of Alleles possible at the Site
+        union { null, array<Allele> } alleles = null;
+
+        // The edge in the graph that represents this Site.
+        union { null, Edge } location = null;         
     }
     
     record Breakpoint {
-        // Represents a Breakpoint between two Sites, containing no extra data.
+        // Represents a Breakpoint in the reference genome, which may be
+        // realized by an adjacency in an individual.
+
+        // The edge in the graph that represents this Breakpoint.
+        union { null, Edge } location = null;     
     }
-    
-    record ReferenceEdge {
-        // An edge in the reference genome graph, representing either a Site or
-        // a Breakpoint. Connects two Sides.
-        
-        // A unique ID for the edge
-        union { null, long } id = null;
-        // The ID of the first (5') Side
-        union { null, long } left = null;
-        // The ID of the second (3') Side
-        union { null, long } right = null;
-        
-        // The Breakpoint or Site itself
-        union { null, Breakpoint, Site } contents = null;
-    }
-    
 }
