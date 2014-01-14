@@ -1,0 +1,74 @@
+@namespace("edu.ucsc.genome")
+protocol ReferenceGenome {
+    
+    // The schemas here describe the reference genome.
+    
+    enum Face {
+        // Keeps track of whether we are talking about the left (5') or right
+        // (3') side of a base.
+        LEFT,
+        RIGHT
+    }
+    
+    record Position {
+        // Identifies a position in the reference genome as a base and a face
+        // (left/5' or right/3') of that base.
+        
+        // What contig is it on? "chr1", "chr2", "chrM", etc. "novel" is used
+        // for novel insertions.
+        union { null, string } contig = null;
+        // What base are we talking about?
+        union { null, long } base = null;
+        // What face are we talking about (left or right)? 
+        union { null, Face } face = null; 
+    }
+    
+    record Side {
+        // Represents one side of a Site, a node in the graph of Sites and
+        // Breakpoints.
+        
+        // A unique ID for the Side
+        union { null, long } id = null;
+        
+        // Where in the genome does it live?
+        union { null, Position } position = null;
+    }
+    
+    record Allele {
+        // Holds a piece of sequence data to be referenced by ID.
+        
+        // What's the allele's unique ID?
+        union { null, long } id = null;
+        
+        // What non-unique string of bases does the allele represent?
+        union { null, string } bases = null;
+    }
+    
+    record Site {
+        // Represents a Site, which contains a list of Allele IDs which may
+        // occupy the Site.
+        
+        union { null, array<long> } alleles = null;
+        
+    }
+    
+    record Breakpoint {
+        // Represents a Breakpoint between two Sites, containing no extra data.
+    }
+    
+    record ReferenceEdge {
+        // An edge in the reference genome graph, representing either a Site or
+        // a Breakpoint. Connects two Sides.
+        
+        // A unique ID for the edge
+        union { null, long } id = null;
+        // The ID of the first (5') Side
+        union { null, long } left = null;
+        // The ID of the second (3') Side
+        union { null, long } right = null;
+        
+        // The Breakpoint or Site itself
+        union { null, Breakpoint, Site } contents = null;
+    }
+    
+}

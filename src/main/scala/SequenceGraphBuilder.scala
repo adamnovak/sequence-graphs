@@ -2,19 +2,19 @@ package edu.ucsc.soe.sequencegraph
 import scala.collection.mutable.HashMap
 
 /**
-    This objecthandle sproviding sequential global IDs.
+    This object handles providing sequential global IDs.
 */
 object IDMaker {
     // This holds the next available ID
-    var next = 0
+    var next : Long = 0
     
     /**
-        Get a unique string ID.
+        Get a unique ID.
     */
-    def get() : String = {
-        // Make an ID string to return
-        val id = next.toString()
-        // Advance so we ghenerate a different ID next time.
+    def get() : Long = {
+        // Make an ID to return
+        val id = next
+        // Advance so we generate a different ID next time.
         next += 1
         // Return the ID we generated
         id
@@ -39,58 +39,27 @@ object IDMaker {
 
 */
 class SequenceGraphBuilder(sample: String, reference: String) {
-    // This holds all the Sites and Breakpoints we have created inside Loci, by
-    // ID
-    val loci = HashMap.empty[String, Locus]
-    
     // This holds all the Sides we have created, by ID
-    val sides = HashMap.empty[String, Side]
+    val sides = HashMap.empty[Long, Side]
     
     // This holds all the SequenceGraphEdges we have created, by ID
-    val edges = HashMap.empty[String, SequenceGraphEdge]
+    val edges = HashMap.empty[Long, SequenceGraphEdge]
     
     // This holds all the Alleles we have created, by ID
-    val alleles = HashMap.empty[String, Allele]
+    val alleles = HashMap.empty[Long, Allele]
     
     // This holds all the IDs of the Sides at the ends of chromosomes, by contig
     // name and phase number (usually 0 or 1).
-    val ends = HashMap.empty[(String, Int), String]
+    val ends = HashMap.empty[(String, Int), Long]
     
-    /**
-        Make sure that a Site for the given region exists, and return the ID of
-        its Locus.
-    */
-    def getSite(region: Region): String = {
-        // We cheat a bit by making Site Locus IDs just be the stringified
-        // contents of the Site.
-        val id = "%s:%s:%d-%d".format(reference, region.contig, region.start,
-            region.end)
-        
-        if(!loci.contains(id)) {
-            // We need to add this Site first
-            loci(id) = new Locus(id, new Site(region, reference))
-        }
-        
-        // Return the ID of the Site Locus which is now guaranteed to exist.
-        id
-    }
+    
     
     /**
         Make sure that an Allele for the given string of bases at the given Site
         Locus exists, and return its ID.
     */
-    def getAllele(locus: String, bases: String) : String = {
-        // We cheat a bit by making Allele IDs just be the stringified
-        // contents of the Allele.
-        val id = "%s=%s".format(locus, bases)
-        
-        if(!alleles.contains(id)) {
-            // We need to add this Allele first
-            alleles(id) = new Allele(id, locus, bases)
-        }
-        
-        // Return the ID of the Allele which is now guaranteed to exist.
-        id
+    def getAllele(bases: String) : Long = {
+        0
     }
     
     /**
@@ -109,7 +78,7 @@ class SequenceGraphBuilder(sample: String, reference: String) {
                 .setRight(alleleGroup.left)
                 .setGenome(sample)
                 // Set ploidy to 1, since we're adding to exactly 1 phase
-                .setPloidy(new PloidyBounds(1, 1))
+                .setPloidy(new PloidyBounds(1, 1, null))
                 .setContents(new Adjacency())
                 .build()
                 
@@ -128,9 +97,9 @@ class SequenceGraphBuilder(sample: String, reference: String) {
     /**
         Make a new Side, with a new unique ID. Return the ID.
     */
-    def makeSide() : String = {
-        // Make a new Side
-        val side = new Side(IDMaker.get(), sample)
+    def makeSide() : Long = {
+        // Make a new Side. TODO: Fill in position.
+        val side = new Side(IDMaker.get(), new Position("somewhere", 0, Face.LEFT))
         
         // Keep it around
         sides(side.id) = side
@@ -143,9 +112,6 @@ class SequenceGraphBuilder(sample: String, reference: String) {
         Make and add a new SequenceGraphEdge holding a new AlleleGroup. Takes
         the string of bases the AlleleGroup should hold, the Region of the
         reference that it corresponds to, and the ploidy of the AlleleGroup.
-        Automatically looks up what Locus ID corresponds to the Site for the
-        given region, and what Allele ID corresponds to the Allele for the given
-        string of bases.
         
         Returns an actual SequenceGraphEdge, rather than an ID.
         
@@ -155,11 +121,8 @@ class SequenceGraphBuilder(sample: String, reference: String) {
     def makeAlleleGroupEdge(bases: String, region: Region, ploidy: Int): 
         SequenceGraphEdge = {
         
-        // Get the locus ID for the region, creating a new Site if it's new.
-        val locus = getSite(region)
-        
         // Get the Allele, creating a new one if it's new.
-        val allele = getAllele(locus, bases)
+        val allele = getAllele(bases)
         
         // Make an AlleleGroup to wrap the Allele reference
         val alleleGroup = new AlleleGroup(allele)
@@ -174,7 +137,7 @@ class SequenceGraphBuilder(sample: String, reference: String) {
             // Associate it with the right genome
             .setGenome(sample)
             // Set ploidy to the single integer we got
-            .setPloidy(new PloidyBounds(ploidy, ploidy))
+            .setPloidy(new PloidyBounds(ploidy, ploidy, null))
             // Put the AlleleGroup in it
             .setContents(alleleGroup)
             .build()
