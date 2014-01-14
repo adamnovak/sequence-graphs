@@ -1,4 +1,4 @@
-@namespace("edu.ucsc.soe.sequencegraph")
+@namespace("edu.ucsc.genome")
 protocol SequenceGraph {
     
     import idl "reference.avdl";

@@ -2,8 +2,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
 import org.apache.spark.graph
 import org.apache.spark.graph._
-import edu.ucsc.soe.sequencegraph
-import edu.ucsc.soe.sequencegraph._
+import edu.ucsc.genome._
 
 import java.io.File
 import java.nio.file.Paths
