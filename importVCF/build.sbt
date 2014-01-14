@@ -22,7 +22,7 @@ libraryDependencies += "org.rogach" %% "scallop" % "0.9.4"
 // our resolvers. We need to specify a complicated version remapping function
 // because vcfimp insists on building for Scala 2.9.2 only, which should be
 // actually compatible with anything 2.9 but doesn't get picked up.
-libraryDependencies += "ca.innovativemedicine" % "vcfimp" % "0.6.0" cross 
+libraryDependencies += "ca.innovativemedicine" % "vcfimp" % "0.6.1" cross 
     CrossVersion.binaryMapped {
         case "2.9.3" => "2.9.2" 
         case "2.9.1" => "2.9.2" 
