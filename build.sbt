@@ -16,6 +16,10 @@ libraryDependencies += "org.apache.spark" %% "spark-core" % "0.9.0-incubating-SN
 
 libraryDependencies += "org.apache.spark" %% "spark-graphx" % "0.9.0-incubating-SNAPSHOT"
 
+// We need this library for testing
+
+libraryDependencies += "org.scalatest" %% "scalatest" % "1.9.2" % "test"
+
 resolvers += "Akka Repository" at "http://repo.akka.io/releases/"
 
 
