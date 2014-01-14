@@ -10,15 +10,16 @@ protocol SequenceGraph {
     // Edge: Connects two Sides.
     
     // The schemas here describe a Sequence Graph. In the graph, Sides are
-    // nodes, linked by AlleleGroups or Adjacencies.
+    // nodes, linked by AlleleGroups or Adjacencies. Anchors provide a shorthand
+    // for a run of reference-haplotype-matching AlleleGroups and Adjacencies.
     
     // Telomeres are represented by Sides that are not involved in AlleleGroup
     // edges, and which correspond to before-the-beginning and after-the-end
     // positions on chromosomes.
     
     record PloidyBounds {
-        // All AlleleGroups and Adjacencies can have ploidy bounds specified.
-        // The ploidy of that edge is restricted to nonnegative integers within
+        // All edges in the Sequence Graph can have ploidy bounds specified. The
+        // ploidy of that edge is restricted to nonnegative integers within
         // those bounds. Additionally, PloidyBounds objects can have variable
         // names assigned to them, allowing the ploidy they bound to be involved
         // in Constraints.
@@ -47,7 +48,8 @@ protocol SequenceGraph {
         // Alternatively, a novel Allele object may be stored here.
         union { null, int, edu.ucsc.genome.Allele } allele = null;
         
-        // The ploidy bounds on this Adjacency or AlleleGroup
+        // The ploidy bounds on this AlleleGroup. Null means that the ploidy is
+        // exactly 1.
         union { null, PloidyBounds } ploidy = null;
         
         // What Genome does this belong to?
@@ -60,7 +62,26 @@ protocol SequenceGraph {
         // The Edge that specifies which Sides this Adjacency links.
         union { null, edu.ucsc.genome.Edge } edge = null;
         
-        // The ploidy bounds on this Adjacency or AlleleGroup
+        // The ploidy bounds on this Adjacency. Null means that the ploidy is
+        // exactly 1.
+        union { null, PloidyBounds } ploidy = null;
+        
+        // What Genome does this belong to?
+        union { null, string } genome = null;
+    }
+    
+    record Anchor {
+        // Represents a compressed run of reference-haplotype-matching
+        // AlleleGroups and Adjacencies: specifically, the shortest such run
+        // necessary to connect the endpoint Sides of the anchor, in the order
+        // used here. (Two Anchors in opposite directions can specify a
+        // reference-haplotype circular chromosome).
+        
+        // The Edge that specifies which Sides this Anchor links.
+        union { null, edu.ucsc.genome.Edge } edge = null;
+        
+        // The ploidy bounds on this Anchor. Null means that the ploidy is
+        // exactly 1.
         union { null, PloidyBounds } ploidy = null;
         
         // What Genome does this belong to?
