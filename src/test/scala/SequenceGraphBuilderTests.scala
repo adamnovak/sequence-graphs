@@ -53,6 +53,30 @@ class SequenceGraphBuilderTests extends FunSuite {
         assert(builder.getLastAlleleGroup("chr1", 1).get.allele === allele1)
     }
     
+    test("can add a phased pair of Anchors") {
+        val startSide0 = builder.getLastSide("chr1", 0)
+        val startSide1 = builder.getLastSide("chr1", 1)
+        
+        builder.addAnchor("chr1", List(0), 100)
+        val midSide0 = builder.getLastSide("chr1", 0)
+        val midSide1 = builder.getLastSide("chr1", 1)
+        
+        assert(midSide0 != startSide0)
+        assert(midSide0 != midSide1)
+        assert(midSide1 === startSide1)
+        assert(builder.getLastAlleleGroup("chr1", 0) === None)
+        
+        builder.addAnchor("chr1", List(1), 100)
+        val endSide0 = builder.getLastSide("chr1", 0)
+        val endSide1 = builder.getLastSide("chr1", 1)
+        
+        assert(endSide0 != endSide1)
+        assert(endSide1 != midSide1)
+        assert(endSide0 === midSide0)
+        assert(builder.getLastAlleleGroup("chr1", 0) === None)
+        assert(builder.getLastAlleleGroup("chr1", 1) === None)
+    }
+    
     test("can add an unphased Allele") {
         val allele = new Allele("G")
         
@@ -68,6 +92,21 @@ class SequenceGraphBuilderTests extends FunSuite {
         assert(endSide1 != startSide1)
         assert(builder.getLastAlleleGroup("chr1", 0).get.allele === allele)
         assert(builder.getLastAlleleGroup("chr1", 1).get.allele === allele)
+    }
+    
+    test("can add an unphased Anchor") {
+        val startSide0 = builder.getLastSide("chr1", 0)
+        val startSide1 = builder.getLastSide("chr1", 1)
+        
+        builder.addAnchor("chr1", List(0, 1), 10)
+        val endSide0 = builder.getLastSide("chr1", 0)
+        val endSide1 = builder.getLastSide("chr1", 1)
+        
+        assert(endSide0 === endSide1)
+        assert(endSide0 != startSide0)
+        assert(endSide1 != startSide1)
+        assert(builder.getLastAlleleGroup("chr1", 0) === None)
+        assert(builder.getLastAlleleGroup("chr1", 1) === None)
     }
     
     test("can add a phased AlleleGroup manually") {
@@ -95,6 +134,8 @@ class SequenceGraphBuilderTests extends FunSuite {
         // Make sure it got in
         assert(builder.getLastSide("chr1", 0) === trailingSide)
         
-        
+        // Again for the other phase
+        builder.addAlleleGroup("chr1", 1, alleleGroup)
+        assert(builder.getLastSide("chr1", 1) === trailingSide)
     }
 }

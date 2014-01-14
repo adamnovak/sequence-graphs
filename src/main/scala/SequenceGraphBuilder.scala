@@ -87,6 +87,40 @@ class SequenceGraphBuilder(sample: String, reference: String) {
     }
     
     /**
+     * Attach the given Anchor to the end of the given contig's given
+     * phase.
+     * 
+     * TODO: Unify somehow with addAlleleGroup.
+     */
+    def addAnchor(contig: String, phase: Int, 
+        anchor: Anchor) : Unit = {
+        
+        ends.get((contig, phase)).foreach { (end) => 
+            // If we do have something at the end of this phase of this contig
+            // already, make an Adjacency to this AlleleGroup's first Side.
+            val newAdjacency = Adjacency.newBuilder()
+                // Attach the Edge
+                .setEdge(new Edge(IDMaker.get(), end, anchor.edge.left))
+                // Set ploidy to exactly 1, which can be a null PloidyBounds.
+                .setPloidy(null)
+                // Attach to our genome
+                .setGenome(sample)
+                .build()
+                
+            // Add the Adjacency to our collection
+            adjacencies += newAdjacency
+            
+        }
+        
+        // Put this Anchor's second Side as the new trailing end of
+        // the chromosome.
+        ends((contig, phase)) = anchor.edge.right
+        
+        // Remember the Anchor in our list of Anchors
+        anchors += anchor
+    }
+    
+    /**
      * Append a new AlleleGroup holding the given allele to all of the given
      * phases of the given contig. The total ploidy is exactly equal to the
      * number of phases to which the allele is being appended. The
@@ -133,8 +167,50 @@ class SequenceGraphBuilder(sample: String, reference: String) {
         addSide(trailingSide)
         
         phases map { (phase) =>
-            // Add the AlleleGroup in to each Phase with a ploidy-1 Adjacency.
+            // Add the AlleleGroup into each Phase with a ploidy-1 Adjacency.
             addAlleleGroup(contig, phase, alleleGroup)
+        }
+    }
+    
+    /**
+     * Add an Anchor, with ploidy equal to the number of phases specified here,
+     * to the given phases of the given contigs. The anchor will run for the
+     * specified number of bases.
+     *
+     * Phases must not be empty. The first phase specified determines the
+     * starting position of the Site this AlleleGroup occupies. All phases
+     * specified must currently end with `Face.RIGHT` Sides.
+     *
+     * TODO: Unify somewhow with addAllele.
+     */
+    def addAnchor(contig: String, phases: List[Int], 
+        referenceLength: Int) : Unit = {
+        
+        // Ploidy is number of phases to append to.
+        val ploidy = new PloidyBounds(phases.size, null, null)
+        
+        // Get the left Side for the new Anchor. It can be generated from
+        // any phase. We know it will be a Face.LEFT Side because of the
+        // preconditions on this method.
+        val leadingSide = getNextSide(contig, phases.head)
+        
+        // Make a right Side for the Anchor
+        val trailingSide = new Side(IDMaker.get(), new Position(contig, 
+            leadingSide.position.base + referenceLength, Face.RIGHT))
+            
+            
+        // Make an Anchor with the correct ploidy to be added to that many
+        // phases.
+        val anchor = new Anchor(new Edge(IDMaker.get(), 
+            leadingSide.id, trailingSide.id), ploidy, sample)
+        
+        // Add the new Sides
+        addSide(leadingSide)
+        addSide(trailingSide)
+        
+        phases map { (phase) =>
+            // Add the Anchor into each Phase with a ploidy-1 Adjacency.
+            addAnchor(contig, phase, anchor)
         }
     }
     
