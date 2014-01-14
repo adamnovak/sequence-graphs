@@ -40,7 +40,7 @@ protocol SequenceGraph {
         // phasing information is available to distinguish the instances.
         
         // The Edge that specifies which Sides this AlleleGroup links.
-        union { null, edu.ucsc.genome.Edge } location = null;
+        union { null, edu.ucsc.genome.Edge } edge = null;
         
         // The index of the Allele that this AlleleGroup represents, out of the
         // "alleles" array of the corresponding Site in the reference model.
@@ -58,7 +58,7 @@ protocol SequenceGraph {
         // Represents a covalent bond in the DNA backbone between two Sides.
         
         // The Edge that specifies which Sides this Adjacency links.
-        union { null, edu.ucsc.genome.Edge } location = null;
+        union { null, edu.ucsc.genome.Edge } edge = null;
         
         // The ploidy bounds on this Adjacency or AlleleGroup
         union { null, PloidyBounds } ploidy = null;
