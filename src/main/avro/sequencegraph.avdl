@@ -1,121 +1,70 @@
 @namespace("edu.ucsc.soe.sequencegraph")
 protocol SequenceGraph {
     
-    // The schemas here describe a Sequence Graph. In the graph, Sides 
-    // are nodes, linked by SequenceGraphEdges, which may be AlleleGroups or 
-    // Adjacencies.
+    import idl "reference.avdl";
     
-    // Our portion of the reference genome model.
-    // TODO: just import the reference genome schema and re-use those types.
+    // From the reference genome model (edu.ucsc.genome), we use:
+    // Face: represents the 5' or 3' side of a base
+    // Position: Represents either the 5' or 3' side of a base in the reference.
+    // Side: Represents one side of a Site in the reference.
+    // Edge: Connects two Sides.
     
-    enum Face {
-        // Keeps track of whether we are talking about the left (5') or right
-        // (3') side of a base.
-        LEFT,
-        RIGHT
-    }
-    
-    record Position {
-        // Identifies a position in the reference genome as a base and a face
-        // (left/5' or right/3') of that base.
-        
-        // What contig is it on? "chr1", "chr2", "chrM", etc. "novel" is used
-        // for novel insertions.
-        union { null, string } contig = null;
-        // What base are we talking about?
-        union { null, long } base = null;
-        // What face are we talking about (left or right)? 
-        union { null, Face } face = null; 
-    }
-    
-    record Side {
-        // Represents one side of a SequenceGraphEdge (an AlleleGroup or
-        // Adjacency). A Side that does not participate in an AlleleGroup edge
-        // is a telomere.
-        
-        // A unique ID for the Side
-        union { null, long } id = null;
-        
-        // Where in the genome does it live? Telomeres correspond to the right
-        // side of the before-the-beginning base and the left side of the after-
-        // the-end base for their chromosome.
-        union { null, Position } position = null;
-        
-        // We don't record what genome or sample Sides belong to, because
-        // eventually we would like to use the types from the reference schema
-        // for basic things like Sides. We keep that data in the edges instead.
-        
-    }
-    
-    record Allele {
-        // Holds a piece of sequence data to be referenced by ID.
-        
-        // What's the allele's unique ID?
-        union { null, long } id = null;
-        
-        // What non-unique string of bases does the allele represent?
-        union { null, string } bases = null;
-    }
+    // The schemas here describe a Sequence Graph. In the graph, Sides are
+    // nodes, linked by AlleleGroups or Adjacencies.
     
     // Telomeres are represented by Sides that are not involved in AlleleGroup
     // edges, and which correspond to before-the-beginning and after-the-end
     // positions on chromosomes.
     
-    record AlleleGroup {
-        // AVRO schema for an AlleleGroup. AlleleGroups are contained within
-        // SequenceGraphEdges, which specify the Sides they link.
-        
-        // The ID for the Allele giving the sequence for this AlleleGroup
-        union { null, long } allele = null;
-    }
-    
-    record Adjacency {
-        // AVRO schema for an Adjacency. Adjacencies are contained within
-        // SequenceGraphEdges, which specify the Sides they link.
-        
-        // Adjacencies don't need anything not already contained in the
-        // SequenceGraphEdge.
-    }
-    
     record PloidyBounds {
-        // All SequenceGraphEdges (AlleleGroups and Adjacencies) can have ploidy
-        // bounds specified. The ploidy of that edge is restricted to
-        // nonnegative integers within those bounds. Adfditionally, PloidyBounds
-        // objects can have variable names assigned to them, allowing them to be
-        // involved in Constraints.
+        // All AlleleGroups and Adjacencies can have ploidy bounds specified.
+        // The ploidy of that edge is restricted to nonnegative integers within
+        // those bounds. Additionally, PloidyBounds objects can have variable
+        // names assigned to them, allowing the ploidy they bound to be involved
+        // in Constraints.
         
         // A lower bound on the ploidy. null means the lower bound is 1.
         union { null, int } lower = null;
+        
         // An upper bound on the ploidy. null means the upper bound is the same
         // as the lower bound.
         union { null, int } upper = null;
+        
         // A unique variable name for referencing this ploidy value in
         // Constraints.
         union { null, string } variable = null;
     }
     
-    record SequenceGraphEdge {
-        // An edge in the Sequence Graph, representing either an Adjaceny or an
-        // AlleleGroup. Fields should not be null unless you are doing a 
-        // projection. We want to use one type here for both things so that our
-        // graph only has one type in its edge RDD.
+    record AlleleGroup {
+        // Represents zero or more instances of a certain allele, where no
+        // phasing information is available to distinguish the instances.
         
-        // A unique ID for the edge, used when it is referenced in the
-        // annotation graph as a node.
-        union { null, long } id = null;
-        // The ID of the first (5') Side
-        union { null, long } left = null;
-        // The ID of the second (3') Side
-        union { null, long } right = null;
+        // The Edge that specifies which Sides this AlleleGroup links.
+        union { null, edu.ucsc.genome.Edge } location = null;
+        
+        // The index of the Allele that this AlleleGroup represents, out of the
+        // "alleles" array of the corresponding Site in the reference model.
+        // Alternatively, a novel Allele object may be stored here.
+        union { null, int, edu.ucsc.genome.Allele } allele = null;
         
         // The ploidy bounds on this Adjacency or AlleleGroup
         union { null, PloidyBounds } ploidy = null;
         
         // What Genome does this belong to?
         union { null, string } genome = null;
+    }
+    
+    record Adjacency {
+        // Represents a covalent bond in the DNA backbone between two Sides.
         
-        // The Adjacency or AlleleGroup itself
-        union { null, AlleleGroup, Adjacency } contents = null;
+        // The Edge that specifies which Sides this Adjacency links.
+        union { null, edu.ucsc.genome.Edge } location = null;
+        
+        // The ploidy bounds on this Adjacency or AlleleGroup
+        union { null, PloidyBounds } ploidy = null;
+        
+        // What Genome does this belong to?
+        union { null, string } genome = null;
     }
     
     record Term {
@@ -140,7 +89,5 @@ protocol SequenceGraph {
         // than or equal to?
         union { null, int } limit = null;
     }
-    
-    
     
 }
