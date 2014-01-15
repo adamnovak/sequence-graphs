@@ -1,0 +1,115 @@
+Draft of annotation schemas, mostly cribbed from the ADAM spec. Not ready yet.
+
+record VariantAnnotation {
+    // Annotations for a particular Allele at a particular site.
+    
+    // What site (portion of the reference between left and right Sides) are
+    // we annotating?
+    
+    // ID of the left Side of the site
+    union { null, long } left = null;
+    // ID of the right Side of the site
+    union { null, long } right = null;
+    
+    // And what allele's presence at that site are we annotating? Holds an
+    // allele ID.
+    union { null, long } allele = null;
+
+    // fields denote whether variant has been seen in dbSNP, Hapmap2/3, or
+    // 1000 genomes
+    union { boolean, null } inDbSNP = false;
+    union { boolean, null } inHM2 = false;
+    union { boolean, null } inHM3 = false;
+    union { boolean, null } in1000G = false;
+}
+
+
+
+record GenomeAnnotation {
+    // Annotation for a genome, many of which may exist in a Sample.
+
+    // What genome are we annotating?
+    union { null, string } genome = null;
+    
+    // What sample is it in?
+    union { null, string } sample = null;
+    
+    // identifiers for genome cohort and genome ethnicity
+    union { null, string } genomeEthnicity = null;
+    union { null, string } genomeCohort = null;
+    
+    // Min fraction of the genome in the sample.
+    union { null, double } minFraction = null;
+    
+    // Max fraction of the genome in the sample.
+    union { null, double } maxFraction = null;
+    
+}    
+
+record AlleleCoverage {
+    // Annotation for a certain Allele in a certain Site in a certain
+    // Sample. Based on ADAMGenotype.
+    
+    // What site (portion of the reference between left and right Sides) are
+    // we annotating?
+    
+    // ID of the left Side of the site
+    union { null, long } left = null;
+    // ID of the right Side of the site
+    union { null, long } right = null;
+    
+    // And what allele's presence at that site are we annotating? Holds an
+    // allele ID. A special allele ID is reserved for ambigoups reads
+    // mapping to the site but not a particular allele.
+    union { null, long } allele = null;
+    
+    // What Sample does this belong to?
+    union { null, string } sample = null;
+    
+    // Annotations
+
+    // expected value of number of chromosomes with this allele at this 
+    // site.
+    union { null, double } expectedAlleleDosage = null;
+    // read depth for this Allele at this Site
+    union { null, long } depth = null;
+    // RMS base quality score for reads aligned to this Allele in this Site
+    union { null, long } rmsBaseQuality = null;
+    // RMS mapping quality for reads aligned to this Allele in this Site
+    union { null, long } rmsMappingQuality = null;
+    // number of reads mapped at Site on forward strand of this Allele
+    union { null, long } readsMappedForwardStrand = null;
+    // number of reads mapped to this Allele in this Site with mapq = 0
+    union { null, long } readsMappedMapQ0 = null;
+}
+
+record AdjacencyCoverage {
+    // Annotation for coverage of an adjacency between two Sides in a
+    // Sample.
+    
+    // What Sides are we annotating the adjacency between?
+    
+    // ID of the left Side of the breakpoint
+    union { null, long } left = null;
+    // ID of the right Side of the breakpoint
+    union { null, long } right = null;
+    
+    // What Sample does this belong to?
+    union { null, string } sample = null;
+    
+    // Annotations
+
+    // expected value of number of chromosomes with this allele at this 
+    // site.
+    union { null, double } expectedAlleleDosage = null;
+    // read depth for this adjacency between these Sites
+    union { null, long } depth = null;
+    // RMS base quality score for reads aligned to this Allele in this Site
+    union { null, long } rmsBaseQuality = null;
+    // RMS mapping quality for reads aligned to these Alleles in these Sites
+    union { null, long } rmsMappingQuality = null;
+    // number of reads mapped at adjacency on forward strand of this Allele
+    union { null, long } readsMappedForwardStrand = null;
+    // number of reads mapped to these Alleles in these Sites with mapq = 0
+    union { null, long } readsMappedMapQ0 = null;
+}
