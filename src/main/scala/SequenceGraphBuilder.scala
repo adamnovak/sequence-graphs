@@ -23,6 +23,16 @@ object IDMaker {
 }
 
 /**
+ * Dummy class for Anchors, which are not yet in the Avro spec. Anchors really
+ * represent long runs of the reference haplotype, and are most like
+ * AlleleGroups, but we base them off Adjacencies here since that class has all
+ * the same members.
+ *
+ * TODO: Add Anchor back to the Avro spec.
+ */
+class Anchor(a: Edge, b: PloidyBounds, c: String) extends Adjacency(a, b, c)
+
+/**
  *
  * SequenceGraphBuilder: a class to build up a sequence graph for a diploid
  * genome.
@@ -67,8 +77,8 @@ class SequenceGraphBuilder(sample: String, reference: String) {
             val newAdjacency = Adjacency.newBuilder()
                 // Attach the Edge
                 .setEdge(new Edge(IDMaker.get(), end, alleleGroup.edge.left))
-                // Set ploidy to exactly 1, which can be a null PloidyBounds.
-                .setPloidy(null)
+                // Set ploidy to exactly 1
+                .setPloidy(new PloidyBounds(1, null, null))
                 // Attach to our genome
                 .setGenome(sample)
                 .build()
@@ -101,8 +111,8 @@ class SequenceGraphBuilder(sample: String, reference: String) {
             val newAdjacency = Adjacency.newBuilder()
                 // Attach the Edge
                 .setEdge(new Edge(IDMaker.get(), end, anchor.edge.left))
-                // Set ploidy to exactly 1, which can be a null PloidyBounds.
-                .setPloidy(null)
+                // Set ploidy to exactly 1
+                .setPloidy(new PloidyBounds(1, null, null))
                 // Attach to our genome
                 .setGenome(sample)
                 .build()
@@ -152,9 +162,10 @@ class SequenceGraphBuilder(sample: String, reference: String) {
         // preconditions on this method.
         val leadingSide = getNextSide(contig, phases.head)
         
-        // Make a right Side for the AlleleGroup
+        // Make a right Side for the AlleleGroup (non-reference)
         val trailingSide = new Side(IDMaker.get(), new Position(contig, 
-            leadingSide.position.base + actualReferenceLength, Face.RIGHT))
+            leadingSide.position.base + actualReferenceLength, Face.RIGHT),
+            false)
             
             
         // Make an AlleleGroup with the correct ploidy to be added to that many
@@ -196,7 +207,7 @@ class SequenceGraphBuilder(sample: String, reference: String) {
         
         // Make a right Side for the Anchor
         val trailingSide = new Side(IDMaker.get(), new Position(contig, 
-            leadingSide.position.base + referenceLength, Face.RIGHT))
+            leadingSide.position.base + referenceLength, Face.RIGHT), false)
             
             
         // Make an Anchor with the correct ploidy to be added to that many
@@ -232,7 +243,7 @@ class SequenceGraphBuilder(sample: String, reference: String) {
             // We couldn't find anything there already. Make a new (vacuously
             // phased) telomer Side.
             val telomere = new Side(IDMaker.get(), new Position(contig, 0, 
-                Face.RIGHT))
+                Face.RIGHT), false)
                 
             // Remember the telomere
             addSide(telomere)
@@ -287,7 +298,7 @@ class SequenceGraphBuilder(sample: String, reference: String) {
          
         // Make and return a new Side that comes directly after the last one
         // (which may have been a leading telomere)
-        new Side(IDMaker.get(), new Position(contig, newBase, newFace))
+        new Side(IDMaker.get(), new Position(contig, newBase, newFace), false)
     }
     
     /**
@@ -306,8 +317,8 @@ class SequenceGraphBuilder(sample: String, reference: String) {
         val adjacency = Adjacency.newBuilder()
             // Attach the Edge
             .setEdge(new Edge(IDMaker.get(), end.id, telomere.id))
-            // Set ploidy to exactly 1, which can be a null PloidyBounds.
-            .setPloidy(null)
+            // Set ploidy to exactly 1
+            .setPloidy(new PloidyBounds(1, null, null))
             // Attach to our genome
             .setGenome(sample)
             .build()

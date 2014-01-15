@@ -119,11 +119,12 @@ class SequenceGraphBuilderTests extends FunSuite {
         val allele = new Allele("ACTTGAT")
         // Make a right Side for the AlleleGroup
         val trailingSide = new Side(IDMaker.get(), new Position("chr1", 
-            leadingSide.position.base + allele.bases.size, Face.RIGHT))
+            leadingSide.position.base + allele.bases.size, Face.RIGHT), false)
             
         // Make an AlleleGroup with ploidy 1
         val alleleGroup = new AlleleGroup(new Edge(IDMaker.get(), 
-            leadingSide.id, trailingSide.id), allele, null, "bob")
+            leadingSide.id, trailingSide.id), allele, 
+            new PloidyBounds(1, null, null), "bob")
         
         // Add the trailing side
         builder.addSide(trailingSide)
