@@ -1,0 +1,73 @@
+@namespace("edu.ucsc.genome")
+protocol ReferenceStore {
+    
+    import idl "reference.avdl";
+    
+    // Defines an RPC protocol that provides access to the reference genome.
+    
+    error NotFoundError {
+        // Error thrown when an ID is not found.
+        
+        // The ID that was missing.
+        long id;
+        
+        // An informative message.
+        string message;
+    }
+    
+    /////////////////////////////////////////
+    // Initialization and metadata functions
+    /////////////////////////////////////////
+    
+    // Get the name of the assembly being served (e.g. hg38).
+    string getAssemblyName();
+    
+    // Get a list of all contig names in the reference model (chr1, chrX, chrZ,
+    // etc. depending on the organism)
+    array<string> getContigNames();
+    
+    /////////////////////////////////////////
+    // Basic functions for walking the graph
+    /////////////////////////////////////////
+    
+    // Get the Side object specified by the given ID.
+    Side getSide(long id) throws NotFoundError;
+    
+    // Get the Site attached to the Side with the given ID. There will only ever
+    // be one such Site.
+    Site getAttachedSite(long sideId) throws NotFoundError;
+    
+    // Get all of the Breakpoints attached to a certain Side.
+    array<Breakpoint> getAttachedBreakpoints(long sideId) throws NotFoundError;
+    
+    /////////////////////////////////
+    // More advanced query functions
+    /////////////////////////////////
+    
+    // Get the ID of the Side representing the left or right telomere of the
+    // specified contig, or null for circular contigs.
+    union { long, null } getTelomere(string contig, Face end);   
+    
+    // Get the Site (and its contained Alleles) covering the given Position, or
+    // null if no Site exists there.
+    union { Site, null } getSiteAt(Position position);
+    
+    // Get all multi-Allele Sites (and the Alleles they hold) along the
+    // reference haplotype's path between the given pair of positions.
+    //
+    // Note: this will attempt to return a lot of data on large intervals.
+    array<Site> getPolymorphicSitesBetween(Position left, Position right);
+    
+    // Get all inserted (reference allele == "") Sites overlapping the region
+    // from the left position to the right position.
+    //
+    // Note: this will attempt to return a lot of data on large intervals.
+    array<Site> getInsertionsBetween(Position left, Position right);
+    
+    // Get all non-reference-haplotype Breakpoints that represent deletions
+    // relative to the reference haplotype overlapping the region between the
+    // left position and the right position.
+    //
+    // Note: this will attempt to return a lot of data on large intervals.
+    array<Breakpoint> getDeletionsBetween(Position left, Position right);
+}
