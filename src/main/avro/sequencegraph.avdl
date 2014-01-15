@@ -10,8 +10,7 @@ protocol SequenceGraph {
     // Edge: Connects two Sides.
     
     // The schemas here describe a Sequence Graph. In the graph, Sides are
-    // nodes, linked by AlleleGroups or Adjacencies. Anchors provide a shorthand
-    // for a run of reference-haplotype-matching AlleleGroups and Adjacencies.
+    // nodes, linked by AlleleGroups or Adjacencies.
     
     // Telomeres are represented by Sides that are not involved in AlleleGroup
     // edges, and which correspond to before-the-beginning and after-the-end
@@ -41,8 +40,11 @@ protocol SequenceGraph {
         // phasing information is available to distinguish the instances. An
         // empty AlleleGroup, sometimes required to discard phasing information
         // while walking along a chromosome, can be specified by using an Edge
-        // where the Positions of the Sides it connects are in reverse order.
-        // Such an AlleleGroup may not contain a non-empty Allele.
+        // where the Positions of the Sides it connects are in reverse order
+        // (i.e. the left face of base 3 and the right face of base 2). This
+        // preserves the alternation of left and right faces when reading along
+        // a single strand. Such an AlleleGroup may not contain a non-empty
+        // Allele.
         
         // The Edge that specifies which Sides this AlleleGroup links.
         Edge edge;
