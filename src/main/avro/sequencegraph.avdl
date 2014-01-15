@@ -3,7 +3,7 @@ protocol SequenceGraph {
     
     import idl "reference.avdl";
     
-    // From the reference genome model (edu.ucsc.genome), we use:
+    // From the reference genome model, we use:
     // Face: represents the 5' or 3' side of a base
     // Position: Represents either the 5' or 3' side of a base in the reference.
     // Side: Represents one side of a Site in the reference.
@@ -24,15 +24,15 @@ protocol SequenceGraph {
         // names assigned to them, allowing the ploidy they bound to be involved
         // in Constraints.
         
-        // A lower bound on the ploidy. null means the lower bound is 1.
-        union { null, int } lower = null;
+        // A lower bound on the ploidy.
+        int lower = 1;
         
         // An upper bound on the ploidy. null means the upper bound is the same
         // as the lower bound.
         union { null, int } upper = null;
         
-        // A unique variable name for referencing this ploidy value in
-        // Constraints.
+        // An optional, unique variable name for referencing this ploidy value
+        // in Constraints.
         union { null, string } variable = null;
     }
     
@@ -41,22 +41,21 @@ protocol SequenceGraph {
         // phasing information is available to distinguish the instances. An
         // empty AlleleGroup, sometimes required to discard phasing information
         // while walking along a chromosome, can be specified by using an Edge
-        // where the Positions of the Sides it connects are identical. Such an
-        // AlleleGroup may not contain a non-empty Allele.
+        // where the Positions of the Sides it connects are in reverse order.
+        // Such an AlleleGroup may not contain a non-empty Allele.
         
         // The Edge that specifies which Sides this AlleleGroup links.
-        union { null, edu.ucsc.genome.Edge } edge = null;
+        Edge edge;
         
         // The index of the Allele that this AlleleGroup represents, out of the
         // "alleles" array of the corresponding Site in the reference model.
         // Alternatively, a novel Allele object may be stored here.
-        union { null, int, edu.ucsc.genome.Allele } allele = null;
+        union { int, Allele } allele;
         
-        // The ploidy bounds on this AlleleGroup. Null means that the ploidy is
-        // exactly 1.
-        union { null, PloidyBounds } ploidy = null;
+        // The ploidy bounds on this AlleleGroup.
+        PloidyBounds ploidy;
         
-        // What Genome does this belong to?
+        // What Genome does this belong to (optional)?
         union { null, string } genome = null;
     }
     
@@ -64,32 +63,29 @@ protocol SequenceGraph {
         // Represents a covalent bond in the DNA backbone between two Sides.
         
         // The Edge that specifies which Sides this Adjacency links.
-        union { null, edu.ucsc.genome.Edge } edge = null;
+        Edge edge;
         
-        // The ploidy bounds on this Adjacency. Null means that the ploidy is
-        // exactly 1.
-        union { null, PloidyBounds } ploidy = null;
+        // The ploidy bounds on this Adjacency.
+        PloidyBounds ploidy;
         
-        // What Genome does this belong to?
+        // What Genome does this belong to (optional)?
         union { null, string } genome = null;
     }
     
-    record Anchor {
-        // Represents a compressed run of reference-haplotype-matching
-        // AlleleGroups and Adjacencies: specifically, the shortest such run
-        // necessary to connect the endpoint Sides of the anchor, in the order
-        // used here. (Two Anchors in opposite directions can specify a
-        // reference-haplotype circular chromosome).
+    record Transmission {
+        // Represents the transmission of alleles in one AlleleGroup of one
+        // genome to alleles in another AlleleGroup in another genome.
         
-        // The Edge that specifies which Sides this Anchor links.
-        union { null, edu.ucsc.genome.Edge } edge = null;
+        // References AlleleGroups by edge ID.
         
-        // The ploidy bounds on this Anchor. Null means that the ploidy is
-        // exactly 1.
-        union { null, PloidyBounds } ploidy = null;
+        // The ID of the parent AlleleGroup's Edge
+        long parent;
         
-        // What Genome does this belong to?
-        union { null, string } genome = null;
+        // The ID of the child AlleleGroup's Edge
+        long child;
+        
+        // How many alleles were transmitted from the parent to the child?
+        PloidyBounds ploidy;
     }
     
     record Term {
@@ -97,10 +93,10 @@ protocol SequenceGraph {
         
         // What variable are we talking about? Must correspond to a variable
         // used to name a PloidyBounds.
-        union { null, string } variable = null;
+        string variable;
         
         // What weight should be applied to this variable in the expression?
-        union { null, double } weight = null;
+        double weight;
     }
     
     record Constraint {
@@ -108,11 +104,11 @@ protocol SequenceGraph {
         // ({weight} * {variable}) + ... <= {constant}
         
         // What are all the variables on the left hand side, with their weights?
-        union { null, array<Term> } terms = null;
+        array<Term> terms;
         
         // What is the constant value that the sum of the terms must be less
         // than or equal to?
-        union { null, int } limit = null;
+        int limit;
     }
     
 }

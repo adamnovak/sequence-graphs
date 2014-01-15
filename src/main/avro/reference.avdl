@@ -16,11 +16,11 @@ protocol ReferenceGenome {
         
         // What contig is it on? "chr1", "chr2", "chrM", etc. "novel" is used
         // for novel insertions.
-        union { null, string } contig = null;
+        string contig;
         // What base are we talking about?
-        union { null, long } base = null;
+        long base;
         // What face are we talking about (left or right)? 
-        union { null, Face } face = null; 
+        Face face; 
     }
     
     record Side {
@@ -28,10 +28,13 @@ protocol ReferenceGenome {
         // Breakpoints.
         
         // A unique ID for the Side
-        union { null, long } id = null;
+        long id;
         
         // Where in the genome does it live?
-        union { null, Position } position = null;
+        Position position;
+        
+        // Is this Side part of the reference haplotype?
+        boolean isReference;
     }
     
     record Allele {
@@ -39,7 +42,7 @@ protocol ReferenceGenome {
         
         // What string of bases does the allele represent? An empty string is
         // legal here.
-        union { null, string } bases = null;
+        string bases;
     }
     
     record Edge {
@@ -50,10 +53,10 @@ protocol ReferenceGenome {
         union { null, long } id = null;
         
         // The ID of the 5' side of the Edge
-        union { null, long } left = null;
+        long left;
 
         // The ID of the 3' side of the Edge
-        union { null, long } right = null;
+        long right;
 
     }
      
@@ -62,11 +65,11 @@ protocol ReferenceGenome {
         // Alleles may be present in an individual.
 
         // The Edge in the graph that represents this Site.
-        union { null, Edge } edge = null;
+        Edge edge;
         
         // A list of Alleles possible at the Site. The 0th Allele is taken to be
         // the "reference" allele, while the others are alternates.
-        union { null, array<Allele> } alleles = null;         
+        array<Allele> alleles;         
     }
     
     record Breakpoint {
@@ -74,14 +77,14 @@ protocol ReferenceGenome {
         // realized by an adjacency in an individual.
 
         // The Edge in the graph that represents this Breakpoint.
-        union { null, Edge } edge = null;
+        Edge edge;
         
         // A flag indicating whether this adjacency is part of the cannonical
         // reference genome, or whether it is a variant that has been observed
         // in the population. Between any two Sides, there can be at most one
         // path consisting only of reference adjacencies and sites with nonempty
         // reference alleles.
-        union { null, boolean } isReference = null;   
+        boolean isReference;   
     }
     
     // Telomeres are represented by Sides that are not involved in Site edges,
