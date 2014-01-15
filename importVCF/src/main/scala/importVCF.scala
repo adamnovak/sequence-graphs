@@ -48,9 +48,9 @@ object SequenceGraphs {
         // Get the actual File or die trying, and then make VcfParser parse
         // that. We need to invoke the VcfParser functor first for some reason.
         VcfParser().parseFile(opts.vcfFile.get.get, false) { 
-            (metadata, entries) =>
+            (info, entries) =>
             // We get the VCF metadata and an iterator of VCF entries.
-            importSample(metadata, entries, opts.sampleName.get.get)
+            importSample(info, entries, opts.sampleName.get.get)
             
         }
         
@@ -62,11 +62,11 @@ object SequenceGraphs {
         SequenceGraphEdges, as well as Sites and Breakpoints for them to be in,
         and Alleles they contain.
         
-        Takes the VCF metadata, an iterator over the VCF's variants, and the
+        Takes the VCF header metadata, an iterator over the VCF's variants, and the
         name of the sample to import.
     
     */
-    def importSample(metadata : VcfInfo, 
+    def importSample(info : VcfInfo, 
         entries : Iterator[(Variant, List[Metadata.Format], 
         List[List[List[VcfValue]]])], sampleName : String) {
         // TODO: Can I do something to not have to include this big ugly type?
@@ -78,22 +78,55 @@ object SequenceGraphs {
         // Make a SequenceGraphBuilder to build up our sample's graph
         val builder = new SequenceGraphBuilder(sampleName, "reference")
         
-        println(metadata)
-        println("NS is:")
-        println(metadata.getTypedMetadata[Metadata.Info](VcfId("NS")))
-        println("DP is:")
-        println(metadata.getTypedMetadata[Metadata.Info](VcfId("DP")))
-        println("AF is:")
-        println(metadata.getTypedMetadata[Metadata.Info](VcfId("AF")))
-        println("AA is:")
-        println(metadata.getTypedMetadata[Metadata.Info](VcfId("AA")))
-        println("HQ is:")
-        println(metadata.getTypedMetadata[Metadata.Format](VcfId("HQ")))
-        println("DP is:")
-        println(metadata.getTypedMetadata[Metadata.Format](VcfId("DP")))
+        // Get the index of the sample we want
+        val sampleIndex = info.samples indexWhere { (sample) => 
+            sample.id.id == sampleName
+        }
         
-        for((variant, formats, sample) <- entries) {
-            println(sample)
+        if(sampleIndex < 0) {
+            throw new Exception("Sample %s not found in file".format(
+                sampleName))
+        } else {
+            println("Importing sample %s at index %d...".format(
+                sampleName, sampleIndex))
+        }
+        
+        for((variant, formats, samples) <- entries) {
+            // For each variant in the file
+            
+            // This holds the values read for the sample
+            val sampleValues = samples(sampleIndex)
+            
+            // Find the index of the genotype field
+            val genotypeIndex = formats indexWhere { (format) =>
+                format.id.id == "GT"
+            }
+            
+            if(genotypeIndex != -1) {
+                // We actually have a GT field for this variant
+            
+                // Pull out the genotype string as a String.
+                val genotypeString = sampleValues(genotypeIndex).head match {
+                    case VcfString(value) => value
+                    case _ => throw new Exception("Got a non-string GT value")
+                }
+            
+                println(genotypeString)
+                
+                // At the moment we support only phased or unphased diploid
+                // genomes.
+                
+                // Is the string a phased genotype?
+                val phased = genotypeString contains "|"
+                
+                // Pull out and intify the two allele indices
+                val alleleIndices = genotypeString.split("[|/]").map(_.toInt)
+                
+                println(phased)
+                println(alleleIndices(0))
+                println(alleleIndices(1))
+                
+            }
         }
         
         
