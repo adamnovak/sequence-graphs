@@ -1,7 +1,7 @@
 @namespace("edu.ucsc.genome")
 protocol ReferenceStore {
     
-    import idl "reference.avdl";
+    import idl "../reference.avdl";
     
     // Defines an RPC protocol that provides access to the reference genome.
     

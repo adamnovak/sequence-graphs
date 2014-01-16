@@ -14,6 +14,8 @@ protocol ReferenceGenome {
         // Identifies a position in the reference genome as a base and a face
         // (left/5' or right/3') of that base.
         
+        // Every unique Position is contained by at most one Site.
+        
         // What contig is it on? "chr1", "chr2", "chrM", etc. "novel" is used
         // for novel insertions.
         string contig;

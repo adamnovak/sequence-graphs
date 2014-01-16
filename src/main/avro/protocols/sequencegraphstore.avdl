@@ -1,0 +1,103 @@
+@namespace("edu.ucsc.genome")
+protocol SequenceGraphStore {
+    
+    import idl "../sequencegraph.avdl";
+    
+    // Defines an RPC protocol that provides access to a Sequence Graph
+    
+    error NotFoundError {
+        // Error thrown when an ID is not found.
+        
+        // The ID that was missing.
+        long id;
+        
+        // An informative message.
+        string message;
+    }
+    
+    error VariableNotFoundError {
+        // Error thrown when an LP variable is not found.
+        
+        // The variable that was missing.
+        string variable;
+        
+        // An informative message.
+        string message;    
+    }
+    
+    /////////////////////////////////////////
+    // Initialization and metadata functions
+    /////////////////////////////////////////
+    
+    // Get the name of the reference assembly this sequence graph is based on
+    // (e.g. hg38).
+    string getReferenceName();
+    
+    // Get a list of all named genomes in this Sequence Graph.
+    array<string> getGenomeNames();
+    
+    /////////////////////////////////////////
+    // Basic functions for walking the graph
+    /////////////////////////////////////////
+    
+    // Get the Side object specified by the given ID.
+    Side getSide(long id) throws NotFoundError;
+    
+    // Get the AlleleGroup attached to the Side with the given ID. There will
+    // only ever be one such AlleleGroup.
+    AlleleGroup getAttachedAlleleGroup(long sideId) throws NotFoundError;
+    
+    // Get all of the Adjacencies attached to a certain Side.
+    array<Adjacency> getAdjacencies(long sideId) throws NotFoundError;
+    
+    // Get the AlleleGroup with the specified edge ID
+    AlleleGroup getAlleleGroup(long edgeId) throws NotFoundError;
+    
+    // Get the Transmissions that attach to the AlleleGroup with the given edge
+    // ID.
+    array<Transmission> getAttachedTransmissions(long edgeId) 
+        throws NotFoundError;
+    
+    ////////////////////////////////////////
+    // Integer Linear Programming functions
+    ////////////////////////////////////////
+    
+    // Get all of the Linear Programming constraints in the graph.
+    array<Constraint> getConstraints();
+    
+    // Get the object that has its ploidy determined by a PloidyBounds with the
+    // given variable name. Raises an error if no object has a PloidyBounds with
+    // that variable name.
+    union { AlleleGroup, Adjacency, Transmission } findVariableOwner(
+        string variable) throws VariableNotFoundError;
+    
+    /////////////////////////////////
+    // More advanced query functions
+    /////////////////////////////////
+    
+    // Get the IDs of all Sides representing left or right telomeres of the
+    // specified contig.
+    array<long> getTelomeres(string contig, Face end);   
+    
+    // Get all AlleleGroups for the Site covering the given Position.
+    array<AlleleGroup> getAlleleGroupsAt(Position position);
+    
+    // Get all non-reference AlleleGroups between the left position and the
+    // right position.
+    //
+    // Note: this will attempt to return a lot of data on large intervals.
+    array<AlleleGroup> getVariantAlleleGroupsBetween(Position left,
+        Position right);
+    
+    // Get all inserted AlleleGroups between the left position and the right
+    // position.
+    //
+    // Note: this will attempt to return a lot of data on large intervals.
+    array<AlleleGroup> getInsertionsBetween(Position left, Position right);
+    
+    // Get all Adjacencies involved in deletions between the left position and
+    // the right position.
+    //
+    // Note: this will attempt to return a lot of data on large intervals.
+    array<Adjacency> getDeletionsBetween(Position left, Position right);
+}
