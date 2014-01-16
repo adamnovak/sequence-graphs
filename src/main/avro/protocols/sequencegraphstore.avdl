@@ -1,3 +1,4 @@
+// SKETCH of a POSSIBLE API for accessing a sequence graph
 @namespace("edu.ucsc.genome")
 protocol SequenceGraphStore {
     
@@ -100,4 +101,6 @@ protocol SequenceGraphStore {
     //
     // Note: this will attempt to return a lot of data on large intervals.
     array<Adjacency> getDeletionsBetween(Position left, Position right);
+    
+    // TODO: What other operations do we want to support?
 }

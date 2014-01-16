@@ -1,3 +1,4 @@
+// SKETCH of a POSSIBLE API for accessing a reference graph
 @namespace("edu.ucsc.genome")
 protocol ReferenceStore {
     
@@ -70,4 +71,6 @@ protocol ReferenceStore {
     //
     // Note: this will attempt to return a lot of data on large intervals.
     array<Breakpoint> getDeletionsBetween(Position left, Position right);
+    
+    // TODO: What other operations do we want to support?
 }
