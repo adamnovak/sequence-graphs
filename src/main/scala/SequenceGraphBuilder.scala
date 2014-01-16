@@ -94,6 +94,8 @@ class SequenceGraphBuilder(sample: String, reference: String) {
         
         // Remember the AlleleGroup in our list of AlleleGroups
         alleleGroups += alleleGroup
+        
+        println("Added %s to %s:%d".format(alleleGroup.allele, contig, phase))
     }
     
     /**
@@ -127,7 +129,10 @@ class SequenceGraphBuilder(sample: String, reference: String) {
         ends((contig, phase)) = anchor.edge.right
         
         // Remember the Anchor in our list of Anchors
+        // TODO: What if it's there already?
         anchors += anchor
+        
+        println("Added anchor to %s:%d".format(contig, phase))
     }
     
     /**
@@ -188,6 +193,8 @@ class SequenceGraphBuilder(sample: String, reference: String) {
      * to the given phases of the given contigs. The anchor will run for the
      * specified number of bases.
      *
+     * If referenceLength is 0, does nothing.
+     *
      * Phases must not be empty. The first phase specified determines the
      * starting position of the Site this AlleleGroup occupies. All phases
      * specified must currently end with `Face.RIGHT` Sides.
@@ -197,31 +204,34 @@ class SequenceGraphBuilder(sample: String, reference: String) {
     def addAnchor(contig: String, phases: List[Int], 
         referenceLength: Int) : Unit = {
         
-        // Ploidy is number of phases to append to.
-        val ploidy = new PloidyBounds(phases.size, null, null)
+        if(referenceLength > 0) {
         
-        // Get the left Side for the new Anchor. It can be generated from
-        // any phase. We know it will be a Face.LEFT Side because of the
-        // preconditions on this method.
-        val leadingSide = getNextSide(contig, phases.head)
-        
-        // Make a right Side for the Anchor
-        val trailingSide = new Side(IDMaker.get(), new Position(contig, 
-            leadingSide.position.base + referenceLength, Face.RIGHT), false)
+            // Ploidy is number of phases to append to.
+            val ploidy = new PloidyBounds(phases.size, null, null)
             
+            // Get the left Side for the new Anchor. It can be generated from
+            // any phase. We know it will be a Face.LEFT Side because of the
+            // preconditions on this method.
+            val leadingSide = getNextSide(contig, phases.head)
             
-        // Make an Anchor with the correct ploidy to be added to that many
-        // phases.
-        val anchor = new Anchor(new Edge(IDMaker.get(), 
-            leadingSide.id, trailingSide.id), ploidy, sample)
-        
-        // Add the new Sides
-        addSide(leadingSide)
-        addSide(trailingSide)
-        
-        phases map { (phase) =>
-            // Add the Anchor into each Phase with a ploidy-1 Adjacency.
-            addAnchor(contig, phase, anchor)
+            // Make a right Side for the Anchor
+            val trailingSide = new Side(IDMaker.get(), new Position(contig, 
+                leadingSide.position.base + referenceLength, Face.RIGHT), false)
+                
+                
+            // Make an Anchor with the correct ploidy to be added to that many
+            // phases.
+            val anchor = new Anchor(new Edge(IDMaker.get(), 
+                leadingSide.id, trailingSide.id), ploidy, sample)
+            
+            // Add the new Sides
+            addSide(leadingSide)
+            addSide(trailingSide)
+            
+            phases map { (phase) =>
+                // Add the Anchor into each Phase with a ploidy-1 Adjacency.
+                addAnchor(contig, phase, anchor)
+            }
         }
     }
     

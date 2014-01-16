@@ -91,16 +91,63 @@ object SequenceGraphs {
                 sampleName, sampleIndex))
         }
         
+        // Was the last variant processed phased?
+        var lastCallPhased: Boolean = true
+        
+        // What contig was the last variant on? We assume the variants are
+        // sorted by contig and position.
+        var lastContig: String = null
+        
+        // Where did the last variant end on that contig?
+        var lastEnd: Int = 0
+        
         for((variant, formats, samples) <- entries) {
             // For each variant in the file
             
-            // This holds the values read for the sample
+            // What contig is it on?
+            val contig: String = variant.chromosome match {
+                case Left(vcfid) => vcfid.toString
+                case Right(string) => string
+            }
+            
+            // Where does it start in the reference?
+            val referenceStart = variant.position
+            
+            // Where does it end in the reference?
+            val referenceEnd = referenceStart + variant.reference.size
+            
+            // What alleles are available? The reference and all the alternates.
+            val alleles = Right(variant.reference) :: variant.alternates
+            
+            if(contig != lastContig && lastContig != null) {
+                // We're ending an old contig and starting a new one.
+                
+                // Add trailing telomeres
+                builder.close(lastContig, 0)
+                builder.close(lastContig, 1)
+                
+                // Create new leading telomeres
+                builder.getLastSide(contig, 0)
+                builder.getLastSide(contig, 1)
+                
+                // Record that the leading telomeres are phased, and on this
+                // contig, and at the very start.
+                lastCallPhased = true
+                lastContig = contig
+                lastEnd = 0
+            }
+            
+            // This holds the geontype values read for the sample
             val sampleValues = samples(sampleIndex)
             
             // Find the index of the genotype field
             val genotypeIndex = formats indexWhere { (format) =>
                 format.id.id == "GT"
             }
+            
+            // How far are we from the last variant? If this is 0, no Anchors
+            // will actually get added.
+            val referenceDistance = referenceStart - lastEnd
             
             if(genotypeIndex != -1) {
                 // We actually have a GT field for this variant
@@ -119,13 +166,65 @@ object SequenceGraphs {
                 // Is the string a phased genotype?
                 val phased = genotypeString contains "|"
                 
+                // Add the intermediate Anchors between the last variant site
+                // and this one
+                if(phased && lastCallPhased) {
+                    // We need phased anchors, since both this call and the
+                    // previous one are phased
+                    
+                    builder.addAnchor(contig, List(0), referenceDistance)
+                    builder.addAnchor(contig, List(1), referenceDistance)
+                    
+                } else {
+                    // We need an unphased anchor.
+                    
+                    builder.addAnchor(contig, List(0, 1), referenceDistance)
+                }
+                
+                // TODO: Add a backwards empty AlleleGroup to discard phasing if
+                // there is no room for an Anchor to do it.
+                
+                // Now we want to add the actual AlleleGroups.
+                
                 // Pull out and intify the two allele indices
                 val alleleIndices = genotypeString.split("[|/]").map(_.toInt)
                 
-                println(phased)
-                println(alleleIndices(0))
-                println(alleleIndices(1))
+                // TODO: Map over phases.
                 
+                // The alternates are in the variant.alternates list.
+                // Load the allele in phase 0
+                val allele0: Either[Either[Breakend, VcfId], String] = 
+                    alleles(alleleIndices(0))
+                    
+                // Load the allele in phase 1
+                val allele1: Either[Either[Breakend, VcfId], String] = 
+                    alleles(alleleIndices(1))
+                
+                // For now we handle only string alleles.
+                
+                val alleleString0 = allele0 match {
+                    case Right(string) => string
+                    case Left(_) => throw new Exception(
+                        "Breakends and ID'd alleles not supported")
+                }
+                
+                val alleleString1 = allele1 match {
+                    case Right(string) => string
+                    case Left(_) => throw new Exception(
+                        "Breakends and ID'd alleles not supported")
+                }
+                
+                // Add the Alleles to the appropriate Phases. TODO: if they are
+                // the same and unphased, add just one AlleleGroup
+                builder.addAllele(contig, List(0), new Allele(alleleString0), 
+                    referenceEnd - referenceStart)
+                builder.addAllele(contig, List(1), new Allele(alleleString1), 
+                    referenceEnd - referenceStart)
+                    
+                // Save information about this site
+                lastCallPhased = phased
+                lastContig = contig
+                lastEnd = referenceEnd
             }
         }
         
