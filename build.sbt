@@ -10,11 +10,11 @@ name := "Sequence Graph API"
 
 version := "0.1"
 
-scalaVersion := "2.9.3"
+scalaVersion := "2.10.3"
 
-libraryDependencies += "org.apache.spark" %% "spark-core" % "0.9.0-incubating-SNAPSHOT"
+libraryDependencies += "org.apache.spark" %% "spark-core" % "0.9.0-incubating"
 
-libraryDependencies += "org.apache.spark" %% "spark-graphx" % "0.9.0-incubating-SNAPSHOT"
+libraryDependencies += "org.apache.spark" %% "spark-graphx" % "0.9.0-incubating"
 
 // We need this library for testing
 

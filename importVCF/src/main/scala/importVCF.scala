@@ -1,7 +1,7 @@
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
-import org.apache.spark.graph
-import org.apache.spark.graph._
+import org.apache.spark.graphx
+import org.apache.spark.graphx._
 import edu.ucsc.genome._
 
 import java.io.File
