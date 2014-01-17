@@ -434,6 +434,8 @@ class SequenceGraphBuilder(sample: String, reference: String) {
         import org.apache.spark.SparkContext._
         import org.apache.hadoop.mapreduce.Job
 
+        // Auto-serializeableification from Matt Massie
+        import com.zenfractal.AvroSerializable
         
         // Set up the minimal Spark stuff that we need to be able to use the
         // AvroParquetOutputFormat to do our writing.
@@ -450,9 +452,10 @@ class SequenceGraphBuilder(sample: String, reference: String) {
         // Set the Avro schema to use for this job
         AvroParquetOutputFormat.setSchema(job, Side.SCHEMA$)
         
-        // Make an RDD of Sides, with null keys. Put it all into one partition.
+        // Make an RDD of SerializeableSides, with null keys. Put it all into
+        // one partition.
         val sideRdd = sc.makeRDD(sides mapValues { (side) => 
-            (null, side) 
+            (null, new AvroSerializable[Side](side)) 
         } toSeq, 1)
         
         // Save the RDD to a Parquet file in our temporary output directory. The

@@ -68,7 +68,7 @@ object SequenceGraphs {
         }
         
         // Write Parquet files to the current directory.
-        graph.writeParquetFiles(".")
+        graph.writeParquetFiles("parquet")
         
     }
     
