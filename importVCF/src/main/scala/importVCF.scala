@@ -37,6 +37,9 @@ object SequenceGraphs {
             val sampleName = trailArg[String](required = true,
                 descr = "Sample to import")
             
+            val dotFile = opt[String](
+                descr = "Save a GraphViz graph to this .dot file")
+            
             val version = opt[Boolean](noshort = true, 
                 descr = "Print version")
             val help = opt[Boolean](noshort = true, 
@@ -44,39 +47,47 @@ object SequenceGraphs {
 
         } 
         
+        // What sample are we importing?
+        val sample = opts.sampleName.get.get
+        
+        // Make a new SequenceGraphBuilder to build its graph.
+        val graph = new SequenceGraphBuilder(sample, "reference")
         
         // Get the actual File or die trying, and then make VcfParser parse
         // that. We need to invoke the VcfParser functor first for some reason.
         VcfParser().parseFile(opts.vcfFile.get.get, false) { 
             (info, entries) =>
             // We get the VCF metadata and an iterator of VCF entries.
-            importSample(info, entries, opts.sampleName.get.get)
-            
+            // Import our sample
+            importSample(graph, info, entries, sample)
+        }
+        
+        opts.dotFile.get map { (file) =>
+            // Write out a graphviz graph
+            graph.writeDotFile(file)
         }
         
     }
     
     /**
-    
-        Import a sample from a VCF, creating a list of Sides and a list of
-        SequenceGraphEdges, as well as Sites and Breakpoints for them to be in,
-        and Alleles they contain.
-        
-        Takes the VCF header metadata, an iterator over the VCF's variants, and the
-        name of the sample to import.
-    
-    */
-    def importSample(info : VcfInfo, 
-        entries : Iterator[(Variant, List[Metadata.Format], 
-        List[List[List[VcfValue]]])], sampleName : String) {
+     *
+     *   Import a sample into the given SequenceGraphBuilder from a VCF, creating
+     *   a list of Sides and a list of SequenceGraphEdges, as well as Sites and
+     *   Breakpoints for them to be in, and Alleles they contain.
+     *   
+     *   Takes the VCF header metadata, an iterator over the VCF's variants, and the
+     *   name of the sample to import.
+     * 
+     */
+    def importSample(builder: SequenceGraphBuilder, info: VcfInfo, 
+        entries: Iterator[(Variant, List[Metadata.Format], 
+        List[List[List[VcfValue]]])], sampleName: String) {
         // TODO: Can I do something to not have to include this big ugly type?
         // The vcfimp flatten tool accomplishes this by returning an anonymous
         // function typed VcfParser.Reader[Either[String, Unit]] which lets the
         // types on the internal anonymous function be inferred, but I don't
         // like the wierd partial application format that gives me.
         
-        // Make a SequenceGraphBuilder to build up our sample's graph
-        val builder = new SequenceGraphBuilder(sampleName, "reference")
         
         // Get the index of the sample we want
         val sampleIndex = info.samples indexWhere { (sample) => 
@@ -107,7 +118,7 @@ object SequenceGraphs {
             // What contig is it on?
             val contig: String = variant.chromosome match {
                 case Left(vcfid) => vcfid.toString
-                case Right(string) => string
+                case Right(string) => "chr" + string
             }
             
             // Where does it start in the reference?
@@ -158,8 +169,6 @@ object SequenceGraphs {
                     case _ => throw new Exception("Got a non-string GT value")
                 }
             
-                println(genotypeString)
-                
                 // At the moment we support only phased or unphased diploid
                 // genomes.
                 
@@ -226,6 +235,7 @@ object SequenceGraphs {
                 lastContig = contig
                 lastEnd = referenceEnd
             }
+            
         }
         
         

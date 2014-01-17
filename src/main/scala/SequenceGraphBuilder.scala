@@ -1,6 +1,12 @@
 package edu.ucsc.genome
 import scala.collection.mutable.HashMap
-import scala.collection.mutable.MutableList
+import scala.collection.mutable.HashSet
+
+// We want to write GraphViz graphs
+import org.kohsuke.graphviz._
+
+// We want to write files
+import java.io._
 
 /**
  * This object handles providing sequential global IDs.
@@ -53,13 +59,13 @@ class SequenceGraphBuilder(sample: String, reference: String) {
     val sides = HashMap.empty[Long, Side]
     
     // This holds all the AlleleGroups we have created.
-    val alleleGroups = MutableList[AlleleGroup]()
+    val alleleGroups = HashSet.empty[AlleleGroup]
     
     // This holds all the Adjacencies we have created.
-    val adjacencies = MutableList[Adjacency]()
+    val adjacencies = HashSet.empty[Adjacency]
     
     // This holds all the Anchors we have created.
-    val anchors = MutableList[Anchor]()
+    val anchors = HashSet.empty[Anchor]
     
     // This holds all the IDs of the Sides at the ends of chromosomes, by contig
     // name and phase number (usually 0 or 1).
@@ -92,7 +98,7 @@ class SequenceGraphBuilder(sample: String, reference: String) {
         // the chromosome.
         ends((contig, phase)) = alleleGroup.edge.right
         
-        // Remember the AlleleGroup in our list of AlleleGroups
+        // Remember the AlleleGroup in our set of AlleleGroups
         alleleGroups += alleleGroup
         
         println("Added %s to %s:%d".format(alleleGroup.allele, contig, phase))
@@ -128,8 +134,7 @@ class SequenceGraphBuilder(sample: String, reference: String) {
         // the chromosome.
         ends((contig, phase)) = anchor.edge.right
         
-        // Remember the Anchor in our list of Anchors
-        // TODO: What if it's there already?
+        // Remember the Anchor in our set of Anchors
         anchors += anchor
         
         println("Added anchor to %s:%d".format(contig, phase))
@@ -336,6 +341,84 @@ class SequenceGraphBuilder(sample: String, reference: String) {
         // Remember everything
         addSide(telomere)
         adjacencies += adjacency
+    }
+    
+    /**
+     * Write out the graph we have built to the given GraphViz dot file.
+     */
+    def writeDotFile(file: String) {
+        // Make a new graph
+        val graph = new org.kohsuke.graphviz.Graph()
+        
+        // Set up edge styles
+        graph.edgeWith(new Style().attr("arrowsize", "0"))
+        
+        // And node styles
+        graph.nodeWith(new Style().attr("shape", "point").attr("label", ""))
+        
+        // Make a Node for every Side, organized by ID, and add to the graph
+        val nodes = sides.mapValues({ (side) =>
+            val node = new Node().id(side.id.toString)
+            graph.node(node)
+            node
+        })
+        
+        alleleGroups map { (alleleGroup : AlleleGroup) =>
+            
+            // What should we label it?
+            val label = alleleGroup.allele match {
+                // Put bases if we have actual bases
+                case allele: Allele => allele.bases
+                // Put something else if we're referencing an allele by index
+                case index: java.lang.Integer => "#%d".format(index)
+                // It's something else
+                case _ => "<unknown>"
+            }
+            
+            // Make an edge for every AlleleGroup.
+            graph.edge(nodes(alleleGroup.edge.left),
+                nodes(alleleGroup.edge.right), new Style()
+                    // Label it with the bases
+                    .attr("label", label)
+                    // Give it an arrow head
+                    .attr("arrowsize", "1")
+                    .attr("color", "#ff0000"))
+        }
+        
+        adjacencies map { (adjacency) =>
+            // Make an edge for every Adjacency
+            graph.edge(nodes(adjacency.edge.left),
+                nodes(adjacency.edge.right))
+        }
+        
+        anchors map { (anchor) =>
+            // What are the two Sides of the anchor?
+            val leftPos = sides(anchor.edge.left).position
+            val rightPos = sides(anchor.edge.right).position
+            
+            // What should we write on the anchor?
+            val label = if(leftPos.contig == rightPos.contig) {
+                // The anchor is properly on a single contig, so we can
+                // determine its length.
+                val length = rightPos.base - leftPos.base
+                "%sbp anchor".format(length)
+            } else {
+                // We have no idea how long the anchor is
+                "anchor across contigs"
+            }
+            
+            // Make an edge for every Anchor
+            graph.edge(nodes(anchor.edge.left),
+                nodes(anchor.edge.right), new Style()
+                    .attr("label", label)
+                    .attr("color", "#0000ff"))
+        }
+        
+        // Write the graph to the file
+        graph.writeTo(new FileOutputStream(file))
+        
+        println("Wrote %s".format(file))
+        
     }
     
     

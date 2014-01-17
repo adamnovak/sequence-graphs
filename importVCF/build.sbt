@@ -30,5 +30,4 @@ libraryDependencies += "ca.innovativemedicine" % "vcfimp" % "0.6.1" cross
         case x => x
     }
 
-
 resolvers += "Akka Repository" at "http://repo.akka.io/releases/"

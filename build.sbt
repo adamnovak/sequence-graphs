@@ -20,6 +20,10 @@ libraryDependencies += "org.apache.spark" %% "spark-graphx" % "0.9.0-incubating-
 
 libraryDependencies += "org.scalatest" %% "scalatest" % "1.9.2" % "test"
 
+// We need to be able to write out graph pictures
+
+libraryDependencies += "org.kohsuke" % "graphviz-api" % "1.1"
+
 resolvers += "Akka Repository" at "http://repo.akka.io/releases/"
 
 
