@@ -12,11 +12,19 @@ sbt publish-local
 ###To install vcfimp
 
 ```
-git clone https://github.com/adamnovak/vcfimp.git
+git clone https://github.com/fnothaft/vcfimp.git
 cd vcfimp
-git checkout v0.6.1
-sbt publish-local
+git checkout v0.7.0
+sbt
 ```
+
+Once sbt is open:
+
+'''
+>> project vcfimp
+>> publish-local
+>> exit
+'''
 
 ##Installation
 
