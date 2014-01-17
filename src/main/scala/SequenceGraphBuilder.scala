@@ -8,6 +8,9 @@ import org.kohsuke.graphviz._
 // We want to write files
 import java.io._
 
+// We need to work with Avro things
+import org.apache.avro.generic.IndexedRecord
+
 /**
  * This object handles providing sequential global IDs.
  */
@@ -422,14 +425,18 @@ class SequenceGraphBuilder(sample: String, reference: String) {
     }
     
     /**
-     * Write Parquet Avro files with all of the parts of the graph to the
-     * specified directory.
+     * Given an iteravle of Avro records of type RecordType, writes them to a
+     * Parquet file in the specified directory. Any other Parquet data in that
+     * directory will be overwritten.
      */
-    def writeParquetFiles(directory: String) {
+    def writeCollectionToParquet[RecordType <: IndexedRecord](
+        things: Iterable[RecordType], directory: String)(implicit m: Manifest[RecordType]) = {
+        
         // See <http://zenfractal.com/2013/08/21/a-powerful-big-data-trio/>
         // Grab all the imports we need
         import parquet.hadoop.{ParquetOutputFormat, ParquetInputFormat}
-        import parquet.avro.{AvroParquetOutputFormat, AvroWriteSupport, AvroReadSupport}
+        import parquet.avro.{AvroParquetOutputFormat, AvroWriteSupport, 
+            AvroReadSupport}
         import org.apache.spark.SparkContext
         import org.apache.spark.SparkContext._
         import org.apache.hadoop.mapreduce.Job
@@ -437,11 +444,14 @@ class SequenceGraphBuilder(sample: String, reference: String) {
         // Auto-serializeableification from Matt Massie
         import com.zenfractal.AvroSerializable
         
+        // And we use a hack to get at the (static) schemas of generic things
+        import org.apache.avro.Schema
+        
         // Set up the minimal Spark stuff that we need to be able to use the
         // AvroParquetOutputFormat to do our writing.
         
         // We need a Spark context
-        val sc = new SparkContext("local", "ParquetExample")
+        val sc = new SparkContext("local", "writeParquetFiles")
         
         // We need a job to configure
         val job = new Job()
@@ -449,24 +459,55 @@ class SequenceGraphBuilder(sample: String, reference: String) {
         // Set up Parquet to write using Avro for this job
         ParquetOutputFormat.setWriteSupportClass(job, classOf[AvroWriteSupport])
         
+        // Go get the static SCHEMA$ for the Avro record type. We can't do it
+        // the normal way (RecordType.SCHEMA$) because Scala keeps static things
+        // in companion objects with the same names as the types they really
+        // belong to, and type parameters don't automatically bring them along.
+        
+        // First we need the class of the record, which we need anyway for doing
+        // the writing.
+        val recordClass = m.erasure
+        
+        println("Writing out a collection of %s".format(
+            recordClass.getCanonicalName))
+        
+        // Get the schema Field object    
+        val recordSchemaField = recordClass.getDeclaredField("SCHEMA$")
+        // Get the static value of this field. Argument is ignored for static
+        // fields, so pass null. See <http://docs.oracle.com/javase/7/docs/api/j
+        // ava/lang/reflect/Field.html#get%28java.lang.Object%29>
+        val recordSchema = recordSchemaField.get(null).asInstanceOf[Schema]
+        
         // Set the Avro schema to use for this job
-        AvroParquetOutputFormat.setSchema(job, Side.SCHEMA$)
+        AvroParquetOutputFormat.setSchema(job, recordSchema)
         
-        // Make an RDD of SerializeableSides, with null keys. Put it all into
-        // one partition.
-        val sideRdd = sc.makeRDD(sides mapValues { (side) => 
-            (null, new AvroSerializable[Side](side)) 
-        } toSeq, 1)
+        // Make an RDD of serializeable-wrapped Avro records, with null keys.
+        // Put it all into one partition. We have to make sure we make a seq of
+        // the values and map on that; if we are not careful with the types, the
+        // keys from the HashMap can end up being our RDD keys, and we for some
+        // reason need to definitely have a PairRDD (i.e. an RDD of key, value
+        // pairs) that definitely has null keys.
+        val rdd = sc.makeRDD(things.toSeq map { (record) => 
+            (null, new AvroSerializable[RecordType](record))
+        }, 1)
         
-        // Save the RDD to a Parquet file in our temporary output directory. The
-        // keys are void, the values are Sides, the output format is a
-        // ParquetOutputFormat for Sides, and the configuration of the job we
-        // set up is used.
-        sideRdd.saveAsNewAPIHadoopFile(directory, classOf[Void], classOf[Side],
-          classOf[ParquetOutputFormat[Side]], job.getConfiguration)
-
-
-
+        // Save the RDD to a Parquet file in our output directory. The keys are
+        // void, the values are RecordTypes, the output format is a
+        // ParquetOutputFormat for RecordTypes, and the configuration of the job
+        // we set up is used.
+        rdd.saveAsNewAPIHadoopFile(directory, classOf[Void], 
+            recordClass, classOf[ParquetOutputFormat[RecordType]],
+            job.getConfiguration)
+        
+    }
+    
+    /**
+     * Write Parquet Avro files with all of the parts of the graph to the
+     * specified directory.
+     */
+    def writeParquetFiles(directory: String) = {
+        writeCollectionToParquet(sides.values, directory)
+        
     }
     
     
