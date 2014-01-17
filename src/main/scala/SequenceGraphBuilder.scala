@@ -32,16 +32,6 @@ object IDMaker {
 }
 
 /**
- * Dummy class for Anchors, which are not yet in the Avro spec. Anchors really
- * represent long runs of the reference haplotype, and are most like
- * AlleleGroups, but we base them off Adjacencies here since that class has all
- * the same members.
- *
- * TODO: Add Anchor back to the Avro spec.
- */
-class Anchor(a: Edge, b: PloidyBounds, c: String) extends Adjacency(a, b, c)
-
-/**
  *
  * SequenceGraphBuilder: a class to build up a sequence graph for a diploid
  * genome.
@@ -498,6 +488,10 @@ class SequenceGraphBuilder(sample: String, reference: String) {
         rdd.saveAsNewAPIHadoopFile(directory, classOf[Void], 
             recordClass, classOf[ParquetOutputFormat[RecordType]],
             job.getConfiguration)
+            
+        // Stop the SparkContext so we can make another one (apparently it
+        // always wants to use the same local port)
+        sc.stop()
         
     }
     
@@ -506,8 +500,14 @@ class SequenceGraphBuilder(sample: String, reference: String) {
      * specified directory.
      */
     def writeParquetFiles(directory: String) = {
-        writeCollectionToParquet(sides.values, directory)
-        
+        // Put the sides under "/Sides"
+        writeCollectionToParquet(sides.values, directory + "/Sides")
+        // AlleleGroups go under /AlleleGroups
+        writeCollectionToParquet(alleleGroups, directory + "/AlleleGroups")
+        // Adjacencies go under /Adjacencies
+        writeCollectionToParquet(adjacencies, directory + "/Adjacencies")
+        // Anchors go under /Anchors
+        writeCollectionToParquet(anchors, directory + "/Anchors")
     }
     
     

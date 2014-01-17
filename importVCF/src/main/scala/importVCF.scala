@@ -36,6 +36,9 @@ object SequenceGraphs {
             // What sample should we import?
             val sampleName = trailArg[String](required = true,
                 descr = "Sample to import")
+                
+            val directory = trailArg[String](required = true,
+                descr = "Directory to save under (will overwrite)")
             
             val dotFile = opt[String](
                 descr = "Save a GraphViz graph to this .dot file")
@@ -68,7 +71,10 @@ object SequenceGraphs {
         }
         
         // Write Parquet files to the current directory.
-        graph.writeParquetFiles("parquet")
+        graph.writeParquetFiles(opts.directory.get.get)
+        
+        // TODO: Flush logging output from Parquet/Spark stuff.
+        println("VCF imported")
         
     }
     

@@ -74,6 +74,25 @@ protocol SequenceGraph {
         union { null, string } genome = null;
     }
     
+    record Anchor {
+        // Represents a compressed run of reference-haplotype-matching
+        // AlleleGroups and Adjacencies connecting a pair of reference haplotype
+        // Sides: specifically, the shortest such run necessary to connect the
+        // endpoint Sides of the anchor, in the order used here. (Two Anchors in
+        // opposite directions can specify a reference-haplotype circular
+        // chromosome).
+        
+        // The Edge that specifies which Sides this Anchor links.
+        union { null, edu.ucsc.genome.Edge } edge = null;
+        
+        // The ploidy bounds on this Anchor. Null means that the ploidy is
+        // exactly 1.
+        union { null, PloidyBounds } ploidy = null;
+        
+        // What Genome does this belong to?
+        union { null, string } genome = null;
+    }
+    
     record Transmission {
         // Represents the transmission of alleles in one AlleleGroup of one
         // genome to alleles in another AlleleGroup in another genome.
