@@ -421,6 +421,51 @@ class SequenceGraphBuilder(sample: String, reference: String) {
         
     }
     
+    /**
+     * Write Parquet Avro files with all of the parts of the graph to the
+     * specified directory.
+     */
+    def writeParquetFiles(directory: String) {
+        // See <http://zenfractal.com/2013/08/21/a-powerful-big-data-trio/>
+        // Grab all the imports we need
+        import parquet.hadoop.{ParquetOutputFormat, ParquetInputFormat}
+        import parquet.avro.{AvroParquetOutputFormat, AvroWriteSupport, AvroReadSupport}
+        import org.apache.spark.SparkContext
+        import org.apache.spark.SparkContext._
+        import org.apache.hadoop.mapreduce.Job
+
+        
+        // Set up the minimal Spark stuff that we need to be able to use the
+        // AvroParquetOutputFormat to do our writing.
+        
+        // We need a Spark context
+        val sc = new SparkContext("local", "ParquetExample")
+        
+        // We need a job to configure
+        val job = new Job()
+        
+        // Set up Parquet to write using Avro for this job
+        ParquetOutputFormat.setWriteSupportClass(job, classOf[AvroWriteSupport])
+        
+        // Set the Avro schema to use for this job
+        AvroParquetOutputFormat.setSchema(job, Side.SCHEMA$)
+        
+        // Make an RDD of Sides, with null keys. Put it all into one partition.
+        val sideRdd = sc.makeRDD(sides mapValues { (side) => 
+            (null, side) 
+        } toSeq, 1)
+        
+        // Save the RDD to a Parquet file in our temporary output directory. The
+        // keys are void, the values are Sides, the output format is a
+        // ParquetOutputFormat for Sides, and the configuration of the job we
+        // set up is used.
+        sideRdd.saveAsNewAPIHadoopFile(directory, classOf[Void], classOf[Side],
+          classOf[ParquetOutputFormat[Side]], job.getConfiguration)
+
+
+
+    }
+    
     
 }
 
