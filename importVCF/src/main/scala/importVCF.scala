@@ -25,7 +25,7 @@ object SequenceGraphs {
         // examples.
         val opts = new ScallopConf(args) {
             guessOptionName = true
-            banner("""Usage: importVCF [OPTION]... vcfFile
+            banner("""Usage: importVCF [OPTION]... vcfFile sample output-dir
                 |Import a VCF file to sequence graph format.
                 |Options:
                 |""".stripMargin)
