@@ -15,16 +15,8 @@ sbt publish-local
 git clone https://github.com/fnothaft/vcfimp.git
 cd vcfimp
 git checkout v0.7.0
-sbt
+sbt vcfimp/publish-local
 ```
-
-Once sbt is open:
-
-'''
->> project vcfimp
->> publish-local
->> exit
-'''
 
 ##Installation
 
@@ -43,5 +35,5 @@ sbt test
 ###Running command-line tools
 
 ```
-./importVCF.sh <vcf file> <sample name>
+./importVCF.sh <vcf file> <sample name> <output directory name>
 ```
