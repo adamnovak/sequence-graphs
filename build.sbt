@@ -28,6 +28,10 @@ libraryDependencies += "org.kohsuke" % "graphviz-api" % "1.1"
 
 libraryDependencies += "com.twitter" % "parquet-avro" % "1.0.0"
 
+// We need slf4j for logging
+
+libraryDependencies += "org.slf4j" % "slf4j-api" % "1.7.2"
+
 resolvers += "Akka Repository" at "http://repo.akka.io/releases/"
 
 
