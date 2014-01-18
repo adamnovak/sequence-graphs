@@ -22,6 +22,14 @@ import org.rogach.scallop._
 import java.util.logging._
 import parquet.Log
 
+import org.apache.hadoop.mapreduce.Job
+
+class DiscardHandler extends java.util.logging.Handler {
+    def close() {}
+    def flush() {}
+    def publish(record: LogRecord) {}
+}
+
 object SequenceGraphs {
     def main(args: Array[String]) {
         
@@ -118,8 +126,12 @@ object SequenceGraphs {
             graph.writeDotFile(file)
         }
         
+        SequenceGraphKryoProperties.setupContextProperties()
+        val sc = new SparkContext("local", "importVCF")
+        val job = new Job()
+      
         // Write Parquet files to the current directory.
-        graph.writeParquetFiles(opts.directory.get.get)
+        graph.writeParquetFiles(opts.directory.get.get, sc, job)
         
         // TODO: Flush logging output from Parquet/Spark stuff.
         println("VCF imported")
@@ -329,7 +341,7 @@ object SequenceGraphs {
                         // Add a different AlleleGroup to each phase
                         phases.map { (phase) =>
                             builder.addAllele(contig, List(phase), 
-                                new Allele(alleleString), 
+                                new Allele(alleleString, variant.reference), 
                                 referenceEnd - referenceStart)
                         }
                     } else {
@@ -340,7 +352,7 @@ object SequenceGraphs {
                         // Anchor in both phases between the AlleleGroups for
                         // this variant and anything else.
                         builder.addAllele(contig, phases, 
-                            new Allele(alleleString), 
+                            new Allele(alleleString, variant.reference), 
                             referenceEnd - referenceStart)
                     }
                 }
