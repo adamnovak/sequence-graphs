@@ -1,10 +1,10 @@
-// Build a tool to import a VCF to sequence graph format.
+// Build a tool to dump a sequence graph as JSON
 
 packageArchetype.java_application
 
 exportJars := true
 
-name := "importVCF"
+name := "debug"
 
 version := "0.1"
 
