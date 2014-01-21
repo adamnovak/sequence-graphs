@@ -18,10 +18,9 @@ import scala.collection.JavaConversions._
 // We want to parse command-line arguments
 import org.rogach.scallop._
 
-// We want reasonable logging
-import org.apache.log4j.{ Logger, BasicConfigurator }
-import org.apache.log4j.varia.NullAppender
+// We want reasonable logging from Parquet.
 import java.util.logging._
+import parquet.Log
 
 class DiscardHandler extends java.util.logging.Handler {
     def close() {}
@@ -61,15 +60,29 @@ object SequenceGraphs {
 
         } 
         
-        // Configure logging
-        BasicConfigurator.configure(new NullAppender())
-        org.apache.log4j.LogManager.getRootLogger.addAppender(new NullAppender())
-        org.apache.log4j.LogManager.getRootLogger.addAppender(new NullAppender())
+        // Parquet "helpfully" forcibly adds an INFO-level logger to console if
+        // we don't configure its logger specifically (i.e. if we let its log
+        // messages pass through to the root logger). It also overrides any
+        // level we set on its logger, resetting it to INFO. The solution is to
+        // add a warning-level console logger specifically for Parquet, and tell
+        // it not to propagate messages up to the root logger.
         
-        // Get the Java root logger
-        val rootLogger = java.util.logging.Logger.getLogger("")
-        rootLogger.addHandler(new DiscardHandler())
-
+        // This could be done through the properties-file-based Java logging
+        // configuration mechanism, but that would require telling Java how to
+        // *find* the properties file, which in turn requires either setting a
+        // JVM command- line option or messing about with the Java preferences
+        // API.
+        
+        // Get the logger Parquet is going to use (before Parquet's static
+        // logger initialization code can run)
+        val parquetLogger = Logger.getLogger(
+            classOf[Log].getPackage().getName())
+        // Attach our own ConsoleHandler for it
+        val consoleHandler = new ConsoleHandler()
+        consoleHandler.setLevel(Level.WARNING)
+        parquetLogger.addHandler(consoleHandler)
+        // Tell it not to send messages up
+        parquetLogger.setUseParentHandlers(false)
         
         // What sample are we importing?
         val sample = opts.sampleName.get.get
