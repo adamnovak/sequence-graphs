@@ -1,7 +1,7 @@
+package edu.ucsc.genome.ImportVCF
+
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
-import org.apache.spark.graphx
-import org.apache.spark.graphx._
 import edu.ucsc.genome._
 
 import java.io.File
@@ -16,7 +16,18 @@ import ca.innovativemedicine.vcf.parsers._
 import scala.collection.JavaConversions._
 
 // We want to parse command-line arguments
-import org.rogach.scallop._;
+import org.rogach.scallop._
+
+// We want reasonable logging
+import org.apache.log4j.{ Logger, BasicConfigurator }
+import org.apache.log4j.varia.NullAppender
+import java.util.logging._
+
+class DiscardHandler extends java.util.logging.Handler {
+    def close() {}
+    def flush() {}
+    def publish(record: LogRecord) {}
+}
 
 object SequenceGraphs {
     def main(args: Array[String]) {
@@ -49,6 +60,16 @@ object SequenceGraphs {
                 descr = "Show this message")
 
         } 
+        
+        // Configure logging
+        BasicConfigurator.configure(new NullAppender())
+        org.apache.log4j.LogManager.getRootLogger.addAppender(new NullAppender())
+        org.apache.log4j.LogManager.getRootLogger.addAppender(new NullAppender())
+        
+        // Get the Java root logger
+        val rootLogger = java.util.logging.Logger.getLogger("")
+        rootLogger.addHandler(new DiscardHandler())
+
         
         // What sample are we importing?
         val sample = opts.sampleName.get.get

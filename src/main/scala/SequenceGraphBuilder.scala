@@ -430,9 +430,6 @@ class SequenceGraphBuilder(sample: String, reference: String) {
         import org.apache.spark.SparkContext
         import org.apache.spark.SparkContext._
         import org.apache.hadoop.mapreduce.Job
-
-        // Auto-serializeableification from Matt Massie
-        import com.zenfractal.AvroSerializable
         
         // And we use a hack to get at the (static) schemas of generic things
         import org.apache.avro.Schema
@@ -440,6 +437,8 @@ class SequenceGraphBuilder(sample: String, reference: String) {
         // Set up the minimal Spark stuff that we need to be able to use the
         // AvroParquetOutputFormat to do our writing.
         
+        SequenceGraphKryoProperties.setupContextProperties()
+
         // We need a Spark context
         val sc = new SparkContext("local", "writeParquetFiles")
         
@@ -477,9 +476,12 @@ class SequenceGraphBuilder(sample: String, reference: String) {
         // keys from the HashMap can end up being our RDD keys, and we for some
         // reason need to definitely have a PairRDD (i.e. an RDD of key, value
         // pairs) that definitely has null keys.
-        val rdd = sc.makeRDD(things.toSeq map { (record) => 
+      /*val rdd = sc.makeRDD(things.toSeq map { (record) => 
             (null, new AvroSerializable[RecordType](record))
-        }, 1)
+        }, 1)*/
+      val rdd = sc.makeRDD(things.toSeq map { r => 
+        (null, r)
+      }, 1)
         
         // Save the RDD to a Parquet file in our output directory. The keys are
         // void, the values are RecordTypes, the output format is a
