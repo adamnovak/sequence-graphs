@@ -15,6 +15,11 @@ sbt publish-local
 git clone https://github.com/fnothaft/vcfimp.git
 cd vcfimp
 git checkout v0.7.0
+```
+
+Go into project/Build.scala and change the Scala version to 2.9.3.
+
+```
 sbt vcfimp/publish-local
 ```
 
