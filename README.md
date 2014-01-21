@@ -5,22 +5,16 @@
 ```
 git clone https://github.com/apache/incubator-spark
 cd incubator-spark
-git checkout v0.9.0-incubating
+git checkout v0.8.1-incubating
 sbt publish-local
 ```
 
 ###To install vcfimp
 
 ```
-git clone https://github.com/fnothaft/vcfimp.git
+git clone https://github.com/adamnovak/vcfimp.git
 cd vcfimp
-git checkout v0.7.0
-```
-
-Go into project/Build.scala and change the Scala version to 2.9.3.
-
-```
-sbt vcfimp/publish-local
+sbt "+ vcfimp/publish-local"
 ```
 
 ##Installation
