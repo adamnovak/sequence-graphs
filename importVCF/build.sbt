@@ -26,4 +26,14 @@ libraryDependencies += "ca.innovativemedicine" %% "vcfimp" % "0.7.0"
 // output.
 libraryDependencies += "log4j" % "log4j" % "1.2.17"
 
+// We need some SLF4J logging implementation so it will stop logging complaints
+// about not having a logging implementation. See
+// <https://github.com/scalikejdbc/scalikejdbc/issues/21>.
+// This implementation will pump log messages through log4j above.
+libraryDependencies += "org.slf4j" % "slf4j-log4j12" % "1.7.5"
+
+// We need an slf4j-api to go with our implementation
+libraryDependencies += "org.slf4j" % "slf4j-api" % "1.7.5"
+
+
 resolvers += "Akka Repository" at "http://repo.akka.io/releases/"
