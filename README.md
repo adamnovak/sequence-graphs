@@ -1,6 +1,6 @@
 ##Dependencies
 
-###To install Apache Spark with GraphX
+###To install Apache Spark
 
 ```
 git clone https://github.com/apache/incubator-spark
