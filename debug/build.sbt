@@ -1,10 +1,10 @@
-// Build a tool to import a VCF to sequence graph format.
+// Build a tool to dump a sequence graph as JSON
 
 packageArchetype.java_application
 
 exportJars := true
 
-name := "importVCF"
+name := "debug"
 
 version := "0.1"
 
@@ -19,11 +19,9 @@ libraryDependencies += "org.apache.spark" %% "spark-core" % "0.8.1-incubating"
 libraryDependencies += "org.rogach" %% "scallop" % "0.9.4"
 
 // We get innovativemedicine's vcfimp VCF parser, which may not exist in any of
-// our resolvers.
+// our resolvers. We need to specify a complicated version remapping function
+// because vcfimp insists on building for Scala 2.9.2 only, which should be
+// actually compatible with anything 2.9 but doesn't get picked up.
 libraryDependencies += "ca.innovativemedicine" %% "vcfimp" % "0.7.0"
-
-// We need log4j so we can tell Spark to be somewhat quieter and not swamp out
-// output.
-libraryDependencies += "log4j" % "log4j" % "1.2.17"
 
 resolvers += "Akka Repository" at "http://repo.akka.io/releases/"
