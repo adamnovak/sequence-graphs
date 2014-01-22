@@ -4,7 +4,7 @@ import org.scalatest._
 
 class SequenceGraphBuilderTests extends FunSuite {
 
-    val builder = new SequenceGraphBuilder("bob", "hg19")
+    val builder = new InMemorySequenceGraphBuilder("bob", "hg19")
     
     test("starts with no AlleleGroups") {
         assert(builder.getLastAlleleGroup("chr1", 0) === None)

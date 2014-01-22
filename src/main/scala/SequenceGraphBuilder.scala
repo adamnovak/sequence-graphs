@@ -32,9 +32,71 @@ object IDMaker {
 }
 
 /**
+ * SequenceGraphBuilder: an interface that allows the streaming production of
+ * sequence graphs. Keeps track of the current end of every chromosome in any
+ * number of "phases", and allows new Alleles and Anchors to be appended to
+ * chromosomes and phases. Also allows the most recently added things to be
+ * peeked at, and handles the creation of telomere Sides.
+ */
+trait SequenceGraphBuilder {
+
+    /**
+     * Append a new AlleleGroup holding the given allele to all of the given
+     * phases of the given contig. The total ploidy is exactly equal to the
+     * number of phases to which the allele is being appended. The
+     * referenceLength parameter specifies the length of the reference Site
+     * which the AlleleGroup is to occupy (i.e. how far its ending Side should
+     * be from its starting Side); by default this is the number of bases in the
+     * given Allele.
+     * 
+     * Phases must not be empty. The first phase specified determines the
+     * starting position of the Site this AlleleGroup occupies. All phases
+     * specified must currently end with `Face.RIGHT` Sides.
+     */
+    def addAllele(contig: String, phases: Seq[Int], allele: Allele, 
+        referenceLength: Int = -1)
+        
+    /**
+     * Add an Anchor, with ploidy equal to the number of phases specified here,
+     * to the given phases of the given contigs. The anchor will run for the
+     * specified number of bases.
+     *
+     * If referenceLength is 0, does nothing.
+     *
+     * Phases must not be empty. The first phase specified determines the
+     * starting position of the Site this AlleleGroup occupies. All phases
+     * specified must currently end with `Face.RIGHT` Sides.
+     *
+     * TODO: Unify somewhow with addAllele.
+     */
+    def addAnchor(contig: String, phases: Seq[Int], 
+        referenceLength: Int)
+        
+    /**
+     * Add a trailing telomere to the given phase of the given contig. Attach it
+     * to the last thing we have there with an Adjacency. Will create a new
+     * leading telomere if nothing is in that phase of that contig already.
+     */
+    def close(contig: String, phase: Int)
+        
+    /**
+     * Get the last AlleleGroup on the given phase of the given contig, or None
+     * if there is no AlleleGroup there.
+     */
+    def getLastAlleleGroup(contig: String, phase: Int) : 
+        Option[AlleleGroup]
+        
+    /**
+     * Get the last Side on the given contig in the given phase, or add and
+     * remember a new leading telomere if none is found.
+     */
+    def getLastSide(contig: String, phase: Int) : Side
+}
+
+/**
  *
- * SequenceGraphBuilder: a class to build up a sequence graph for a diploid
- * genome.
+ * InMemorySequenceGraphBuilder: a class to build up a sequence graph for a
+ * genome in memory.
  * 
  * This class contains collections of all the parts needed to build a proper
  * sequence graph.
@@ -47,7 +109,9 @@ object IDMaker {
  * Operates on a given genome/sample name, and a given reference name.
  *
  */
-class SequenceGraphBuilder(sample: String, reference: String) {
+class InMemorySequenceGraphBuilder(sample: String, reference: String) 
+    extends SequenceGraphBuilder {
+
     // This holds all the Sides we have created, by ID
     private val sides = HashMap.empty[Long, Side]
     

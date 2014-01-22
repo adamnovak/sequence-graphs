@@ -102,7 +102,7 @@ object SequenceGraphs {
         val sample = opts.sampleName.get.get
         
         // Make a new SequenceGraphBuilder to build its graph.
-        val graph = new SequenceGraphBuilder(sample, "reference")
+        val graph = new InMemorySequenceGraphBuilder(sample, "reference")
         
         // Get the actual File or die trying, and then make VcfParser parse
         // that. We need to invoke the VcfParser functor first for some reason.
