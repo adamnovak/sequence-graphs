@@ -22,12 +22,6 @@ import org.rogach.scallop._
 import java.util.logging._
 import parquet.Log
 
-class DiscardHandler extends java.util.logging.Handler {
-    def close() {}
-    def flush() {}
-    def publish(record: LogRecord) {}
-}
-
 object SequenceGraphs {
     def main(args: Array[String]) {
         
@@ -108,16 +102,6 @@ object SequenceGraphs {
             // Write out a graphviz graph
             graph.writeDotFile(file)
         }
-        
-        // SLF4J gets very upset if it can't find its StaticLoggerBinder and
-        // writes directly to stderr. So we make sure to load it. It still
-        // complains about not having it anyway, but it's clearly wrong.
-        import org.slf4j.impl.StaticLoggerBinder
-        import org.slf4j.LoggerFactory
-
-        val slf4jLogger = LoggerFactory.getLogger(getClass)
-        slf4jLogger.error("Logging with SLF4J via StaticLoggerBinder %s".format(
-            StaticLoggerBinder.getSingleton().getLoggerFactoryClassStr()))
         
         // Write Parquet files to the current directory.
         graph.writeParquetFiles(opts.directory.get.get)

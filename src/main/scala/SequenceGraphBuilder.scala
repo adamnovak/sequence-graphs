@@ -442,6 +442,42 @@ class SequenceGraphBuilder(sample: String, reference: String) {
         // We need a Spark context
         val sc = new SparkContext("local", "writeParquetFiles")
         
+        
+        
+        try {
+            // That SparkContext needs to have the slf4j StaticLoggerBinder we
+            // are using on its classpath, or it will complain to standard error
+            // about not having that. Since it doesn't inherit our full
+            // classpath by default, we need to add the JAR we would load
+            // org.slf4j.impl.StaticLoggerBinder from. This is complicated by
+            // the fact that that class my not necessarily have actually been
+            // provided by the application developer, so we can't just load it
+            // and look where it came from.
+            
+            // Get the class object for the binder we want to send out, via
+            // reflection. If it does not exist, an exception will be produced.
+            val binderClass = Class.forName("org.slf4j.impl.StaticLoggerBinder")
+            
+            // Get the .jar it lives in. If it somehow doesn't live in a .jar,
+            // this will error out. See
+            // <http://stackoverflow.com/q/1983839/402891>
+            val binderJar = binderClass.getProtectionDomain.getCodeSource
+                .getLocation
+            
+            // Add the .jar to the Spark context
+            sc.addJar(binderJar.toString)
+            
+            println("Successfully shipping StaticLoggerBinder to workers")
+            
+        } catch {
+            case e: Exception => {
+                println("""Failed to find an slf4j StaticLoggerBinder .jar to 
+                ship out with Spark jobs. Are you sure you have set up slf4j 
+                correctly in your application?""".stripMargin)
+                println(e.getMessage)
+            }
+        }
+        
         // We need a job to configure
         val job = new Job()
         
@@ -476,12 +512,9 @@ class SequenceGraphBuilder(sample: String, reference: String) {
         // keys from the HashMap can end up being our RDD keys, and we for some
         // reason need to definitely have a PairRDD (i.e. an RDD of key, value
         // pairs) that definitely has null keys.
-      /*val rdd = sc.makeRDD(things.toSeq map { (record) => 
-            (null, new AvroSerializable[RecordType](record))
-        }, 1)*/
-      val rdd = sc.makeRDD(things.toSeq map { r => 
-        (null, r)
-      }, 1)
+        val rdd = sc.makeRDD(things.toSeq map { r => 
+            (null, r)
+        }, 1)
         
         // Save the RDD to a Parquet file in our output directory. The keys are
         // void, the values are RecordTypes, the output format is a
