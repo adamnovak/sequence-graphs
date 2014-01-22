@@ -108,35 +108,4 @@ class SequenceGraphBuilderTests extends FunSuite {
         assert(builder.getLastAlleleGroup("chr1", 0) === None)
         assert(builder.getLastAlleleGroup("chr1", 1) === None)
     }
-    
-    test("can add a phased AlleleGroup manually") {
-        // Grab the left side for the AlleleGroup
-        val leadingSide = builder.getNextSide("chr1", 0)
-        
-        assert(leadingSide.position.face === Face.LEFT)
-        
-        // How long do we want it to be?
-        val allele = new Allele("ACTTGAT")
-        // Make a right Side for the AlleleGroup
-        val trailingSide = new Side(IDMaker.get(), new Position("chr1", 
-            leadingSide.position.base + allele.bases.size, Face.RIGHT), false)
-            
-        // Make an AlleleGroup with ploidy 1
-        val alleleGroup = new AlleleGroup(new Edge(IDMaker.get(), 
-            leadingSide.id, trailingSide.id), allele, 
-            new PloidyBounds(1, null, null), "bob")
-        
-        // Add the trailing side
-        builder.addSide(trailingSide)
-        
-        // Add the actual AlleleGroup in with an Adjacency
-        builder.addAlleleGroup("chr1", 0, alleleGroup)
-        
-        // Make sure it got in
-        assert(builder.getLastSide("chr1", 0) === trailingSide)
-        
-        // Again for the other phase
-        builder.addAlleleGroup("chr1", 1, alleleGroup)
-        assert(builder.getLastSide("chr1", 1) === trailingSide)
-    }
 }

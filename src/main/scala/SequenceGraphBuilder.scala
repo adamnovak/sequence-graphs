@@ -49,26 +49,27 @@ object IDMaker {
  */
 class SequenceGraphBuilder(sample: String, reference: String) {
     // This holds all the Sides we have created, by ID
-    val sides = HashMap.empty[Long, Side]
+    private val sides = HashMap.empty[Long, Side]
     
     // This holds all the AlleleGroups we have created.
-    val alleleGroups = HashSet.empty[AlleleGroup]
+    private val alleleGroups = HashSet.empty[AlleleGroup]
     
     // This holds all the Adjacencies we have created.
-    val adjacencies = HashSet.empty[Adjacency]
+    private val adjacencies = HashSet.empty[Adjacency]
     
     // This holds all the Anchors we have created.
-    val anchors = HashSet.empty[Anchor]
+    private val anchors = HashSet.empty[Anchor]
     
     // This holds all the IDs of the Sides at the ends of chromosomes, by contig
     // name and phase number (usually 0 or 1).
-    val ends = HashMap.empty[(String, Int), Long]
+    private val ends = HashMap.empty[(String, Int), Long]
     
     /**
      * Attach the given AlleleGroup to the end of the given contig's given
      * phase.
      */
-    def addAlleleGroup(contig: String, phase: Int, alleleGroup: AlleleGroup) = {
+    protected def addAlleleGroup(contig: String, phase: Int, 
+        alleleGroup: AlleleGroup) = {
         
         ends.get((contig, phase)).foreach { (end) => 
             // If we do have something at the end of this phase of this contig
@@ -102,7 +103,7 @@ class SequenceGraphBuilder(sample: String, reference: String) {
      * 
      * TODO: Unify somehow with addAlleleGroup.
      */
-    def addAnchor(contig: String, phase: Int, 
+    protected def addAnchor(contig: String, phase: Int, 
         anchor: Anchor) : Unit = {
         
         ends.get((contig, phase)).foreach { (end) => 
@@ -236,7 +237,7 @@ class SequenceGraphBuilder(sample: String, reference: String) {
      * Remember the given Side by its ID. Can be called repeatedly on the same
      * Side.
      */
-    def addSide(side: Side) = {
+    protected def addSide(side: Side) = {
         // Put the Side in the HashMap
         sides(side.id) = side
     }
