@@ -121,6 +121,8 @@ class SequenceGraphBuilder(sample: String, reference: String) {
             // Add the Adjacency to our collection
             adjacencies += newAdjacency
             
+            println("Added adjacency: %s".format(newAdjacency.toString))
+            
         }
         
         // Put this Anchor's second Side as the new trailing end of
@@ -207,6 +209,9 @@ class SequenceGraphBuilder(sample: String, reference: String) {
             // Ploidy is number of phases to append to.
             val ploidy = new PloidyBounds(phases.size, null, null)
             
+            // Ensure a telomere exists for all phases
+            phases.map(getLastSide(contig, _))
+            
             // Get the left Side for the new Anchor. It can be generated from
             // any phase. We know it will be a Face.LEFT Side because of the
             // preconditions on this method.
@@ -228,6 +233,7 @@ class SequenceGraphBuilder(sample: String, reference: String) {
             
             phases map { (phase) =>
                 // Add the Anchor into each Phase with a ploidy-1 Adjacency.
+                println("Adding edge to unphased anchor")
                 addAnchor(contig, phase, anchor)
             }
         }
@@ -359,14 +365,14 @@ class SequenceGraphBuilder(sample: String, reference: String) {
         alleleGroups map { (alleleGroup : AlleleGroup) =>
             
             // What should we label it?
-            val label = alleleGroup.allele match {
+            val label = (alleleGroup.allele match {
                 // Put bases if we have actual bases
                 case allele: Allele => allele.bases
                 // Put something else if we're referencing an allele by index
                 case index: java.lang.Integer => "#%d".format(index)
                 // It's something else
                 case _ => "<unknown>"
-            }
+            }) + "\nx%d".format(alleleGroup.ploidy.lower)
             
             // Make an edge for every AlleleGroup.
             graph.edge(nodes(alleleGroup.edge.left),
@@ -394,10 +400,10 @@ class SequenceGraphBuilder(sample: String, reference: String) {
                 // The anchor is properly on a single contig, so we can
                 // determine its length.
                 val length = rightPos.base - leftPos.base
-                "%sbp anchor".format(length)
+                "%sbp anchor x%d".format(length, anchor.ploidy.lower)
             } else {
                 // We have no idea how long the anchor is
-                "anchor across contigs"
+                "anchor across contigs x%d".format(anchor.ploidy.lower)
             }
             
             // Make an edge for every Anchor

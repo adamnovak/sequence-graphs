@@ -222,13 +222,13 @@ object SequenceGraphs {
                 if(phased && lastCallPhased) {
                     // We need phased anchors, since both this call and the
                     // previous one are phased
-                    
+                    println("Adding phased anchor")
                     builder.addAnchor(contig, List(0), referenceDistance)
                     builder.addAnchor(contig, List(1), referenceDistance)
                     
                 } else {
                     // We need an unphased anchor.
-                    
+                    println("Adding unphased anchor")
                     builder.addAnchor(contig, List(0, 1), referenceDistance)
                 }
                 
