@@ -44,6 +44,9 @@ object SequenceGraphs {
             val directory = trailArg[String](required = true,
                 descr = "Directory to save under (will overwrite)")
             
+            val chromSizes = opt[File](
+                descr = "File of chromosome sizes to read, for end telomeres")
+            
             val dotFile = opt[String](
                 descr = "Save a GraphViz graph to this .dot file")
             
@@ -83,6 +86,18 @@ object SequenceGraphs {
         // Tell it not to send messages up
         parquetLogger.setUseParentHandlers(false)
         
+        // Parse the chromosome sizes file (<name>\t<int> TSV) into a map from
+        // chromosome names to lengths
+        val chromSizes = opts.chromSizes.get.map { (file) =>
+            import scala.io.Source
+            Source.fromFile(file).getLines.map { (line) =>
+                // Split each line on the tab
+                val parts = line.split("\t")
+                // Make the second item an int
+                (parts(0), parts(1).toInt)
+            }.toMap
+        }
+        
         // What sample are we importing?
         val sample = opts.sampleName.get.get
         
@@ -95,7 +110,7 @@ object SequenceGraphs {
             (info, entries) =>
             // We get the VCF metadata and an iterator of VCF entries.
             // Import our sample
-            importSample(graph, info, entries, sample)
+            importSample(graph, info, entries, sample, chromSizes)
         }
         
         opts.dotFile.get map { (file) =>
@@ -116,6 +131,10 @@ object SequenceGraphs {
      *   Import a sample into the given SequenceGraphBuilder from a VCF, creating
      *   a list of Sides and a list of SequenceGraphEdges, as well as Sites and
      *   Breakpoints for them to be in, and Alleles they contain.
+     *
+     *   Optionally accepts a chromosome sizes map (of integer lengths by
+     *   chromosome name), which, if specified, enables the creation of trailing
+     *   telomeres (since we know where to put them)
      *   
      *   Takes the VCF header metadata, an iterator over the VCF's variants, and the
      *   name of the sample to import.
@@ -123,7 +142,8 @@ object SequenceGraphs {
      */
     def importSample(builder: SequenceGraphBuilder, info: VcfInfo, 
         entries: Iterator[(Variant, List[Metadata.Format], 
-        List[List[List[VcfValue]]])], sampleName: String) {
+        List[List[List[VcfValue]]])], sampleName: String, 
+        chromSizes: Option[Map[String, Int]]) {
         // TODO: Can I do something to not have to include this big ugly type?
         // The vcfimp flatten tool accomplishes this by returning an anonymous
         // function typed VcfParser.Reader[Either[String, Unit]] which lets the
@@ -175,9 +195,20 @@ object SequenceGraphs {
             if(contig != lastContig && lastContig != null) {
                 // We're ending an old contig and starting a new one.
                 
-                // Add trailing telomeres
-                builder.close(lastContig, 0)
-                builder.close(lastContig, 1)
+                chromSizes.map { (sizes) =>
+                    // We know the chromosome length, so we can add some
+                    // trailing telomeres.
+                    
+                    // How far out do they have to be?
+                    val telomereDistance = sizes(lastContig) - lastEnd
+                    
+                    // Add trailing unphased anchor
+                    builder.addAnchor(lastContig, List(0, 1), telomereDistance)
+                    
+                    // Add trailing telomeres
+                    builder.close(lastContig, 0)
+                    builder.close(lastContig, 1)
+                }
                 
                 // Create new leading telomeres
                 builder.getLastSide(contig, 0)
@@ -280,7 +311,25 @@ object SequenceGraphs {
             
         }
         
+        // Now we've gone through all variants in the file.
         
+        if(lastContig != null) {
+            // We had a last contig, so maybe we want trailing telomeres on it?
+            chromSizes.map { (sizes) =>
+                // We know the chromosome length, so we can add some
+                // trailing telomeres.
+                
+                // How far out do they have to be?
+                val telomereDistance = sizes(lastContig) - lastEnd
+                
+                // Add trailing unphased anchor
+                builder.addAnchor(lastContig, List(0, 1), telomereDistance)
+                
+                // Add trailing telomeres
+                builder.close(lastContig, 0)
+                builder.close(lastContig, 1)
+            }
+        }
     }
 }
 
