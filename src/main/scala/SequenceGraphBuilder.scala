@@ -467,8 +467,6 @@ class SequenceGraphBuilder(sample: String, reference: String) {
             // Add the .jar to the Spark context
             sc.addJar(binderJar.toString)
             
-            println("Successfully shipping StaticLoggerBinder to workers")
-            
         } catch {
             case e: Exception => {
                 println("""Failed to find an slf4j StaticLoggerBinder .jar to 
