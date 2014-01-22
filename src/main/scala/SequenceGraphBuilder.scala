@@ -476,6 +476,10 @@ class SequenceGraphBuilder(sample: String, reference: String) {
             }
         }
         
+        // TODO: The above shipping out of the log binder .jar *should* work,
+        // but does not appear to: the angry message still gets printed by the
+        // worker. Figure out why this is and fix it.
+        
         // We need a job to configure
         val job = new Job()
         
