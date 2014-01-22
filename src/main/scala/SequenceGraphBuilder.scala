@@ -94,7 +94,6 @@ class SequenceGraphBuilder(sample: String, reference: String) {
         // Remember the AlleleGroup in our set of AlleleGroups
         alleleGroups += alleleGroup
         
-        println("Added %s to %s:%d".format(alleleGroup.allele, contig, phase))
     }
     
     /**
@@ -120,9 +119,6 @@ class SequenceGraphBuilder(sample: String, reference: String) {
                 
             // Add the Adjacency to our collection
             adjacencies += newAdjacency
-            
-            println("Added adjacency: %s".format(newAdjacency.toString))
-            
         }
         
         // Put this Anchor's second Side as the new trailing end of
@@ -131,8 +127,6 @@ class SequenceGraphBuilder(sample: String, reference: String) {
         
         // Remember the Anchor in our set of Anchors
         anchors += anchor
-        
-        println("Added anchor to %s:%d".format(contig, phase))
     }
     
     /**
@@ -148,7 +142,7 @@ class SequenceGraphBuilder(sample: String, reference: String) {
      * starting position of the Site this AlleleGroup occupies. All phases
      * specified must currently end with `Face.RIGHT` Sides.
      */
-    def addAllele(contig: String, phases: List[Int], allele: Allele, 
+    def addAllele(contig: String, phases: Seq[Int], allele: Allele, 
         referenceLength: Int = -1) = {
         
         // Ploidy is number of phases to append to.
@@ -201,7 +195,7 @@ class SequenceGraphBuilder(sample: String, reference: String) {
      *
      * TODO: Unify somewhow with addAllele.
      */
-    def addAnchor(contig: String, phases: List[Int], 
+    def addAnchor(contig: String, phases: Seq[Int], 
         referenceLength: Int) : Unit = {
         
         if(referenceLength > 0) {
@@ -233,7 +227,6 @@ class SequenceGraphBuilder(sample: String, reference: String) {
             
             phases map { (phase) =>
                 // Add the Anchor into each Phase with a ploidy-1 Adjacency.
-                println("Adding edge to unphased anchor")
                 addAnchor(contig, phase, anchor)
             }
         }

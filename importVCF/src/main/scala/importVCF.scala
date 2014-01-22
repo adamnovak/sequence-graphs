@@ -174,12 +174,14 @@ object SequenceGraphs {
         // Where did the last variant end on that contig?
         var lastEnd: Int = 0
         
-        for((variant, formats, samples) <- entries) {
-            // For each variant in the file
+        for((variant, formats, samples) <- entries
+            if variant.filter == Some(FilterResult.Pass)) {
+            // For each variant in the file that passed the filters
             
             // What contig is it on?
             val contig: String = variant.chromosome match {
                 case Left(vcfid) => vcfid.toString
+                case Right(string) if string startsWith "chr" => string
                 case Right(string) => "chr" + string
             }
             
@@ -239,13 +241,15 @@ object SequenceGraphs {
                 // Pull out the genotype string as a String.
                 val genotypeString = sampleValues(genotypeIndex).head match {
                     case VcfString(value) => value
-                    case _ => throw new Exception("Got a non-string GT value")
+                    case somethingElse => throw new Exception(
+                        "Got a non-string GT value: %s".format(somethingElse))
                 }
             
                 // At the moment we support only phased or unphased diploid
                 // genomes.
                 
-                // Is the string a phased genotype?
+                // Is the string a phased genotype? It is if it hasn't got a "/"
+                // in it. TODO: partial phasing like 1|0/2, if that's allowed.
                 val phased = genotypeString contains "|"
                 
                 // Add the intermediate Anchors between the last variant site
@@ -253,13 +257,11 @@ object SequenceGraphs {
                 if(phased && lastCallPhased) {
                     // We need phased anchors, since both this call and the
                     // previous one are phased
-                    println("Adding phased anchor")
                     builder.addAnchor(contig, List(0), referenceDistance)
                     builder.addAnchor(contig, List(1), referenceDistance)
                     
                 } else {
                     // We need an unphased anchor.
-                    println("Adding unphased anchor")
                     builder.addAnchor(contig, List(0, 1), referenceDistance)
                 }
                 
@@ -268,41 +270,82 @@ object SequenceGraphs {
                 
                 // Now we want to add the actual AlleleGroups.
                 
+                // Print progress
+                chromSizes match {
+                    case Some(map) =>
+                        println("%s:%d: %s (%2.2f%%)".format(contig, 
+                            referenceStart, genotypeString, 
+                            (referenceStart:Double)/map(contig) * 100))
+                    case None =>
+                        println("%s:%d: %s".format(contig, referenceStart, 
+                            genotypeString))
+                }
+                
+                
+                
                 // Pull out and intify the two allele indices
                 val alleleIndices = genotypeString.split("[|/]").map(_.toInt)
                 
-                // TODO: Map over phases.
-                
-                // The alternates are in the variant.alternates list.
-                // Load the allele in phase 0
-                val allele0: Either[Either[Breakend, VcfId], String] = 
-                    alleles(alleleIndices(0))
-                    
-                // Load the allele in phase 1
-                val allele1: Either[Either[Breakend, VcfId], String] = 
-                    alleles(alleleIndices(1))
-                
-                // For now we handle only string alleles.
-                
-                val alleleString0 = allele0 match {
-                    case Right(string) => string
-                    case Left(_) => throw new Exception(
-                        "Breakends and ID'd alleles not supported")
+                if(alleleIndices.size != 2) {
+                    // Complain about non-diploid places
+                    // TODO: Use a logger
+                    println("Warning: non-diploid locus!")
                 }
                 
-                val alleleString1 = allele1 match {
-                    case Right(string) => string
-                    case Left(_) => throw new Exception(
-                        "Breakends and ID'd alleles not supported")
+                // Zip allele indices with their phases (confusingly called
+                // "indices" also) using zipWithIndex. So we get (allele, phase)
+                // tuples.
+                val enumeratedIndices = alleleIndices.zipWithIndex
+                
+                
+                // Collect by allele index, and pull out phase numbers (so we
+                // have all the phases each allele index needs to be stuck in,
+                // in a map by allele index).
+                val phasesByAlleleIndex = enumeratedIndices.groupBy(_._1)
+                    .mapValues(_.map(_._2))
+                
+                // For phased sites, we look at the phase numbers. For unphased
+                // sites, we just look at the lengths.
+                
+                // For each allele index, get that allele string and add it
+                // either to the list of phases, or to all phases with a ploidy
+                // given by the list length, depending on phasing status.
+                
+                // Edge case: for a genotype of just "0" and not "0/0", we'll
+                // add an allele just to phase 0.
+                phasesByAlleleIndex.foreach { case(alleleIndex, phases) =>
+                    // Look up the allele
+                    val allele: Either[Either[Breakend, VcfId], String] = 
+                        alleles(alleleIndex)
+                    
+                    // For now we handle only string alleles.
+                    val alleleString = allele match {
+                        case Right(string) => string
+                        case Left(_) => throw new Exception(
+                            "Breakends and ID'd alleles not supported")
+                    }
+                    
+                    if(phased) {
+                        // Add a different AlleleGroup to each phase
+                        phases.map { (phase) =>
+                            builder.addAllele(contig, List(phase), 
+                                new Allele(alleleString), 
+                                referenceEnd - referenceStart)
+                        }
+                    } else {
+                        // Add one AlleleGroup to all of the phases listed, with
+                        // a ploidy equal to the list length. We handle the fact
+                        // that, at this point, we can't tell the difference
+                        // between any phases by having some intervening single
+                        // Anchor in both phases between the AlleleGroups for
+                        // this variant and anything else.
+                        builder.addAllele(contig, phases, 
+                            new Allele(alleleString), 
+                            referenceEnd - referenceStart)
+                    }
                 }
                 
-                // Add the Alleles to the appropriate Phases. TODO: if they are
-                // the same and unphased, add just one AlleleGroup
-                builder.addAllele(contig, List(0), new Allele(alleleString0), 
-                    referenceEnd - referenceStart)
-                builder.addAllele(contig, List(1), new Allele(alleleString1), 
-                    referenceEnd - referenceStart)
-                    
+                
                 // Save information about this site
                 lastCallPhased = phased
                 lastContig = contig
