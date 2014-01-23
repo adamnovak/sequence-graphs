@@ -620,7 +620,11 @@ class InMemorySequenceGraphBuilder(sample: String, reference: String)
      * directory will be overwritten.
      */
     def writeCollectionToParquet[RecordType <: IndexedRecord](
-        things: Iterable[RecordType], directory: String, sc: SparkContext, job: Job)(implicit m: Manifest[RecordType]) = {
+        things: Iterable[RecordType], directory: String, sc: SparkContext)(implicit m: Manifest[RecordType]) = {
+        
+        // Every timne we switch Avro schemas, we need a new Job. So we create
+        // our own.
+        val job = new Job()
         
         try {
             // That SparkContext needs to have the slf4j StaticLoggerBinder we
@@ -707,15 +711,15 @@ class InMemorySequenceGraphBuilder(sample: String, reference: String)
      * Write Parquet Avro files with all of the parts of the graph to the
      * specified directory.
      */
-    def writeParquetFiles(directory: String, sc: SparkContext, job: Job) = {
+    def writeParquetFiles(directory: String, sc: SparkContext) = {
         // Put the sides under "/Sides"
-        writeCollectionToParquet(sides.values, directory + "/Sides", sc, job)
+        writeCollectionToParquet(sides.values, directory + "/Sides", sc)
         // AlleleGroups go under /AlleleGroups
-        writeCollectionToParquet(alleleGroups, directory + "/AlleleGroups", sc, job)
+        writeCollectionToParquet(alleleGroups, directory + "/AlleleGroups", sc)
         // Adjacencies go under /Adjacencies
-        writeCollectionToParquet(adjacencies, directory + "/Adjacencies", sc, job)
+        writeCollectionToParquet(adjacencies, directory + "/Adjacencies", sc)
         // Anchors go under /Anchors
-        writeCollectionToParquet(anchors, directory + "/Anchors", sc, job)
+        writeCollectionToParquet(anchors, directory + "/Anchors", sc)
     }
     
     
@@ -723,17 +727,18 @@ class InMemorySequenceGraphBuilder(sample: String, reference: String)
 
 /**
  * ParquetSequenceGraphBuilder: a class that builds a sequence graph into
- * Parquet files in the specified directory.
+ * Parquet files in the specified directory, using the given SparkContext to run
+ * its jobs.
  *
  * TODO: Make streaming. For now just uses an InMemorySequenceGraphBuilder and
  * writes out from that.
  */
 class ParquetSequenceGraphBuilder(sample: String, reference: String, 
-    directory: String, sc: SparkContext, job: Job) 
+    directory: String, sc: SparkContext) 
     extends InMemorySequenceGraphBuilder(sample, reference) {
     
     // Write out the Parquet files at the end
-    override def finish() = writeParquetFiles(directory, sc, job)
+    override def finish() = writeParquetFiles(directory, sc)
     
 }
 

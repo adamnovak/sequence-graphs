@@ -117,12 +117,13 @@ object SequenceGraphs {
             // for a dot file?
             println("Writing to Parquet")
             
+            // Set up Kryo for the serialization we need to do to run Spark.
             SequenceGraphKryoProperties.setupContextProperties()
+            // Make a new SparkContext so we can use Spark to write Parquet.
             val sc = new SparkContext("local", "importVCF")
-            val job = new Job()
             
             new ParquetSequenceGraphBuilder(sample, "reference", 
-                opts.parquetDir.get.get, sc, job)
+                opts.parquetDir.get.get, sc)
         } else if (opts.dotFile.get isDefined) {
             // The user wants to write GraphViz
             println("Writing to Graphviz")
