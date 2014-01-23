@@ -5,4 +5,4 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # Run the command. Make sure to build with "sbt stage" first.
-$DIR/exportVCF/target/universal/stage/bin/exportVCF "$@"
+$DIR/exportVCF/target/universal/stage/bin/exportvcf "$@"
