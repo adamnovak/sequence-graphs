@@ -32,9 +32,30 @@ libraryDependencies += "com.twitter" % "parquet-avro" % "1.3.2"
 
 libraryDependencies += "org.slf4j" % "slf4j-api" % "1.7.2"
 
-// We need Apaceh Commons Lang because it's useful (for escaping strings in .dot
+// We need Apache Commons Lang because it's useful (for escaping strings in .dot
 // files)
 libraryDependencies += "org.apache.commons" % "commons-lang3" % "3.2.1"
 
+// add hadoop bam and everything
+
+libraryDependencies += "fi.tkk.ics.hadoop.bam" % "hadoop-bam" % "6.1-SNAPSHOT"
+
+libraryDependencies += "variant" % "variant" % "1.93"
+
+libraryDependencies += "tribble" % "tribble" % "1.93"
+
+libraryDependencies += "picard" % "picard" % "1.93"
+
+libraryDependencies += "samtools" % "samtools" % "1.93"
+
+libraryDependencies += "cofoja" % "cofoja" % "1.0"
+
+// add adam
+
+libraryDependencies += "edu.berkeley.cs.amplab.adam" % "adam-core" % "0.6.1-SNAPSHOT"
+
 resolvers += "Akka Repository" at "http://repo.akka.io/releases/"
 
+resolvers += "Hadoop-BAM" at "http://hadoop-bam.sourceforge.net/maven/"
+
+resolvers += "Sonatype" at "http://oss.sonatype.org/content/repositories/snapshots/"

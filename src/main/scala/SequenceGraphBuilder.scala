@@ -11,6 +11,21 @@ import java.io._
 // We need to work with Avro things
 import org.apache.avro.generic.IndexedRecord
 
+// import spark
+import org.apache.spark.SparkContext
+import org.apache.spark.SparkContext._
+
+// import parquet
+import parquet.hadoop.{ParquetOutputFormat, ParquetInputFormat}
+import parquet.avro.{AvroParquetOutputFormat, AvroWriteSupport, 
+                     AvroReadSupport}
+
+// And we use a hack to get at the (static) schemas of generic things
+import org.apache.avro.Schema
+
+// import hadoop job
+import org.apache.hadoop.mapreduce.Job
+
 /**
  * This object handles providing sequential global IDs.
  */
@@ -605,29 +620,7 @@ class InMemorySequenceGraphBuilder(sample: String, reference: String)
      * directory will be overwritten.
      */
     def writeCollectionToParquet[RecordType <: IndexedRecord](
-        things: Iterable[RecordType], directory: String)(implicit m: Manifest[RecordType]) = {
-        
-        // See <http://zenfractal.com/2013/08/21/a-powerful-big-data-trio/>
-        // Grab all the imports we need
-        import parquet.hadoop.{ParquetOutputFormat, ParquetInputFormat}
-        import parquet.avro.{AvroParquetOutputFormat, AvroWriteSupport, 
-            AvroReadSupport}
-        import org.apache.spark.SparkContext
-        import org.apache.spark.SparkContext._
-        import org.apache.hadoop.mapreduce.Job
-        
-        // And we use a hack to get at the (static) schemas of generic things
-        import org.apache.avro.Schema
-        
-        // Set up the minimal Spark stuff that we need to be able to use the
-        // AvroParquetOutputFormat to do our writing.
-        
-        SequenceGraphKryoProperties.setupContextProperties()
-
-        // We need a Spark context
-        val sc = new SparkContext("local", "writeParquetFiles")
-        
-        
+        things: Iterable[RecordType], directory: String, sc: SparkContext, job: Job)(implicit m: Manifest[RecordType]) = {
         
         try {
             // That SparkContext needs to have the slf4j StaticLoggerBinder we
@@ -664,10 +657,7 @@ class InMemorySequenceGraphBuilder(sample: String, reference: String)
         // TODO: The above shipping out of the log binder .jar *should* work,
         // but does not appear to: the angry message still gets printed by the
         // worker. Figure out why this is and fix it.
-        
-        // We need a job to configure
-        val job = new Job()
-        
+                
         // Set up Parquet to write using Avro for this job
         ParquetOutputFormat.setWriteSupportClass(job, classOf[AvroWriteSupport])
         
@@ -710,26 +700,22 @@ class InMemorySequenceGraphBuilder(sample: String, reference: String)
         rdd.saveAsNewAPIHadoopFile(directory, classOf[Void], 
             recordClass, classOf[ParquetOutputFormat[RecordType]],
             job.getConfiguration)
-            
-        // Stop the SparkContext so we can make another one (apparently it
-        // always wants to use the same local port)
-        sc.stop()
-        
+                    
     }
     
     /**
      * Write Parquet Avro files with all of the parts of the graph to the
      * specified directory.
      */
-    def writeParquetFiles(directory: String) = {
+    def writeParquetFiles(directory: String, sc: SparkContext, job: Job) = {
         // Put the sides under "/Sides"
-        writeCollectionToParquet(sides.values, directory + "/Sides")
+        writeCollectionToParquet(sides.values, directory + "/Sides", sc, job)
         // AlleleGroups go under /AlleleGroups
-        writeCollectionToParquet(alleleGroups, directory + "/AlleleGroups")
+        writeCollectionToParquet(alleleGroups, directory + "/AlleleGroups", sc, job)
         // Adjacencies go under /Adjacencies
-        writeCollectionToParquet(adjacencies, directory + "/Adjacencies")
+        writeCollectionToParquet(adjacencies, directory + "/Adjacencies", sc, job)
         // Anchors go under /Anchors
-        writeCollectionToParquet(anchors, directory + "/Anchors")
+        writeCollectionToParquet(anchors, directory + "/Anchors", sc, job)
     }
     
     
@@ -743,10 +729,11 @@ class InMemorySequenceGraphBuilder(sample: String, reference: String)
  * writes out from that.
  */
 class ParquetSequenceGraphBuilder(sample: String, reference: String, 
-    directory: String) extends InMemorySequenceGraphBuilder(sample, reference) {
+    directory: String, sc: SparkContext, job: Job) 
+    extends InMemorySequenceGraphBuilder(sample, reference) {
     
     // Write out the Parquet files at the end
-    override def finish() = writeParquetFiles(directory)
+    override def finish() = writeParquetFiles(directory, sc, job)
     
 }
 
