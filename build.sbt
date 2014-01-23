@@ -32,5 +32,9 @@ libraryDependencies += "com.twitter" % "parquet-avro" % "1.3.2"
 
 libraryDependencies += "org.slf4j" % "slf4j-api" % "1.7.2"
 
+// We need Apaceh Commons Lang because it's useful (for escaping strings in .dot
+// files)
+libraryDependencies += "org.apache.commons" % "commons-lang3" % "3.2.1"
+
 resolvers += "Akka Repository" at "http://repo.akka.io/releases/"
 

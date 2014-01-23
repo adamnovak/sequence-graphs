@@ -371,14 +371,24 @@ abstract class EasySequenceGraphBuilder(sample: String, reference: String)
 class GraphvizSequenceGraphBuilder(sample: String, reference: String, 
     file: String) extends EasySequenceGraphBuilder(sample, reference) {
     
-    // Make a new graph
-    val graph = new org.kohsuke.graphviz.Graph()
+    // We need to write escaped strings. See
+    // <http://stackoverflow.com/a/9914380/402891> and
+    // <http://commons.apache.org/proper/commons-
+    // lang/apidocs/org/apache/commons/lang3/StringEscapeUtils.html>
+    import org.apache.commons.lang.StringEscapeUtils.escapeJava
+    
+    // Open the file for writing. See
+    // <http://www.tutorialspoint.com/scala/scala_file_io.htm>
+    val graphWriter = new java.io.PrintWriter(new File(file))
+    
+    // Write a header
+    graphWriter.write("digraph %s {\n".format(sample))
     
     // Set up edge styles
-    graph.edgeWith(new Style().attr("arrowsize", "0"))
+    graphWriter.write("edge [arrowsize=\"0\"];\n")
     
     // And node styles
-    graph.nodeWith(new Style().attr("shape", "point").attr("label", ""))
+    graphWriter.write("node [shape=\"point\", label=\"\"];\n")
     
     // This holds all the Nodes we have created, by ID
     private val nodes = HashMap.empty[Long, Node]
@@ -397,19 +407,17 @@ class GraphvizSequenceGraphBuilder(sample: String, reference: String,
         }) + "\nx%d".format(alleleGroup.ploidy.lower)
         
         // Make an edge for every AlleleGroup.
-        graph.edge(getNode(alleleGroup.edge.left),
-            getNode(alleleGroup.edge.right), new Style()
-                // Label it with the bases
-                .attr("label", label)
-                // Give it an arrow head
-                .attr("arrowsize", "1")
-                .attr("color", "#ff0000"))
+        // TODO: escape labels
+        graphWriter.write(
+            "%d -> %d [label=\"%s\",arrowsize=\"1\",color=\"#ff0000\"];\n"
+            .format(alleleGroup.edge.left, alleleGroup.edge.right, 
+            escapeJava(label)))
     }
     
     protected def addAdjacency(adjacency: Adjacency) : Unit = {
         // Make an edge for every Adjacency
-        graph.edge(getNode(adjacency.edge.left),
-            getNode(adjacency.edge.right))
+        graphWriter.write("%d -> %d;\n".format(
+            adjacency.edge.left, adjacency.edge.right))
     }
     
     protected def addAnchor(anchor: Anchor) : Unit ={
@@ -417,44 +425,34 @@ class GraphvizSequenceGraphBuilder(sample: String, reference: String,
         val label = "Anchor x%d".format(anchor.ploidy.lower)
         
         // Make an edge for every Anchor
-        graph.edge(getNode(anchor.edge.left),
-            getNode(anchor.edge.right), new Style()
-                .attr("label", label)
-                .attr("color", "#0000ff"))
+        graphWriter.write(
+            "%d -> %d [label=\"%s\",color=\"#0000ff\"];\n"
+            .format(anchor.edge.left, anchor.edge.right, escapeJava(label)))
     }
     
     protected def addSide(side: Side) : Unit = {
-        getNode(side.id)
+        // We don't really need to define sides, but this should let any sides
+        // we somehow haven't connected show up.
+        graphWriter.write(
+            "%d;\n"
+            .format(side.id))
     }
     
     
     // SequenceGraphBuilder hooks we use
     
     /**
-     * Write out the graph we have built to the pre-selected GraphViz dot file.
+     * Close the GraphViz graph we have been writing.
      */
     override def finish() {
-        // Write the graph to the file
-        graph.writeTo(new FileOutputStream(file))
+        // Close the graph block
+        graphWriter.write("}\n")
+        
+        // Close the file
+        graphWriter.close()
         
         println("Wrote %s".format(file))
     }
-    
-    
-    // Utility methods we use
-    
-    /**
-     * Make a Node for the given ID, or get the one that exists already.
-     */
-    protected def getNode(id: Long) : Node = {
-        nodes.getOrElseUpdate(id, { 
-            // We need to make a new Node for this id and put it in the graph.
-            val node = new Node().id(id.toString)
-            graph.node(node)
-            node
-        })
-    }
-    
 }
 
 
