@@ -80,18 +80,284 @@ trait SequenceGraphBuilder {
     def close(contig: String, phase: Int)
         
     /**
-     * Get the last AlleleGroup on the given phase of the given contig, or None
-     * if there is no AlleleGroup there.
-     */
-    def getLastAlleleGroup(contig: String, phase: Int) : 
-        Option[AlleleGroup]
-        
-    /**
      * Get the last Side on the given contig in the given phase, or add and
      * remember a new leading telomere if none is found.
      */
     def getLastSide(contig: String, phase: Int) : Side
 }
+
+/**
+ * EasySequenceGraphBuilder: Implement most of the functionality of a
+ * SequenceGraphBuilder, leaving just the part about actually providing a way to
+ * write graph elements.
+ */
+abstract class EasySequenceGraphBuilder(sample: String, reference: String)
+    extends SequenceGraphBuilder {
+    
+    // This mutable HashMap holds all the Sides at the ends of chromosomes, by
+    // contig name and phase number (usually 0 or 1).
+    private val ends = HashMap.empty[(String, Int), Side]
+    
+    // These are the methods implementations need to define.
+    
+    /**
+     * Add the given AlleleGroup to the graph.
+     */
+    protected def addAlleleGroup(alleleGroup: AlleleGroup) : Unit
+    
+    /**
+     * Add the given Adjacency to the graph.
+     */
+    protected def addAdjacency(adjacency: Adjacency) : Unit
+    
+    /**
+     * Add the given Anchor to the graph.
+     */
+    protected def addAnchor(anchor: Anchor) : Unit
+    
+    /**
+     * Add the given Side to the graph. Can be called repeatedly on the same
+     * Side.
+     */
+    protected def addSide(side: Side) : Unit
+    
+    // These are the useful methods involved in implementing the
+    // SequenceGraphBuilder interface.
+    
+    /**
+     * Set the last Side of the given phase of the given contig to the given
+     * Side. If Side is null, means a trailing telomere has been added and
+     * nothing more can be added to that phase.
+     */
+    protected def setLastSide(contig: String, phase: Int, side: Side) {
+        ends((contig, phase)) = side
+    }
+    
+    /**
+     * Create and return (but do not remember) a Side corresponding to the 5'
+     * face of the next unaccounted-for base of the given phase of the given
+     * contig.
+     *
+     * If there is nothing at the end of that phase of that contig, adds a
+     * telomere first.
+     */
+    def getNextSide(contig: String, phase: Int) : Side = {
+        // Go get the last Side, adding a telomere if necessary.
+        val end = getLastSide(contig, phase)
+        
+        // Flip to the opposite face
+        val newFace = end.position.face match {
+            case Face.LEFT => Face.RIGHT
+            case Face.RIGHT => Face.LEFT
+        }
+        
+        // Advance or un-advance the base
+        val newBase = end.position.face match {
+            case Face.LEFT => end.position.base - 1
+            case Face.RIGHT => end.position.base + 1
+        }
+         
+        // Make and return a new Side that comes directly after the last one
+        // (which may have been a leading telomere)
+        new Side(IDMaker.get(), new Position(contig, newBase, newFace), false)
+    }
+    
+    /**
+     * Attach the given AlleleGroup to the end of the given contig's given
+     * phase. The caller is responsible for also setting the last Side of that
+     * contig and phase with `setLastSide`.
+     */
+    protected def addAlleleGroup(contig: String, phase: Int, 
+        alleleGroup: AlleleGroup) : Unit = {
+        
+        ends.get((contig, phase)).foreach { (end) => 
+            // If we do have something at the end of this phase of this contig
+            // already, make an Adjacency to this AlleleGroup's first Side.
+            val newAdjacency = Adjacency.newBuilder()
+                // Attach the Edge
+                .setEdge(new Edge(IDMaker.get(), end.id, alleleGroup.edge.left))
+                // Set ploidy to exactly 1
+                .setPloidy(new PloidyBounds(1, null, null))
+                // Attach to our genome
+                .setGenome(sample)
+                .build()
+                
+            // Add the Adjacency to our collection
+            addAdjacency(newAdjacency)
+            
+        }
+        
+        // Add the AlleleGroup
+        addAlleleGroup(alleleGroup)
+        
+    }
+    
+    /**
+     * Attach the given Anchor to the end of the given contig's given phase. The
+     * caller is responsible for also setting the last Side of that contig and
+     * phase with `setLastSide`.
+     * 
+     * TODO: Unify somehow with addAlleleGroup.
+     */
+    protected def addAnchor(contig: String, phase: Int, 
+        anchor: Anchor) : Unit = {
+        
+        ends.get((contig, phase)).foreach { (end) => 
+            // If we do have something at the end of this phase of this contig
+            // already, make an Adjacency to this AlleleGroup's first Side.
+            val newAdjacency = Adjacency.newBuilder()
+                // Attach the Edge
+                .setEdge(new Edge(IDMaker.get(), end.id, anchor.edge.left))
+                // Set ploidy to exactly 1
+                .setPloidy(new PloidyBounds(1, null, null))
+                // Attach to our genome
+                .setGenome(sample)
+                .build()
+                
+            // Add the Adjacency to our collection
+            addAdjacency(newAdjacency)
+        }
+        
+        // Remember the Anchor in our set of Anchors
+        addAnchor(anchor)
+    }
+    
+    // These are the SequenceGraphBuilder method implementations
+    
+    def getLastSide(contig: String, phase: Int) : Side = {
+        ends.get((contig, phase)) getOrElse {
+            // We couldn't find anything there already. Make a new (vacuously
+            // phased) telomer Side.
+            val telomere = new Side(IDMaker.get(), new Position(contig, 0, 
+                Face.RIGHT), false)
+                
+            // Remember the telomere
+            addSide(telomere)
+            
+            // Stick it at the end where it goes
+            setLastSide(contig, phase, telomere)
+            
+            // Return it
+            telomere
+        }
+    }
+    
+    def addAllele(contig: String, phases: Seq[Int], allele: Allele, 
+        referenceLength: Int = -1) = {
+        
+        // Ploidy is number of phases to append to.
+        val ploidy = new PloidyBounds(phases.size, null, null)
+        // Reference length defaults to number of bases in allele.
+        val actualReferenceLength  = if(referenceLength == -1) {
+            // If it's -1 (the default), just use the length of the allele.
+            allele.bases.size
+        } else {
+            // Otherwise use the specified value.
+            referenceLength
+        }
+        
+        // Get the left Side for the new AlleleGroup. It can be generated from
+        // any phase. We know it will be a Face.LEFT Side because of the
+        // preconditions on this method.
+        val leadingSide = getNextSide(contig, phases.head)
+        
+        // Make a right Side for the AlleleGroup (non-reference)
+        val trailingSide = new Side(IDMaker.get(), new Position(contig, 
+            leadingSide.position.base + actualReferenceLength, Face.RIGHT),
+            false)
+            
+            
+        // Make an AlleleGroup with the correct ploidy to be added to that many
+        // phases.
+        val alleleGroup = new AlleleGroup(new Edge(IDMaker.get(), 
+            leadingSide.id, trailingSide.id), allele, ploidy, sample)
+        
+        // Add the new Sides
+        addSide(leadingSide)
+        addSide(trailingSide)
+        
+        phases map { (phase) =>
+            // Add the AlleleGroup into each Phase with a ploidy-1 Adjacency.
+            addAlleleGroup(contig, phase, alleleGroup)
+            // Set the last Side for that phase
+            setLastSide(contig, phase, trailingSide)
+        }
+    }
+    
+    def addAnchor(contig: String, phases: Seq[Int], 
+        referenceLength: Int) : Unit = {
+        
+        if(referenceLength > 0) {
+        
+            // Ploidy is number of phases to append to.
+            val ploidy = new PloidyBounds(phases.size, null, null)
+            
+            // Ensure a telomere exists for all phases
+            phases.map(getLastSide(contig, _))
+            
+            // Get the left Side for the new Anchor. It can be generated from
+            // any phase. We know it will be a Face.LEFT Side because of the
+            // preconditions on this method.
+            val leadingSide = getNextSide(contig, phases.head)
+            
+            // Make a right Side for the Anchor
+            val trailingSide = new Side(IDMaker.get(), new Position(contig, 
+                leadingSide.position.base + referenceLength, Face.RIGHT), false)
+                
+                
+            // Make an Anchor with the correct ploidy to be added to that many
+            // phases.
+            val anchor = new Anchor(new Edge(IDMaker.get(), 
+                leadingSide.id, trailingSide.id), ploidy, sample)
+            
+            // Add the new Sides
+            addSide(leadingSide)
+            addSide(trailingSide)
+            
+            phases map { (phase) =>
+                // Add the Anchor into each Phase with a ploidy-1 Adjacency.
+                addAnchor(contig, phase, anchor)
+                // Set the last Side for that phase
+                setLastSide(contig, phase, trailingSide)
+            }
+        }
+    }
+    
+    def close(contig: String, phase: Int) {
+        // Get the side we have to come after, or a new leading telomere
+        val end = getLastSide(contig, phase)
+        
+        // Create a new side that ought to be at the end of the given contig.
+        val telomere = getNextSide(contig, phase)
+
+        // Make an Adjacency to link them up
+        val adjacency = Adjacency.newBuilder()
+            // Attach the Edge
+            .setEdge(new Edge(IDMaker.get(), end.id, telomere.id))
+            // Set ploidy to exactly 1
+            .setPloidy(new PloidyBounds(1, null, null))
+            // Attach to our genome
+            .setGenome(sample)
+            .build()
+            
+        // Remember everything
+        addSide(telomere)
+        addAdjacency(adjacency)
+        setLastSide(contig, phase, null)
+    }
+}
+
+/**
+ * GraphvizSequenceGraphBuilder: build a sequence graph on disk, writing to a
+ * GraphViz dot file in a streaming fashion.
+ *
+ * TODO: Actually write to disk instead of the GarphViz library.
+ *
+ * Build a graph for the given genome and sample names, and write it to the
+ * given file.
+ *
+ */
+
 
 /**
  *
