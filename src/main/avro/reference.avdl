@@ -45,6 +45,7 @@ protocol ReferenceGenome {
         // What string of bases does the allele represent? An empty string is
         // legal here.
         string bases;
+        string referenceBases;
     }
     
     record Edge {

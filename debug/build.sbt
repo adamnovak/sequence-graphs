@@ -25,3 +25,7 @@ libraryDependencies += "org.rogach" %% "scallop" % "0.9.4"
 libraryDependencies += "ca.innovativemedicine" %% "vcfimp" % "0.7.0"
 
 resolvers += "Akka Repository" at "http://repo.akka.io/releases/"
+
+resolvers += "Hadoop-BAM" at "http://hadoop-bam.sourceforge.net/maven/"
+
+resolvers += "Sonatype" at "http://oss.sonatype.org/content/repositories/snapshots/"
