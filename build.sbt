@@ -36,6 +36,10 @@ libraryDependencies += "org.slf4j" % "slf4j-api" % "1.7.2"
 // files)
 libraryDependencies += "org.apache.commons" % "commons-lang3" % "3.2.1"
 
+// We need Apache Commons IO because "rm -Rf" takes about a hunderd lines of
+// Java.
+libraryDependencies += "commons-io" % "commons-io" % "2.4"
+
 // add hadoop bam and everything
 
 libraryDependencies += "fi.tkk.ics.hadoop.bam" % "hadoop-bam" % "6.1-SNAPSHOT"

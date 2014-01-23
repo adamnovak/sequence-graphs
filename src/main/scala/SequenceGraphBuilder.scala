@@ -18,7 +18,10 @@ import org.apache.spark.SparkContext._
 // import parquet
 import parquet.hadoop.{ParquetOutputFormat, ParquetInputFormat}
 import parquet.avro.{AvroParquetOutputFormat, AvroWriteSupport, 
-                     AvroReadSupport}
+                     AvroReadSupport, AvroParquetWriter}
+
+// We need to make Paths for Parquet output.
+import org.apache.hadoop.fs.Path
 
 // And we use a hack to get at the (static) schemas of generic things
 import org.apache.avro.Schema
@@ -138,8 +141,7 @@ abstract class EasySequenceGraphBuilder(sample: String, reference: String)
     protected def addAnchor(anchor: Anchor) : Unit
     
     /**
-     * Add the given Side to the graph. May be called repeatedly on the same
-     * Side.
+     * Add the given Side to the graph. Called exactly once per Side.
      */
     protected def addSide(side: Side) : Unit
     
@@ -615,12 +617,18 @@ class InMemorySequenceGraphBuilder(sample: String, reference: String)
     }
     
     /**
-     * Given an iteravle of Avro records of type RecordType, writes them to a
+     * Given an iterable of Avro records of type RecordType, writes them to a
      * Parquet file in the specified directory. Any other Parquet data in that
      * directory will be overwritten.
+     *
+     * The caller must have set up Kryo serialization with
+     * `SequenceGraphKryoProperties.setupContextProperties()`, so that Avro
+     * records can be efficiently serialized to send them to the Spark workers.
+     *
      */
     def writeCollectionToParquet[RecordType <: IndexedRecord](
-        things: Iterable[RecordType], directory: String, sc: SparkContext)(implicit m: Manifest[RecordType]) = {
+        things: Iterable[RecordType], directory: String, sc: SparkContext)
+        (implicit m: Manifest[RecordType]) = {
         
         // Every timne we switch Avro schemas, we need a new Job. So we create
         // our own.
@@ -727,18 +735,89 @@ class InMemorySequenceGraphBuilder(sample: String, reference: String)
 
 /**
  * ParquetSequenceGraphBuilder: a class that builds a sequence graph into
- * Parquet files in the specified directory, using the given SparkContext to run
- * its jobs.
+ * Parquet files in the specified directory on the local filesystem. Does not
+ * use Spark, just Parquet Avro directly, doing all writing single-threaded to
+ * single files.
  *
- * TODO: Make streaming. For now just uses an InMemorySequenceGraphBuilder and
- * writes out from that.
+ * If we used Spark, we would have to load all our data into one RDD before
+ * writing it. We could use Spark Streaming to create RDDs batching sequence
+ * graph components as they are generated, and write those, but that solution is
+ * a bit heavy-weight when we're doing all the graph building in a single thread
+ * anyway.
+ *
+ * Using Spark would enable us to get free access to the appropriate HDFS
+ * configuration.
+ *
+ * If the given directory exists, it will be deleted and replaced.
+ *
  */
 class ParquetSequenceGraphBuilder(sample: String, reference: String, 
-    directory: String, sc: SparkContext) 
-    extends InMemorySequenceGraphBuilder(sample, reference) {
+    directory: String) 
+    extends EasySequenceGraphBuilder(sample, reference) {
     
-    // Write out the Parquet files at the end
-    override def finish() = writeParquetFiles(directory, sc)
+    // Remove the output directory, if it exists.
+    val directoryFile = new File(directory)
+    if(directoryFile.exists()) {
+        // We need to delete the directory and everything inside it.
+        // Unfortunately this is hard, so we need to use an external library.
+        // See <http://alvinalexander.com/blog/post/java/java-io-faq-how-delete-
+        // directory-tree>
+        import org.apache.commons.io.FileUtils
+        FileUtils.deleteDirectory(directoryFile)
+    }
+    
+    
+    // Start up writers to the appropriate places. See
+    // <https://github.com/bigdatagenomics/adam/blob/master/adam-
+    // cli/src/main/scala/edu/berkeley/cs/amplab/adam/cli/Bam2Adam.scala>
+    
+    // A writer for Sides, which go in /Sides
+    val sideWriter = new AvroParquetWriter[Side](
+        new Path(directory + "/Sides/sides.parquet"), Side.SCHEMA$)
+        
+    // A writer for Adjacencies, which go in /Adjacencies
+    val adjacencyWriter = new AvroParquetWriter[Adjacency](
+        new Path(directory + "/Adjacencies/adjacencies.parquet"),
+        Adjacency.SCHEMA$)
+        
+    // A writer for AlleleGroups, which go in /AlleleGroups
+    val alleleGroupWriter = new AvroParquetWriter[AlleleGroup](
+        new Path(directory + "/AlleleGroups/AlleleGroups.parquet"),
+        AlleleGroup.SCHEMA$)
+        
+    // A writer for Anchors, which go in /Anchors
+    val anchorWriter = new AvroParquetWriter[Anchor](
+        new Path(directory + "/Anchors/anchors.parquet"),
+        Anchor.SCHEMA$)
+    
+    // Implementations of what we need to be an EasySequenceGraphBuilder. Just
+    // write everything to the appropriate writer.
+    
+    protected def addAlleleGroup(alleleGroup: AlleleGroup) : Unit = {
+        alleleGroupWriter.write(alleleGroup)
+    }
+    
+    protected def addAdjacency(adjacency: Adjacency) : Unit = {
+        adjacencyWriter.write(adjacency)
+    }
+    
+    protected def addAnchor(anchor: Anchor) : Unit = {
+        anchorWriter.write(anchor)
+    }
+    
+    protected def addSide(side: Side) : Unit = {
+        sideWriter.write(side)
+    }
+    
+    override def finish() {
+        // Properly close all the parquet writers, so data gets written.
+        sideWriter.close()
+        adjacencyWriter.close()
+        alleleGroupWriter.close()
+        anchorWriter.close()
+    }
+    
+    
     
 }
 
