@@ -102,7 +102,14 @@ object SequenceGraphs {
         val sample = opts.sampleName.get.get
         
         // Make a new SequenceGraphBuilder to build its graph.
-        val graph = new InMemorySequenceGraphBuilder(sample, "reference")
+        val graph = opts.dotFile.get match {
+            case Some(filename) =>
+                // We want to write Graphviz, so use a Graphviz builder.
+                new GraphvizSequenceGraphBuilder(sample, "reference", filename)
+            case None =>
+                // We don't want to write Graphviz, so use the normal one.
+                new InMemorySequenceGraphBuilder(sample, "reference")
+        }
         
         // Get the actual File or die trying, and then make VcfParser parse
         // that. We need to invoke the VcfParser functor first for some reason.
@@ -113,15 +120,18 @@ object SequenceGraphs {
             importSample(graph, info, entries, sample, chromSizes)
         }
         
-        opts.dotFile.get map { (file) =>
-            // Write out a graphviz graph
-            graph.writeDotFile(file)
+        graph match {
+            case builder : GraphvizSequenceGraphBuilder =>
+                // Write out Graphviz 
+                
+                // TODO: This means we won't actually write any Parquet if we're
+                // writing GraphViz
+                builder.writeDotFile()
+            case builder : InMemorySequenceGraphBuilder =>
+                // Write out Parquet
+                builder.writeParquetFiles(opts.directory.get.get)
         }
         
-        // Write Parquet files to the current directory.
-        graph.writeParquetFiles(opts.directory.get.get)
-        
-        // TODO: Flush logging output from Parquet/Spark stuff.
         println("VCF imported")
         
     }
