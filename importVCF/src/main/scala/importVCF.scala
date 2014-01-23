@@ -29,7 +29,8 @@ object SequenceGraphs {
         // examples.
         val opts = new ScallopConf(args) {
             guessOptionName = true
-            banner("""Usage: importVCF [OPTION]... vcfFile sample output-dir
+            banner("""Usage: importVCF [OPTION] {--dot-file dotFile | 
+                 --parquet-dir parquetDir} vcfFile sample
                 |Import a VCF file to sequence graph format.
                 |Options:
                 |""".stripMargin)
@@ -40,15 +41,15 @@ object SequenceGraphs {
             // What sample should we import?
             val sampleName = trailArg[String](required = true,
                 descr = "Sample to import")
-                
-            val directory = trailArg[String](required = true,
-                descr = "Directory to save under (will overwrite)")
             
             val chromSizes = opt[File](
                 descr = "File of chromosome sizes to read, for end telomeres")
             
             val dotFile = opt[String](
                 descr = "Save a GraphViz graph to this .dot file")
+                
+            val parquetDir = opt[String](
+                descr = "Save Parquet files in this directory (will overwrite)")
             
             val version = opt[Boolean](noshort = true, 
                 descr = "Print version")
@@ -101,14 +102,24 @@ object SequenceGraphs {
         // What sample are we importing?
         val sample = opts.sampleName.get.get
         
-        // Make a new SequenceGraphBuilder to build its graph.
-        val graph = opts.dotFile.get match {
-            case Some(filename) =>
-                // We want to write Graphviz, so use a Graphviz builder.
-                new GraphvizSequenceGraphBuilder(sample, "reference", filename)
-            case None =>
-                // We don't want to write Graphviz, so use the normal one.
-                new InMemorySequenceGraphBuilder(sample, "reference")
+        // Make a new SequenceGraphBuilder to build its graph, of the right type
+        // to write whatever the user is asking for.
+        val graph = if(opts.parquetDir.get isDefined) {
+            // The user wants to write Parquet. TODO: what if they also asked
+            // for a dot file?
+            println("Writing to Parquet")
+            
+            new ParquetSequenceGraphBuilder(sample, "reference", 
+                opts.parquetDir.get.get)
+        } else if (opts.dotFile.get isDefined) {
+            // The user wants to write GraphViz
+            println("Writing to Graphviz")
+            
+            new GraphvizSequenceGraphBuilder(sample, "reference", 
+                opts.dotFile.get.get)
+        } else {
+            // The user doesn't know what they're doing
+            throw new Exception("Must specify --dot-file or --parquet-dir")
         }
         
         // Get the actual File or die trying, and then make VcfParser parse
@@ -120,17 +131,8 @@ object SequenceGraphs {
             importSample(graph, info, entries, sample, chromSizes)
         }
         
-        graph match {
-            case builder : GraphvizSequenceGraphBuilder =>
-                // Write out Graphviz 
-                
-                // TODO: This means we won't actually write any Parquet if we're
-                // writing GraphViz
-                builder.writeDotFile()
-            case builder : InMemorySequenceGraphBuilder =>
-                // Write out Parquet
-                builder.writeParquetFiles(opts.directory.get.get)
-        }
+        // Now finish up the writing
+        graph.finish()
         
         println("VCF imported")
         

@@ -34,5 +34,6 @@ sbt test
 ###Running command-line tools
 
 ```
-./importVCF.sh <vcf file> <sample name> <output directory name>
+./importVCF.sh --parquet-dir <output directory name> <vcf file> <sample name> 
+./importVCF.sh --dot-file <output file name> <vcf file> <sample name>
 ```

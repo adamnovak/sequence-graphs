@@ -84,6 +84,12 @@ trait SequenceGraphBuilder {
      * remember a new leading telomere if none is found.
      */
     def getLastSide(contig: String, phase: Int) : Side
+    
+    /**
+     * Called when the sequence graph is completed, and should be made ready for
+     * reading from.
+     */
+    def finish() = {}
 }
 
 /**
@@ -356,7 +362,7 @@ abstract class EasySequenceGraphBuilder(sample: String, reference: String)
  * GraphvizSequenceGraphBuilder: build a sequence graph on disk, writing to a
  * GraphViz dot file in a streaming fashion.
  *
- * TODO: Actually write to disk instead of the GarphViz library.
+ * TODO: Make streaming. Actually write to disk instead of the GarphViz library.
  *
  * Build a graph for the given genome and sample names, and write it to the
  * given file.
@@ -421,6 +427,20 @@ class GraphvizSequenceGraphBuilder(sample: String, reference: String,
         getNode(side.id)
     }
     
+    
+    // SequenceGraphBuilder hooks we use
+    
+    /**
+     * Write out the graph we have built to the pre-selected GraphViz dot file.
+     */
+    override def finish() {
+        // Write the graph to the file
+        graph.writeTo(new FileOutputStream(file))
+        
+        println("Wrote %s".format(file))
+    }
+    
+    
     // Utility methods we use
     
     /**
@@ -433,18 +453,6 @@ class GraphvizSequenceGraphBuilder(sample: String, reference: String,
             graph.node(node)
             node
         })
-    }
-    
-    // Extra methods we support
-    
-    /**
-     * Write out the graph we have built to the pre-selected GraphViz dot file.
-     */
-    def writeDotFile() {
-        // Write the graph to the file
-        graph.writeTo(new FileOutputStream(file))
-        
-        println("Wrote %s".format(file))
     }
     
 }
@@ -726,6 +734,21 @@ class InMemorySequenceGraphBuilder(sample: String, reference: String)
         writeCollectionToParquet(anchors, directory + "/Anchors")
     }
     
+    
+}
+
+/**
+ * ParquetSequenceGraphBuilder: a class that builds a sequence graph into
+ * Parquet files in the specified directory.
+ *
+ * TODO: Make streaming. For now just uses an InMemorySequenceGraphBuilder and
+ * writes out from that.
+ */
+class ParquetSequenceGraphBuilder(sample: String, reference: String, 
+    directory: String) extends InMemorySequenceGraphBuilder(sample, reference) {
+    
+    // Write out the Parquet files at the end
+    override def finish() = writeParquetFiles(directory)
     
 }
 
