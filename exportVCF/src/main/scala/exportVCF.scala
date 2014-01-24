@@ -64,23 +64,37 @@ class ExportVCF (cluster: String, directory: String, vcfFile: String,
 
   def export() {
 
-    // Work out what jar we live in.
-    val classToSend = classOf[ExportVCF]
-    
-    // Get the .jar it lives in. If it somehow doesn't live in a .jar,
-    // this will error out. See
-    // <http://stackoverflow.com/q/1983839/402891>
-    val jarToSend = classToSend.getProtectionDomain.getCodeSource
-        .getLocation.toString
-        
-    println("We want to send %s".format(jarToSend))
-    
-    // Set up Spark
-    
+    // Set up serialization stuff for Spark so it can efficiently exchange our
+    // Avro records.
     SequenceGraphKryoProperties.setupContextProperties()
+
+    // The first thing we need is a Spark context. We would like to be able to
+    // make one against any Spark URL: either "local" or soemthing like
+    // "mesos://wherever.biz:1234".
+    
+    // Unfortunately, when we use a Mesos URL, Spark dies unless we also give it
+    // a jar from whence it may load... something. Unfortunately, in general a
+    // Java program has no idea where to find such a jar. However, this program
+    // is built with the sbt native packager, which puts all the jars retrieved
+    // from various repositories and from subproject dependencies together in a
+    // big lib folder. So we can look to see what jar this class has been loaded
+    // from, and load up all the jars in that directory.
+    
+    // What File is the jar that this class is from?
+    val jarFile = new File(classOf[ExportVCF].getProtectionDomain.getCodeSource
+        .getLocation.toURI)
+    
+    // What files are in that directory (should all be .jars)? Make a list of
+    // their string paths.
+    val jarsToSend = jarFile.getParentFile.listFiles.map(_.toString).toSeq
+        
+    println("We want to send %s".format(jarsToSend))
+    
+    // Set up Spark, giving it the appropriate cluster URL, the SPARK_HOME
+    // environment variable if set, and the list of jars we have worked out.
     println("Initializing Spark")
     val sc = new SparkContext(cluster, "exportVCF", 
-        System.getenv("SPARK_HOME"), Seq(jarToSend))
+        System.getenv("SPARK_HOME"), jarsToSend)
     println("Spark initialized")
     val job = new Job(sc.hadoopConfiguration)
 
