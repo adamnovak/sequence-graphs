@@ -318,7 +318,11 @@ object SequenceGraphs {
             // At this point, if we don't have None, we know we want this
             // position.
             
-            for(phased <- genotypePhased; indices <- alleleIndices) yield {
+            for(
+                phased <- genotypePhased; 
+                indices <- alleleIndices;
+                genotype <- genotypeString
+            ) yield {
                 // Add the intermediate Anchors between the last variant site
                 // and this one
                 if(phased && lastCallPhased) {
