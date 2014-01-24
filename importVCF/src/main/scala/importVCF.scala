@@ -191,8 +191,10 @@ object SequenceGraphs {
         // sorted by contig and position.
         var lastContig: String = null
         
-        // Where did the last variant end on that contig?
-        var lastEnd: Int = 0
+        // Where did the last variant end on that contig? It's really 1-bast-
+        // the-end, and thus we need to start at 1, since we are using 1-based
+        // indexing and the telomere occupies 0.
+        var lastEnd: Int = 1
         
         for((variant, formats, samples) <- entries
             if variant.filter == Some(FilterResult.Pass)) {
@@ -216,7 +218,8 @@ object SequenceGraphs {
             // Where does it start in the reference?
             val referenceStart = variant.position
             
-            // Where does it end in the reference?
+            // Where does it end in the reference? This is really 1-bast-the-
+            // end, so it's also the next thing's start.
             val referenceEnd = referenceStart + variant.reference.size
             
             // What alleles are available? The reference and all the alternates.
@@ -248,7 +251,9 @@ object SequenceGraphs {
                 // contig, and at the very start.
                 lastCallPhased = true
                 lastContig = contig
-                lastEnd = 0
+                // The start is at 1 due to 1-based indexing (0, before the
+                // beginning, is the telomere, and this is 1-past-the-end)
+                lastEnd = 1
             }
             
             // How far are we from the last variant? If this is 0, no Anchors
@@ -415,11 +420,13 @@ object SequenceGraphs {
                 // We know the chromosome length, so we can add some
                 // trailing telomeres.
                 
-                // How far out do they have to be?
-                val telomereDistance = sizes(lastContig) - lastEnd
+                // How far out do they have to be? The chromosome length is
+                // number of actual bases, and we're using 1-based indexing, so
+                // we need to add 1 here to get long enough.
+                val telomereBases = sizes(lastContig) - lastEnd + 1
                 
                 // Add trailing unphased anchor
-                builder.addAnchor(lastContig, List(0, 1), telomereDistance)
+                builder.addAnchor(lastContig, List(0, 1), telomereBases)
                 
                 // Add trailing telomeres
                 builder.close(lastContig, 0)

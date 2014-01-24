@@ -281,9 +281,11 @@ abstract class EasySequenceGraphBuilder(sample: String, reference: String)
         // preconditions on this method.
         val leadingSide = getNextSide(contig, phases.head)
         
-        // Make a right Side for the AlleleGroup (non-reference)
+        // Make a right Side for the AlleleGroup (non-reference). We subtract 1
+        // from the position because a 1-base AlleleGroup should have the same
+        // numbers on its two Sides (one is left, and the other is right)
         val trailingSide = new Side(IDMaker.get(), new Position(contig, 
-            leadingSide.position.base + actualReferenceLength, Face.RIGHT),
+            leadingSide.position.base + actualReferenceLength - 1, Face.RIGHT),
             false)
             
             
@@ -325,9 +327,13 @@ abstract class EasySequenceGraphBuilder(sample: String, reference: String)
             // preconditions on this method.
             val leadingSide = getNextSide(contig, phases.head)
             
-            // Make a right Side for the Anchor
+            // Make a right Side for the Anchor. We advance by 1 less than the
+            // specified reference length because of the left/right distinction
+            // for Sides: a 1-base anchor has both its Sides at the same
+            // numerical position, on different faces.
             val trailingSide = new Side(IDMaker.get(), new Position(contig, 
-                leadingSide.position.base + referenceLength, Face.RIGHT), false)
+                leadingSide.position.base + referenceLength - 1, Face.RIGHT),
+                false)
                 
                 
             // Make an Anchor with the correct ploidy to be added to that many
