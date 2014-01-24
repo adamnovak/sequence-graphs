@@ -345,7 +345,7 @@ object SequenceGraphs {
                                 (referenceStart:Double)/map(contig) * 100))
                         case None =>
                             println("%s:%d: %s".format(contig, referenceStart, 
-                                genotypeString))
+                                genotype))
                     }
                 }
                 
