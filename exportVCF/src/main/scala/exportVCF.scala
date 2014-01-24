@@ -36,6 +36,9 @@ object ExportVCF {
              |Export a sequence graph to VCF file.
              |Options:
              |""".stripMargin)
+             
+      val cluster = opt[String](default = Some("local"),
+                descr = "Run against this cluster URL") 
       
       val directory = trailArg[String](required = true,
                                        descr = "Directory to read from")
@@ -49,20 +52,39 @@ object ExportVCF {
                               descr = "Show this message")
     } 
 
-    val export = new ExportVCF(opts.directory.get.get, opts.vcfFile.get.get, opts.sample.get.get)
+    val export = new ExportVCF(opts.cluster.get.get, opts.directory.get.get, 
+        opts.vcfFile.get.get, opts.sample.get.get)
 
     export.export()
   }
 }
 
-class ExportVCF (directory: String, vcfFile: String, sample: String) extends Serializable {
+class ExportVCF (cluster: String, directory: String, vcfFile: String, 
+    sample: String) extends Serializable {
 
   def export() {
 
-    // read data in
+    // Work out what jar we live in.
+    val classToSend = classOf[ExportVCF]
+    
+    // Get the .jar it lives in. If it somehow doesn't live in a .jar,
+    // this will error out. See
+    // <http://stackoverflow.com/q/1983839/402891>
+    val jarToSend = classToSend.getProtectionDomain.getCodeSource
+        .getLocation.toString
+        
+    println("We want to send %s".format(jarToSend))
+    
+    // Set up Spark
+    
     SequenceGraphKryoProperties.setupContextProperties()
-    val sc = new SparkContext("local", "exportVCF")
+    println("Initializing Spark")
+    val sc = new SparkContext(cluster, "exportVCF", 
+        Seq(System.getenv("SPARK_EXAMPLES_JAR"), Seq(jarToSend))
+    println("Spark initialized")
     val job = new Job(sc.hadoopConfiguration)
+
+    // read data in
 
     val filePath = directory
 
