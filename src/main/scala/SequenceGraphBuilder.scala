@@ -405,7 +405,7 @@ class GraphvizSequenceGraphBuilder(sample: String, reference: String,
     graphWriter.write("edge [arrowsize=\"0\"];\n")
     
     // And node styles
-    graphWriter.write("node [shape=\"point\", label=\"\"];\n")
+    graphWriter.write("node [shape=\"point\"];\n")
     
     // This holds all the Nodes we have created, by ID
     private val nodes = HashMap.empty[Long, Node]
@@ -442,17 +442,34 @@ class GraphvizSequenceGraphBuilder(sample: String, reference: String,
         val label = "Anchor x%d".format(anchor.ploidy.lower)
         
         // Make an edge for every Anchor
-        graphWriter.write(
-            "%d -> %d [label=\"%s\",color=\"#0000ff\"];\n"
+        graphWriter.write("%d -> %d [label=\"%s\",color=\"#0000ff\"];\n"
             .format(anchor.edge.left, anchor.edge.right, escapeJava(label)))
     }
     
     protected def addSide(side: Side) : Unit = {
-        // We don't really need to define sides, but this should let any sides
-        // we somehow haven't connected show up.
-        graphWriter.write(
-            "%d;\n"
+        // What should we write on the Side?
+        val label = "%s:%d-%s".format(side.position.contig, side.position.base, 
+            side.position.face match {
+                case Face.LEFT => "L"
+                case Face.RIGHT => "R"
+            })
+            
+        // Getting the label on the point is tricky. See 
+        // <http://marc.info/?l=graphviz-interest&m=126029250410816>
+            
+        // Write out a node to label the side (because point nodes can't have
+        // real labels)
+        graphWriter.write("L%d [shape=\"plaintext\",label=\"%s\"];\n"
+            .format(side.id, escapeJava(label)))
+
+        // Write out the Side without a label
+        graphWriter.write("%d;\n"
             .format(side.id))
+            
+        // Connect them with an invisible edge
+        graphWriter.write(
+            "{rank=same %d -> L%d [dir=\"none\",style=\"dotted\"];}\n"
+            .format(side.id, side.id))
     }
     
     
