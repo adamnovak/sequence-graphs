@@ -198,6 +198,14 @@ object SequenceGraphs {
             if variant.filter == Some(FilterResult.Pass)) {
             // For each variant in the file that passed the filters
             
+            // TODO: This whole loop is bad code, working around the lack of a
+            // scala "continue" or other easy way to see that, after we've
+            // gotten some of the way towards processing this variant, we don't
+            // want it after all (and instead we want to complain to the user
+            // about its having been there). The Right Way to implement all this
+            // is probably as a big for comprehension with lots of guards and
+            // code in the for part.
+            
             // What contig is it on?
             val contig: String = variant.chromosome match {
                 case Left(vcfid) => vcfid.toString
@@ -243,35 +251,71 @@ object SequenceGraphs {
                 lastEnd = 0
             }
             
+            // How far are we from the last variant? If this is 0, no Anchors
+            // will actually get added.
+            val referenceDistance = referenceStart - lastEnd
+            
             // This holds the geontype values read for the sample
             val sampleValues = samples(sampleIndex)
             
             // Find the index of the genotype field
             val genotypeIndex = formats indexWhere { (format) =>
                 format.id.id == "GT"
+            } match {
+                // Make it an Option instead of -1 = fail
+                case -1 => None
+                case somethingElse => Some(somethingElse)
             }
             
-            // How far are we from the last variant? If this is 0, no Anchors
-            // will actually get added.
-            val referenceDistance = referenceStart - lastEnd
             
-            if(genotypeIndex != -1) {
-                // We actually have a GT field for this variant
-            
-                // Pull out the genotype string as a String.
-                val genotypeString = sampleValues(genotypeIndex).head match {
+            // Pull out the genotype string as a String.
+            val genotypeString = genotypeIndex.map {(index) =>
+                sampleValues(index).head match {
                     case VcfString(value) => value
                     case somethingElse => throw new Exception(
                         "Got a non-string GT value: %s".format(somethingElse))
                 }
+            }
             
-                // At the moment we support only phased or unphased diploid
-                // genomes.
-                
-                // Is the string a phased genotype? It is if it hasn't got a "/"
-                // in it. TODO: partial phasing like 1|0/2, if that's allowed.
-                val phased = genotypeString contains "|"
-                
+            // Is the string a phased genotype? It is if it hasn't got a "/"
+            // in it.
+            val genotypePhased = genotypeString.map(_ contains "|")
+            
+            // Pull out and intify the two allele indices
+            val alleleIndices : Option[Seq[Int]] = for(
+                genotype <- genotypeString; 
+                phased <- genotypePhased;
+                result <- {
+                    val indices = genotype.split("[|/]").map(_.toInt)
+                    if(indices.size != 2) {
+                        // Complain about non-diploid places
+                        // TODO: Use a logger
+                        println("Warning: non-diploid locus! Skipping!")
+                        // Skip over them. TODO: work out what they really mean.
+                        None
+                    } else if(indices.forall(_ == 0) && 
+                        phased == lastCallPhased &&
+                        !chromSizes.isEmpty) {
+                        
+                        // They are homozygous reference at this position, and
+                        // we don't need this position to change whether we're
+                        // phased or not, and we're guaranteed to get an anchor
+                        // at the end of the chromosome. So, we can just skip
+                        // this position and make it part of the anchor(s) we're
+                        // going to add.
+                        println("Skipping homozygous reference position.")
+                        None
+                    } else {
+                        // We need to keep going with this position.
+                        Some(indices)
+                    }
+                }
+            ) yield result
+            
+            // At this point, if we don't have None, we know we want this
+            // position.
+            
+            for(phased <- genotypePhased; indices <- alleleIndices) yield {
                 // Add the intermediate Anchors between the last variant site
                 // and this one
                 if(phased && lastCallPhased) {
@@ -288,34 +332,24 @@ object SequenceGraphs {
                 // TODO: Add a backwards empty AlleleGroup to discard phasing if
                 // there is no room for an Anchor to do it.
                 
-                // Now we want to add the actual AlleleGroups.
-                
-                // Print progress
-                chromSizes match {
-                    case Some(map) =>
-                        println("%s:%d: %s (%2.2f%%)".format(contig, 
-                            referenceStart, genotypeString, 
-                            (referenceStart:Double)/map(contig) * 100))
-                    case None =>
-                        println("%s:%d: %s".format(contig, referenceStart, 
-                            genotypeString))
-                }
-                
-                
-                
-                // Pull out and intify the two allele indices
-                val alleleIndices = genotypeString.split("[|/]").map(_.toInt)
-                
-                if(alleleIndices.size != 2) {
-                    // Complain about non-diploid places
-                    // TODO: Use a logger
-                    println("Warning: non-diploid locus!")
+                // Report progress
+                if(referenceStart % 100 == 0) {
+                    // Print progress
+                    chromSizes match {
+                        case Some(map) =>
+                            println("%s:%d: %s (%2.2f%%)".format(contig, 
+                                referenceStart, genotypeString, 
+                                (referenceStart:Double)/map(contig) * 100))
+                        case None =>
+                            println("%s:%d: %s".format(contig, referenceStart, 
+                                genotypeString))
+                    }
                 }
                 
                 // Zip allele indices with their phases (confusingly called
                 // "indices" also) using zipWithIndex. So we get (allele, phase)
                 // tuples.
-                val enumeratedIndices = alleleIndices.zipWithIndex
+                val enumeratedIndices = indices.zipWithIndex
                 
                 
                 // Collect by allele index, and pull out phase numbers (so we
@@ -364,7 +398,6 @@ object SequenceGraphs {
                             referenceEnd - referenceStart)
                     }
                 }
-                
                 
                 // Save information about this site
                 lastCallPhased = phased
