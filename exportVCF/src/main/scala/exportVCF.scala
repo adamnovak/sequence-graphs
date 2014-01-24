@@ -80,7 +80,7 @@ class ExportVCF (cluster: String, directory: String, vcfFile: String,
     SequenceGraphKryoProperties.setupContextProperties()
     println("Initializing Spark")
     val sc = new SparkContext(cluster, "exportVCF", 
-        Seq(System.getenv("SPARK_EXAMPLES_JAR"), Seq(jarToSend))
+        System.getenv("SPARK_HOME"), Seq(jarToSend))
     println("Spark initialized")
     val job = new Job(sc.hadoopConfiguration)
 

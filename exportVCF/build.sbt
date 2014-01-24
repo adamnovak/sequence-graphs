@@ -1,4 +1,4 @@
-// Build a tool to dump a sequence graph as JSON
+// Build a tool to dump a sequence graph as VCF
 
 packageArchetype.java_application
 
@@ -31,6 +31,10 @@ libraryDependencies += "picard" % "picard" % "1.93"
 libraryDependencies += "samtools" % "samtools" % "1.93"
 
 libraryDependencies += "cofoja" % "cofoja" % "1.0"
+
+// Get mesos ourselves
+
+libraryDependencies += "org.apache.mesos" % "mesos" % "0.13.0"
 
 // add adam
 
