@@ -294,8 +294,7 @@ object SequenceGraphs {
                     val indices = genotype.split("[|/]").map(_.toInt)
                     if(indices.size != 2) {
                         // Complain about non-diploid places
-                        // TODO: Use a logger
-                        println("Warning: non-diploid locus! Skipping!")
+                        // TODO: Log this.
                         // Skip over them. TODO: work out what they really mean.
                         None
                     } else if(indices.forall(_ == 0) && 
@@ -308,7 +307,6 @@ object SequenceGraphs {
                         // at the end of the chromosome. So, we can just skip
                         // this position and make it part of the anchor(s) we're
                         // going to add.
-                        println("Skipping homozygous reference position.")
                         None
                     } else {
                         // We need to keep going with this position.
@@ -343,7 +341,7 @@ object SequenceGraphs {
                     chromSizes match {
                         case Some(map) =>
                             println("%s:%d: %s (%2.2f%%)".format(contig, 
-                                referenceStart, genotypeString, 
+                                referenceStart, genotype, 
                                 (referenceStart:Double)/map(contig) * 100))
                         case None =>
                             println("%s:%d: %s".format(contig, referenceStart, 
