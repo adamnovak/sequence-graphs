@@ -289,8 +289,6 @@ object SequenceGraphs {
         ) {
             // For each variant in the file that passed the filters
             
-            
-            
             if(contig != lastContig && lastContig != null) {
                 // We're ending an old contig and starting a new one.
                 
@@ -330,7 +328,7 @@ object SequenceGraphs {
             // and this one
             if(genotypePhased && lastCallPhased) {
                 // We need phased anchors, since both this call and the
-                // previous one are phased
+                // previous one are phased. TODO: We assume a diploid genotype.
                 builder.addAnchor(contig, List(0), referenceDistance)
                 builder.addAnchor(contig, List(1), referenceDistance)
                 
@@ -370,8 +368,10 @@ object SequenceGraphs {
                 // For now we handle only string alleles.
                 val alleleString = allele match {
                     case Right(string) => string
-                    case Left(_) => throw new Exception(
-                        "Breakends and ID'd alleles not supported")
+                    case Left(Right(alleleId)) => throw new Exception(
+                        "Found SV allele: %s".format(alleleId))
+                    case Left(Left(breakend)) => throw new Exception(
+                        "Found breakend: %s".format(breakend))
                 }
                 
                 if(genotypePhased) {
