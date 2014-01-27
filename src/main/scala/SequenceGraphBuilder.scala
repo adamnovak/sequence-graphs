@@ -93,6 +93,13 @@ trait SequenceGraphBuilder {
         referenceLength: Long)
         
     /**
+     * Attach Anchors to the ends of some of the specified phases until all the
+     * phases end at the same reference position. Returns that reference
+     * position.
+     */
+    def squareOff(contig: String, phases: Seq[Int]) : Long
+        
+    /**
      * Add a trailing telomere to the given phase of the given contig, closing
      * it off to the given length. Attach to the last thing we have there
      * with an Adjacency. Will create a new leading telomere if nothing is in
@@ -254,29 +261,6 @@ abstract class EasySequenceGraphBuilder(sample: String, reference: String)
     }
     
     /**
-     * Attach Anchors to the ends of some of the specified phases until all the
-     * phases end at the same reference position.
-     */
-    protected def squareOff(contig: String, phases: Seq[Int]) : Unit = {
-        // Where do all the phases end?
-        val ends = phases.map(getLastSide(contig, _).position.base)
-        
-        // Work out what position we need to square off up to.
-        val targetPosition = ends.max
-            
-        // Put Anchors up to there.
-        phases.zip(ends).map { (pair) =>
-            // Unpack the pair
-            val (phase, end) = pair
-            
-            if(end < targetPosition) {
-                // Pad up to TargetPosition with an anchor
-                addAnchor(contig, List(phase), end + 1, targetPosition - end)
-            }
-        }
-    }
-    
-    /**
      * Attach the given AlleleGroup to the end of the given contig's given
      * phase. The caller is responsible for also setting the last Side of that
      * contig and phase with `setLastSide`, and adding the AlleleGroup to the
@@ -333,6 +317,28 @@ abstract class EasySequenceGraphBuilder(sample: String, reference: String)
     }
     
     // These are the SequenceGraphBuilder method implementations
+    
+    def squareOff(contig: String, phases: Seq[Int]) : Long = {
+        // Where do all the phases end?
+        val ends = phases.map(getLastSide(contig, _).position.base)
+        
+        // Work out what position we need to square off up to.
+        val targetPosition = ends.max
+            
+        // Put phased Anchors up to there.
+        phases.zip(ends).map { (pair) =>
+            // Unpack the pair
+            val (phase, end) = pair
+            
+            if(end < targetPosition) {
+                // Pad up to TargetPosition with an anchor
+                addAnchor(contig, List(phase), end + 1, targetPosition - end)
+            }
+        }
+        
+        // Return the position where all those phases now end.
+        targetPosition
+    }
     
     def getLastSide(contig: String, phase: Int) : Side = {
         ends.get((contig, phase)) getOrElse {

@@ -237,11 +237,6 @@ object SequenceGraphs {
         // sorted by contig and position.
         var lastContig: String = null
         
-        // Where did the last variant end on that contig? It's really 1-bast-
-        // the-end, and thus we need to start at 1, since we are using 1-based
-        // indexing and the telomere occupies 0.
-        var lastEnd: Int = 1
-        
         // How far is there a deletion until in each phase of the current
         // contig? Don't make any graph in any phase if there's something in
         // here greater than its start position. TODO: what if variants overlap
@@ -352,20 +347,24 @@ object SequenceGraphs {
             if(contig != lastContig && lastContig != null) {
                 // We're ending an old contig and starting a new one.
                 
-                chromSizes.map { (sizes) =>
-                    // We know the chromosome length, so we can add some
-                    // trailing telomeres.
-                    
-                    // How far out do they have to be?
-                    val telomereDistance = sizes(lastContig) - lastEnd
-                    
-                    // Add trailing unphased anchor
-                    builder.addAnchor(lastContig, List(0, 1), lastEnd, 
+                // Square off the ends of the phases with phased Anchors.
+                val lastEnd = builder.squareOff(lastContig, List(0, 1))
+                
+                for(
+                    // We have a chromosome sizes map
+                    sizes <- chromSizes;
+                    // For each phase
+                    phase <- List(0, 1);
+                    // Work out how far we have to go to reach the telomere
+                    telomereDistance <- Some(sizes(lastContig) - lastEnd)
+                ) {
+                    // Add trailing phased anchor. We can trivially phase here
+                    // since sample is homozygous reference.
+                    builder.addAnchor(lastContig, List(phase), lastEnd, 
                         telomereDistance)
                     
-                    // Add trailing telomeres
-                    builder.close(lastContig, 0, sizes(lastContig))
-                    builder.close(lastContig, 1, sizes(lastContig))
+                    // Add trailing telomere
+                    builder.close(lastContig, phase, sizes(lastContig))
                 }
                 
                 // Create new leading telomeres
@@ -376,14 +375,7 @@ object SequenceGraphs {
                 // contig, and at the very start.
                 lastCallPhased = true
                 lastContig = contig
-                // The start is at 1 due to 1-based indexing (0, before the
-                // beginning, is the telomere, and this is 1-past-the-end)
-                lastEnd = 1
             }
-            
-            // How far are we from the last variant? If this is 0, no Anchors
-            // will actually get added.
-            val referenceDistance = referenceStart - lastEnd
             
             // Add the intermediate Anchors between the last variant site and
             // this one. If there's no actual space between the sites, it will
@@ -392,13 +384,22 @@ object SequenceGraphs {
             if(genotypePhased && lastCallPhased) {
                 // We need phased anchors, since both this call and the
                 // previous one are phased. TODO: We assume a diploid genotype.
-                builder.addAnchor(contig, List(0), lastEnd, referenceDistance)
-                builder.addAnchor(contig, List(1), lastEnd, referenceDistance)
+                
+                builder.addAnchor(contig, List(0), builder.getLastSide(contig, 0).position.base, referenceEnd - builder.getLastSide(contig, 0).position.base)
+                builder.addAnchor(contig, List(1), builder.getLastSide(contig, 1).position.base, referenceEnd - builder.getLastSide(contig, 1).position.base)
                 
             } else {
-                // We need an unphased anchor.
+                // We need an unphased anchor. This can only happen if we aren't
+                // currently inside a deletion or other structural variant.
+                // TODO: enforce that.
+                
+                // Square off the ends of the phases with phased Anchors if
+                // needed.
+                val lastEnd = builder.squareOff(lastContig, List(0, 1))
+                
+                // Add the unphased anchor after those.
                 builder.addAnchor(contig, List(0, 1), lastEnd,
-                    referenceDistance)
+                    referenceEnd - lastEnd)
             }
             
             
@@ -558,7 +559,6 @@ object SequenceGraphs {
             // Save information about this site
             lastCallPhased = genotypePhased
             lastContig = contig
-            lastEnd = referenceEnd
         }
         
         // Now we've gone through all variants in the file.
@@ -568,6 +568,9 @@ object SequenceGraphs {
             chromSizes.map { (sizes) =>
                 // We know the chromosome length, so we can add some
                 // trailing telomeres.
+                
+                // Square off the ends of the phases with phased Anchors.
+                val lastEnd = builder.squareOff(lastContig, List(0, 1))
                 
                 // How far out do they have to be? The chromosome length is
                 // number of actual bases, and we're using 1-based indexing, so
