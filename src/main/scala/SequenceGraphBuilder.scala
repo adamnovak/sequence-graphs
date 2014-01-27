@@ -111,12 +111,68 @@ trait SequenceGraphBuilder {
 }
 
 /**
+ * Represents a SequenceGraphBuilder that, in addition to taking Alleles and
+ * Anchors on phases, can support wiring up nonreference adjacencies.
+ */
+trait StructuralSequenceGraphBuilder extends SequenceGraphBuilder {
+
+    /**
+     * Add a deletion on the specified phases of the specified contig, running
+     * from the current end position and consuming the specified number of
+     * bases.
+     *
+     * The next thing added to any of the given phases will be placed after the
+     * end of the deletion. It is the caller's responsibility not to add the
+     * things that should have been deleted, and deal with e.g. deletions which
+     * end in the middle of where the caller might want to put, say, an unphased
+     * AlleleGroup.
+     */
+    def addDeletion(contig: String, phases: Seq[Int], length: Int)
+    
+    // Insertions are handled through addAllele, using the referenceLength
+    // parameter. If the sequence is unknown, the caller has to make an ALlele
+    // with a run of Ns.
+    
+    /**
+     * Add an inversion of the specified length to the specified phases of the
+     * specified contig. Should be called when the current end of the contig is
+     * at the start of the inversion. When enough AlleleGroups and Anchors have
+     * been added to reach the end of the inversion, the Adjacencies defining
+     * the inversion will be added.
+     *
+     * Calls to addAnchor and addAlleleGroup will be intercepted and modified in
+     * order to break AlleleGroups or Anchors that would cover the endpoint of
+     * the inversion into two pieces, to provide an attachment point for the new
+     * adjacencies.
+     */
+    def addInversion(contig: String, phases: Seq[Int], length: Int)
+    
+    /**
+     * Add a tandem duplication of the specified length to the specified phases
+     * of the specified contig. Should be called when the cirrent end of the
+     * contig is at the start of the region to be duplicated. When enough
+     * AlleleGroups and Anchors have been added to reach the end of the
+     * duplication, the Adjacencies defining the duplication will be added.
+     *
+     * Note that a tandem duplication constructed in this way cannot be
+     * distinguished from an additional circular chromosome.
+     *
+     * Calls to addAnchor and addAlleleGroup will be intercepted and modified in
+     * order to break AlleleGroups or Anchors that would cover the endpoint of
+     * the duplication into two pieces, to provide an attachment point for the
+     * new adjacencies.
+     */
+    def addDuplication(contig: String, phases: Seq[Int], length: Int)
+    
+}
+
+/**
  * EasySequenceGraphBuilder: Implement most of the functionality of a
- * SequenceGraphBuilder, leaving just the part about actually providing a way to
- * write graph elements.
+ * StructuralSequenceGraphBuilder, leaving just the part about actually
+ * providing a way to write graph elements.
  */
 abstract class EasySequenceGraphBuilder(sample: String, reference: String)
-    extends SequenceGraphBuilder {
+    extends StructuralSequenceGraphBuilder {
     
     // This mutable HashMap holds all the Sides at the ends of chromosomes, by
     // contig name and phase number (usually 0 or 1).
@@ -162,24 +218,27 @@ abstract class EasySequenceGraphBuilder(sample: String, reference: String)
      * face of the next unaccounted-for base of the given phase of the given
      * contig.
      *
+     * Optionally, skip ahead a specified number of bases.
+     *
      * If there is nothing at the end of that phase of that contig, adds a
      * telomere first.
      */
-    def getNextSide(contig: String, phase: Int) : Side = {
+    def getNextSide(contig: String, phase: Int, skip: Int = 0) : Side = {
         // Go get the last Side, adding a telomere if necessary.
         val end = getLastSide(contig, phase)
         
-        // Flip to the opposite face
-        val newFace = end.position.face match {
-            case Face.LEFT => Face.RIGHT
-            case Face.RIGHT => Face.LEFT
+        if(end.position.face != Face.RIGHT) {
+            // Sanity-check the trailing base, so we don't accidentally go
+            // backwards in the reference.
+            throw new Exception("A 5' Face is trailing contig %s phase %d"
+                .format(contig, phase))
         }
         
-        // Advance or un-advance the base
-        val newBase = end.position.face match {
-            case Face.LEFT => end.position.base - 1
-            case Face.RIGHT => end.position.base + 1
-        }
+        // Flip to the opposite face
+        val newFace = Face.LEFT
+        
+        // Advance the base, skipping if desired.
+        val newBase = end.position.base + 1 + skip
          
         // Make and return a new Side that comes directly after the last one
         // (which may have been a leading telomere)
@@ -314,7 +373,8 @@ abstract class EasySequenceGraphBuilder(sample: String, reference: String)
     def addAnchor(contig: String, phases: Seq[Int], 
         referenceLength: Int) : Unit = {
         
-        if(referenceLength > 0) {
+        if(referenceLength >= 0) {
+            // 0-length Anchors are allowed, but negative-length ones are not.
         
             // Ploidy is number of phases to append to.
             val ploidy = new PloidyBounds(phases.size, null, null)
@@ -379,6 +439,50 @@ abstract class EasySequenceGraphBuilder(sample: String, reference: String)
         addAdjacency(adjacency)
         setLastSide(contig, phase, null)
     }
+    
+    // Structural variants (StructuralSequenceGraphBuilder methods)
+    
+    def addDeletion(contig: String, phases: Seq[Int], length: Int) = {
+        // The next thing we add to any of these Phases needs to be at least
+        // that far away. We accomplish this by adding dummy backwards-going
+        // Anchors at the end of the deletion.
+        
+        phases.map { (phase) =>
+        
+            // Ensure a telomere exists for the phase
+            getLastSide(contig, phase)
+            
+            // Get the left Side for the new Anchor, skipping the length of the
+            // deletion.
+            val leadingSide = getNextSide(contig, phase, length)
+            
+            // Make a right Side for the Anchor. It will have the numerical
+            // position of 1 *before* that of the left side of the Anchor.
+            val trailingSide = new Side(IDMaker.get(), new Position(contig, 
+                leadingSide.position.base - 1, Face.RIGHT), false)
+                
+            // Make an Anchor with ploidy 1
+            val ploidy = new PloidyBounds(1, null, null)
+            val anchor = new Anchor(new Edge(IDMaker.get(), 
+                leadingSide.id, trailingSide.id), ploidy, sample)
+            
+            // Add the new Sides
+            addSide(leadingSide)
+            addSide(trailingSide)
+            
+            // Add the Anchor itself
+            addAnchor(anchor)
+            
+            // Connect the Anchor into this phase with a ploidy-1 Adjacency.
+            connectAnchor(contig, phase, anchor)
+            // Set the last Side for this phase
+            setLastSide(contig, phase, trailingSide)
+        }
+    }
+    
+    def addInversion(contig: String, phases: Seq[Int], length: Int) = {}
+    
+    def addDuplication(contig: String, phases: Seq[Int], length: Int) = {}
 }
 
 /**

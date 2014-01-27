@@ -1,5 +1,7 @@
 package edu.ucsc.genome.ImportVCF
 
+import scala.collection.mutable.HashMap
+
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
 import edu.ucsc.genome._
@@ -192,9 +194,9 @@ object SequenceGraphs {
     
     /**
      *
-     *   Import a sample into the given SequenceGraphBuilder from a VCF, creating
-     *   a list of Sides and a list of SequenceGraphEdges, as well as Sites and
-     *   Breakpoints for them to be in, and Alleles they contain.
+     *   Import a sample into the given StructuralSequenceGraphBuilder from a
+     *   VCF, creating a list of Sides and a list of SequenceGraphEdges, as well
+     *   as Sites and Breakpoints for them to be in, and Alleles they contain.
      *
      *   Optionally accepts a chromosome sizes map (of integer lengths by
      *   chromosome name), which, if specified, enables the creation of trailing
@@ -204,7 +206,7 @@ object SequenceGraphs {
      *   the name of the sample to import.
      * 
      */
-    def importSample(builder: SequenceGraphBuilder, info: VcfInfo, 
+    def importSample(builder: StructuralSequenceGraphBuilder, info: VcfInfo, 
         entries: Iterator[(Variant, List[Metadata.Format], 
         List[List[List[VcfValue]]])], sampleName: String, 
         chromSizes: Option[Map[String, Int]]) {
@@ -239,6 +241,12 @@ object SequenceGraphs {
         // the-end, and thus we need to start at 1, since we are using 1-based
         // indexing and the telomere occupies 0.
         var lastEnd: Int = 1
+        
+        // How far is there a deletion until in each phase of the current
+        // contig? Don't make any graph in any phase if there's something in
+        // here greater than its start position. TODO: what if variants overlap
+        // the ends of deletions?
+        val deletedUntil = HashMap.empty[Int, Int]
         
         for(
             // Take appart the variant and see if we really want to process it.
@@ -332,7 +340,11 @@ object SequenceGraphs {
             // by allele index). For phased sites, we look at the phase numbers.
             // For unphased sites, we just look at the number of phases.
             phasesByAlleleIndex <- Some(enumeratedIndices.groupBy(_._1)
-                .mapValues(_.map(_._2)))
+                .mapValues(_.map(_._2).filter { (phase) =>
+                    // Only let through phases that aren't deleted at the
+                    // variant's start point
+                    referenceStart > deletedUntil.getOrElse(phase, -1)
+                }))
             
         ) {
             // For each variant in the file that passed the filters
@@ -389,7 +401,7 @@ object SequenceGraphs {
             // there is no room for an Anchor to do it.
             
             // Report progress
-            if(referenceStart % 100 == 0) {
+            if(referenceStart % 1 == 0) {
                 // Print progress
                 chromSizes match {
                     case Some(map) =>
@@ -459,11 +471,21 @@ object SequenceGraphs {
                                         .format(somethingElse))
                             }
                             
+                        // Get the (only) structural variant end position, which
+                        // is optional.
+                        val variantEnd = getFieldValues(variant.info,
+                            "END") match {
+                                case Some(VcfInteger(head) :: Nil) => Some(head)
+                                case somethingElse => None
+                            }
+                            
                         println("Structural variant: %s".format(variantType))
                         
                         variantType match {
                             case "INS" =>
-                                // Process an insert
+                                // Process an insert. SVLEN tells us how many
+                                // new bases the insert contains, in addition to
+                                // the reference allele.
                                 
                                 // How many bases do we need? Reference length
                                 // plus SVLEN, and all of them are N since we
@@ -487,8 +509,32 @@ object SequenceGraphs {
                                         new Allele(bases, variant.reference), 
                                         referenceEnd - referenceStart)
                                 }
+                            case "DEL" =>
+                                // Process a deletion. SVLEN should be negative
+                                // and say how many bases relative to the
+                                // reference allele were lost. So a reference
+                                // allele of A with SVLEN=-1 means the alt
+                                // allele is "".
                                 
+                                // Get the recorded END, or try to reconstruct
+                                // it.
+                                val endpoint = variantEnd.getOrElse {
+                                    (referenceStart + -variantLength)
+                                }
                                 
+                                // Phasing doesn't really matter here. Add as
+                                // deletion up to the endpoint.
+                                builder.addDeletion(contig, phases,
+                                    endpoint - referenceStart)
+                                    
+                                // Now remember where we are deleted until the
+                                // endpoint on each phase. TODO: This will cause
+                                // trouble if e.g. a sample has a small deletion
+                                // and a larger spanning deletion, and they are
+                                // unphased and both end up on phase 0.
+                                phases.map { (phase) =>
+                                   deletedUntil(phase) = endpoint
+                                }
                         }
                             
                         
