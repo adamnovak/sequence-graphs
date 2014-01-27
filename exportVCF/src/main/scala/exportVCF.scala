@@ -72,13 +72,14 @@ class ExportVCF (cluster: String, directory: String, vcfFile: String,
     // make one against any Spark URL: either "local" or soemthing like
     // "mesos://wherever.biz:1234".
     
-    // Unfortunately, when we use a Mesos URL, Spark dies unless we also give it
-    // a jar from whence it may load... something. Unfortunately, in general a
-    // Java program has no idea where to find such a jar. However, this program
-    // is built with the sbt native packager, which puts all the jars retrieved
-    // from various repositories and from subproject dependencies together in a
-    // big lib folder. So we can look to see what jar this class has been loaded
-    // from, and load up all the jars in that directory.
+    // Unfortunately, when we use a Mesos URL, Spark dies. In an effor to
+    // appease it, we try to give it all of the .jars our program uses.
+    // Unfortunately, in general a Java program has no idea where to find these
+    // jars. However, this program is built with the sbt native packager, which
+    // puts all the jars retrieved from various repositories and from subproject
+    // dependencies together in a big lib folder. So we can look to see what jar
+    // this class has been loaded from, and load up all the jars in that
+    // directory.
     
     // What File is the jar that this class is from?
     val jarFile = new File(classOf[ExportVCF].getProtectionDomain.getCodeSource
