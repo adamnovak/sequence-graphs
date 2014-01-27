@@ -147,6 +147,50 @@ object SequenceGraphs {
     }
     
     /**
+     * Given a VCF Format or Info metadata field list, a list of values for
+     * those fields, and the name of the desired field, find the appropriate
+     * metadata item for the field, and get the corresponding value(s). If no
+     * field with the given name is found, returns None.
+     */
+    def getFieldValues(formats: Seq[Metadata.HasID], 
+        sampleValues: Seq[List[VcfValue]], fieldName: String):
+        Option[List[VcfValue]] = {
+        
+        for(
+            // Find the index of the field
+            index <- formats indexWhere { (format) =>
+                format.id.id == fieldName
+            } match {
+                // Make it an Option instead of -1 = fail
+                case -1 => None
+                case somethingElse => Some(somethingElse)
+            };
+            
+            // Pull out the value list
+            result <- Some(sampleValues(index))
+        ) 
+        // Give back the value list. Will give back None if we don't find the
+        // value list.
+        yield result
+    }
+    
+    /**
+     * Given a map from VCF Format or Info metadata fields to lists of values,
+     * look up the appropriate value list by ID.
+     */
+    def getFieldValues(map: Map[_ <: Metadata.HasID, List[VcfValue]], 
+        fieldName: String): Option[List[VcfValue]] = {
+        
+        // Pull apart the metadatas and value lists. It doesn't really help to
+        // have an efficient lookup by things we can't construct.
+        val (metadatas, values) = map.unzip
+        
+        // Go look up by list traversal.
+        getFieldValues(metadatas.toSeq, values.toSeq, fieldName)
+        
+    }
+    
+    /**
      *
      *   Import a sample into the given SequenceGraphBuilder from a VCF, creating
      *   a list of Sides and a list of SequenceGraphEdges, as well as Sites and
@@ -156,8 +200,8 @@ object SequenceGraphs {
      *   chromosome name), which, if specified, enables the creation of trailing
      *   telomeres (since we know where to put them)
      *   
-     *   Takes the VCF header metadata, an iterator over the VCF's variants, and the
-     *   name of the sample to import.
+     *   Takes the VCF header metadata, an iterator over the VCF's variants, and
+     *   the name of the sample to import.
      * 
      */
     def importSample(builder: SequenceGraphBuilder, info: VcfInfo, 
@@ -233,8 +277,12 @@ object SequenceGraphs {
                 case somethingElse => Some(somethingElse)
             };
             
+            // Get the genotype(s) list for the sample. It should contain only
+            // one genotype. TODO: So something special if "GT" isn't found.
+            genotypes <- getFieldValues(formats, sampleValues, "GT");
+            
             // Pull out the genotype string as a String.
-            genotypeString <- sampleValues(genotypeIndex).head match {
+            genotypeString <- genotypes.head match {
                 case VcfString(value) =>
                     // We found the genotype string.
                     Some(value)
@@ -366,32 +414,89 @@ object SequenceGraphs {
                     alleles(alleleIndex)
                 
                 // For now we handle only string alleles.
-                val alleleString = allele match {
-                    case Right(string) => string
-                    case Left(Right(alleleId)) => throw new Exception(
-                        "Found SV allele: %s".format(alleleId))
+                allele match {
+                    case Right(alleleString) =>
+                        // We have a normal string replacement allele.
+                        if(genotypePhased) {
+                            // Add a different AlleleGroup to each phase
+                            phases.map { (phase) =>
+                                builder.addAllele(contig, List(phase), 
+                                    new Allele(alleleString, variant.reference), 
+                                    referenceEnd - referenceStart)
+                            }
+                        } else {
+                            // Add one AlleleGroup to all of the phases listed,
+                            // with a ploidy equal to the list length. We handle
+                            // the fact that, at this point, we can't tell the
+                            // difference between any phases by having some
+                            // intervening single Anchor in both phases between
+                            // the AlleleGroups for this variant and anything
+                            // else.
+                            builder.addAllele(contig, phases, 
+                                new Allele(alleleString, variant.reference), 
+                                referenceEnd - referenceStart)
+                        }
+                    case Left(Right(alleleId)) =>
+                        // We have a named allele. Ignore the ID, but look at
+                        // the SVTYPE and SVLEN to figure out what to do.
+                        
+                        // Get the (only) structural variant type.
+                        // TODO: Stick list logic into getFieldValues?
+                        val variantType = getFieldValues(variant.info,
+                            "SVTYPE") match {
+                                case Some(VcfString(head) :: Nil) => head
+                                case somethingElse => throw new Exception(
+                                    "Bad structural variant type: %s"
+                                        .format(somethingElse))
+                            }
+                            
+                        // Get the (only) structural variant length
+                        val variantLength = getFieldValues(variant.info,
+                            "SVLEN") match {
+                                case Some(VcfInteger(head) :: Nil) => head
+                                case somethingElse => throw new Exception(
+                                    "Bad structural variant length: %s"
+                                        .format(somethingElse))
+                            }
+                            
+                        println("Structural variant: %s".format(variantType))
+                        
+                        variantType match {
+                            case "INS" =>
+                                // Process an insert
+                                
+                                // How many bases do we need? Reference length
+                                // plus SVLEN, and all of them are N since we
+                                // have no sequence.
+                                val bases = "N" * (referenceEnd -
+                                    referenceStart + variantLength)
+                                
+                                if(genotypePhased) {
+                                    // Add a different AlleleGroup to each phase
+                                    phases.map { (phase) =>
+                                        builder.addAllele(contig, List(phase), 
+                                            new Allele(bases, 
+                                                variant.reference), 
+                                            referenceEnd - referenceStart)
+                                    }
+                                } else {
+                                    // Add one AlleleGroup to all of the phases
+                                    // listed, with a ploidy equal to the list
+                                    // length.
+                                    builder.addAllele(contig, phases, 
+                                        new Allele(bases, variant.reference), 
+                                        referenceEnd - referenceStart)
+                                }
+                                
+                                
+                        }
+                            
+                        
                     case Left(Left(breakend)) => throw new Exception(
                         "Found breakend: %s".format(breakend))
                 }
                 
-                if(genotypePhased) {
-                    // Add a different AlleleGroup to each phase
-                    phases.map { (phase) =>
-                        builder.addAllele(contig, List(phase), 
-                            new Allele(alleleString, variant.reference), 
-                            referenceEnd - referenceStart)
-                    }
-                } else {
-                    // Add one AlleleGroup to all of the phases listed, with
-                    // a ploidy equal to the list length. We handle the fact
-                    // that, at this point, we can't tell the difference
-                    // between any phases by having some intervening single
-                    // Anchor in both phases between the AlleleGroups for
-                    // this variant and anything else.
-                    builder.addAllele(contig, phases, 
-                        new Allele(alleleString, variant.reference), 
-                        referenceEnd - referenceStart)
-                }
+                
             }
             
             // Save information about this site
