@@ -61,7 +61,9 @@ trait SequenceGraphBuilder {
     /**
      * Append a new AlleleGroup holding the given allele to all of the given
      * phases of the given contig. The total ploidy is exactly equal to the
-     * number of phases to which the allele is being appended. The
+     * number of phases to which the allele is being appended. The AlleleGroup
+     * starts at the given reference start position, but the caller is
+     * responsible for adding any Anchors that are necessary beforehand. The
      * referenceLength parameter specifies the length of the reference Site
      * which the AlleleGroup is to occupy (i.e. how far its ending Side should
      * be from its starting Side); by default this is the number of bases in the
@@ -71,13 +73,13 @@ trait SequenceGraphBuilder {
      * starting position of the Site this AlleleGroup occupies. All phases
      * specified must currently end with `Face.RIGHT` Sides.
      */
-    def addAllele(contig: String, phases: Seq[Int], allele: Allele, 
-        referenceLength: Int = -1)
+    def addAllele(contig: String, phases: Seq[Int], start: Long, allele: Allele, 
+        referenceLength: Long = -1)
         
     /**
      * Add an Anchor, with ploidy equal to the number of phases specified here,
-     * to the given phases of the given contigs. The anchor will run for the
-     * specified number of bases.
+     * to the given phases of the given contigs. The anchor will start at the
+     * given start position, and run for the specified number of bases.
      *
      * If referenceLength is 0, does nothing.
      *
@@ -87,15 +89,16 @@ trait SequenceGraphBuilder {
      *
      * TODO: Unify somewhow with addAllele.
      */
-    def addAnchor(contig: String, phases: Seq[Int], 
-        referenceLength: Int)
+    def addAnchor(contig: String, phases: Seq[Int], start: Long,
+        referenceLength: Long)
         
     /**
-     * Add a trailing telomere to the given phase of the given contig. Attach it
-     * to the last thing we have there with an Adjacency. Will create a new
-     * leading telomere if nothing is in that phase of that contig already.
+     * Add a trailing telomere to the given phase of the given contig, closing
+     * it off to the given length. Attach to the last thing we have there
+     * with an Adjacency. Will create a new leading telomere if nothing is in
+     * that phase of that contig already.
      */
-    def close(contig: String, phase: Int)
+    def close(contig: String, phase: Int, length: Long)
         
     /**
      * Get the last Side on the given contig in the given phase, or add and
@@ -118,7 +121,7 @@ trait StructuralSequenceGraphBuilder extends SequenceGraphBuilder {
 
     /**
      * Add a deletion on the specified phases of the specified contig, running
-     * from the current end position and consuming the specified number of
+     * from the given start position and consuming the specified number of
      * bases.
      *
      * The next thing added to any of the given phases will be placed after the
@@ -127,7 +130,7 @@ trait StructuralSequenceGraphBuilder extends SequenceGraphBuilder {
      * end in the middle of where the caller might want to put, say, an unphased
      * AlleleGroup.
      */
-    def addDeletion(contig: String, phases: Seq[Int], length: Int)
+    def addDeletion(contig: String, phases: Seq[Int], start: Long, length: Long)
     
     // Insertions are handled through addAllele, using the referenceLength
     // parameter. If the sequence is unknown, the caller has to make an ALlele
@@ -145,7 +148,8 @@ trait StructuralSequenceGraphBuilder extends SequenceGraphBuilder {
      * the inversion into two pieces, to provide an attachment point for the new
      * adjacencies.
      */
-    def addInversion(contig: String, phases: Seq[Int], length: Int)
+    def addInversion(contig: String, phases: Seq[Int], start: Long,
+        length: Long)
     
     /**
      * Add a tandem duplication of the specified length to the specified phases
@@ -162,7 +166,8 @@ trait StructuralSequenceGraphBuilder extends SequenceGraphBuilder {
      * the duplication into two pieces, to provide an attachment point for the
      * new adjacencies.
      */
-    def addDuplication(contig: String, phases: Seq[Int], length: Int)
+    def addDuplication(contig: String, phases: Seq[Int], start: Long,
+        length: Long)
     
 }
 
@@ -214,16 +219,24 @@ abstract class EasySequenceGraphBuilder(sample: String, reference: String)
     }
     
     /**
+    * Make a Side that could be the next Side on the given contig, advancing
+    * ahead to the given reference position.
+    */
+    def getNextSide(contig: String, phase: Int, position: Long) : Side = {
+        // Make and return a new Side that comes at the given position.
+        new Side(IDMaker.get(), new Position(contig, position, Face.LEFT),
+            false)
+    }
+    
+    /**
      * Create and return (but do not remember) a Side corresponding to the 5'
      * face of the next unaccounted-for base of the given phase of the given
      * contig.
      *
-     * Optionally, skip ahead a specified number of bases.
-     *
      * If there is nothing at the end of that phase of that contig, adds a
      * telomere first.
      */
-    def getNextSide(contig: String, phase: Int, skip: Int = 0) : Side = {
+    def getNextSide(contig: String, phase: Int) : Side = {
         // Go get the last Side, adding a telomere if necessary.
         val end = getLastSide(contig, phase)
         
@@ -234,15 +247,33 @@ abstract class EasySequenceGraphBuilder(sample: String, reference: String)
                 .format(contig, phase))
         }
         
-        // Flip to the opposite face
-        val newFace = Face.LEFT
-        
-        // Advance the base, skipping if desired.
-        val newBase = end.position.base + 1 + skip
+        // Advance the base
+        val newBase = end.position.base + 1
          
-        // Make and return a new Side that comes directly after the last one
-        // (which may have been a leading telomere)
-        new Side(IDMaker.get(), new Position(contig, newBase, newFace), false)
+        getNextSide(contig, phase, newBase)
+    }
+    
+    /**
+     * Attach Anchors to the ends of some of the specified phases until all the
+     * phases end at the same reference position.
+     */
+    protected def squareOff(contig: String, phases: Seq[Int]) : Unit = {
+        // Where do all the phases end?
+        val ends = phases.map(getLastSide(contig, _).position.base)
+        
+        // Work out what position we need to square off up to.
+        val targetPosition = ends.max
+            
+        // Put Anchors up to there.
+        phases.zip(ends).map { (pair) =>
+            // Unpack the pair
+            val (phase, end) = pair
+            
+            if(end < targetPosition) {
+                // Pad up to TargetPosition with an anchor
+                addAnchor(contig, List(phase), end + 1, targetPosition - end)
+            }
+        }
     }
     
     /**
@@ -321,8 +352,14 @@ abstract class EasySequenceGraphBuilder(sample: String, reference: String)
         }
     }
     
-    def addAllele(contig: String, phases: Seq[Int], allele: Allele, 
-        referenceLength: Int = -1) = {
+    def addAllele(contig: String, phases: Seq[Int], start: Long, allele: Allele, 
+        referenceLength: Long = -1) = {
+        
+        if(phases.size > 1) {
+            // Make sure we have an even starting point to add on to (so we
+            // don't create deletions that aren't real).
+            squareOff(contig, phases)
+        }
         
         // Ploidy is number of phases to append to.
         val ploidy = new PloidyBounds(phases.size, null, null)
@@ -338,7 +375,7 @@ abstract class EasySequenceGraphBuilder(sample: String, reference: String)
         // Get the left Side for the new AlleleGroup. It can be generated from
         // any phase. We know it will be a Face.LEFT Side because of the
         // preconditions on this method.
-        val leadingSide = getNextSide(contig, phases.head)
+        val leadingSide = getNextSide(contig, phases.head, start)
         
         // Make a right Side for the AlleleGroup (non-reference). We subtract 1
         // from the position because a 1-base AlleleGroup should have the same
@@ -370,8 +407,14 @@ abstract class EasySequenceGraphBuilder(sample: String, reference: String)
         
     }
     
-    def addAnchor(contig: String, phases: Seq[Int], 
-        referenceLength: Int) : Unit = {
+    def addAnchor(contig: String, phases: Seq[Int], start: Long,
+        referenceLength: Long) : Unit = {
+        
+        if(phases.size > 1) {
+            // Make sure we have an even starting point to add on to (so we
+            // don't create deletions that aren't real).
+            squareOff(contig, phases)
+        }
         
         if(referenceLength >= 0) {
             // 0-length Anchors are allowed, but negative-length ones are not.
@@ -385,7 +428,7 @@ abstract class EasySequenceGraphBuilder(sample: String, reference: String)
             // Get the left Side for the new Anchor. It can be generated from
             // any phase. We know it will be a Face.LEFT Side because of the
             // preconditions on this method.
-            val leadingSide = getNextSide(contig, phases.head)
+            val leadingSide = getNextSide(contig, phases.head, start)
             
             // Make a right Side for the Anchor. We advance by 1 less than the
             // specified reference length because of the left/right distinction
@@ -417,12 +460,12 @@ abstract class EasySequenceGraphBuilder(sample: String, reference: String)
         }
     }
     
-    def close(contig: String, phase: Int) {
+    def close(contig: String, phase: Int, length: Long) {
         // Get the side we have to come after, or a new leading telomere
         val end = getLastSide(contig, phase)
         
         // Create a new side that ought to be at the end of the given contig.
-        val telomere = getNextSide(contig, phase)
+        val telomere = getNextSide(contig, phase, length)
 
         // Make an Adjacency to link them up
         val adjacency = Adjacency.newBuilder()
@@ -442,19 +485,23 @@ abstract class EasySequenceGraphBuilder(sample: String, reference: String)
     
     // Structural variants (StructuralSequenceGraphBuilder methods)
     
-    def addDeletion(contig: String, phases: Seq[Int], length: Int) = {
+    def addDeletion(contig: String, phases: Seq[Int], start: Long, 
+        length: Long) = {
         // The next thing we add to any of these Phases needs to be at least
-        // that far away. We accomplish this by adding dummy backwards-going
-        // Anchors at the end of the deletion.
+        // that far away. We accomplish this by putting a dummy goes-backwards
+        // empty Anchor at the end of the deletion.
+        
+        // TODO: Do it without the anchor.
         
         phases.map { (phase) =>
         
-            // Ensure a telomere exists for the phase
+            // Make sure we have a leading telomere.
             getLastSide(contig, phase)
             
             // Get the left Side for the new Anchor, skipping the length of the
             // deletion.
-            val leadingSide = getNextSide(contig, phase, length)
+            println("Skipping %d to %d".format(start, start + length))
+            val leadingSide = getNextSide(contig, phase, start + length)
             
             // Make a right Side for the Anchor. It will have the numerical
             // position of 1 *before* that of the left side of the Anchor.
@@ -480,9 +527,11 @@ abstract class EasySequenceGraphBuilder(sample: String, reference: String)
         }
     }
     
-    def addInversion(contig: String, phases: Seq[Int], length: Int) = {}
+    def addInversion(contig: String, phases: Seq[Int], start: Long,
+        length: Long) = {}
     
-    def addDuplication(contig: String, phases: Seq[Int], length: Int) = {}
+    def addDuplication(contig: String, phases: Seq[Int], start: Long,
+        length: Long) = {}
 }
 
 /**

@@ -266,7 +266,7 @@ object SequenceGraphs {
             // Where does it start in the reference?
             referenceStart <- Some(variant.position);
             
-            // Where does it end in the reference? This is really 1-bast-the-
+            // Where does it end in the reference? This is really 1-past-the-
             // end, so it's also the next thing's start.
             referenceEnd <- Some(referenceStart + variant.reference.size);
             
@@ -344,7 +344,7 @@ object SequenceGraphs {
                     // Only let through phases that aren't deleted at the
                     // variant's start point
                     referenceStart > deletedUntil.getOrElse(phase, -1)
-                }))
+                }).filter(_._2.size > 0))
             
         ) {
             // For each variant in the file that passed the filters
@@ -360,11 +360,12 @@ object SequenceGraphs {
                     val telomereDistance = sizes(lastContig) - lastEnd
                     
                     // Add trailing unphased anchor
-                    builder.addAnchor(lastContig, List(0, 1), telomereDistance)
+                    builder.addAnchor(lastContig, List(0, 1), lastEnd, 
+                        telomereDistance)
                     
                     // Add trailing telomeres
-                    builder.close(lastContig, 0)
-                    builder.close(lastContig, 1)
+                    builder.close(lastContig, 0, sizes(lastContig))
+                    builder.close(lastContig, 1, sizes(lastContig))
                 }
                 
                 // Create new leading telomeres
@@ -384,21 +385,23 @@ object SequenceGraphs {
             // will actually get added.
             val referenceDistance = referenceStart - lastEnd
             
-            // Add the intermediate Anchors between the last variant site
-            // and this one
+            // Add the intermediate Anchors between the last variant site and
+            // this one. If there's no actual space between the sites, it will
+            // be a backwards anchor (end is at a 1-base-earlier position than
+            // start)
             if(genotypePhased && lastCallPhased) {
                 // We need phased anchors, since both this call and the
                 // previous one are phased. TODO: We assume a diploid genotype.
-                builder.addAnchor(contig, List(0), referenceDistance)
-                builder.addAnchor(contig, List(1), referenceDistance)
+                builder.addAnchor(contig, List(0), lastEnd, referenceDistance)
+                builder.addAnchor(contig, List(1), lastEnd, referenceDistance)
                 
             } else {
                 // We need an unphased anchor.
-                builder.addAnchor(contig, List(0, 1), referenceDistance)
+                builder.addAnchor(contig, List(0, 1), lastEnd,
+                    referenceDistance)
             }
             
-            // TODO: Add a backwards empty AlleleGroup to discard phasing if
-            // there is no room for an Anchor to do it.
+            
             
             // Report progress
             if(referenceStart % 1 == 0) {
@@ -432,7 +435,8 @@ object SequenceGraphs {
                         if(genotypePhased) {
                             // Add a different AlleleGroup to each phase
                             phases.map { (phase) =>
-                                builder.addAllele(contig, List(phase), 
+                                builder.addAllele(contig, List(phase),
+                                    referenceStart, 
                                     new Allele(alleleString, variant.reference), 
                                     referenceEnd - referenceStart)
                             }
@@ -444,7 +448,8 @@ object SequenceGraphs {
                             // intervening single Anchor in both phases between
                             // the AlleleGroups for this variant and anything
                             // else.
-                            builder.addAllele(contig, phases, 
+                            builder.addAllele(contig, phases,
+                                referenceStart, 
                                 new Allele(alleleString, variant.reference), 
                                 referenceEnd - referenceStart)
                         }
@@ -496,7 +501,8 @@ object SequenceGraphs {
                                 if(genotypePhased) {
                                     // Add a different AlleleGroup to each phase
                                     phases.map { (phase) =>
-                                        builder.addAllele(contig, List(phase), 
+                                        builder.addAllele(contig, List(phase),
+                                            referenceStart, 
                                             new Allele(bases, 
                                                 variant.reference), 
                                             referenceEnd - referenceStart)
@@ -505,7 +511,8 @@ object SequenceGraphs {
                                     // Add one AlleleGroup to all of the phases
                                     // listed, with a ploidy equal to the list
                                     // length.
-                                    builder.addAllele(contig, phases, 
+                                    builder.addAllele(contig, phases,
+                                        referenceStart, 
                                         new Allele(bases, variant.reference), 
                                         referenceEnd - referenceStart)
                                 }
@@ -522,9 +529,12 @@ object SequenceGraphs {
                                     (referenceStart + -variantLength)
                                 }
                                 
+                                println("Ends at %d".format(endpoint))
+                                
                                 // Phasing doesn't really matter here. Add as
                                 // deletion up to the endpoint.
                                 builder.addDeletion(contig, phases,
+                                    referenceStart,
                                     endpoint - referenceStart)
                                     
                                 // Now remember where we are deleted until the
@@ -565,11 +575,12 @@ object SequenceGraphs {
                 val telomereBases = sizes(lastContig) - lastEnd + 1
                 
                 // Add trailing unphased anchor
-                builder.addAnchor(lastContig, List(0, 1), telomereBases)
+                builder.addAnchor(lastContig, List(0, 1), lastEnd,
+                    telomereBases)
                 
                 // Add trailing telomeres
-                builder.close(lastContig, 0)
-                builder.close(lastContig, 1)
+                builder.close(lastContig, 0, sizes(lastContig))
+                builder.close(lastContig, 1, sizes(lastContig))
             }
         }
     }
