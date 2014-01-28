@@ -6,8 +6,7 @@ object SGBuild extends Build {
     // building.
     lazy val sequencegraphs = Project(id = "sequencegraphs",
         base = file(".")) aggregate(LocalProject("importVCF"), 
-        LocalProject("debug"), LocalProject("exportVCF"),
-        LocalProject("simpleapp"))
+        LocalProject("debug"), LocalProject("exportVCF"))
 
     // This project depends on the library. Since it depends on a project that
     // aggregates it, we ned to use indirect lookup references with LocalProject
@@ -29,7 +28,4 @@ object SGBuild extends Build {
             // We depend on the root sequence graphs library
             LocalProject("sequencegraphs")
         )
-    lazy val simpleapp = Project(id = "simpleapp",
-        base = file("simpleapp"))
-
 }
