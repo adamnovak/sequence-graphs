@@ -54,10 +54,6 @@ libraryDependencies += "samtools" % "samtools" % "1.93"
 
 libraryDependencies += "cofoja" % "cofoja" % "1.0"
 
-// add adam
-
-libraryDependencies += "edu.berkeley.cs.amplab.adam" % "adam-core" % "0.6.1-SNAPSHOT"
-
 resolvers += "Akka Repository" at "http://repo.akka.io/releases/"
 
 resolvers += "Hadoop-BAM" at "http://hadoop-bam.sourceforge.net/maven/"
