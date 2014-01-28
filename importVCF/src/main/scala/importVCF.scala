@@ -34,7 +34,7 @@ class DiscardHandler extends java.util.logging.Handler {
     def publish(record: LogRecord) {}
 }
 
-object SequenceGraphs {
+object ImportVCF {
     def main(args: Array[String]) {
         
         // Option parsing code more or less stolen from various Scallop
@@ -53,6 +53,9 @@ object SequenceGraphs {
             // What sample should we import?
             val sampleName = trailArg[String](required = true,
                 descr = "Sample to import")
+                
+            val cluster = opt[String](default = Some("local"),
+                descr = "Run against this cluster URL") 
             
             val chromSizes = opt[File](
                 descr = "File of chromosome sizes to read, for end telomeres")
@@ -69,6 +72,8 @@ object SequenceGraphs {
                 descr = "Show this message")
 
         } 
+        
+        // Set up logging
         
         // Parquet "helpfully" forcibly adds an INFO-level logger to console if
         // we don't configure its logger specifically (i.e. if we let its log
@@ -99,6 +104,35 @@ object SequenceGraphs {
         // Tell it not to send messages up
         parquetLogger.setUseParentHandlers(false)
         
+        // Set up Spark.
+        
+        // Set up serialization stuff for Spark so it can efficiently exchange
+        // our Avro records.
+        SequenceGraphKryoProperties.setupContextProperties()
+
+        // The first thing we need is a Spark context. We would like to be able
+        // to make one against any Spark URL: either "local" or soemthing like
+        // "mesos://wherever.biz:1234". We need to feed it all the jars it needs
+        // to run our code. Fortunately, they all live next to our jar, if the
+        // sbt native packager has worked correctly.
+        
+        // What File is the jar that this class is from?
+        val jarFile = new File(getClass.getProtectionDomain
+            .getCodeSource.getLocation.toURI)
+        
+        // What files are in that directory (should all be .jars)? Make a list
+        // of their string paths.
+        val jarsToSend = jarFile.getParentFile.listFiles.map(_.toString).toSeq
+            
+        // Set up Spark, giving it the appropriate cluster URL, the SPARK_HOME
+        // environment variable (which must be set!), and the list of jars we
+        // have worked out.
+        println("Initializing Spark")
+        val sc = new SparkContext(opts.cluster.get.get, "importVCF", 
+            System.getenv("SPARK_HOME"), jarsToSend)
+        println("Spark initialized")
+        val job = new Job(sc.hadoopConfiguration)
+        
         // Parse the chromosome sizes file (<name>\t<int> TSV) into a map from
         // chromosome names to lengths
         val chromSizes = opts.chromSizes.get.map { (file) =>
@@ -121,8 +155,8 @@ object SequenceGraphs {
             // for a dot file?
             println("Writing to Parquet")
             
-            new ParquetSequenceGraphBuilder(sample, "reference", 
-                opts.parquetDir.get.get)
+            new SparkParquetSequenceGraphBuilder(sample, "reference", 
+                opts.parquetDir.get.get, sc)
         } else if (opts.dotFile.get isDefined) {
             // The user wants to write GraphViz
             println("Writing to Graphviz")

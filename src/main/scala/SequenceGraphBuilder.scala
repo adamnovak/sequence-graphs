@@ -29,6 +29,9 @@ import org.apache.avro.Schema
 // import hadoop job
 import org.apache.hadoop.mapreduce.Job
 
+// And Spark stuff
+import org.apache.spark.rdd.RDD
+
 /**
  * This object handles providing sequential global IDs.
  */
@@ -997,6 +1000,220 @@ class ParquetSequenceGraphBuilder(sample: String, reference: String,
         adjacencyWriter.close()
         alleleGroupWriter.close()
         anchorWriter.close()
+    }
+    
+    
+    
+}
+
+/**
+ * SparkParquetSequenceGraphBuilder: a class that builds a sequence graph into
+ * Parquet files in the specified directory anywhere that Spark can access,
+ * using Spark.
+ *
+ * Requires a SparkContext.
+ *
+ * Optionally takes a limit (number of objects of each type to accumulate on the
+ * master before making a new RDD), and a number of partitions for the RDDs to
+ * use.
+ *
+ * Keeps a limited number of items in memory on the driver. Adds everything in
+ * to growing Spark RDDs when the master generates too many things. At the end,
+ * saves the Spark RDDs.
+ *
+ */
+class SparkParquetSequenceGraphBuilder(sample: String, reference: String, 
+    directory: String, sc: SparkContext, limit: Int = 10, partitions: Int = 10) 
+    extends EasySequenceGraphBuilder(sample, reference) {
+    
+    // Keep Lists of Sides, Adjacencies, AlleleGroups, and Anchors, when we
+    // don't yet have enough to justify creating new RDDs.
+    var sides: List[Side] = Nil
+    var adjacencies: List[Adjacency] = Nil
+    var alleleGroups: List[AlleleGroup] = Nil
+    var anchors: List[Anchor] = Nil
+    
+    // Keep RDDs of each
+    var sidesRDD: Option[RDD[Side]] = None
+    var adjacenciesRDD: Option[RDD[Adjacency]] = None
+    var alleleGroupsRDD: Option[RDD[AlleleGroup]] = None
+    var anchorsRDD: Option[RDD[Anchor]] = None
+    
+    /**
+     * Check each type of object to see if we have limit of them or more, and,
+     * if so, move the objects from the list to the RDD.
+     */
+    protected def updateRDDs(itemLimit: Int) = {
+    
+        if(sides.size > itemLimit) {
+            // Too many Sides. Update the Sides RDD
+            
+            // Make a new RDD of just the Sides that need to be added.
+            val newSidesRDD = sc.makeRDD(sides, partitions)
+            
+            // Union it in with the old one
+            sidesRDD = Some(sidesRDD match {
+                case Some(rdd) => rdd.union(newSidesRDD)
+                case None => newSidesRDD
+            })
+            
+            // Clear the sides list
+            sides = Nil
+            
+            println("Sides in Spark memory: %s".format(sidesRDD.get.countApprox(
+                1000)))
+        }
+        
+        if(adjacencies.size > itemLimit) {
+            // Too many Adjacencies. Update the Sides RDD
+            
+            // Make a new RDD of just the Adjacencies that need to be added.
+            val newAdjacenciesRDD = sc.makeRDD(adjacencies, partitions)
+            
+            // Union it in with the old one
+            adjacenciesRDD = Some(adjacenciesRDD match {
+                case Some(rdd) => rdd.union(newAdjacenciesRDD)
+                case None => newAdjacenciesRDD
+            })
+            
+            // Clear the adjacencies list
+            adjacencies = Nil
+            
+            println("Adjacencies in Spark memory: %s".format(
+                adjacenciesRDD.get.countApprox(1000)))
+        }
+        
+        if(alleleGroups.size > itemLimit) {
+            // Too many AlleleGroups. Update the AlleleGroups RDD
+            
+            // Make a new RDD of just the AlleleGroups that need to be added.
+            val newAlleleGroupsRDD = sc.makeRDD(alleleGroups, partitions)
+            
+            // Union it in with the old one
+            alleleGroupsRDD = Some(alleleGroupsRDD match {
+                case Some(rdd) => rdd.union(newAlleleGroupsRDD)
+                case None => newAlleleGroupsRDD
+            })
+            
+            // Clear the alleleGroups list
+            alleleGroups = Nil
+            
+            println("AlleleGroups in Spark memory: %s".format(
+                alleleGroupsRDD.get.countApprox(1000)))
+        }
+        
+        if(anchors.size > itemLimit) {
+            // Too many Anchors. Update the Anchors RDD
+            
+            // Make a new RDD of just the Anchors that need to be added.
+            val newAnchorsRDD = sc.makeRDD(anchors, partitions)
+            
+            // Union it in with the old one
+            anchorsRDD = Some(anchorsRDD match {
+                case Some(rdd) => rdd.union(newAnchorsRDD)
+                case None => newAnchorsRDD
+            })
+            
+            // Clear the anchors list
+            anchors = Nil
+            
+            println("Anchors in Spark memory: %s".format(
+                anchorsRDD.get.countApprox(1000)))
+        }
+    
+    }
+    
+    /**
+     * Given an RDD of Avro records of type RecordType, writes them to a
+     * Parquet file in the specified directory. Any other Parquet data in that
+     * directory will be overwritten.
+     *
+     * The caller must have set up Kryo serialization with
+     * `SequenceGraphKryoProperties.setupContextProperties()`, so that Avro
+     * records can be efficiently serialized to send them to the Spark workers.
+     *
+     */
+    def writeRDDToParquet[RecordType <: IndexedRecord](things: RDD[RecordType],
+        directory: String)(implicit m: Manifest[RecordType]) = {
+        
+        // Every time we switch Avro schemas, we need a new Job. So we create
+        // our own.
+        val job = new Job()
+                
+        // Set up Parquet to write using Avro for this job
+        ParquetOutputFormat.setWriteSupportClass(job, classOf[AvroWriteSupport])
+        
+        // Go get the static SCHEMA$ for the Avro record type. We can't do it
+        // the normal way (RecordType.SCHEMA$) because Scala keeps static things
+        // in companion objects with the same names as the types they really
+        // belong to, and type parameters don't automatically bring them along.
+        
+        // First we need the class of the record, which we need anyway for doing
+        // the writing.
+        val recordClass = m.erasure
+        
+        println("Writing out an RDD of %s".format(
+            recordClass.getCanonicalName))
+        
+        // Get the schema Field object    
+        val recordSchemaField = recordClass.getDeclaredField("SCHEMA$")
+        // Get the static value of this field. Argument is ignored for static
+        // fields, so pass null. See <http://docs.oracle.com/javase/7/docs/api/j
+        // ava/lang/reflect/Field.html#get%28java.lang.Object%29>
+        val recordSchema = recordSchemaField.get(null).asInstanceOf[Schema]
+        
+        // Set the Avro schema to use for this job
+        AvroParquetOutputFormat.setSchema(job, recordSchema)
+        
+        // Make a PairRDD of serializeable-wrapped Avro records, with null keys.
+        val pairRDD = things.map(thing => (null, thing))
+        
+        // Save the PairRDD to a Parquet file in our output directory. The keys
+        // are void, the values are RecordTypes, the output format is a
+        // ParquetOutputFormat for RecordTypes, and the configuration of the job
+        // we set up is used.
+        pairRDD.saveAsNewAPIHadoopFile(directory, classOf[Void], 
+            recordClass, classOf[ParquetOutputFormat[RecordType]],
+            job.getConfiguration)
+                    
+    }
+    
+    // Implementations of what we need to be an EasySequenceGraphBuilder. Just
+    // load everything into the appropriate list, and check to see if we need to
+    // update the RDDs.
+    
+    protected def addAlleleGroup(alleleGroup: AlleleGroup) : Unit = {
+        alleleGroups = alleleGroup :: alleleGroups
+        updateRDDs(limit)
+    }
+    
+    protected def addAdjacency(adjacency: Adjacency) : Unit = {
+        adjacencies = adjacency :: adjacencies
+        updateRDDs(limit)
+    }
+    
+    protected def addAnchor(anchor: Anchor) : Unit = {
+        anchors = anchor :: anchors
+        updateRDDs(limit)
+    }
+    
+    protected def addSide(side: Side) : Unit = {
+        sides = side :: sides
+        updateRDDs(limit)
+    }
+    
+    override def finish() {
+        println("Making sure everything is in Spark memory:")
+    
+        // Make sure everything is in the RDDs
+        updateRDDs(-1)
+        
+        // Save everything to the appropriate Parquet directories
+        writeRDDToParquet(sidesRDD.get, directory + "/Sides")
+        writeRDDToParquet(adjacenciesRDD.get, directory + "/Adjacencies")
+        writeRDDToParquet(alleleGroupsRDD.get, directory + "/AlleleGroups")
+        writeRDDToParquet(anchorsRDD.get, directory + "/Anchors")
+
     }
     
     
