@@ -14,6 +14,12 @@ libraryDependencies += "org.apache.spark" %% "spark-core" % "0.8.1-incubating"
 
 //libraryDependencies += "org.apache.mesos" % "mesos" % "0.13.0"
 
+
+
+// add adam
+
+libraryDependencies += "edu.berkeley.cs.amplab.adam" % "adam-core" % "0.6.1-SNAPSHOT"
+
 resolvers += "Akka Repository" at "http://repo.akka.io/releases/"
 
 resolvers += "Hadoop-BAM" at "http://hadoop-bam.sourceforge.net/maven/"
