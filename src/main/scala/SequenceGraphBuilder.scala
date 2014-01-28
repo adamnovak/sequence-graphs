@@ -1023,8 +1023,8 @@ class ParquetSequenceGraphBuilder(sample: String, reference: String,
  *
  */
 class SparkParquetSequenceGraphBuilder(sample: String, reference: String, 
-    directory: String, sc: SparkContext, limit: Int = 10, partitions: Int = 10) 
-    extends EasySequenceGraphBuilder(sample, reference) {
+    directory: String, sc: SparkContext, limit: Int = 10000,
+    partitions: Int = 1) extends EasySequenceGraphBuilder(sample, reference) {
     
     // Keep Lists of Sides, Adjacencies, AlleleGroups, and Anchors, when we
     // don't yet have enough to justify creating new RDDs.
@@ -1045,7 +1045,7 @@ class SparkParquetSequenceGraphBuilder(sample: String, reference: String,
      */
     protected def updateRDDs(itemLimit: Int) = {
     
-        if(sides.size > itemLimit) {
+        if(sides.size >= itemLimit) {
             // Too many Sides. Update the Sides RDD
             
             // Make a new RDD of just the Sides that need to be added.
@@ -1064,7 +1064,7 @@ class SparkParquetSequenceGraphBuilder(sample: String, reference: String,
                 1000)))
         }
         
-        if(adjacencies.size > itemLimit) {
+        if(adjacencies.size >= itemLimit) {
             // Too many Adjacencies. Update the Sides RDD
             
             // Make a new RDD of just the Adjacencies that need to be added.
@@ -1083,7 +1083,7 @@ class SparkParquetSequenceGraphBuilder(sample: String, reference: String,
                 adjacenciesRDD.get.countApprox(1000)))
         }
         
-        if(alleleGroups.size > itemLimit) {
+        if(alleleGroups.size >= itemLimit) {
             // Too many AlleleGroups. Update the AlleleGroups RDD
             
             // Make a new RDD of just the AlleleGroups that need to be added.
@@ -1102,7 +1102,7 @@ class SparkParquetSequenceGraphBuilder(sample: String, reference: String,
                 alleleGroupsRDD.get.countApprox(1000)))
         }
         
-        if(anchors.size > itemLimit) {
+        if(anchors.size >= itemLimit) {
             // Too many Anchors. Update the Anchors RDD
             
             // Make a new RDD of just the Anchors that need to be added.
@@ -1206,7 +1206,7 @@ class SparkParquetSequenceGraphBuilder(sample: String, reference: String,
         println("Making sure everything is in Spark memory:")
     
         // Make sure everything is in the RDDs
-        updateRDDs(-1)
+        updateRDDs(0)
         
         // Save everything to the appropriate Parquet directories
         writeRDDToParquet(sidesRDD.get, directory + "/Sides")

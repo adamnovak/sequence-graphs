@@ -440,7 +440,7 @@ object ImportVCF {
             
             
             // Report progress
-            if(referenceStart % 1 == 0) {
+            if(referenceStart % 100 == 0) {
                 // Print progress
                 chromSizes match {
                     case Some(map) =>
