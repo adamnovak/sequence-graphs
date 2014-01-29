@@ -194,8 +194,18 @@ class ExportVCF (cluster: String, directory: String, vcfFile: String,
                               sample: String): VariantContextWritable = {
     // convert alleles to Picard allele
     val alleleNoGroup = alleles.flatMap((r: AlleleGroup) => r.getAllele() match {
-      case (a: SGAllele) => Some(a)
-      case _ => None
+      case (a: SGAllele) => {
+        var l = List[SGAllele]()
+
+        val ploidy = r.getPloidy.getLower()
+        
+        for (i <- 0 until ploidy) {
+          l = a :: l
+        }
+
+        l
+      }
+      case _ => List[SGAllele]()
     })
 
     val refBases = alleleNoGroup.head.getReferenceBases
