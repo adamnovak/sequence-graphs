@@ -1060,8 +1060,6 @@ class SparkParquetSequenceGraphBuilder(sample: String, reference: String,
             // Clear the sides list
             sides = Nil
             
-            println("Sides in Spark memory: %s".format(sidesRDD.get.countApprox(
-                1000)))
         }
         
         if(adjacencies.size >= itemLimit) {
@@ -1079,8 +1077,6 @@ class SparkParquetSequenceGraphBuilder(sample: String, reference: String,
             // Clear the adjacencies list
             adjacencies = Nil
             
-            println("Adjacencies in Spark memory: %s".format(
-                adjacenciesRDD.get.countApprox(1000)))
         }
         
         if(alleleGroups.size >= itemLimit) {
@@ -1098,8 +1094,6 @@ class SparkParquetSequenceGraphBuilder(sample: String, reference: String,
             // Clear the alleleGroups list
             alleleGroups = Nil
             
-            println("AlleleGroups in Spark memory: %s".format(
-                alleleGroupsRDD.get.countApprox(1000)))
         }
         
         if(anchors.size >= itemLimit) {
@@ -1117,8 +1111,6 @@ class SparkParquetSequenceGraphBuilder(sample: String, reference: String,
             // Clear the anchors list
             anchors = Nil
             
-            println("Anchors in Spark memory: %s".format(
-                anchorsRDD.get.countApprox(1000)))
         }
     
     }
