@@ -89,8 +89,6 @@ class ExportVCF (cluster: String, directory: String, vcfFile: String,
     // their string paths.
     val jarsToSend = jarFile.getParentFile.listFiles.map(_.toString).toSeq
         
-    println("We want to send %s".format(jarsToSend))
-    
     // Set up Spark, giving it the appropriate cluster URL, the SPARK_HOME
     // environment variable if set, and the list of jars we have worked out.
     println("Initializing Spark")
@@ -102,6 +100,7 @@ class ExportVCF (cluster: String, directory: String, vcfFile: String,
     // read data in
 
     val filePath = directory
+
 
     ParquetInputFormat.setReadSupportClass(job, classOf[AvroReadSupport[Side]])
     val sides: RDD[Side] = sc.newAPIHadoopFile(filePath + "/Sides",
