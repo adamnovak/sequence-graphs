@@ -148,25 +148,25 @@ object ImportVCF {
         // What sample are we importing?
         val sample = opts.sampleName.get.get
         
-        // Make a new SequenceGraphBuilder to build its graph, of the right type
-        // to write whatever the user is asking for.
-        val graph = if(opts.parquetDir.get isDefined) {
+        // Make a new SequenceGraphWriter to save its graph.
+        val writer = if(opts.parquetDir.get isDefined) {
             // The user wants to write Parquet. TODO: what if they also asked
             // for a dot file?
             println("Writing to Parquet")
             
-            new SparkParquetSequenceGraphBuilder(sample, "reference", 
-                opts.parquetDir.get.get, sc)
+            new SparkParquetSequenceGraphWriter(opts.parquetDir.get.get, sc)
         } else if (opts.dotFile.get isDefined) {
             // The user wants to write GraphViz
             println("Writing to Graphviz")
             
-            new GraphvizSequenceGraphBuilder(sample, "reference", 
-                opts.dotFile.get.get)
+            new GraphvizSequenceGraphWriter(opts.dotFile.get.get)
         } else {
             // The user doesn't know what they're doing
             throw new Exception("Must specify --dot-file or --parquet-dir")
         }
+        
+        // Make the graph builder that writes to the writer
+        val graph = new EasySequenceGraphBuilder(sample, "reference", writer)
         
         // Get the actual File or die trying, and then make VcfParser parse
         // that. We need to invoke the VcfParser functor first for some reason.
