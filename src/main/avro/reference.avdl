@@ -1,5 +1,5 @@
 @namespace("edu.ucsc.genome")
-protocol ReferenceGenome {
+protocol ReferenceGraphTypes {
     
     // The schemas here describe the reference genome.
     

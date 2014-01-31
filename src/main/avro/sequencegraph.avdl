@@ -1,5 +1,5 @@
 @namespace("edu.ucsc.genome")
-protocol SequenceGraph {
+protocol SequenceGraphTypes {
     
     import idl "reference.avdl";
     
