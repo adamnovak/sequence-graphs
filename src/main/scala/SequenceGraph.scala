@@ -51,9 +51,13 @@ class SequenceGraph(sidesRDD: RDD[Side], alleleGroupsRDD: RDD[AlleleGroup],
  * Represents a bunch of Sequence Graph parts, such as might be returned from a
  * function that generates a small piece of a Sequence Graph. Can be stored in
  * an RDD.
+ *
+ * Immutable, so all modification methods return modified versions.
  */
-class SequenceGraphChunk(sidesSeq: Seq[Side], alleleGroupsSeq: Seq[AlleleGroup],
-    adjacenciesSeq: Seq[Adjacency], anchorsSeq: Seq[Anchor]) {
+class SequenceGraphChunk(sidesSeq: Seq[Side] = Nil,
+    alleleGroupsSeq: Seq[AlleleGroup] = Nil,
+    adjacenciesSeq: Seq[Adjacency] = Nil,
+    anchorsSeq: Seq[Anchor] = Nil) {
     
     // We keep around all the sequence graph parts. Constructor arguments don't
     // magically become fields we can reference on other instances.
@@ -81,6 +85,44 @@ class SequenceGraphChunk(sidesSeq: Seq[Side], alleleGroupsSeq: Seq[AlleleGroup],
      * returns the result.
      */
     def ++(other: SequenceGraphChunk) = union(other)
+    
+    /**
+     * Add some Sides to this SequenceGraphChunk.
+     */
+    def addSides(moreSides: Seq[Side]) = {
+        new SequenceGraphChunk(sides ++ moreSides, alleleGroups, adjacencies, 
+            anchors)
+    }
+        
+    /**
+     * Add some AlleleGroups to this SequenceGraphChunk.
+     */
+    def addAlleleGroups(moreAlleleGroups: Seq[AlleleGroup]) = {
+        new SequenceGraphChunk(sides, alleleGroups ++ moreAlleleGroups, 
+        adjacencies, anchors)
+    }
+    
+    /**
+     * Add some Adjacencies to this SequenceGraphChunk.
+     */    
+    def addAdjacencies(moreAdjacencies: Seq[Adjacency]) = {
+        new SequenceGraphChunk(sides, alleleGroups, 
+            adjacencies ++ moreAdjacencies, anchors)
+    }
+        
+    /**
+     * Add some Anchors to this SequenceGraphChunk.
+     */
+    def addAnchors(moreAnchors: Seq[Anchor]) = {
+        new SequenceGraphChunk(sides, alleleGroups, adjacencies,
+            anchors ++ moreAnchors)
+    }
+    
+    def +(side: Side) = addSides(List(side))
+    def +(alleleGroup: AlleleGroup) = addAlleleGroups(List(alleleGroup))
+    def +(adjacency: Adjacency) = addAdjacencies(List(adjacency))
+    def +(anchor: Anchor) = addAnchors(List(anchor))
+    
     
 }
 

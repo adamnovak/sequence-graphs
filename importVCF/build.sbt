@@ -22,6 +22,9 @@ libraryDependencies += "org.rogach" %% "scallop" % "0.9.4"
 // our resolvers.
 libraryDependencies += "ca.innovativemedicine" %% "vcfimp" % "0.7.0"
 
+// We need a parallel VCF parser
+libraryDependencies += "fi.tkk.ics.hadoop.bam" % "hadoop-bam" % "6.1-SNAPSHOT"
+
 // We need log4j so we can tell Spark to be somewhat quieter and not swamp out
 // output.
 libraryDependencies += "log4j" % "log4j" % "1.2.17"

@@ -4,6 +4,7 @@ import scala.collection.mutable.HashMap
 
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
+import org.apache.spark.rdd.RDD
 import edu.ucsc.genome._
 
 import java.io.File
@@ -12,6 +13,13 @@ import java.nio.file.Paths
 // We want to read VCF files
 import ca.innovativemedicine.vcf._
 import ca.innovativemedicine.vcf.parsers._
+
+// We want to read VCF files in parallel with Hadoop things
+import fi.tkk.ics.hadoop.bam.VCFInputFormat
+import fi.tkk.ics.hadoop.bam.VariantContextWritable
+import org.apache.hadoop.io.LongWritable
+import org.broadinstitute.variant.variantcontext.VariantContext
+
 
 // We want to be able to loop over Java iterators: load a bunch of conversions.
 // See <http://stackoverflow.com/a/1625252/402891>
@@ -48,7 +56,7 @@ object ImportVCF {
                 |""".stripMargin)
             
             // What file should we read?
-            val vcfFile = trailArg[File](required = true,
+            val vcfFile = trailArg[String](required = true,
                 descr = "VCF file to open")
             // What sample should we import?
             val sampleName = trailArg[String](required = true,
@@ -148,6 +156,8 @@ object ImportVCF {
         // What sample are we importing?
         val sample = opts.sampleName.get.get
         
+        importSampleInParallel(opts.vcfFile.get.get, sample, sc)
+        
         // Make a new SequenceGraphWriter to save its graph.
         val writer = if(opts.parquetDir.get isDefined) {
             // The user wants to write Parquet. TODO: what if they also asked
@@ -170,7 +180,7 @@ object ImportVCF {
         
         // Get the actual File or die trying, and then make VcfParser parse
         // that. We need to invoke the VcfParser functor first for some reason.
-        VcfParser().parseFile(opts.vcfFile.get.get, false) { 
+        VcfParser().parseFile(new File(opts.vcfFile.get.get), false) { 
             (info, entries) =>
             // We get the VCF metadata and an iterator of VCF entries.
             // Import our sample
@@ -226,6 +236,119 @@ object ImportVCF {
         // Go look up by list traversal.
         getFieldValues(metadatas.toSeq, values.toSeq, fieldName)
         
+    }
+    
+    /**
+     * Function to pair up each element with a copy of its successor.
+     */
+    def pairUp[K <% Ordered[K] : ClassManifest, V: ClassManifest]
+        (rdd: RDD[(K, V)]): RDD[((K, V), (K, V))] = {
+        
+        rdd.sortByKey().zip(rdd.sortByKey())
+        
+    }
+    
+    def importSampleInParallel(filename: String, sample: String, 
+        sc: SparkContext) = {
+        
+
+        // Get an RDD of VCF records, sorted by position. Use VariantContext
+        // and not VariantContextWriteable as our internal record type. Make
+        // sure it has the correct number of partitions.
+        val records: RDD[(Long, VariantContext)] = sc.newAPIHadoopFile(filename,
+           classOf[VCFInputFormat], classOf[LongWritable], 
+           classOf[VariantContextWritable], sc.hadoopConfiguration)
+           .map(p => (p._1.get, p._2.get))
+           
+        // How many partitions should we use? Apparently we need to match this
+        // when we zip two things.
+        val numPartitions = records.partitions.size
+           
+        println("First record: %s".format(records.first))
+        
+        val sorted = records.sortByKey().collect.toSeq
+        
+        println("Sorted: %d".format(sorted.size))
+        println("First record: %s".format(sorted.first))
+
+        // How many IDs should we allocate per record? Needed for Sides and
+        // Edges.
+        val idsPerRecord = 100
+        
+        // Make an RDD with one long ID for each record. IDs are sequential.
+        // Then multiply by IDs per record, to give a unique ID starting point
+        // for each record.
+        val idStarts: RDD[Long] = sc.makeRDD(1L until records.count,
+            numPartitions)
+            
+        // Number all the records sequentially. They can be sorted into this
+        // order now, and each can guess the IDs of its neighbors.
+        val numberedRecords = idStarts.zip(records)
+            
+        // Get phasing status for each variant
+        val phased: RDD[(Long, Boolean)] = records mapValues { (record) =>
+            record.getGenotype(sample).isPhased()
+        }
+
+        // Produce all the AlleleGroups and their endpoints, numbered by record.
+        val alleleGroups: RDD[(Long, SequenceGraphChunk)] = numberedRecords
+            .map { (parts) =>
+                val (idStart: Long, record: VariantContext) = parts
+                
+                // What is the next free ID in our block?
+                var nextID = idStart * idsPerRecord
+                
+                // What SequenceGraphChunk are we using to collect our parts?
+                var chunk = new SequenceGraphChunk()
+            
+                // Get the sample genotype
+                val genotype = record.getGenotype(sample)
+                
+                // Get the alleles
+                val alleles = genotype.getAlleles()
+                
+                alleles.map { (allele) =>
+                    // Get a Side for the left side
+                    val side1 = new Side(nextID, new Position(record.getChr, 
+                        record.getStart, Face.LEFT), false)
+                    nextID += 1
+                    // Get a Side for the right side
+                    val side2 = new Side(nextID, new Position(record.getChr, 
+                        record.getEnd, Face.RIGHT), false)
+                    nextID += 1
+                    
+                    // Make an AlleleGroup between them
+                    val group = new AlleleGroup(
+                        new Edge(nextID, side1.id, side2.id), 
+                        new Allele(allele.getBaseString, 
+                            record.getReference.getBaseString), 
+                        new PloidyBounds(1, null, null), 
+                        sample)
+                    nextID += 1
+
+                    // TODO: check for ID overflow
+                        
+                    // Add everything in to the SequenceGraphChunk we are
+                    // building.
+                    chunk = chunk + side1 + side2 + group
+                }
+                
+                // Return the assembled chunk of sequence graph, keyed by the
+                // record it came from.
+                (idStart, chunk)
+            }
+           
+        // Look at adjacent pairs of SequenceGraphChunks and add the Anchors and
+        // Adjacencies to wire them together if appropriate.
+        
+            
+        // Aggregate the AlleleGroups and their Sides into a SequenceGraph.
+        val alleleGroupsGraph = new SequenceGraph(alleleGroups.values)
+        
+
+        // Count up number of Sides made
+        println("Sides: %d".format(alleleGroupsGraph.sides.count))
+       
     }
     
     /**
