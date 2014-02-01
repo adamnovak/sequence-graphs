@@ -239,12 +239,27 @@ object ImportVCF {
     }
     
     /**
-     * Function to pair up each element with a copy of its successor.
+     * Function to pair up each element with a copy of its successor. RDD items
+     * must be sequentially numbered.
      */
-    def pairUp[K <% Ordered[K] : ClassManifest, V: ClassManifest]
-        (rdd: RDD[(K, V)]): RDD[((K, V), (K, V))] = {
+    def pairUp[V: ClassManifest]
+        (rdd: RDD[(Long, V)]): RDD[((Long, V), (Long, V))] = {
         
-        rdd.sortByKey().zip(rdd.sortByKey())
+        // Give everything the key of its successor.
+        val keyedBySuccessors = rdd.map { (kvPair) =>
+            (kvPair._1 + 1, kvPair._2)
+        }
+        
+        // Join up with the successors, transform, and return. We ought to drop
+        // the first and last things.
+        keyedBySuccessors.join(rdd).map { (item) =>
+            // Unpack the entries
+            val (successorKey: Long, (thing: V, successor: V)) = item
+            
+            // Return the thing we want: a pair of the thing and its successor,
+            // with both IDs.
+            ((successorKey - 1, thing), (successorKey, successor))
+        }
         
     }
     
@@ -264,26 +279,20 @@ object ImportVCF {
         // when we zip two things.
         val numPartitions = records.partitions.size
            
-        println("First record: %s".format(records.first))
-        
-        val sorted = records.sortByKey().collect.toSeq
-        
-        println("Sorted: %d".format(sorted.size))
-        println("First record: %s".format(sorted.first))
+        // TODO: debug why sortByKey() is returning empty RDDs. For now just
+        // assume our input VCF is sorted.
 
         // How many IDs should we allocate per record? Needed for Sides and
         // Edges.
         val idsPerRecord = 100
         
         // Make an RDD with one long ID for each record. IDs are sequential.
-        // Then multiply by IDs per record, to give a unique ID starting point
-        // for each record.
-        val idStarts: RDD[Long] = sc.makeRDD(1L until records.count,
+        val idBlocks: RDD[Long] = sc.makeRDD(1L until records.count,
             numPartitions)
             
         // Number all the records sequentially. They can be sorted into this
         // order now, and each can guess the IDs of its neighbors.
-        val numberedRecords = idStarts.zip(records)
+        val numberedRecords = idBlocks.zip(records.values)
             
         // Get phasing status for each variant
         val phased: RDD[(Long, Boolean)] = records mapValues { (record) =>
@@ -293,10 +302,10 @@ object ImportVCF {
         // Produce all the AlleleGroups and their endpoints, numbered by record.
         val alleleGroups: RDD[(Long, SequenceGraphChunk)] = numberedRecords
             .map { (parts) =>
-                val (idStart: Long, record: VariantContext) = parts
+                val (idBlock: Long, record: VariantContext) = parts
                 
                 // What is the next free ID in our block?
-                var nextID = idStart * idsPerRecord
+                var nextID = idBlock * idsPerRecord
                 
                 // What SequenceGraphChunk are we using to collect our parts?
                 var chunk = new SequenceGraphChunk()
@@ -335,19 +344,88 @@ object ImportVCF {
                 
                 // Return the assembled chunk of sequence graph, keyed by the
                 // record it came from.
-                (idStart, chunk)
+                (idBlock, chunk)
             }
            
         // Look at adjacent pairs of SequenceGraphChunks and add the Anchors and
         // Adjacencies to wire them together if appropriate.
+        val connectors: RDD[SequenceGraphChunk] = pairUp(alleleGroups).map {
+            (item) =>
+            // Unpack the item tuple
+            val ((firstID, firstChunk), (secondID, secondChunk)) = item
+            
+            // TODO: check phasing
+            // For now just tie together corresponding AlleleGroups.
+            val pairsToLink = firstChunk.alleleGroups.zip(
+                secondChunk.alleleGroups)
+            
+            
+            // We need to know where to make IDs from. Put them in the first
+            // chunk's namespace, after the largest AlleleGroup edge ID we find
+            // (since those are made last above).
+            var nextID = firstChunk.alleleGroups.map(_.edge.id).max + 1
+            
+            // We need a SequenceGraphChunk to build in
+            var chunk = new SequenceGraphChunk()
+            
+            pairsToLink.foreach { (pair) =>
+                // Unpack the two AlleleGroups to link
+                val (firstGroup: AlleleGroup, secondGroup: AlleleGroup) = pair
+                
+                // Where does our Anchor need to start after?
+                val prevPos = firstChunk.getSide(firstGroup.edge.right)
+                    .get
+                    .position
+                
+                // Where does our Anchor need to end before?
+                val nextPos = secondChunk.getSide(secondGroup.edge.left)
+                    .get
+                    .position
+                
+                // Make two Sides for an Anchor
+                val startSide = new Side(nextID, new Position(prevPos.contig, 
+                    prevPos.base + 1, Face.LEFT), false)
+                nextID += 1
+                val endSide = new Side(nextID, new Position(nextPos.contig, 
+                    nextPos.base - 1, Face.RIGHT), false)
+                nextID += 1
+                    
+                // Make the Anchor
+                val anchor = new Anchor(
+                    new Edge(nextID, startSide.id, endSide.id), 
+                    new PloidyBounds(1, null, null), 
+                    sample)
+                nextID += 1
+                    
+                // Make the two connecting adjacencies
+                val leftAdjacency = new Adjacency(
+                    new Edge(nextID, firstGroup.edge.right, startSide.id), 
+                    new PloidyBounds(1, null, null), 
+                    sample)
+                nextID += 1
+                    
+                val rightAdjacency = new Adjacency(
+                    new Edge(nextID, endSide.id, secondGroup.edge.left), 
+                    new PloidyBounds(1, null, null), 
+                    sample)
+                nextID += 1
+                
+                // Put everything in the SequenceGraphChunk
+                chunk = (chunk + startSide + endSide + anchor + leftAdjacency 
+                    + rightAdjacency)
+            }
+            
+            // Return the chunk we built
+            chunk
+        }
         
             
-        // Aggregate the AlleleGroups and their Sides into a SequenceGraph.
-        val alleleGroupsGraph = new SequenceGraph(alleleGroups.values)
+        // Aggregate into a SequenceGraph.
+        val graph = new SequenceGraph(alleleGroups.values.union(connectors))
         
 
         // Count up number of Sides made
-        println("Sides: %d".format(alleleGroupsGraph.sides.count))
+        println("Sides: %d".format(graph.sides.count))
        
     }
     

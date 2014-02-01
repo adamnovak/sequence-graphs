@@ -118,12 +118,35 @@ class SequenceGraphChunk(sidesSeq: Seq[Side] = Nil,
             anchors ++ moreAnchors)
     }
     
+    /**
+     * Add a single Side to a SequenceGraphChunk.
+     */
     def +(side: Side) = addSides(List(side))
+    
+    /**
+     * Add a single AlleleGroup to a SequenceGraphChunk.
+     */
     def +(alleleGroup: AlleleGroup) = addAlleleGroups(List(alleleGroup))
+    
+    /**
+     * Add a single Adjacency to a SequenceGraphChunk.
+     */
     def +(adjacency: Adjacency) = addAdjacencies(List(adjacency))
+    
+    /**
+     * Add a single Anchor to a SequenceGraphChunk.
+     */
     def +(anchor: Anchor) = addAnchors(List(anchor))
     
-    
+    /**
+     * Get the Side with the given ID, or None if no Side with that ID exists.
+     * 
+     * Just does a simple scan through all the Sides, so don't let your
+     * SequenceGraphChunks become too big.
+     */
+    def getSide(id: Long) : Option[Side] = {
+        sides.find(_.id == id)
+    }
 }
 
 /**
