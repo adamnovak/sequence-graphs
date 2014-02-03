@@ -73,7 +73,7 @@ object ImportVCF {
                 descr = "Save a GraphViz graph to this .dot file")
                 
             val parquetDir = opt[String](
-                descr = "Save Parquet files in this directory (will overwrite)")
+                descr = "Save Parquet files in this directory (absolute path)")
             
             val version = opt[Boolean](noshort = true, 
                 descr = "Print version")
