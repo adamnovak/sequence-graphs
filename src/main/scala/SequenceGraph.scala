@@ -1,6 +1,9 @@
 package edu.ucsc.genome
 
 import org.apache.spark.rdd.RDD
+import org.apache.spark.SparkContext
+import org.apache.spark.SparkContext._
+import org.apache.avro.generic.IndexedRecord
 
 /**
  * Represents a Sequence Graph (or component thereof) as a series of Spark RDDs.
@@ -43,6 +46,89 @@ class SequenceGraph(sidesRDD: RDD[Side], alleleGroupsRDD: RDD[AlleleGroup],
      * returns the result.
      */
     def ++(other: SequenceGraph) = union(other)
+    
+    /**
+     * Given an RDD of Avro records of type RecordType, writes them to a
+     * Parquet file in the specified directory. Any other Parquet data in that
+     * directory will be overwritten.
+     *
+     * The caller must have set up Kryo serialization with
+     * `SequenceGraphKryoProperties.setupContextProperties()`, so that Avro
+     * records can be efficiently serialized to send them to the Spark workers.
+     *
+     */
+    protected def writeRDDToParquet[RecordType <: IndexedRecord](
+        things: RDD[RecordType], directory: String)
+        (implicit m: Manifest[RecordType]) = {
+        
+        // Import parquet
+        import parquet.hadoop.{ParquetOutputFormat, ParquetInputFormat}
+        import parquet.avro.{AvroParquetOutputFormat, AvroWriteSupport, 
+                             AvroReadSupport, AvroParquetWriter}
+
+        // We need to make Paths for Parquet output.
+        import org.apache.hadoop.fs.Path
+
+        // And we use a hack to get at the (static) schemas of generic things
+        import org.apache.avro.Schema
+
+        // import hadoop job
+        import org.apache.hadoop.mapreduce.Job
+        
+        // Every time we switch Avro schemas, we need a new Job. So we create
+        // our own.
+        val job = new Job()
+                
+        // Set up Parquet to write using Avro for this job
+        ParquetOutputFormat.setWriteSupportClass(job, classOf[AvroWriteSupport])
+        
+        // Go get the static SCHEMA$ for the Avro record type. We can't do it
+        // the normal way (RecordType.SCHEMA$) because Scala keeps static things
+        // in companion objects with the same names as the types they really
+        // belong to, and type parameters don't automatically bring them along.
+        
+        // First we need the class of the record, which we need anyway for doing
+        // the writing.
+        val recordClass = m.erasure
+        
+        println("Writing out an RDD of %d x %s".format(things.count,
+            recordClass.getCanonicalName))
+        
+        // Get the schema Field object    
+        val recordSchemaField = recordClass.getDeclaredField("SCHEMA$")
+        // Get the static value of this field. Argument is ignored for static
+        // fields, so pass null. See <http://docs.oracle.com/javase/7/docs/api/j
+        // ava/lang/reflect/Field.html#get%28java.lang.Object%29>
+        val recordSchema = recordSchemaField.get(null).asInstanceOf[Schema]
+        
+        // Set the Avro schema to use for this job
+        AvroParquetOutputFormat.setSchema(job, recordSchema)
+        
+        // Make a PairRDD of serializeable-wrapped Avro records, with null keys.
+        val pairRDD = things.map(thing => (null, thing))
+        
+        // Save the PairRDD to a Parquet file in our output directory. The keys
+        // are void, the values are RecordTypes, the output format is a
+        // ParquetOutputFormat for RecordTypes, and the configuration of the job
+        // we set up is used.
+        pairRDD.saveAsNewAPIHadoopFile(directory, classOf[Void], 
+            recordClass, classOf[ParquetOutputFormat[RecordType]],
+            job.getConfiguration)
+                    
+    }
+    
+    /**
+     * Write this SequenceGraph to a series of Parquet directories.
+     */
+    def writeToParquet(directory: String) = {
+    
+        // Write each type of object in turn.
+        writeRDDToParquet(sides, directory + "/Sides")
+        writeRDDToParquet(adjacencies, directory + "/Adjacencies")
+        writeRDDToParquet(alleleGroups, directory + "/AlleleGroups")
+        writeRDDToParquet(anchors, directory + "/Anchors")
+    
+    }
     
     
 }
@@ -147,11 +233,41 @@ class SequenceGraphChunk(sidesSeq: Seq[Side] = Nil,
     def getSide(id: Long) : Option[Side] = {
         sides.find(_.id == id)
     }
+    
+    /**
+     * Get the `count` minimal-position-and-face Sides in this chunk for each
+     * contig, in sorted order (smallest first).
+     *
+     * TODO: Implement proper k-select
+     */
+    def getMinimalSides(count: Int = 1) : Map[String, Seq[Side]] = {
+        import scala.util.Sorting
+    
+        // Grab count lowest within each contig
+        sides.groupBy(_.position.contig).mapValues { (value) => 
+            Sorting.stableSort(value)
+                .slice(0, count)
+        }
+        
+    }
+    
+    /**
+     * Get the `count` maximal-position-and-face Sides in this chunk for each
+     * contig, in sorted order (largest first).
+     *
+     * TODO: Implement proper k-select
+     */
+    def getMaximalSides(count: Int = 1) : Map[String, Seq[Side]] = {
+        import scala.util.Sorting
+    
+        // Grab count highest within each contig
+        sides.groupBy(_.position.contig).mapValues { (value) => 
+            Sorting.stableSort(value)
+                .reverse
+                .slice(0, count)
+        }
+        
+    }
 }
-
-/**
- * Provides an implicit conversion to extend RDDs of SequenceGraphChunks to
- * easily be turned into SequenceGraphs.
- */
 
  

@@ -26,6 +26,7 @@ import org.broadinstitute.variant.variantcontext.VariantContext
 import scala.collection.JavaConversions._
 
 import scala.math._
+import scala.util.Sorting
 
 // We want to parse command-line arguments
 import org.rogach.scallop._
@@ -156,39 +157,48 @@ object ImportVCF {
         // What sample are we importing?
         val sample = opts.sampleName.get.get
         
-        importSampleInParallel(opts.vcfFile.get.get, sample, sc)
+        
         
         // Make a new SequenceGraphWriter to save its graph.
-        val writer = if(opts.parquetDir.get isDefined) {
+        if(opts.parquetDir.get isDefined) {
             // The user wants to write Parquet. TODO: what if they also asked
             // for a dot file?
             println("Writing to Parquet")
+            
+            // Import the sample in parallel
+            importSampleInParallel(opts.vcfFile.get.get, sample, sc)
+                // Write the resulting parts to the directory specified
+                .writeToParquet(opts.parquetDir.get.get)
             
             new SparkParquetSequenceGraphWriter(opts.parquetDir.get.get, sc)
         } else if (opts.dotFile.get isDefined) {
             // The user wants to write GraphViz
             println("Writing to Graphviz")
             
-            new GraphvizSequenceGraphWriter(opts.dotFile.get.get)
+            // Make the GraphViz writer
+            val writer = new GraphvizSequenceGraphWriter(opts.dotFile.get.get)
+            
+            // Make the graph builder that writes to the writer
+            val graph = new EasySequenceGraphBuilder(sample, "reference", 
+                writer)
+            
+            // Get the actual File or die trying, and then make VcfParser parse
+            // that. We need to invoke the VcfParser functor first for some
+            // reason.
+            VcfParser().parseFile(new File(opts.vcfFile.get.get), false) { 
+                (info, entries) =>
+                // We get the VCF metadata and an iterator of VCF entries.
+                // Import our sample
+                importSample(graph, info, entries, sample, chromSizes)
+            }
+            
+            // Now finish up the writing
+            graph.finish()
+            
         } else {
             // The user doesn't know what they're doing
             throw new Exception("Must specify --dot-file or --parquet-dir")
         }
-        
-        // Make the graph builder that writes to the writer
-        val graph = new EasySequenceGraphBuilder(sample, "reference", writer)
-        
-        // Get the actual File or die trying, and then make VcfParser parse
-        // that. We need to invoke the VcfParser functor first for some reason.
-        VcfParser().parseFile(new File(opts.vcfFile.get.get), false) { 
-            (info, entries) =>
-            // We get the VCF metadata and an iterator of VCF entries.
-            // Import our sample
-            importSample(graph, info, entries, sample, chromSizes)
-        }
-        
-        // Now finish up the writing
-        graph.finish()
         
         println("VCF imported")
         
@@ -263,8 +273,12 @@ object ImportVCF {
         
     }
     
+    /**
+     * Import a sample from a VCF in parallel, produsing a SequenceGraph, which
+     * wraps Spark RDDs.
+     */
     def importSampleInParallel(filename: String, sample: String, 
-        sc: SparkContext) = {
+        sc: SparkContext): SequenceGraph = {
         
 
         // Get an RDD of VCF records, sorted by position. Use VariantContext
@@ -419,13 +433,132 @@ object ImportVCF {
             chunk
         }
         
+        
+        
+        // Use parallel reduction to get the two minimal-position Sides on each
+        // contig. Sides in the tuple are kept in sorted order. Because of the
+        // way we build the graph, these are guaranteed to be the dangling
+        // endpoints. TODO: Implement this as a GraphX operation to find all
+        // degree-1 nodes instead.
+        val minimalSidesByContig: Map[String, Seq[Side]] = alleleGroups
+            .values
+            // Grab the minimal Sides for each chunk
+            .map(_.getMinimalSides(2))
+            .reduce { (map1, map2) =>
+                val pairs = for(
+                    // For each contig
+                    key <- map1.keySet ++ map2.keySet;
+                    // Get the four Sides for that contig
+                    values <- Some(map1.getOrElse(key, Nil) ++ 
+                        map2.getOrElse(key, Nil));
+                    // Pick the best two
+                    selected <- Some(Sorting.stableSort(values).slice(0, 2))
+                ) yield (key, selected.toSeq)
+                
+                pairs.toMap
+            }
+            
+        // Do a similar thing to get the maximal-position Sides
+        val maximalSidesByContig: Map[String, Seq[Side]] = alleleGroups
+            .values
+            .map(_.getMaximalSides(2))
+            .reduce { (map1, map2) =>
+                val pairs = for(
+                    key <- map1.keySet ++ map2.keySet;
+                    values <- Some(map1.getOrElse(key, Nil) ++ 
+                        map2.getOrElse(key, Nil));
+                    selected <- Some(Sorting.stableSort(values)
+                        // We flip around the sorted sides and pick the
+                        // furthest-along two instead.
+                        .reverse
+                        .slice(0, 2))
+                ) yield (key, selected.toSeq)
+                
+                pairs.toMap
+            }
+        
+        // Now prepend/append leading/trailing Anchors and telomeres.
+        
+        // Where should we put them?
+        var endParts = new SequenceGraphChunk()
+        
+        // What IDs should we use? Start after the whole range we already used.
+        var nextID = records.count * idsPerRecord
+        
+        // We know both sides maps have the same keys, because if there's a
+        // minimal element there must be a maximal one.
+        for(
+            contig <- minimalSidesByContig.keySet;
+            minimalSides <- minimalSidesByContig.get(contig);
+            maximalSides <- maximalSidesByContig.get(contig)
+        ) {
+            // Prepend Anchor and telomere to minimal sides
+            for(side <- minimalSides) {
+                // Make the Anchor sides.
+                // Left starts at base 1
+                var anchorLeft = new Side(nextID, 
+                    new Position(contig, 1, Face.LEFT), false)
+                nextID += 1
+                
+                // Right ends at the base before the leftmost Side already
+                // there.
+                var anchorRight = new Side(nextID, 
+                    new Position(contig, side.position.base - 1, Face.RIGHT), 
+                    false)
+                nextID += 1
+                
+                // Add a Telomere side
+                var telomere = new Side(nextID, 
+                    new Position(contig, 0, Face.RIGHT), false)
+                nextID += 1
+                
+                // Add the Anchor
+                var anchor = new Anchor(
+                    new Edge(nextID, anchorLeft.id, anchorRight.id), 
+                    new PloidyBounds(1, null, null), 
+                    sample)
+                nextID += 1
+                
+                // Add the Adjacency to the rest of the graph
+                var adjacencyToGraph = new Adjacency(
+                    new Edge(nextID, anchorRight.id, side.id), 
+                    new PloidyBounds(1, null, null), 
+                    sample)
+                nextID += 1
+                
+                // Add the Adjacency to the telomere
+                var adjacencyToTelomere = new Adjacency(
+                    new Edge(nextID, telomere.id, anchorLeft.id), 
+                    new PloidyBounds(1, null, null), 
+                    sample)
+                nextID += 1
+                
+                // Put everything in the chunk
+                endParts = (endParts + anchorLeft + anchorRight + telomere + 
+                    anchor + adjacencyToGraph + adjacencyToTelomere)
+            }
+            
+            // TODO: Add trailing telomeres for maximalSides according to the
+            // chromSizes.
+            
+        }
+        
+        
             
         // Aggregate into a SequenceGraph.
-        val graph = new SequenceGraph(alleleGroups.values.union(connectors))
+        val graph = new SequenceGraph(alleleGroups.values
+            .union(connectors)
+            .union(sc.parallelize(List(endParts)))
+        )
+        
         
 
         // Count up number of Sides made
         println("Sides: %d".format(graph.sides.count))
+        
+        // Return the finished SequenceGraph
+        graph
+        
        
     }
     
