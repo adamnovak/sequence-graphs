@@ -49,6 +49,7 @@ sbt test
 ###Running command-line tools
 
 ```
-./importVCF.sh --parquet-dir <output directory name> <vcf file> <sample name> 
+./importVCF.sh --parquet-dir <output directory absolute path> <vcf file> <sample name>
+./importVCF.sh --cluster mesos://localhost:5050 --parquet-dir <output directory absolute path> <vcf file> <sample name> 
 ./importVCF.sh --dot-file <output file name> <vcf file> <sample name>
 ```
