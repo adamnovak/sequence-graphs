@@ -5,6 +5,20 @@ import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
 import org.apache.avro.generic.IndexedRecord
 
+// Import parquet
+import parquet.hadoop.{ParquetOutputFormat, ParquetInputFormat}
+import parquet.avro.{AvroParquetOutputFormat, AvroWriteSupport, 
+                     AvroReadSupport, AvroParquetWriter}
+
+// We need to make Paths for Parquet output.
+import org.apache.hadoop.fs.Path
+
+// And we use a hack to get at the (static) schemas of generic things
+import org.apache.avro.Schema
+
+// import hadoop job
+import org.apache.hadoop.mapreduce.Job
+
 /**
  * Represents a Sequence Graph (or component thereof) as a series of Spark RDDs.
  */
@@ -60,20 +74,6 @@ class SequenceGraph(sidesRDD: RDD[Side], alleleGroupsRDD: RDD[AlleleGroup],
     protected def writeRDDToParquet[RecordType <: IndexedRecord](
         things: RDD[RecordType], directory: String)
         (implicit m: Manifest[RecordType]) = {
-        
-        // Import parquet
-        import parquet.hadoop.{ParquetOutputFormat, ParquetInputFormat}
-        import parquet.avro.{AvroParquetOutputFormat, AvroWriteSupport, 
-                             AvroReadSupport, AvroParquetWriter}
-
-        // We need to make Paths for Parquet output.
-        import org.apache.hadoop.fs.Path
-
-        // And we use a hack to get at the (static) schemas of generic things
-        import org.apache.avro.Schema
-
-        // import hadoop job
-        import org.apache.hadoop.mapreduce.Job
         
         // Every time we switch Avro schemas, we need a new Job. So we create
         // our own.
