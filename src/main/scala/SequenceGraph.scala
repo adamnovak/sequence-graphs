@@ -130,6 +130,23 @@ class SequenceGraph(sidesRDD: RDD[Side], alleleGroupsRDD: RDD[AlleleGroup],
     
     }
     
+    /**
+     * Write this SequenceGraph to a (serial) SequenceGraphWriter. Collects
+     * everything into driver node memory.
+     *
+     * TODO: Find a way to iterate over RDD items, fetching them lazily from
+     * where they live.
+     */
+    def write(writer: SequenceGraphWriter) = {
+    
+        // Try doing an un-thread-safe thing over all the items.
+        sides.collect.foreach(writer.writeSide _)
+        adjacencies.collect.foreach(writer.writeAdjacency _)
+        alleleGroups.collect.foreach(writer.writeAlleleGroup _)
+        anchors.collect.foreach(writer.writeAnchor _)
+        
+    }
+    
     
 }
 

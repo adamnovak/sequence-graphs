@@ -157,7 +157,10 @@ object ImportVCF {
         // What sample are we importing?
         val sample = opts.sampleName.get.get
         
-        
+        // Import the sample in parallel, but only if we actually try to save
+        // it.
+        lazy val imported = importSampleInParallel(opts.vcfFile.get.get, sample,
+            sc)
         
         // Make a new SequenceGraphWriter to save its graph.
         if(opts.parquetDir.get isDefined) {
@@ -165,10 +168,9 @@ object ImportVCF {
             // for a dot file?
             println("Writing to Parquet")
             
-            // Import the sample in parallel
-            importSampleInParallel(opts.vcfFile.get.get, sample, sc)
-                // Write the resulting parts to the directory specified
-                .writeToParquet(opts.parquetDir.get.get)
+            
+            // Write the resulting parts to the directory specified
+            imported.writeToParquet(opts.parquetDir.get.get)
             
             new SparkParquetSequenceGraphWriter(opts.parquetDir.get.get, sc)
         } else if (opts.dotFile.get isDefined) {
@@ -178,22 +180,10 @@ object ImportVCF {
             // Make the GraphViz writer
             val writer = new GraphvizSequenceGraphWriter(opts.dotFile.get.get)
             
-            // Make the graph builder that writes to the writer
-            val graph = new EasySequenceGraphBuilder(sample, "reference", 
-                writer)
-            
-            // Get the actual File or die trying, and then make VcfParser parse
-            // that. We need to invoke the VcfParser functor first for some
-            // reason.
-            VcfParser().parseFile(new File(opts.vcfFile.get.get), false) { 
-                (info, entries) =>
-                // We get the VCF metadata and an iterator of VCF entries.
-                // Import our sample
-                importSample(graph, info, entries, sample, chromSizes)
-            }
+            imported.write(writer)
             
             // Now finish up the writing
-            graph.finish()
+            writer.close()
             
         } else {
             // The user doesn't know what they're doing
@@ -289,6 +279,8 @@ object ImportVCF {
            classOf[VariantContextWritable], sc.hadoopConfiguration)
            .map(p => (p._1.get, p._2.get))
            
+        println("Got %d VCF records".format(records.count))
+           
         // How many partitions should we use? Apparently we need to match this
         // when we zip two things.
         val numPartitions = records.partitions.size
@@ -301,7 +293,7 @@ object ImportVCF {
         val idsPerRecord = 100
         
         // Make an RDD with one long ID for each record. IDs are sequential.
-        val idBlocks: RDD[Long] = sc.makeRDD(1L until records.count,
+        val idBlocks: RDD[Long] = sc.makeRDD(0L until records.count,
             numPartitions)
             
         // Number all the records sequentially. They can be sorted into this
@@ -360,6 +352,8 @@ object ImportVCF {
                 // record it came from.
                 (idBlock, chunk)
             }
+        
+        println("Got %d chunks".format(alleleGroups.count))
            
         // Look at adjacent pairs of SequenceGraphChunks and add the Anchors and
         // Adjacencies to wire them together if appropriate.
@@ -384,7 +378,8 @@ object ImportVCF {
             
             pairsToLink.foreach { (pair) =>
                 // Unpack the two AlleleGroups to link
-                val (firstGroup: AlleleGroup, secondGroup: AlleleGroup) = pair
+                val (firstGroup: AlleleGroup, 
+                    secondGroup: AlleleGroup) = pair
                 
                 // Where does our Anchor need to start after?
                 val prevPos = firstChunk.getSide(firstGroup.edge.right)
@@ -431,8 +426,7 @@ object ImportVCF {
             
             // Return the chunk we built
             chunk
-        }
-        
+        } 
         
         
         // Use parallel reduction to get the two minimal-position Sides on each
@@ -444,7 +438,8 @@ object ImportVCF {
             .values
             // Grab the minimal Sides for each chunk
             .map(_.getMinimalSides(2))
-            .reduce { (map1, map2) =>
+            .fold(Map.empty) { (map1, map2) =>
+                
                 val pairs = for(
                     // For each contig
                     key <- map1.keySet ++ map2.keySet;
@@ -462,7 +457,7 @@ object ImportVCF {
         val maximalSidesByContig: Map[String, Seq[Side]] = alleleGroups
             .values
             .map(_.getMaximalSides(2))
-            .reduce { (map1, map2) =>
+            .fold(Map.empty) { (map1, map2) =>
                 val pairs = for(
                     key <- map1.keySet ++ map2.keySet;
                     values <- Some(map1.getOrElse(key, Nil) ++ 
@@ -486,7 +481,8 @@ object ImportVCF {
         var nextID = records.count * idsPerRecord
         
         // We know both sides maps have the same keys, because if there's a
-        // minimal element there must be a maximal one.
+        // minimal element there must be a maximal one. There may be neither,
+        // but this for comprehension should handle that.
         for(
             contig <- minimalSidesByContig.keySet;
             minimalSides <- minimalSidesByContig.get(contig);
