@@ -160,7 +160,7 @@ object ImportVCF {
         // Import the sample in parallel, but only if we actually try to save
         // it.
         lazy val imported = importSampleInParallel(opts.vcfFile.get.get, sample,
-            sc)
+            chromSizes, sc)
         
         // Make a new SequenceGraphWriter to save its graph.
         if(opts.parquetDir.get isDefined) {
@@ -264,10 +264,16 @@ object ImportVCF {
     }
     
     /**
-     * Import a sample from a VCF in parallel, produsing a SequenceGraph, which
+     * Import a sample from a VCF in parallel, producing a SequenceGraph, which
      * wraps Spark RDDs.
+     *
+     * Takes the VCF file name to import, the name of the sample to look at in
+     * that file, an optional map from contig names to sizes, and a Spark
+     * context.
+     *
      */
     def importSampleInParallel(filename: String, sample: String, 
+        chromSizes: Option[Map[String, Int]], 
         sc: SparkContext): SequenceGraph = {
         
 
@@ -324,6 +330,16 @@ object ImportVCF {
                 // Get the alleles
                 val alleles = genotype.getAlleles()
                 
+                // Get the contig we're on
+                val contig = record.getChr match {
+                    // Things that start with "chr" pass as is
+                    case string if string startsWith "chr" => string
+                    // Everything else gets "chr" prepended
+                    case string => "chr" + string
+                    // TODO: Handle "random" or "ecoli_whatever" or what have
+                    // you.
+                };
+                
                 alleles.map { (vcfAllele) =>
                     // Convert the VCF allele to one of our Alleles, which needs
                     // both sample and reference strings (for export)
@@ -331,13 +347,11 @@ object ImportVCF {
                             record.getReference.getBaseString)
                     
                     // Get a Side for the left side
-                    val side1 = pen.drawSide(record.getChr, record.getStart, 
-                        Face.LEFT)
+                    val side1 = pen.drawSide(contig, record.getStart, Face.LEFT)
                     chunk += side1
                     
                     // Get a Side for the right side
-                    val side2 = pen.drawSide(record.getChr, record.getEnd, 
-                        Face.RIGHT)
+                    val side2 = pen.drawSide(contig, record.getEnd, Face.RIGHT)
                     chunk += side2
                     
                     // Make an AlleleGroup between them
@@ -359,10 +373,10 @@ object ImportVCF {
            
         // Look at adjacent pairs of SequenceGraphChunks and add the Anchors and
         // Adjacencies to wire them together if appropriate.
+        // TODO: Adapt the pairUp thing to be able to reject variants after some
+        // processing.
         val connectors: RDD[SequenceGraphChunk] = 
-            pairUp(alleleGroupsWithPhasing).
-            map {
-                (item) =>
+            pairUp(alleleGroupsWithPhasing).map { (item) =>
                 // Unpack the super-complex tuple.
                 val ((firstID, (firstChunk, firstPhased)),
                     (secondID, (secondChunk, secondPhased))) = item
@@ -382,26 +396,65 @@ object ImportVCF {
                 // We need a SequenceGraphChunk to build in
                 var chunk = new SequenceGraphChunk()
                 
-                if(firstPhased && secondPhased) {
-                    // Link corresponding pairs of alleles with Anchors
-                    
-                    val pairsToLink = firstChunk.alleleGroups.zip(
-                        secondChunk.alleleGroups)
+                // Find a Side where the first variant ended. TODO: deal with
+                // complex variants.
+                val prevSideID = firstChunk.alleleGroups.first.edge.right
+                
+                // Get its Position.
+                val prevPos = firstChunk.getSide(prevSideID).get.position
+                
+                // Find a Side where the next variant started. TODO: deal with
+                // complex variants.
+                val nextSideID = secondChunk.alleleGroups.first.edge.right
+                
+                // Get its Position.
+                val nextPos = secondChunk.getSide(nextSideID).get.position
+                
+                if(prevPos.contig == nextPos.contig) {
+                    // Need to be physically linked since they're on the same
+                    // contig.
+                
+                    if(firstPhased && secondPhased) {
+                        // Link corresponding pairs of alleles with Anchors
                         
-                    pairsToLink.foreach { (pair) =>
-                        // Unpack the two AlleleGroups to link
-                        val (firstGroup: AlleleGroup, 
-                            secondGroup: AlleleGroup) = pair
+                        // TODO: De-nest into its own function or something,
+                        // this is super-indented.
                         
-                        // Where does our Anchor need to start after?
-                        val prevPos = firstChunk.getSide(firstGroup.edge.right)
-                            .get
-                            .position
+                        val pairsToLink = firstChunk.alleleGroups.zip(
+                            secondChunk.alleleGroups)
+                            
+                        pairsToLink.foreach { (pair) =>
+                            // Unpack the two AlleleGroups to link
+                            val (firstGroup: AlleleGroup, 
+                                secondGroup: AlleleGroup) = pair
+                            
+                            // We use prevPos and nextPos as found for the two
+                            // Sites above. This will work as long as variants
+                            // don't start generating anything more interesting
+                            // than AlleleGroups with identical reference
+                            // positions.
+                            
+                            // Make two Sides for an Anchor
+                            val startSide = pen.drawSide(prevPos.contig, 
+                                prevPos.base + 1, Face.LEFT)
+                            chunk += startSide
+                            
+                            val endSide = pen.drawSide(nextPos.contig, 
+                                nextPos.base - 1, Face.RIGHT)
+                            chunk += endSide
+                                
+                            // Make the Anchor
+                            chunk += pen.drawAnchor(startSide, endSide)
+                                
+                            // Make the two connecting adjacencies
+                            chunk += pen.drawAdjacency(firstGroup.edge.right,
+                                startSide)
+                            chunk += pen.drawAdjacency(endSide,
+                                secondGroup.edge.left)
+                        }
                         
-                        // Where does our Anchor need to end before?
-                        val nextPos = secondChunk.getSide(secondGroup.edge.left)
-                            .get
-                            .position
+                    } else {
+                        // Lose phasing by linking through a single Anchor
                         
                         // Make two Sides for an Anchor
                         val startSide = pen.drawSide(prevPos.contig, 
@@ -411,65 +464,32 @@ object ImportVCF {
                         val endSide = pen.drawSide(nextPos.contig, 
                             nextPos.base - 1, Face.RIGHT)
                         chunk += endSide
-                            
+                        
                         // Make the Anchor
                         chunk += pen.drawAnchor(startSide, endSide)
-                            
-                        // Make the two connecting adjacencies
-                        chunk += pen.drawAdjacency(firstGroup.edge.right,
-                            startSide)
-                        chunk += pen.drawAdjacency(endSide,
-                            secondGroup.edge.left)
+                        
+                        firstChunk.alleleGroups.foreach { (alleleGroup) =>
+                            // Attach the end of each of the AlleleGroups on the
+                            // left
+                            chunk += pen.drawAdjacency(alleleGroup.edge.right,
+                                startSide)
+                        }
+                        
+                        secondChunk.alleleGroups.foreach { (alleleGroup) =>
+                            // Attach the start of each of the AlleleGroups on
+                            // the left
+                            chunk += pen.drawAdjacency(endSide,
+                                alleleGroup.edge.left)
+                        }
+                        
+                        // TODO: Unify this with the phased case, somehow. Or
+                        // write utility methods (leftmost/rightmost Position
+                        // from a chunk?).
+                        
+                        // Now we have hooked the two chunks together, losing
+                        // phasing.
+                        
                     }
-                    
-                } else {
-                    // Lose phasing by linking through a single Anchor
-                    
-                    // Where did the first variant end?
-                    val prevSideID = firstChunk.alleleGroups.first.edge.right
-                    
-                    // Where does our Anchor need to start after?
-                    val prevPos = firstChunk.getSide(prevSideID).get.position
-                    
-                    // Where did the next variant start?
-                    val nextSideID = secondChunk.alleleGroups.first.edge.right
-                    
-                    // Where does our Anchor need to end before?
-                    val nextPos = secondChunk.getSide(nextSideID).get.position
-                    
-                    // Make two Sides for an Anchor
-                    val startSide = pen.drawSide(prevPos.contig, 
-                        prevPos.base + 1, Face.LEFT)
-                    chunk += startSide
-                    
-                    val endSide = pen.drawSide(nextPos.contig, 
-                        nextPos.base - 1, Face.RIGHT)
-                    chunk += endSide
-                    
-                    // Make the Anchor
-                    chunk += pen.drawAnchor(startSide, endSide)
-                    
-                    firstChunk.alleleGroups.foreach { (alleleGroup) =>
-                        // Attach the end of each of the AlleleGroups on the
-                        // left
-                        chunk += pen.drawAdjacency(alleleGroup.edge.right,
-                            startSide)
-                    }
-                    
-                    secondChunk.alleleGroups.foreach { (alleleGroup) =>
-                        // Attach the start of each of the AlleleGroups on the
-                        // left
-                        chunk += pen.drawAdjacency(endSide,
-                            alleleGroup.edge.left)
-                    }
-                    
-                    // TODO: Unify this with the phased case, somehow. Or write
-                    // utility methods (leftmost/rightmost Position from a
-                    // chunk?).
-                    
-                    // Now we have hooked the two chunks together, losing
-                    // phasing.
-                    
                 }
                 
                 // Return the chunk we built
@@ -540,8 +560,9 @@ object ImportVCF {
             minimalSides <- minimalSidesByContig.get(contig);
             maximalSides <- maximalSidesByContig.get(contig)
         ) {
-            // Prepend Anchor and telomere to minimal sides
             for(side <- minimalSides) {
+                // Prepend Anchor and telomere to minimal Sides.
+            
                 // Make the Anchor sides.
                 // Left starts at base 1
                 val anchorLeft = pen.drawSide(contig, 1, Face.LEFT)
@@ -567,28 +588,50 @@ object ImportVCF {
                 endParts += pen.drawAdjacency(telomere, anchorLeft)
             }
             
-            // TODO: Add trailing telomeres for maximalSides according to the
-            // chromSizes.
+            for(sizes <- chromSizes; side <- maximalSides) {
+                // Since we have the chromosome sizes, do trailing telomeres on
+                // maximal Sides as well.
+                
+                // Make the Anchor sides.
+                // Left starts at base after the rightmost Side already there.
+                val anchorLeft = pen.drawSide(contig, side.position.base + 1,
+                    Face.LEFT)
+                endParts += anchorLeft
+                
+                // Right ends at the last base
+                val anchorRight = pen.drawSide(contig, sizes(contig),
+                    Face.RIGHT)
+                endParts += anchorRight
+                
+                // Add a Telomere side
+                val telomere = pen.drawSide(contig, sizes(contig) + 1,
+                    Face.LEFT)
+                endParts += telomere
+                
+                // Add the Anchor
+                endParts += pen.drawAnchor(anchorLeft, anchorRight)
+                
+                // Add the Adjacency to the rest of the graph
+                endParts += pen.drawAdjacency(side, anchorLeft)
+                
+                // Add the Adjacency to the telomere
+                endParts += pen.drawAdjacency(anchorRight, telomere)
+                
+            }
             
         }
         
-        
-            
         // Aggregate into a SequenceGraph.
         val graph = new SequenceGraph(alleleGroups.values
             .union(connectors)
             .union(sc.parallelize(List(endParts)))
         )
-        
-        
 
         // Count up number of Sides made
         println("Sides: %d".format(graph.sides.count))
         
         // Return the finished SequenceGraph
         graph
-        
-       
     }
     
     /**
