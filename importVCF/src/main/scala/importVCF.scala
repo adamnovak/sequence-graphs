@@ -286,10 +286,15 @@ object ImportVCF {
            .map(p => (p._1.get, p._2.get))
            
         println("Got %d VCF records".format(records.count))
-           
+        
         // How many partitions should we use? Apparently we need to match this
         // when we zip two things.
         val numPartitions = records.partitions.size
+           
+        // Filter down the records, throwing out any that are "filtered"
+        val passingRecords = records.filter { (pair) => !(pair._2.isFiltered) }
+        
+        println("Got %d passing filters".format(passingRecords.count))
            
         // TODO: debug why sortByKey() is returning empty RDDs. For now just
         // assume our input VCF is sorted.
@@ -299,12 +304,12 @@ object ImportVCF {
         val idsPerRecord = 100
         
         // Make an RDD with one long ID for each record. IDs are sequential.
-        val idBlocks: RDD[Long] = sc.makeRDD(0L until records.count,
+        val idBlocks: RDD[Long] = sc.makeRDD(0L until passingRecords.count,
             numPartitions)
             
         // Number all the records sequentially. They can be sorted into this
         // order now, and each can guess the IDs of its neighbors.
-        val numberedRecords = idBlocks.zip(records.values)
+        val numberedRecords = idBlocks.zip(passingRecords.values)
             
         // Get phasing status for each variant, keyed by sequential ID.
         val phased: RDD[(Long, Boolean)] = numberedRecords mapValues { 
@@ -362,8 +367,6 @@ object ImportVCF {
                 // record it came from.
                 (idBlock, chunk)
             }
-        
-        println("Got %d chunks".format(alleleGroups.count))
         
         // Get (alleleGroupChunk, phasedFlag) tuples, keyed by sequential ID.
         // Easy; just a join. The join *should* be trivial because both RDDs are
@@ -546,7 +549,7 @@ object ImportVCF {
         var endParts = new SequenceGraphChunk()
         
         // What IDs should we use? Start after the whole range we already used.
-        val nextID = records.count * idsPerRecord
+        val nextID = passingRecords.count * idsPerRecord
         
         // Make a pen to draw the stuff on the ends of the chromosomes, in
         // serial. It can go as far as it wants in ID space.
