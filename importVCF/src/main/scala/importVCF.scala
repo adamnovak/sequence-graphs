@@ -310,8 +310,10 @@ object ImportVCF {
             .map { (parts) =>
                 val (idBlock: Long, record: VariantContext) = parts
                 
-                // What is the next free ID in our block?
-                var nextID = idBlock * idsPerRecord
+                // Make a pen to draw Sequence Graph parts with IDs from the
+                // given block.
+                val pen = new SequenceGraphPen(sample, idBlock * idsPerRecord,
+                    idsPerRecord)
                 
                 // What SequenceGraphChunk are we using to collect our parts?
                 var chunk = new SequenceGraphChunk()
@@ -322,30 +324,24 @@ object ImportVCF {
                 // Get the alleles
                 val alleles = genotype.getAlleles()
                 
-                alleles.map { (allele) =>
+                alleles.map { (vcfAllele) =>
+                    // Convert the VCF allele to one of our Alleles, which needs
+                    // both sample and reference strings (for export)
+                    val allele = new Allele(vcfAllele.getBaseString, 
+                            record.getReference.getBaseString)
+                    
                     // Get a Side for the left side
-                    val side1 = new Side(nextID, new Position(record.getChr, 
-                        record.getStart, Face.LEFT), false)
-                    nextID += 1
+                    val side1 = pen.drawSide(record.getChr, record.getStart, 
+                        Face.LEFT)
+                    chunk += side1
+                    
                     // Get a Side for the right side
-                    val side2 = new Side(nextID, new Position(record.getChr, 
-                        record.getEnd, Face.RIGHT), false)
-                    nextID += 1
+                    val side2 = pen.drawSide(record.getChr, record.getEnd, 
+                        Face.RIGHT)
+                    chunk += side2
                     
                     // Make an AlleleGroup between them
-                    val group = new AlleleGroup(
-                        new Edge(nextID, side1.id, side2.id), 
-                        new Allele(allele.getBaseString, 
-                            record.getReference.getBaseString), 
-                        new PloidyBounds(1, null, null), 
-                        sample)
-                    nextID += 1
-
-                    // TODO: check for ID overflow
-                        
-                    // Add everything in to the SequenceGraphChunk we are
-                    // building.
-                    chunk = chunk + side1 + side2 + group
+                    chunk += pen.drawAlleleGroup(side1, side2, allele)
                 }
                 
                 // Return the assembled chunk of sequence graph, keyed by the
@@ -371,7 +367,13 @@ object ImportVCF {
             // We need to know where to make IDs from. Put them in the first
             // chunk's namespace, after the largest AlleleGroup edge ID we find
             // (since those are made last above).
-            var nextID = firstChunk.alleleGroups.map(_.edge.id).max + 1
+            val nextID = firstChunk.alleleGroups.map(_.edge.id).max + 1
+
+            // Make a pen to draw Sequence Graph parts with IDs from the given
+            // block. We need to reconstruct where the block ought to end,
+            // because we sort of hack about to grab the next ID to use.
+            val pen = new SequenceGraphPen(sample, nextID, 
+                idsPerRecord - nextID % idsPerRecord)
             
             // We need a SequenceGraphChunk to build in
             var chunk = new SequenceGraphChunk()
@@ -392,36 +394,22 @@ object ImportVCF {
                     .position
                 
                 // Make two Sides for an Anchor
-                val startSide = new Side(nextID, new Position(prevPos.contig, 
-                    prevPos.base + 1, Face.LEFT), false)
-                nextID += 1
-                val endSide = new Side(nextID, new Position(nextPos.contig, 
-                    nextPos.base - 1, Face.RIGHT), false)
-                nextID += 1
+                val startSide = pen.drawSide(prevPos.contig, prevPos.base + 1, 
+                    Face.LEFT)
+                chunk += startSide
+                
+                val endSide = pen.drawSide(nextPos.contig, nextPos.base - 1, 
+                    Face.RIGHT)
+                chunk += endSide
                     
                 // Make the Anchor
-                val anchor = new Anchor(
-                    new Edge(nextID, startSide.id, endSide.id), 
-                    new PloidyBounds(1, null, null), 
-                    sample)
-                nextID += 1
+                chunk += pen.drawAnchor(startSide, endSide)
                     
                 // Make the two connecting adjacencies
-                val leftAdjacency = new Adjacency(
-                    new Edge(nextID, firstGroup.edge.right, startSide.id), 
-                    new PloidyBounds(1, null, null), 
-                    sample)
-                nextID += 1
-                    
-                val rightAdjacency = new Adjacency(
-                    new Edge(nextID, endSide.id, secondGroup.edge.left), 
-                    new PloidyBounds(1, null, null), 
-                    sample)
-                nextID += 1
-                
-                // Put everything in the SequenceGraphChunk
-                chunk = (chunk + startSide + endSide + anchor + leftAdjacency 
-                    + rightAdjacency)
+                chunk += pen.drawAdjacency(firstGroup.edge.right,
+                    startSide)
+                chunk += pen.drawAdjacency(endSide,
+                    secondGroup.edge.left)
             }
             
             // Return the chunk we built
@@ -478,7 +466,11 @@ object ImportVCF {
         var endParts = new SequenceGraphChunk()
         
         // What IDs should we use? Start after the whole range we already used.
-        var nextID = records.count * idsPerRecord
+        val nextID = records.count * idsPerRecord
+        
+        // Make a pen to draw the stuff on the ends of the chromosomes, in
+        // serial. It can go as far as it wants in ID space.
+        val pen = new SequenceGraphPen(sample, nextID)
         
         // We know both sides maps have the same keys, because if there's a
         // minimal element there must be a maximal one. There may be neither,
@@ -492,46 +484,27 @@ object ImportVCF {
             for(side <- minimalSides) {
                 // Make the Anchor sides.
                 // Left starts at base 1
-                var anchorLeft = new Side(nextID, 
-                    new Position(contig, 1, Face.LEFT), false)
-                nextID += 1
+                val anchorLeft = pen.drawSide(contig, 1, Face.LEFT)
+                endParts += anchorLeft
                 
                 // Right ends at the base before the leftmost Side already
                 // there.
-                var anchorRight = new Side(nextID, 
-                    new Position(contig, side.position.base - 1, Face.RIGHT), 
-                    false)
-                nextID += 1
+                val anchorRight = pen.drawSide(contig, side.position.base - 1,
+                    Face.RIGHT)
+                endParts += anchorRight
                 
                 // Add a Telomere side
-                var telomere = new Side(nextID, 
-                    new Position(contig, 0, Face.RIGHT), false)
-                nextID += 1
+                val telomere = pen.drawSide(contig, 0, Face.RIGHT)
+                endParts += telomere
                 
                 // Add the Anchor
-                var anchor = new Anchor(
-                    new Edge(nextID, anchorLeft.id, anchorRight.id), 
-                    new PloidyBounds(1, null, null), 
-                    sample)
-                nextID += 1
+                endParts += pen.drawAnchor(anchorLeft, anchorRight)
                 
                 // Add the Adjacency to the rest of the graph
-                var adjacencyToGraph = new Adjacency(
-                    new Edge(nextID, anchorRight.id, side.id), 
-                    new PloidyBounds(1, null, null), 
-                    sample)
-                nextID += 1
+                endParts += pen.drawAdjacency(anchorRight, side)
                 
                 // Add the Adjacency to the telomere
-                var adjacencyToTelomere = new Adjacency(
-                    new Edge(nextID, telomere.id, anchorLeft.id), 
-                    new PloidyBounds(1, null, null), 
-                    sample)
-                nextID += 1
-                
-                // Put everything in the chunk
-                endParts = (endParts + anchorLeft + anchorRight + telomere + 
-                    anchor + adjacencyToGraph + adjacencyToTelomere)
+                endParts += pen.drawAdjacency(telomere, anchorLeft)
             }
             
             // TODO: Add trailing telomeres for maximalSides according to the
