@@ -51,7 +51,7 @@ object ImportVCF {
         val opts = new ScallopConf(args) {
             guessOptionName = true
             banner("""Usage: importVCF [OPTION] {--dot-file dotFile | 
-                 --parquet-dir parquetDir} vcfFile sample
+                 --parquet-dir parquetDir | --serial parquetDir} vcfFile sample
                 |Import a VCF file to sequence graph format.
                 |Options:
                 |""".stripMargin)
@@ -74,6 +74,9 @@ object ImportVCF {
                 
             val parquetDir = opt[String](
                 descr = "Save Parquet files in this directory (absolute path)")
+                
+            val serial = opt[String](
+                descr = "Save Parquet files in this directory (serial import)")
             
             val version = opt[Boolean](noshort = true, 
                 descr = "Print version")
@@ -120,7 +123,7 @@ object ImportVCF {
         SequenceGraphKryoProperties.setupContextProperties()
         
         // Set the executors to use a more reasonable amount of memory.
-        System.setProperty("spark.executor.memory", "10G")
+        System.setProperty("spark.executor.memory", "250G")
 
         // The first thing we need is a Spark context. We would like to be able
         // to make one against any Spark URL: either "local" or soemthing like
@@ -188,6 +191,30 @@ object ImportVCF {
             // Now finish up the writing
             writer.close()
             
+        } else if (opts.serial.get isDefined) {
+            // Use the old serial Spark-free Parquet import path.
+            // Streams to disk, but reads through the whole file.
+            
+            // Make a SequenceGraphWriter to stream to Parquet
+            val writer = new ParquetSequenceGraphWriter(opts.serial.get.get)
+            
+            // Make a SequenceGraphBuilder to build the graph
+            val graph = new EasySequenceGraphBuilder(sample, "reference",
+                writer)
+            
+            // Get the actual File or die trying, and then make VcfParser parse
+            // that. We need to invoke the VcfParser functor first for some
+            // reason.
+            VcfParser().parseFile(new File(opts.vcfFile.get.get), false) {
+                (info, entries) =>
+                // We get the VCF metadata and an iterator of VCF entries.
+                // Import our sample
+                importSample(graph, info, entries, sample, chromSizes)
+            }
+            
+            // Now finish up the writing
+            graph.finish()
+                 
         } else {
             // The user doesn't know what they're doing
             throw new Exception("Must specify --dot-file or --parquet-dir")
