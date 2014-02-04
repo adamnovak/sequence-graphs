@@ -76,7 +76,7 @@ class SequenceGraphPen(genome: String = "", idStart: Long = 0,
      * Optionally can flag the Side as reference; by default it is not.
      */
     def drawSide(contig: String, base: Long, face: Face,
-        isReference: Boolean = true): Side = {
+        isReference: Boolean = false): Side = {
         
         new Side(id, new Position(contig, base, face), isReference)
     }

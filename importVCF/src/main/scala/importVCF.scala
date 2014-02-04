@@ -118,6 +118,9 @@ object ImportVCF {
         // Set up serialization stuff for Spark so it can efficiently exchange
         // our Avro records.
         SequenceGraphKryoProperties.setupContextProperties()
+        
+        // Set the executors to use a more reasonable amount of memory.
+        System.setProperty("spark.executor.memory", "10G")
 
         // The first thing we need is a Spark context. We would like to be able
         // to make one against any Spark URL: either "local" or soemthing like
@@ -166,7 +169,7 @@ object ImportVCF {
         if(opts.parquetDir.get isDefined) {
             // The user wants to write Parquet. TODO: what if they also asked
             // for a dot file?
-            println("Writing to Parquet")
+            println("Will write to Parquet")
             
             
             // Write the resulting parts to the directory specified
@@ -175,7 +178,7 @@ object ImportVCF {
             new SparkParquetSequenceGraphWriter(opts.parquetDir.get.get, sc)
         } else if (opts.dotFile.get isDefined) {
             // The user wants to write GraphViz
-            println("Writing to Graphviz")
+            println("Will write to GraphViz")
             
             // Make the GraphViz writer
             val writer = new GraphvizSequenceGraphWriter(opts.dotFile.get.get)
@@ -630,8 +633,7 @@ object ImportVCF {
             .union(sc.parallelize(List(endParts)))
         )
 
-        // Count up number of Sides made
-        println("Sides: %d".format(graph.sides.count))
+        println("Constructed final SequenceGraph RDDs")
         
         // Return the finished SequenceGraph
         graph

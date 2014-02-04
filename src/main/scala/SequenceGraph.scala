@@ -91,8 +91,7 @@ class SequenceGraph(sidesRDD: RDD[Side], alleleGroupsRDD: RDD[AlleleGroup],
         // the writing.
         val recordClass = m.erasure
         
-        println("Writing out an RDD of %d x %s".format(things.count,
-            recordClass.getCanonicalName))
+        println("Writing out an RDD of %s".format(recordClass.getCanonicalName))
         
         // Get the schema Field object    
         val recordSchemaField = recordClass.getDeclaredField("SCHEMA$")
@@ -114,6 +113,8 @@ class SequenceGraph(sidesRDD: RDD[Side], alleleGroupsRDD: RDD[AlleleGroup],
         pairRDD.saveAsNewAPIHadoopFile(directory, classOf[Void], 
             recordClass, classOf[ParquetOutputFormat[RecordType]],
             job.getConfiguration)
+            
+        println("RDD written")
                     
     }
     
