@@ -300,9 +300,9 @@ object ImportVCF {
         // order now, and each can guess the IDs of its neighbors.
         val numberedRecords = idBlocks.zip(records.values)
             
-        // Get phasing status for each variant
-        val phased: RDD[(Long, Boolean)] = records mapValues { (record) =>
-            record.getGenotype(sample).isPhased()
+        // Get phasing status for each variant, keyed by sequential ID.
+        val phased: RDD[(Long, Boolean)] = numberedRecords mapValues { 
+            record => record.getGenotype(sample).isPhased()
         }
 
         // Produce all the AlleleGroups and their endpoints, numbered by record.
@@ -350,71 +350,131 @@ object ImportVCF {
             }
         
         println("Got %d chunks".format(alleleGroups.count))
+        
+        // Get (alleleGroupChunk, phasedFlag) tuples, keyed by sequential ID.
+        // Easy; just a join. The join *should* be trivial because both RDDs are
+        // the same elements in the same order; hopefully Spark is smart enough
+        // not to drag everything all over the cluster to calculate this.
+        val alleleGroupsWithPhasing = alleleGroups.join(phased)
            
         // Look at adjacent pairs of SequenceGraphChunks and add the Anchors and
         // Adjacencies to wire them together if appropriate.
-        val connectors: RDD[SequenceGraphChunk] = pairUp(alleleGroups).map {
-            (item) =>
-            // Unpack the item tuple
-            val ((firstID, firstChunk), (secondID, secondChunk)) = item
-            
-            // TODO: check phasing
-            // For now just tie together corresponding AlleleGroups.
-            val pairsToLink = firstChunk.alleleGroups.zip(
-                secondChunk.alleleGroups)
-            
-            
-            // We need to know where to make IDs from. Put them in the first
-            // chunk's namespace, after the largest AlleleGroup edge ID we find
-            // (since those are made last above).
-            val nextID = firstChunk.alleleGroups.map(_.edge.id).max + 1
+        val connectors: RDD[SequenceGraphChunk] = 
+            pairUp(alleleGroupsWithPhasing).
+            map {
+                (item) =>
+                // Unpack the super-complex tuple.
+                val ((firstID, (firstChunk, firstPhased)),
+                    (secondID, (secondChunk, secondPhased))) = item
+                
+                // We need to know where to make IDs from. Put them in the first
+                // chunk's namespace, after the largest AlleleGroup edge ID we
+                // find (since those are made last above).
+                val nextID = firstChunk.alleleGroups.map(_.edge.id).max + 1
 
-            // Make a pen to draw Sequence Graph parts with IDs from the given
-            // block. We need to reconstruct where the block ought to end,
-            // because we sort of hack about to grab the next ID to use.
-            val pen = new SequenceGraphPen(sample, nextID, 
-                idsPerRecord - nextID % idsPerRecord)
-            
-            // We need a SequenceGraphChunk to build in
-            var chunk = new SequenceGraphChunk()
-            
-            pairsToLink.foreach { (pair) =>
-                // Unpack the two AlleleGroups to link
-                val (firstGroup: AlleleGroup, 
-                    secondGroup: AlleleGroup) = pair
+                // Make a pen to draw Sequence Graph parts with IDs from the
+                // given block. We need to reconstruct where the block ought to
+                // end, because we sort of hack about to grab the next ID to
+                // use.
+                val pen = new SequenceGraphPen(sample, nextID, 
+                    idsPerRecord - nextID % idsPerRecord)
                 
-                // Where does our Anchor need to start after?
-                val prevPos = firstChunk.getSide(firstGroup.edge.right)
-                    .get
-                    .position
+                // We need a SequenceGraphChunk to build in
+                var chunk = new SequenceGraphChunk()
                 
-                // Where does our Anchor need to end before?
-                val nextPos = secondChunk.getSide(secondGroup.edge.left)
-                    .get
-                    .position
-                
-                // Make two Sides for an Anchor
-                val startSide = pen.drawSide(prevPos.contig, prevPos.base + 1, 
-                    Face.LEFT)
-                chunk += startSide
-                
-                val endSide = pen.drawSide(nextPos.contig, nextPos.base - 1, 
-                    Face.RIGHT)
-                chunk += endSide
+                if(firstPhased && secondPhased) {
+                    // Link corresponding pairs of alleles with Anchors
                     
-                // Make the Anchor
-                chunk += pen.drawAnchor(startSide, endSide)
+                    val pairsToLink = firstChunk.alleleGroups.zip(
+                        secondChunk.alleleGroups)
+                        
+                    pairsToLink.foreach { (pair) =>
+                        // Unpack the two AlleleGroups to link
+                        val (firstGroup: AlleleGroup, 
+                            secondGroup: AlleleGroup) = pair
+                        
+                        // Where does our Anchor need to start after?
+                        val prevPos = firstChunk.getSide(firstGroup.edge.right)
+                            .get
+                            .position
+                        
+                        // Where does our Anchor need to end before?
+                        val nextPos = secondChunk.getSide(secondGroup.edge.left)
+                            .get
+                            .position
+                        
+                        // Make two Sides for an Anchor
+                        val startSide = pen.drawSide(prevPos.contig, 
+                            prevPos.base + 1, Face.LEFT)
+                        chunk += startSide
+                        
+                        val endSide = pen.drawSide(nextPos.contig, 
+                            nextPos.base - 1, Face.RIGHT)
+                        chunk += endSide
+                            
+                        // Make the Anchor
+                        chunk += pen.drawAnchor(startSide, endSide)
+                            
+                        // Make the two connecting adjacencies
+                        chunk += pen.drawAdjacency(firstGroup.edge.right,
+                            startSide)
+                        chunk += pen.drawAdjacency(endSide,
+                            secondGroup.edge.left)
+                    }
                     
-                // Make the two connecting adjacencies
-                chunk += pen.drawAdjacency(firstGroup.edge.right,
-                    startSide)
-                chunk += pen.drawAdjacency(endSide,
-                    secondGroup.edge.left)
-            }
-            
-            // Return the chunk we built
-            chunk
-        } 
+                } else {
+                    // Lose phasing by linking through a single Anchor
+                    
+                    // Where did the first variant end?
+                    val prevSideID = firstChunk.alleleGroups.first.edge.right
+                    
+                    // Where does our Anchor need to start after?
+                    val prevPos = firstChunk.getSide(prevSideID).get.position
+                    
+                    // Where did the next variant start?
+                    val nextSideID = secondChunk.alleleGroups.first.edge.right
+                    
+                    // Where does our Anchor need to end before?
+                    val nextPos = secondChunk.getSide(nextSideID).get.position
+                    
+                    // Make two Sides for an Anchor
+                    val startSide = pen.drawSide(prevPos.contig, 
+                        prevPos.base + 1, Face.LEFT)
+                    chunk += startSide
+                    
+                    val endSide = pen.drawSide(nextPos.contig, 
+                        nextPos.base - 1, Face.RIGHT)
+                    chunk += endSide
+                    
+                    // Make the Anchor
+                    chunk += pen.drawAnchor(startSide, endSide)
+                    
+                    firstChunk.alleleGroups.foreach { (alleleGroup) =>
+                        // Attach the end of each of the AlleleGroups on the
+                        // left
+                        chunk += pen.drawAdjacency(alleleGroup.edge.right,
+                            startSide)
+                    }
+                    
+                    secondChunk.alleleGroups.foreach { (alleleGroup) =>
+                        // Attach the start of each of the AlleleGroups on the
+                        // left
+                        chunk += pen.drawAdjacency(endSide,
+                            alleleGroup.edge.left)
+                    }
+                    
+                    // TODO: Unify this with the phased case, somehow. Or write
+                    // utility methods (leftmost/rightmost Position from a
+                    // chunk?).
+                    
+                    // Now we have hooked the two chunks together, losing
+                    // phasing.
+                    
+                }
+                
+                // Return the chunk we built
+                chunk
+            } 
         
         
         // Use parallel reduction to get the two minimal-position Sides on each
