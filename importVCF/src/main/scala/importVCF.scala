@@ -293,6 +293,28 @@ object ImportVCF {
         
     }
     
+    /**
+     * Key every element in the given RDD with its index.
+     */
+    def enumerate(rdd: RDD[T]): RDD[(Long, T)] = {
+        // Count the elements
+        val count = rdd.count
+        
+        // Make an RDD of the numbers, assuming they magically get to the right
+        // partitions, because the given rdd may have uneven partitions and we
+        // can't specify we want to match that here.
+        val numberRDD = rdd.context.makeRDD(0L until count, rdd.partitions)
+    }
+    
+    /**
+     * Pretend to offer an actual element-wise zip using the count-and-
+     * enumerate-and-join trick.
+     */
+    def actualZip(rdd1: RDD[T], rdd2: RDD[U]): RDD[(T, U)] = {
+        
+        
+    
+    }
     
     /**
      * Run the given function for each pair of adjacent elements in the given
