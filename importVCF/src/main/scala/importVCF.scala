@@ -293,6 +293,60 @@ object ImportVCF {
         
     }
     
+    
+    /**
+     * Run the given function for each pair of adjacent elements in the given
+     * RDD. The first element will be involved in an invocation with None as the
+     * first argument, and the last argument will be involved as an invocation
+     * with None as the second argument.
+     */
+    def withNeighbors[T, U: ClassManifest](rdd: RDD[T], 
+        function: (Option[T], Option[T]) => U): RDD[U] = {
+        
+        // Make an RDD of optionized input values
+        val optionRDD: RDD[Option[T]] = rdd.map(Some(_))
+        
+        println("Optioned")
+        optionRDD.collect.foreach(println _)
+        
+        // Make an RDD of just None
+        val noneRDD: RDD[Option[T]] = rdd.context.parallelize(List(None))
+        
+        val preUnioned = noneRDD.union(optionRDD).coalesce(10)
+        
+        println("preUnioned: %d".format(preUnioned.count))
+        preUnioned.collect.foreach(println _)
+        
+        val postUnioned = optionRDD.union(noneRDD).coalesce(10)
+        
+        println("postUnioned: %d".format(postUnioned.count))
+        postUnioned.collect.foreach(println _)
+        
+        // Stick a None on the front of the list, and stick a None on the back
+        // of the list, and zip together.
+        val zipped : RDD[(Option[T], Option[T])] = preUnioned.zipPartitions(postUnioned) {
+            (it1: Iterator[Option[T]], it2: Iterator[Option[T]]) =>
+            
+            val toReturn: Iterator[(Option[T], Option[T])] = it1 zip it2
+            toReturn
+        }
+        
+        println("Zipped: %d".format(zipped.count))
+        zipped.collect.foreach(println _)       
+        
+        zipped.map { (pair) =>
+            // Unpack the two arguments
+            val (arg1, arg2) = pair
+            
+            println("%s:%s".format(arg1, arg2))
+            
+            // Pass them along to the function we're invoking. Its return values
+            // collect into our result.
+            function(arg1, arg2)
+        }
+        
+    }
+    
     /**
      * Import a sample from a VCF in parallel, producing a SequenceGraph, which
      * wraps Spark RDDs.
@@ -315,7 +369,7 @@ object ImportVCF {
            classOf[VariantContextWritable], sc.hadoopConfiguration)
            .map(p => (p._1.get, p._2.get))
            
-        println("Got %d VCF records".format(records.count))
+        println("Prepared VCF")
         
         // How many partitions should we use? Apparently we need to match this
         // when we zip two things.
@@ -324,7 +378,11 @@ object ImportVCF {
         // Filter down the records, throwing out any that are "filtered"
         val passingRecords = records.filter { (pair) => !(pair._2.isFiltered) }
         
-        println("Got %d passing filters".format(passingRecords.count))
+        // Go count up the number of records passing filters, which we need to
+        // know in order to assign IDs.
+        println("Counting exact number of records that passed filters...")
+        val passingRecordCount = passingRecords.count
+        println("Got %d records passing filters".format(passingRecordCount))
            
         // TODO: debug why sortByKey() is returning empty RDDs. For now just
         // assume our input VCF is sorted.
@@ -334,7 +392,7 @@ object ImportVCF {
         val idsPerRecord = 100
         
         // Make an RDD with one long ID for each record. IDs are sequential.
-        val idBlocks: RDD[Long] = sc.makeRDD(0L until passingRecords.count,
+        val idBlocks: RDD[Long] = sc.makeRDD(0L until passingRecordCount,
             numPartitions)
             
         // Number all the records sequentially. They can be sorted into this
@@ -345,7 +403,7 @@ object ImportVCF {
         val phased: RDD[(Long, Boolean)] = numberedRecords mapValues { 
             record => record.getGenotype(sample).isPhased()
         }
-
+        
         // Produce all the AlleleGroups and their endpoints, numbered by record.
         val alleleGroups: RDD[(Long, SequenceGraphChunk)] = numberedRecords
             .map { (parts) =>
@@ -409,10 +467,19 @@ object ImportVCF {
         // TODO: Adapt the pairUp thing to be able to reject variants after some
         // processing.
         val connectors: RDD[SequenceGraphChunk] = 
-            pairUp(alleleGroupsWithPhasing).map { (item) =>
-                // Unpack the super-complex tuple.
-                val ((firstID, (firstChunk, firstPhased)),
-                    (secondID, (secondChunk, secondPhased))) = item
+            withNeighbors(alleleGroupsWithPhasing, {
+             
+            (left: Option[(Long, (SequenceGraphChunk, Boolean))], 
+            right: Option[(Long, (SequenceGraphChunk, Boolean))]) =>
+            
+            // We need a SequenceGraphChunk to build in
+            var chunk = new SequenceGraphChunk()
+            
+            for(
+                // Go grab the chunks and their metadata for both sides.
+                (firstID, (firstChunk, firstPhased)) <- left;
+                (secondID, (secondChunk, secondPhased)) <- right
+            ) {
                 
                 // We need to know where to make IDs from. Put them in the first
                 // chunk's namespace, after the largest AlleleGroup edge ID we
@@ -426,8 +493,7 @@ object ImportVCF {
                 val pen = new SequenceGraphPen(sample, nextID, 
                     idsPerRecord - nextID % idsPerRecord)
                 
-                // We need a SequenceGraphChunk to build in
-                var chunk = new SequenceGraphChunk()
+                
                 
                 // Find a Side where the first variant ended. TODO: deal with
                 // complex variants.
@@ -524,10 +590,14 @@ object ImportVCF {
                         
                     }
                 }
-                
-                // Return the chunk we built
-                chunk
-            } 
+            
+            }
+            
+            // Return the chunk (which has nothing in it if we didn't feel the
+            // need to build anything, because we are, for example, on an end).
+            chunk
+            
+        })
         
         
         // Use parallel reduction to get the two minimal-position Sides on each
@@ -579,7 +649,7 @@ object ImportVCF {
         var endParts = new SequenceGraphChunk()
         
         // What IDs should we use? Start after the whole range we already used.
-        val nextID = passingRecords.count * idsPerRecord
+        val nextID = passingRecordCount * idsPerRecord
         
         // Make a pen to draw the stuff on the ends of the chromosomes, in
         // serial. It can go as far as it wants in ID space.
