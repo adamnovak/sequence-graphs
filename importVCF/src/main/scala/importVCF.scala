@@ -43,7 +43,7 @@ import org.apache.hadoop.mapreduce.Job
  *
  * Shouldn't be secretly storing the original VariantContext as a field.
  */
-class VariantRecord(original: VariantContext) extends Serializable {
+class VariantRecord(@transient original: VariantContext) extends Serializable {
     import org.broadinstitute.variant.variantcontext.{Allele, Genotype}
     
     // Steal all the values from the original
@@ -70,8 +70,6 @@ class VariantRecord(original: VariantContext) extends Serializable {
     def getReference: Allele = reference
     def getGenotype(sample: String): Genotype = genotypes(sample)
     def isFiltered: Boolean = filtered
-    
-    
     
 }
 
@@ -363,18 +361,13 @@ object ImportVCF {
             case otherThing => throw new Exception("Wrong thing!")
         }
         
-        
-        
-        val collected = firstElements.collect
-        
-        println("Partitions total: %d processed: %d".format(rdd.partitions.size,
-            collected.size))
-            
-        
         // Now collect that into an Array of first elements (or None) ordered by
         // partition. Probably easier to do it on the master than via an
         // accumulator that the master would need to read anyway.
-        val broadcastArray = rdd.context.broadcast(collected
+        val broadcastArray = rdd.context.broadcast(firstElements
+                // Collect to master (depends on T being able to actually
+                // serialize/deserialize and not just pretending to)
+                .collect
                 // Sort by partition
                 .sortBy(_._1)
                 // Get the first value (or None)
@@ -482,10 +475,8 @@ object ImportVCF {
                 // for every record.
                 (previous: Option[(Long, VariantRecord)],
                     current: Option[(Long, VariantRecord)]) =>
-                println("Got neighbors:")
-                println(previous)
-                println(current)
-                val toReturn = current match {
+
+                current match {
                     case Some((id, record)) =>
                         // We have the current record. Grab the genotype.
                         val currentGenotype = record.getGenotype(sample)
@@ -518,8 +509,6 @@ object ImportVCF {
                     // We have no current record. Don't produce anything.
                     case None => None
                 }
-                println("Filtered %s".format(current))
-                toReturn
                 
             }).flatMap((x: Option[(Long, VariantRecord)]) => x)
             
