@@ -465,6 +465,11 @@ object ImportVCF {
         // Filter down the records, throwing out any that are "filtered"
         val passingRecords = records.filter { (pair) => !(pair._2.isFiltered) }
         
+        // Report how many records pass filters, so we can get a handle on how
+        // many records are dropped by the next step.
+        println("Counting records passing filters...")
+        println("Got %d records".format(passingRecords.count))
+        
         // Figure out which records are interesting: actually non-reference in
         // some way, or important in gaining/losing phasing.
         val interestingRecords: RDD[(Long, VariantRecord)] = chromSizes match {
