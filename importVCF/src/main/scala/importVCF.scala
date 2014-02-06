@@ -293,79 +293,104 @@ object ImportVCF {
         
     }
     
-    /**
-     * Key every element in the given RDD with its index.
-     */
-    def enumerate(rdd: RDD[T]): RDD[(Long, T)] = {
-        // Count the elements
-        val count = rdd.count
-        
-        // Make an RDD of the numbers, assuming they magically get to the right
-        // partitions, because the given rdd may have uneven partitions and we
-        // can't specify we want to match that here.
-        val numberRDD = rdd.context.makeRDD(0L until count, rdd.partitions)
-    }
-    
-    /**
-     * Pretend to offer an actual element-wise zip using the count-and-
-     * enumerate-and-join trick.
-     */
-    def actualZip(rdd1: RDD[T], rdd2: RDD[U]): RDD[(T, U)] = {
-        
-        
-    
-    }
     
     /**
      * Run the given function for each pair of adjacent elements in the given
      * RDD. The first element will be involved in an invocation with None as the
      * first argument, and the last argument will be involved as an invocation
      * with None as the second argument.
+     *
+     * Implementation based on method provided by Imran Rashid: <http://mail-
+     * archives.apache.org/mod_mbox/spark-user/201402.mbox/%3CCAO24D
+     * %3DTkwfWbRiBrz2dP84u-cVXG7CT9%2BkoK5dfUMBQC%3D6y3nQ%40mail.gmail.com%3E>
      */
-    def withNeighbors[T, U: ClassManifest](rdd: RDD[T], 
+    def withNeighbors[T: ClassManifest, U: ClassManifest](rdd: RDD[T], 
         function: (Option[T], Option[T]) => U): RDD[U] = {
         
-        // Make an RDD of optionized input values
-        val optionRDD: RDD[Option[T]] = rdd.map(Some(_))
         
-        println("Optioned")
-        optionRDD.collect.foreach(println _)
+        // Make a map from partition to the first element of that partition.
         
-        // Make an RDD of just None
-        val noneRDD: RDD[Option[T]] = rdd.context.parallelize(List(None))
-        
-        val preUnioned = noneRDD.union(optionRDD).coalesce(10)
-        
-        println("preUnioned: %d".format(preUnioned.count))
-        preUnioned.collect.foreach(println _)
-        
-        val postUnioned = optionRDD.union(noneRDD).coalesce(10)
-        
-        println("postUnioned: %d".format(postUnioned.count))
-        postUnioned.collect.foreach(println _)
-        
-        // Stick a None on the front of the list, and stick a None on the back
-        // of the list, and zip together.
-        val zipped : RDD[(Option[T], Option[T])] = preUnioned.zipPartitions(postUnioned) {
-            (it1: Iterator[Option[T]], it2: Iterator[Option[T]]) =>
-            
-            val toReturn: Iterator[(Option[T], Option[T])] = it1 zip it2
-            toReturn
+        // First make an RDD of partition first element by partition index. Ends
+        // up being a 1-element-per-partition RDD.
+        val firstElements = rdd.mapPartitionsWithIndex { 
+            case(index, iterator) =>
+                iterator.hasNext match {
+                    // We have a first element. Say so.
+                    case true => List((index, Some(iterator.next))).iterator
+                    // We have no first element (empty partition). Say so.
+                    case false => List((index, None)).iterator
+                }
         }
         
-        println("Zipped: %d".format(zipped.count))
-        zipped.collect.foreach(println _)       
-        
-        zipped.map { (pair) =>
-            // Unpack the two arguments
-            val (arg1, arg2) = pair
+        // Now collect that into an Array of first elements (or None) ordered by
+        // partition. Probably easier to do it on the master than via an
+        // accumulator that the master would need to read anyway.
+        val broadcastArray = rdd.context.broadcast(
+            firstElements
+                // Collect to master
+                .collect
+                // Sort by partition
+                .sortBy(_._1)
+                // Get the first value (or None)
+                .map(_._2))
+
+        // Now do a scan in each partition, and produce the results for each
+        // partition.
+        rdd.mapPartitionsWithIndex { case(index, iterator) =>
+            // Put a leading None on the first partition, but nothing everywhere
+            // else.
+            val leadingIterator = index match {
+                case 0 => List(None).iterator
+                case _ => Iterator.empty
+            }
             
-            println("%s:%s".format(arg1, arg2))
+            // Find the next value after our partition. It may not exist, in
+            // which case we want None. TODO: Can we have a flat version of
+            // this?
+            val nextValue: Option[Option[T]] = broadcastArray.value
+                // Starting at the thing after us
+                .drop(index + 1)
+                // Find the first Some and grab it
+                .find(!_.isEmpty)
+                
+            // So we have either Some(Some(value)) or None (for no Somes found)
             
-            // Pass them along to the function we're invoking. Its return values
-            // collect into our result.
-            function(arg1, arg2)
+            // Make an iterator for the next value
+            val trailingIterator: Iterator[Option[T]] = nextValue match {
+                // We found something, so give back an iterator for what we
+                // found.
+                case Some(Some(found)) => List(Some(found)).iterator
+                // There are no non-empty partitions after us, so add a trailing
+                // None.
+                case None => List(None).iterator
+                // Otherwise we broke
+                case otherwise => 
+                    throw new Exception("Next matching thing was %s".format(
+                        otherwise))
+            }
+                
+            // Concatenate the leading None (if needed), all out items as
+            // Options, and the trailing None (if needed).
+            val optionIterator: Iterator[Option[T]] = leadingIterator ++
+                iterator.map(Some(_)) ++ 
+                trailingIterator
+            
+            // Do a window-2 scan over the iterator, sliding over by 1 each time
+            // (the default). Skip partial windows. See <http://daily-
+            // scala.blogspot.com/2009/11/iteratorsliding.html>
+            val slidingIterator = optionIterator.sliding(2, 1)
+            val groupedIterator = slidingIterator.withPartial(false)
+            
+            // Run the function and return an iterator of its results.
+            groupedIterator.map { (pair: Seq[Option[T]]) =>
+                // We have a length-2 Seq of the two things. Just pull out the
+                // two items. No possibility of partial windows, since we banned
+                // them.
+                function(pair(0), pair(1))
+            }
         }
+        
+        
         
     }
     
@@ -482,7 +507,9 @@ object ImportVCF {
         // Easy; just a join. The join *should* be trivial because both RDDs are
         // the same elements in the same order; hopefully Spark is smart enough
         // not to drag everything all over the cluster to calculate this.
-        val alleleGroupsWithPhasing = alleleGroups.join(phased)
+        // TODO: Evidently it's not trivial and we need to sort after doing
+        // this.
+        val alleleGroupsWithPhasing = alleleGroups.join(phased).sortByKey(true)
            
         // Look at adjacent pairs of SequenceGraphChunks and add the Anchors and
         // Adjacencies to wire them together if appropriate.
