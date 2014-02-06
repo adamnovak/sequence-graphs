@@ -10,6 +10,9 @@ version := "0.1"
 
 scalaVersion := "2.9.3"
 
+// See unchecked warnings. See <http://stackoverflow.com/a/9417094/402891>
+scalacOptions ++= Seq("-unchecked")
+
 libraryDependencies += "org.apache.spark" %% "spark-core" % "0.8.1-incubating"
 
 //libraryDependencies += "org.apache.spark" %% "spark-graphx" % "0.9.0-incubating"

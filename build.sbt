@@ -1,18 +1,23 @@
-// Set up the Avro code generator
+// Project info
+name := "Sequence Graph API"
 
+version := "0.1"
+
+scalaVersion := "2.9.3"
+
+// Set up the Avro code generator
 seq( sbtavro.SbtAvro.avroSettings : _*)
 
 (stringType in avroConfig) := "String"
 
 (version in avroConfig) := "1.7.5"
 
+// Set up dependency graph drawing
+net.virtualvoid.sbt.graph.Plugin.graphSettings
+
 // This is a library, not an application, so no native packager setup is needed.
 
-name := "Sequence Graph API"
-
-version := "0.1"
-
-scalaVersion := "2.9.3"
+// Now dependencies
 
 libraryDependencies += "org.apache.spark" %% "spark-core" % "0.8.1-incubating"
 
@@ -32,7 +37,7 @@ libraryDependencies += "com.twitter" % "parquet-avro" % "1.3.2"
 
 // We need slf4j for logging
 
-libraryDependencies += "org.slf4j" % "slf4j-api" % "1.7.2"
+libraryDependencies += "org.slf4j" % "slf4j-api" % "1.7.5"
 
 // We need Apache Commons Lang because it's useful (for escaping strings in .dot
 // files)
@@ -43,7 +48,6 @@ libraryDependencies += "org.apache.commons" % "commons-lang3" % "3.2.1"
 libraryDependencies += "commons-io" % "commons-io" % "2.4"
 
 // add hadoop bam and everything
-
 libraryDependencies += "fi.tkk.ics.hadoop.bam" % "hadoop-bam" % "6.1-SNAPSHOT"
 
 libraryDependencies += "variant" % "variant" % "1.93"

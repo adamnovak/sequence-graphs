@@ -19,6 +19,7 @@ import fi.tkk.ics.hadoop.bam.VCFInputFormat
 import fi.tkk.ics.hadoop.bam.VariantContextWritable
 import org.apache.hadoop.io.LongWritable
 import org.broadinstitute.variant.variantcontext.VariantContext
+import org.broadinstitute.variant.variantcontext.LazyGenotypesContext
 
 
 // We want to be able to loop over Java iterators: load a bunch of conversions.
@@ -37,11 +38,26 @@ import parquet.Log
 
 import org.apache.hadoop.mapreduce.Job
 
-class DiscardHandler extends java.util.logging.Handler {
-    def close() {}
-    def flush() {}
-    def publish(record: LogRecord) {}
+/**
+ * A fully serializeable VariantContext that doesn't have any linkering lazy
+ * parsing to do. Accomplishes this by replacing the default
+ * LazyGenotypesContext used to store genotypes with a fully parsed
+ * GenotypesContext.
+ */
+class EagerVariantContext(original: VariantContext) 
+    extends VariantContext(original) {
+
+    // At this point we've already run out superclass copy constructor.
+    // Turn our genotypes field into a base GenotypesContext.
+    genotypes match {
+        case lazyOne: LazyGenotypesContext =>
+            // We have a lazy context and we need to make it not lazy.
+            // We can just tell it to get back to work and do all its parsing.
+            lazyOne.decode
+    }
+    
 }
+
 
 object ImportVCF {
     def main(args: Array[String]) {
@@ -438,12 +454,18 @@ object ImportVCF {
         // Filter down the records, throwing out any that are "filtered"
         val passingRecords = records.filter { (pair) => !(pair._2.isFiltered) }
         
+        // Load the genotypes for all unfiltered records. We need to do this
+        // before we start sending VariantContexts between nodes, since
+        // genotypes are not loaded from disk until asked for.
+        val loadedRecords: RDD[(Long, VariantContext)] = records
+            .mapValues(new EagerVariantContext(_))
+        
         // Figure out which records are interesting: actually non-reference in
         // some way, or important in gaining/losing phasing.
         val interestingRecords: RDD[(Long, VariantContext)] = chromSizes match {
             // We know chromosome sizes, so every record can rely on having an
             // anchor after it.
-            case Some(sizes) => withNeighbors(passingRecords, {
+            case Some(sizes) => withNeighbors(loadedRecords, {
                 // Go through and look at the last record and the current record
                 // for every record.
                 (previous: Option[(Long, VariantContext)],
@@ -491,8 +513,8 @@ object ImportVCF {
             
             // If chromosome sizes aren't known, we won't generate trailing
             // telomere anchors, so we can't let things get subsumed by the
-            // anchors that follow them.
-            case None => passingRecords
+            // anchors that follow them. Just pass everything through.
+            case None => loadedRecords
         }
         
         // Go count up the number of records passing filters, which we need to
