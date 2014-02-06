@@ -19,7 +19,6 @@ import fi.tkk.ics.hadoop.bam.VCFInputFormat
 import fi.tkk.ics.hadoop.bam.VariantContextWritable
 import org.apache.hadoop.io.LongWritable
 import org.broadinstitute.variant.variantcontext.VariantContext
-import org.broadinstitute.variant.variantcontext.LazyGenotypesContext
 
 
 // We want to be able to loop over Java iterators: load a bunch of conversions.
@@ -39,22 +38,40 @@ import parquet.Log
 import org.apache.hadoop.mapreduce.Job
 
 /**
- * A fully serializeable VariantContext that doesn't have any linkering lazy
- * parsing to do. Accomplishes this by replacing the default
- * LazyGenotypesContext used to store genotypes with a fully parsed
- * GenotypesContext.
+ * A fully serializeable approximation of VariantContext that doesn't have any
+ * lingering lazy parsing to do. Just copies over all the data we actually use.
+ *
+ * Shouldn't be secretly storing the original VariantContext as a field.
  */
-class EagerVariantContext(original: VariantContext) 
-    extends VariantContext(original) {
-
-    // At this point we've already run out superclass copy constructor.
-    // Turn our genotypes field into a base GenotypesContext.
-    genotypes match {
-        case lazyOne: LazyGenotypesContext =>
-            // We have a lazy context and we need to make it not lazy.
-            // We can just tell it to get back to work and do all its parsing.
-            lazyOne.decode
+class VariantRecord(original: VariantContext) extends Serializable {
+    import org.broadinstitute.variant.variantcontext.{Allele, Genotype}
+    
+    // Steal all the values from the original
+    val chr: String = original.getChr
+    val start: Long = original.getStart
+    val end: Long = original.getEnd
+    val alleles: Seq[Allele] = original.getAlleles
+    val reference: Allele = original.getReference
+    val genotypes: Map[String, Genotype] = {
+        // Go through all the samples and get their genotypes, and make our own
+        // map.
+        original.getSampleNames.map {
+            (name: String) => (name, original.getGenotype(name))
+        }.toMap
     }
+    val filtered: Boolean = original.isFiltered
+    
+    
+    // Replicate a portion of the interface
+    def getChr: String = chr
+    def getStart: Long = start
+    def getEnd: Long = end
+    def getAlleles: Seq[Allele] = alleles
+    def getReference: Allele = reference
+    def getGenotype(sample: String): Genotype = genotypes(sample)
+    def isFiltered: Boolean = filtered
+    
+    
     
 }
 
@@ -437,13 +454,14 @@ object ImportVCF {
         sc: SparkContext): SequenceGraph = {
         
 
-        // Get an RDD of VCF records, sorted by position. Use VariantContext
-        // and not VariantContextWriteable as our internal record type. Make
-        // sure it has the correct number of partitions.
-        val records: RDD[(Long, VariantContext)] = sc.newAPIHadoopFile(filename,
+        // Get an RDD of VCF records, sorted by position. Use VariantRecord and
+        // not VariantContext or VariantContextWriteable as our internal record
+        // type, since VariantContext does not want to be serialized and we do
+        // need to consider records with their neighbors.
+        val records: RDD[(Long, VariantRecord)] = sc.newAPIHadoopFile(filename,
            classOf[VCFInputFormat], classOf[LongWritable], 
            classOf[VariantContextWritable], sc.hadoopConfiguration)
-           .map(p => (p._1.get, p._2.get))
+           .map(p => (p._1.get, new VariantRecord(p._2.get)))
            
         println("Prepared VCF")
         
@@ -454,22 +472,16 @@ object ImportVCF {
         // Filter down the records, throwing out any that are "filtered"
         val passingRecords = records.filter { (pair) => !(pair._2.isFiltered) }
         
-        // Load the genotypes for all unfiltered records. We need to do this
-        // before we start sending VariantContexts between nodes, since
-        // genotypes are not loaded from disk until asked for.
-        val loadedRecords: RDD[(Long, VariantContext)] = records
-            .mapValues(new EagerVariantContext(_))
-        
         // Figure out which records are interesting: actually non-reference in
         // some way, or important in gaining/losing phasing.
-        val interestingRecords: RDD[(Long, VariantContext)] = chromSizes match {
+        val interestingRecords: RDD[(Long, VariantRecord)] = chromSizes match {
             // We know chromosome sizes, so every record can rely on having an
             // anchor after it.
-            case Some(sizes) => withNeighbors(loadedRecords, {
+            case Some(sizes) => withNeighbors(passingRecords, {
                 // Go through and look at the last record and the current record
                 // for every record.
-                (previous: Option[(Long, VariantContext)],
-                    current: Option[(Long, VariantContext)]) =>
+                (previous: Option[(Long, VariantRecord)],
+                    current: Option[(Long, VariantRecord)]) =>
                 println("Got neighbors:")
                 println(previous)
                 println(current)
@@ -509,12 +521,12 @@ object ImportVCF {
                 println("Filtered %s".format(current))
                 toReturn
                 
-            }).flatMap((x: Option[(Long, VariantContext)]) => x)
+            }).flatMap((x: Option[(Long, VariantRecord)]) => x)
             
             // If chromosome sizes aren't known, we won't generate trailing
             // telomere anchors, so we can't let things get subsumed by the
             // anchors that follow them. Just pass everything through.
-            case None => loadedRecords
+            case None => passingRecords
         }
         
         // Go count up the number of records passing filters, which we need to
@@ -546,7 +558,7 @@ object ImportVCF {
         // Produce all the AlleleGroups and their endpoints, numbered by record.
         val alleleGroups: RDD[(Long, SequenceGraphChunk)] = numberedRecords
             .map { (parts) =>
-                val (idBlock: Long, record: VariantContext) = parts
+                val (idBlock: Long, record: VariantRecord) = parts
                 
                 // Make a pen to draw Sequence Graph parts with IDs from the
                 // given block.
