@@ -303,32 +303,45 @@ object ImportVCF {
      * Implementation based on method provided by Imran Rashid: <http://mail-
      * archives.apache.org/mod_mbox/spark-user/201402.mbox/%3CCAO24D
      * %3DTkwfWbRiBrz2dP84u-cVXG7CT9%2BkoK5dfUMBQC%3D6y3nQ%40mail.gmail.com%3E>
+     *
+     * Note that the type in the RDD must be properly serializeable. If it does
+     * something like lazy parsing (like GATK's VariantContext does), this
+     * method will break when it tries to send open file handles or whatever
+     * from one place to another.
      */
     def withNeighbors[T: ClassManifest, U: ClassManifest](rdd: RDD[T], 
         function: (Option[T], Option[T]) => U): RDD[U] = {
         
         
         // Make a map from partition to the first element of that partition.
-        
         // First make an RDD of partition first element by partition index. Ends
         // up being a 1-element-per-partition RDD.
-        val firstElements = rdd.mapPartitionsWithIndex { 
+        val firstElements: RDD[(Int, Option[T])] = rdd.mapPartitionsWithIndex { 
             case(index, iterator) =>
                 iterator.hasNext match {
                     // We have a first element. Say so.
-                    case true => List((index, Some(iterator.next))).iterator
+                    case true => 
+                        val element = iterator.next
+                        Some((index, Some(element))).iterator
                     // We have no first element (empty partition). Say so.
-                    case false => List((index, None)).iterator
+                    case false => 
+                        Some((index, None)).iterator
                 }
+            case otherThing => throw new Exception("Wrong thing!")
         }
+        
+        
+        
+        val collected = firstElements.collect
+        
+        println("Partitions total: %d processed: %d".format(rdd.partitions.size,
+            collected.size))
+            
         
         // Now collect that into an Array of first elements (or None) ordered by
         // partition. Probably easier to do it on the master than via an
         // accumulator that the master would need to read anyway.
-        val broadcastArray = rdd.context.broadcast(
-            firstElements
-                // Collect to master
-                .collect
+        val broadcastArray = rdd.context.broadcast(collected
                 // Sort by partition
                 .sortBy(_._1)
                 // Get the first value (or None)
@@ -425,11 +438,68 @@ object ImportVCF {
         // Filter down the records, throwing out any that are "filtered"
         val passingRecords = records.filter { (pair) => !(pair._2.isFiltered) }
         
+        // Figure out which records are interesting: actually non-reference in
+        // some way, or important in gaining/losing phasing.
+        val interestingRecords: RDD[(Long, VariantContext)] = chromSizes match {
+            // We know chromosome sizes, so every record can rely on having an
+            // anchor after it.
+            case Some(sizes) => withNeighbors(passingRecords, {
+                // Go through and look at the last record and the current record
+                // for every record.
+                (previous: Option[(Long, VariantContext)],
+                    current: Option[(Long, VariantContext)]) =>
+                println("Got neighbors:")
+                println(previous)
+                println(current)
+                val toReturn = current match {
+                    case Some((id, record)) =>
+                        // We have the current record. Grab the genotype.
+                        val currentGenotype = record.getGenotype(sample)
+                        
+                        previous match {
+                            case Some((id2, record2)) =>
+                                // We have the previous one too. Grab it too.
+                                val previousGenotype = record2.getGenotype(
+                                    sample)
+                                
+                                if(currentGenotype.isHomRef && 
+                                    currentGenotype.isPhased == 
+                                    previousGenotype.isPhased) {
+                                    
+                                    // It's homozygous reference and doesn't
+                                    // change away from our previous phasing.
+                                    // Discard it.
+                                    None
+                                    
+                                } else {
+                                    // It's either variant or needed to change
+                                    // phasing. Keep it
+                                    Some((id, record))
+                                }
+                            case None =>
+                                // This is the first record. Keep it.
+                                // TODO: See when we can drop the first record.
+                                Some((id, record))
+                        }
+                    // We have no current record. Don't produce anything.
+                    case None => None
+                }
+                println("Filtered %s".format(current))
+                toReturn
+                
+            }).flatMap((x: Option[(Long, VariantContext)]) => x)
+            
+            // If chromosome sizes aren't known, we won't generate trailing
+            // telomere anchors, so we can't let things get subsumed by the
+            // anchors that follow them.
+            case None => passingRecords
+        }
+        
         // Go count up the number of records passing filters, which we need to
         // know in order to assign IDs.
-        println("Counting exact number of records that passed filters...")
-        val passingRecordCount = passingRecords.count
-        println("Got %d records passing filters".format(passingRecordCount))
+        println("Counting exact number of records to convert...")
+        val recordCount = interestingRecords.count
+        println("Got %d records".format(recordCount))
            
         // TODO: debug why sortByKey() is returning empty RDDs. For now just
         // assume our input VCF is sorted.
@@ -439,12 +509,12 @@ object ImportVCF {
         val idsPerRecord = 100
         
         // Make an RDD with one long ID for each record. IDs are sequential.
-        val idBlocks: RDD[Long] = sc.makeRDD(0L until passingRecordCount,
+        val idBlocks: RDD[Long] = sc.makeRDD(0L until recordCount,
             numPartitions)
             
         // Number all the records sequentially. They can be sorted into this
         // order now, and each can guess the IDs of its neighbors.
-        val numberedRecords = idBlocks.zip(passingRecords.values)
+        val numberedRecords = idBlocks.zip(interestingRecords.values)
             
         // Get phasing status for each variant, keyed by sequential ID.
         val phased: RDD[(Long, Boolean)] = numberedRecords mapValues { 
@@ -561,7 +631,6 @@ object ImportVCF {
                 if(prevPos.contig == nextPos.contig) {
                     // Need to be physically linked since they're on the same
                     // contig.
-                
                     if(firstPhased && secondPhased) {
                         // Link corresponding pairs of alleles with Anchors
                         
@@ -698,7 +767,7 @@ object ImportVCF {
         var endParts = new SequenceGraphChunk()
         
         // What IDs should we use? Start after the whole range we already used.
-        val nextID = passingRecordCount * idsPerRecord
+        val nextID = recordCount * idsPerRecord
         
         // Make a pen to draw the stuff on the ends of the chromosomes, in
         // serial. It can go as far as it wants in ID space.
