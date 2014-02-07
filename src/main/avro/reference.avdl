@@ -21,6 +21,12 @@ protocol ReferenceGraphTypes {
         string contig;
         // What base are we talking about?
         long base;
+        
+        // Every base has a UUID, which is currently held to be the (string,
+        // long) tuple of the contig and the base. This magically gives UUIDs to
+        // all hg38 bases and also allows us to add novel things with arbirtrary
+        // UUID strings and base index 0.
+        
         // What face are we talking about (left or right)? 
         Face face; 
     }
@@ -37,6 +43,11 @@ protocol ReferenceGraphTypes {
         
         // Is this Side part of the reference haplotype?
         boolean isReference;
+        
+        // What is a lower bound on the Side's position along the reference
+        // haplotype? This is necessary for efficient range queries in reference
+        // haplotype coordinates.
+        Position lowerBound;
     }
     
     record Allele {

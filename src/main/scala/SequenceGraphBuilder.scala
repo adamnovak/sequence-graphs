@@ -205,10 +205,10 @@ class EasySequenceGraphBuilder(sample: String, reference: String,
     * Make a Side that could be the next Side on the given contig, advancing
     * ahead to the given reference position.
     */
-    def getNextSide(contig: String, phase: Int, position: Long) : Side = {
+    def getNextSide(contig: String, phase: Int, base: Long) : Side = {
         // Make and return a new Side that comes at the given position.
-        new Side(IDMaker.get(), new Position(contig, position, Face.LEFT),
-            false)
+        val position = new Position(contig, base, Face.LEFT)
+        new Side(IDMaker.get(), position, false, position)
     }
     
     /**
@@ -320,8 +320,9 @@ class EasySequenceGraphBuilder(sample: String, reference: String,
         ends.get((contig, phase)) getOrElse {
             // We couldn't find anything there already. Make a new (vacuously
             // phased) telomer Side.
-            val telomere = new Side(IDMaker.get(), new Position(contig, 0, 
-                Face.RIGHT), false)
+            // First its position
+            val position = new Position(contig, 0, Face.RIGHT)
+            val telomere = new Side(IDMaker.get(), position, false, position)
                 
             // Remember the telomere
             writer.writeSide(telomere)
@@ -362,9 +363,9 @@ class EasySequenceGraphBuilder(sample: String, reference: String,
         // Make a right Side for the AlleleGroup (non-reference). We subtract 1
         // from the position because a 1-base AlleleGroup should have the same
         // numbers on its two Sides (one is left, and the other is right)
-        val trailingSide = new Side(IDMaker.get(), new Position(contig, 
-            leadingSide.position.base + actualReferenceLength - 1, Face.RIGHT),
-            false)
+        val position = new Position(contig, 
+            leadingSide.position.base + actualReferenceLength - 1, Face.RIGHT)
+        val trailingSide = new Side(IDMaker.get(), position, false, position)
             
             
         // Make an AlleleGroup with the correct ploidy to be added to that many
@@ -416,9 +417,10 @@ class EasySequenceGraphBuilder(sample: String, reference: String,
             // specified reference length because of the left/right distinction
             // for Sides: a 1-base anchor has both its Sides at the same
             // numerical position, on different faces.
-            val trailingSide = new Side(IDMaker.get(), new Position(contig, 
-                leadingSide.position.base + referenceLength - 1, Face.RIGHT),
-                false)
+            val position = new Position(contig, 
+                leadingSide.position.base + referenceLength - 1, Face.RIGHT)
+            val trailingSide = new Side(IDMaker.get(), position, false,
+                position)
                 
                 
             // Make an Anchor with the correct ploidy to be added to that many
@@ -490,8 +492,10 @@ class EasySequenceGraphBuilder(sample: String, reference: String,
             
             // Make a right Side for the Anchor. It will have the numerical
             // position of 1 *before* that of the left side of the Anchor.
-            val trailingSide = new Side(IDMaker.get(), new Position(contig, 
-                leadingSide.position.base - 1, Face.RIGHT), false)
+            val position = new Position(contig, leadingSide.position.base - 1,
+                Face.RIGHT)
+            val trailingSide = new Side(IDMaker.get(), position, false,
+                position)
                 
             // Make an Anchor with ploidy 1
             val ploidy = new PloidyBounds(1, null, null)

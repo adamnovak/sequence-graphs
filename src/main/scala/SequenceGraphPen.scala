@@ -77,8 +77,13 @@ class SequenceGraphPen(genome: String = "", idStart: Long = 0,
      */
     def drawSide(contig: String, base: Long, face: Face,
         isReference: Boolean = false): Side = {
-        
-        new Side(id, new Position(contig, base, face), isReference)
+        // Where is the Side in the reference coordinate system?
+        val position = new Position(contig, base, face)
+        // Say that this Side appears there, and that its lower bound is also
+        // that position. We could also have Sides in complicated insert graphs
+        // that have just UUID positions, but they still have a lower bound in
+        // our linear coordinate system.
+        new Side(id, position, isReference, position)
     }
     
     /**
