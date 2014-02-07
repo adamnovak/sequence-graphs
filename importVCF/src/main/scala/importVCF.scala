@@ -154,7 +154,11 @@ object ImportVCF {
         SequenceGraphKryoProperties.setupContextProperties()
         
         // Set the executors to use a more reasonable amount of memory.
-        System.setProperty("spark.executor.memory", "250G")
+        System.setProperty("spark.executor.memory", "25G")
+        
+        // Set the parallelism level to have enough reducers to not run out of
+        // memory
+        System.setProperty("spark.default.parallelism", "16")
 
         // The first thing we need is a Spark context. We would like to be able
         // to make one against any Spark URL: either "local" or soemthing like
