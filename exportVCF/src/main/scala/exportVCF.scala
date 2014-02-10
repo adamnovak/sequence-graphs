@@ -116,30 +116,6 @@ class ExportVCF (cluster: String, directory: String, vcfFile: String,
     // And Anchors
     val an: RDD[Anchor] = SequenceGraph.readRDDFromParquet(sc,
         filePath + "/Anchors")
-        
-    /*ParquetInputFormat.setReadSupportClass(job, classOf[AvroReadSupport[Side]])
-    val sides: RDD[Side] = sc.newAPIHadoopFile(filePath + "/Sides",
-                                               classOf[ParquetInputFormat[Side]], 
-                                               classOf[Void], classOf[Side],
-                                               ContextUtil.getConfiguration(job)).map(p => p._2)
-    
-    ParquetInputFormat.setReadSupportClass(job, classOf[AvroReadSupport[AlleleGroup]])
-    val ag = sc.newAPIHadoopFile(filePath + "/AlleleGroups",
-                                 classOf[ParquetInputFormat[AlleleGroup]], 
-                                 classOf[Void], classOf[AlleleGroup],
-                                 ContextUtil.getConfiguration(job)).map(p => p._2)
-    
-    ParquetInputFormat.setReadSupportClass(job, classOf[AvroReadSupport[Adjacency]])
-    val ad = sc.newAPIHadoopFile(filePath + "/Adjacencies",
-                                 classOf[ParquetInputFormat[Adjacency]], 
-                                 classOf[Void], classOf[Adjacency],
-                                 ContextUtil.getConfiguration(job)).map(p => p._2)
-
-    ParquetInputFormat.setReadSupportClass(job, classOf[AvroReadSupport[Anchor]])
-    val an = sc.newAPIHadoopFile(filePath + "/Anchors",
-                                 classOf[ParquetInputFormat[Anchor]], 
-                                 classOf[Void], classOf[Anchor],
-                                 ContextUtil.getConfiguration(job)).map(p => p._2).cache()*/
  
     // get phasing sets
     // key all sides by their ids

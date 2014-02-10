@@ -134,40 +134,8 @@ object SequenceGraph {
             recordClass, config)
             .map(p => p._2)
             
-        rdd.map { (loaded: IndexedRecord) =>
-            
-            // Serailize and de-serialize with Avro to get into the appropriate
-            // type. Avro deserialization will load with the thread context
-            // classloader (or the classloader of the class we pass it), even
-            // though ParquetAvro deserialization won't.
-            
-            // This seems like a hack, but it's much easier to implement than
-            // walking and fixing up the whole object graph from ParquetAvro
-            // ourselves.
-            
-            // TODO: Fix the underlying bug and make ParquetAvro use the thread
-            // context classloader.
-           
-            
-            // Make an output stream that saves in a byte array
-            val byteOutput = new ByteArrayOutputStream
-            
-            // Get an Avro Encoder to write to it, using the schema it was read
-            // with.
-            // TODO: Switch to binary encoding/decoding.
-            val encoder = EncoderFactory.get.jsonEncoder(loaded.getSchema,
-                byteOutput)
-            
-            // Get a GenericDatumWriter to write to the encoder, using the
-            // schema it was read with.
-            val writer = new GenericDatumWriter[IndexedRecord](loaded.getSchema)
-            
-            // Write
-            writer.write(loaded, encoder)            
-            encoder.flush()
-            
-            // Grab the bytes
-            val bytes = byteOutput.toByteArray
+        rdd.mapPartitions { (loadedIterator: Iterator[IndexedRecord]) =>
+            // Do per-partition setup so we don't reflect in the inner loop.
             
             // Get the schema Field object for the requested record type   
             val recordSchemaField = recordClass.getDeclaredField("SCHEMA$")
@@ -176,29 +144,67 @@ object SequenceGraph {
             // /docs/api/java/lang/reflect/Field.html#get%28java.lang.Object%29>
             val recordSchema = recordSchemaField.get(null).asInstanceOf[Schema]
             
-            // Make an input stream
-            val byteInput = new ByteArrayInputStream(bytes)
-            
-            // Make an Avro Decoder for the correct class, using our version of
-            // the schema.
-            val decoder = DecoderFactory.defaultFactory
-                .jsonDecoder(recordSchema, byteInput)
-            
             // Make a reader that produces things of the right type
             val datumReader = new SpecificDatumReader[RecordType](recordClass)
+        
+            loadedIterator.map { (loaded: IndexedRecord) =>
             
-            try {
-                // Read
-                datumReader.read(null.asInstanceOf[RecordType], decoder)
-            } catch {
-                case _: java.io.EOFException =>
-                    // This will happen if you're trying to read with the wrong
-                    // schema. TODO: fix schema migration.
-                    throw new Exception("Check schema versions. EOF in: %s"
-                        .format(new String(bytes)))
+                // Serailize and de-serialize with Avro to get into the
+                // appropriate type. Avro deserialization will load with the
+                // thread context classloader (or the classloader of the class
+                // we pass it), even though ParquetAvro deserialization won't.
+                
+                // This seems like a hack, but it's much easier to implement
+                // than walking and fixing up the whole object graph from
+                // ParquetAvro ourselves.
+                
+                // TODO: Fix the underlying bug and make ParquetAvro use the
+                // thread context classloader.
+               
+                
+                // Make an output stream that saves in a byte array
+                val byteOutput = new ByteArrayOutputStream
+                
+                // Get an Avro Encoder to write to it, using the schema it was
+                // read with.
+                // TODO: Switch to binary encoding/decoding.
+                val encoder = EncoderFactory.get.jsonEncoder(loaded.getSchema,
+                    byteOutput)
+                
+                // Get a GenericDatumWriter to write to the encoder, using the
+                // schema it was read with.
+                val writer = new GenericDatumWriter[IndexedRecord](
+                    loaded.getSchema)
+                
+                // Write
+                writer.write(loaded, encoder)            
+                encoder.flush()
+                
+                // Grab the bytes
+                val bytes = byteOutput.toByteArray
+                
+                // Make an input stream
+                val byteInput = new ByteArrayInputStream(bytes)
+                
+                // Make an Avro Decoder for the correct class, using our version of
+                // the schema.
+                val decoder = DecoderFactory.defaultFactory
+                    .jsonDecoder(recordSchema, byteInput)
+                
+                try {
+                    // Read
+                    datumReader.read(null.asInstanceOf[RecordType], decoder)
+                } catch {
+                    case _: java.io.EOFException =>
+                        // This will happen if you're trying to read with the
+                        // wrong schema. TODO: fix schema migration.
+                        throw new Exception("Check schema versions. EOF in: %s"
+                            .format(new String(bytes)))
+                }
+            
             }
         
-        }
+        }.cache
         
     }
 }
