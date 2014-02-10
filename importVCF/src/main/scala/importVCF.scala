@@ -347,6 +347,8 @@ object ImportVCF {
     def withNeighbors[T: ClassManifest, U: ClassManifest](rdd: RDD[T], 
         function: (Option[T], Option[T]) => U): RDD[U] = {
         
+        // We re-use our input rdd, so cache it.
+        rdd.cache
         
         // Make a map from partition to the first element of that partition.
         // First make an RDD of partition first element by partition index. Ends
@@ -546,15 +548,15 @@ object ImportVCF {
             
         // Number all the records sequentially. They can be sorted into this
         // order now, and each can guess the IDs of its neighbors.
-        val numberedRecords = idBlocks.zip(interestingRecords.values)
+        val numberedRecords = idBlocks.zip(interestingRecords.values).cache
             
         // Get phasing status for each variant, keyed by sequential ID.
-        val phased: RDD[(Long, Boolean)] = numberedRecords mapValues { 
-            record => record.getGenotype(sample).isPhased()
+        val phased: RDD[Boolean] = numberedRecords map { case (_, record) => 
+            record.getGenotype(sample).isPhased()
         }
         
-        // Produce all the AlleleGroups and their endpoints, numbered by record.
-        val alleleGroups: RDD[(Long, SequenceGraphChunk)] = numberedRecords
+        // Produce all the AlleleGroups and their endpoints
+        val alleleGroups: RDD[SequenceGraphChunk] = numberedRecords
             .map { (parts) =>
                 val (idBlock: Long, record: VariantRecord) = parts
                 
@@ -600,18 +602,12 @@ object ImportVCF {
                     chunk += pen.drawAlleleGroup(side1, side2, allele)
                 }
                 
-                // Return the assembled chunk of sequence graph, keyed by the
-                // record it came from.
-                (idBlock, chunk)
-            }
+                // Return the assembled chunk of sequence graph
+                chunk
+            }.cache
         
-        // Get (alleleGroupChunk, phasedFlag) tuples, keyed by sequential ID.
-        // Easy; just a join. The join *should* be trivial because both RDDs are
-        // the same elements in the same order; hopefully Spark is smart enough
-        // not to drag everything all over the cluster to calculate this.
-        // TODO: Evidently it's not trivial and we need to sort after doing
-        // this.
-        val alleleGroupsWithPhasing = alleleGroups.join(phased).sortByKey(true)
+        // Get (alleleGroupChunk, phasedFlag) tuples
+        val alleleGroupsWithPhasing = alleleGroups.zip(phased)
            
         // Look at adjacent pairs of SequenceGraphChunks and add the Anchors and
         // Adjacencies to wire them together if appropriate.
@@ -620,16 +616,16 @@ object ImportVCF {
         val connectors: RDD[SequenceGraphChunk] = 
             withNeighbors(alleleGroupsWithPhasing, {
              
-            (left: Option[(Long, (SequenceGraphChunk, Boolean))], 
-            right: Option[(Long, (SequenceGraphChunk, Boolean))]) =>
+            (left: Option[(SequenceGraphChunk, Boolean)], 
+            right: Option[(SequenceGraphChunk, Boolean)]) =>
             
             // We need a SequenceGraphChunk to build in
             var chunk = new SequenceGraphChunk()
             
             for(
                 // Go grab the chunks and their metadata for both sides.
-                (firstID, (firstChunk, firstPhased)) <- left;
-                (secondID, (secondChunk, secondPhased)) <- right
+                (firstChunk, firstPhased) <- left;
+                (secondChunk, secondPhased) <- right
             ) {
                 
                 // We need to know where to make IDs from. Put them in the first
@@ -756,7 +752,6 @@ object ImportVCF {
         // endpoints. TODO: Implement this as a GraphX operation to find all
         // degree-1 nodes instead.
         val minimalSidesByContig: Map[String, Seq[Side]] = alleleGroups
-            .values
             // Grab the minimal Sides for each chunk
             .map(_.getMinimalSides(2))
             .fold(Map.empty) { (map1, map2) =>
@@ -776,7 +771,6 @@ object ImportVCF {
             
         // Do a similar thing to get the maximal-position Sides
         val maximalSidesByContig: Map[String, Seq[Side]] = alleleGroups
-            .values
             .map(_.getMaximalSides(2))
             .fold(Map.empty) { (map1, map2) =>
                 val pairs = for(
@@ -875,7 +869,7 @@ object ImportVCF {
         }
         
         // Aggregate into a SequenceGraph.
-        val graph = new SequenceGraph(alleleGroups.values
+        val graph = new SequenceGraph(alleleGroups
             .union(connectors)
             .union(sc.parallelize(List(endParts)))
         )

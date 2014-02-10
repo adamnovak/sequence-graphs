@@ -134,6 +134,8 @@ object SequenceGraph {
             recordClass, config)
             .map(p => p._2)
             
+            
+        // TODO: Check if we need this slow serialization loop to fix types.
         rdd.mapPartitions { (loadedIterator: Iterator[IndexedRecord]) =>
             // Do per-partition setup so we don't reflect in the inner loop.
             
