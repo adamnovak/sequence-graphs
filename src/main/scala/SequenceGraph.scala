@@ -137,22 +137,33 @@ object SequenceGraph {
         rdd.map { (loaded: IndexedRecord) =>
             
             // Serailize and de-serialize with Avro to get into the appropriate
-            // type.
+            // type. Avro deserialization will load with the thread context
+            // classloader (or the classloader of the class we pass it), even
+            // though ParquetAvro deserialization won't.
+            
+            // This seems like a hack, but it's much easier to implement than
+            // walking and fixing up the whole object graph from ParquetAvro
+            // ourselves.
+            
+            // TODO: Fix the underlying bug and make ParquetAvro use the thread
+            // context classloader.
+           
             
             // Make an output stream that saves in a byte array
             val byteOutput = new ByteArrayOutputStream
             
-            // Get an Avro Encoder to write to it, using the schema it was read with.
-            val encoder = EncoderFactory.get.jsonEncoder(loaded.getSchema, byteOutput)
+            // Get an Avro Encoder to write to it, using the schema it was read
+            // with.
+            // TODO: Switch to binary encoding/decoding.
+            val encoder = EncoderFactory.get.jsonEncoder(loaded.getSchema,
+                byteOutput)
             
-            // Get a GenericDatumWriter to write to the encoder, using the schema it was read with.
+            // Get a GenericDatumWriter to write to the encoder, using the
+            // schema it was read with.
             val writer = new GenericDatumWriter[IndexedRecord](loaded.getSchema)
             
             // Write
-            writer.write(loaded, encoder)
-            
-            writer.write(loaded, encoder)
-            
+            writer.write(loaded, encoder)            
             encoder.flush()
             
             // Grab the bytes
@@ -160,16 +171,18 @@ object SequenceGraph {
             
             // Get the schema Field object for the requested record type   
             val recordSchemaField = recordClass.getDeclaredField("SCHEMA$")
-            // Get the static value of this field. Argument is ignored for static
-            // fields, so pass null. See <http://docs.oracle.com/javase/7/docs/api/j
-            // ava/lang/reflect/Field.html#get%28java.lang.Object%29>
+            // Get the static value of this field. Argument is ignored for
+            // static fields, so pass null. See <http://docs.oracle.com/javase/7
+            // /docs/api/java/lang/reflect/Field.html#get%28java.lang.Object%29>
             val recordSchema = recordSchemaField.get(null).asInstanceOf[Schema]
             
             // Make an input stream
             val byteInput = new ByteArrayInputStream(bytes)
             
-            // Make an Avro Decoder for the correct class, using our version of the schema.
-            val decoder = DecoderFactory.defaultFactory.jsonDecoder(recordSchema, byteInput)
+            // Make an Avro Decoder for the correct class, using our version of
+            // the schema.
+            val decoder = DecoderFactory.defaultFactory
+                .jsonDecoder(recordSchema, byteInput)
             
             // Make a reader that produces things of the right type
             val datumReader = new SpecificDatumReader[RecordType](recordClass)
@@ -179,134 +192,15 @@ object SequenceGraph {
                 datumReader.read(null.asInstanceOf[RecordType], decoder)
             } catch {
                 case _: java.io.EOFException =>
-                    throw new Exception("EOF in %s".format(new String(bytes)))
+                    // This will happen if you're trying to read with the wrong
+                    // schema. TODO: fix schema migration.
+                    throw new Exception("Check schema versions. EOF in: %s"
+                        .format(new String(bytes)))
             }
         
         }
         
-        /*// Now correct the types
-        val toReturn = rdd.map { 
-            //case record: RecordType =>
-                // We got the correct type after all. Assume all its members are
-                // correctly typed. No need to do anything.
-                //record
-            case record: IndexedRecord =>
-                // We got an incorrect record type, since Parquet refused to
-                // load the right class. We need to correct the type not only of
-                // this record but of all its IndexedRecord-extending members.
-                
-                // First load the Hadoop config from its bytes
-                val byteInput = new ByteArrayInputStream(bytes)
-                val dataInput = new DataInputStream(byteInput)
-                val loadedConfig = new Configuration
-                loadedConfig.readFields(dataInput)
-                fixRecordClass(loadedConfig, record)
-            case _ =>
-                throw new Exception("Loaded really wrong type") 
-        }
-        
-        rdd.foreach {
-            case correct: RecordType =>
-                // Do nothing
-            case incorrect: IndexedRecord =>
-                throw new Exception("Incorrect record type!")
-        }
-        
-        toReturn*/
-            
     }
-    
-    /**
-     * Load a class in any way possible. Checks thread classloader, and current
-     * classloader.
-     */
-    def getClass(name: String): Class[_] = {
-        
-        var properClass = Thread.currentThread.getContextClassLoader
-                .loadClass(name)
-        
-        if(properClass == null) {
-            // Try the currentt classloader
-            properClass = Class.forName(name)
-        }
-        
-        if(properClass == null) {
-            throw new Exception("No class %s".format(name))
-        }
-        
-        properClass
-    
-    }
-    
-    /**
-     * Given an object tree of IndexedRecords, assume that the root record is
-     * actually the given record type, and correct it and all of its members.
-     */
-    def fixRecordClass[RecordType <: IndexedRecord](config: Configuration,
-        record: IndexedRecord)(implicit m: Manifest[RecordType]): RecordType = {
-        
-        // Get this record's schema, which helpfully came with it
-        val schema = record.getSchema
-        
-        // What class should it be? Guaranteed to be some class since it's an
-        // IndexedRecord.
-        val properClassName = schema.getFullName
-        
-        val properClass = getClass(properClassName)
-            
-        // Make a new instance of that, assuming that the class has a public no-
-        // argument constructor, which the Avro code generator provides. Since
-        // ConfigurationUtil already did runtime type checking, we can just
-        // asInstanceOf here.
-        val properInstance: RecordType = properClass.newInstance
-            .asInstanceOf[RecordType]
-        
-        // How many fields are in this record's schema? Guaranteed to have a
-        // fields slist since it's an IndexedRecord.
-        val numFields = schema.getFields.size
-        
-        // Work out what class names each field has
-        val fieldClassnames = schema.getFields.map(_.schema.getFullName)
-        
-        // Get the classes for all the fields
-        val fieldClasses = fieldClassnames.map(getClass(_))
-        
-        // Up-convert all the fields if necessary
-        (0 until numFields).zip(fieldClasses).map { case (index, fieldClass) =>
-            (index, record.get(index) match {
-                // Figure out what to do with each field's value
-                case innerRecord: IndexedRecord =>
-                    // If it's an IndexedRecord, make sure it has the correct
-                    // actual type
-                    fixRecordClass(config, innerRecord)
-                case other =>
-                    // Just pass through anything else
-                    other
-                // TODO: Fix up stuff inside of arrays, or enums.
-            })
-        }.foreach {
-            case (index, value) =>
-                // Set that field of the object to the fixed-up value.
-                properInstance.put(index, value)
-        }
-        
-        
-        // Return the fixed-up IndexedRecord
-        properInstance
-        
-        // For each field
-            // Get the value
-            // If the value is an IndexedRecord
-                // Recurse on it, returning another IndexedRecord that's 
-                // internally fixed.
-            // Else just keep that value.
-        // Look up and load the type we are supposed to be with getFullName
-        // Make a new instance of it.
-        // Populate each field with the value we found for that field.
-        // Return the fixed up version.
-        
-    }
-
 }
 
 /**
