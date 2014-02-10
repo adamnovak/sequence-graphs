@@ -137,15 +137,15 @@ object SequenceGraph {
         rdd.map { (loaded: IndexedRecord) =>
             
             // Serailize and de-serialize with Avro to get into the appropriate
-            // types.
+            // type.
             
             // Make an output stream that saves in a byte array
             val byteOutput = new ByteArrayOutputStream
             
-            // Get an Avro Encoder to write to it
+            // Get an Avro Encoder to write to it, using the schema it was read with.
             val encoder = EncoderFactory.get.jsonEncoder(loaded.getSchema, byteOutput)
             
-            // Get a GenericDatumWriter to write to the encoder
+            // Get a GenericDatumWriter to write to the encoder, using the schema it was read with.
             val writer = new GenericDatumWriter[IndexedRecord](loaded.getSchema)
             
             // Write
@@ -158,11 +158,18 @@ object SequenceGraph {
             // Grab the bytes
             val bytes = byteOutput.toByteArray
             
+            // Get the schema Field object for the requested record type   
+            val recordSchemaField = recordClass.getDeclaredField("SCHEMA$")
+            // Get the static value of this field. Argument is ignored for static
+            // fields, so pass null. See <http://docs.oracle.com/javase/7/docs/api/j
+            // ava/lang/reflect/Field.html#get%28java.lang.Object%29>
+            val recordSchema = recordSchemaField.get(null).asInstanceOf[Schema]
+            
             // Make an input stream
             val byteInput = new ByteArrayInputStream(bytes)
             
-            // Make an Avro Decoder for the correct class
-            val decoder = DecoderFactory.defaultFactory.jsonDecoder(loaded.getSchema, byteInput)
+            // Make an Avro Decoder for the correct class, using our version of the schema.
+            val decoder = DecoderFactory.defaultFactory.jsonDecoder(recordSchema, byteInput)
             
             // Make a reader that produces things of the right type
             val datumReader = new SpecificDatumReader[RecordType](recordClass)
