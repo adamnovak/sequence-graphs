@@ -1,5 +1,10 @@
 package edu.ucsc.genome
 
+import java.io.{ByteArrayOutputStream, ByteArrayInputStream, DataOutputStream,
+    DataInputStream}
+
+import scala.collection.JavaConversions._
+
 import org.apache.spark.rdd.RDD
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
@@ -16,6 +21,12 @@ import org.apache.hadoop.fs.Path
 
 // And we use a hack to get at the (static) schemas of generic things
 import org.apache.avro.Schema
+
+// And more hacks to get things into the right type when Parquet Avro ignores
+// our classpath.
+import org.apache.avro.io.{EncoderFactory, DecoderFactory}
+import org.apache.avro.generic.GenericDatumWriter
+import org.apache.avro.specific.SpecificDatumReader
 
 // import hadoop stuff
 import org.apache.hadoop.mapreduce.Job
@@ -96,7 +107,7 @@ object SequenceGraph {
         
         // Every time we switch Avro schemas, we need a new Job. So we create
         // our own.
-        val job = new Job()
+        val job = new Job(sc.hadoopConfiguration)
         
         // Configure Parquet to read the correct Avro thing. This may not
         // actually work to produce the right record type, but it's worth a
@@ -122,20 +133,102 @@ object SequenceGraph {
             classOf[ParquetInputFormat[RecordType]], classOf[Void], 
             recordClass, config)
             .map(p => p._2)
+            
+        rdd.map { (loaded: IndexedRecord) =>
+            
+            // Serailize and de-serialize with Avro to get into the appropriate
+            // types.
+            
+            // Make an output stream that saves in a byte array
+            val byteOutput = new ByteArrayOutputStream
+            
+            // Get an Avro Encoder to write to it
+            val encoder = EncoderFactory.get.jsonEncoder(loaded.getSchema, byteOutput)
+            
+            // Get a GenericDatumWriter to write to the encoder
+            val writer = new GenericDatumWriter[IndexedRecord](loaded.getSchema)
+            
+            // Write
+            writer.write(loaded, encoder)
+            
+            writer.write(loaded, encoder)
+            
+            encoder.flush()
+            
+            // Grab the bytes
+            val bytes = byteOutput.toByteArray
+            
+            // Make an input stream
+            val byteInput = new ByteArrayInputStream(bytes)
+            
+            // Make an Avro Decoder for the correct class
+            val decoder = DecoderFactory.defaultFactory.jsonDecoder(loaded.getSchema, byteInput)
+            
+            // Make a reader that produces things of the right type
+            val datumReader = new SpecificDatumReader[RecordType](recordClass)
+            
+            try {
+                // Read
+                datumReader.read(null.asInstanceOf[RecordType], decoder)
+            } catch {
+                case _: java.io.EOFException =>
+                    throw new Exception("EOF in %s".format(new String(bytes)))
+            }
         
-        // Now correct the types
-        rdd.map { 
-            case record: RecordType =>
+        }
+        
+        /*// Now correct the types
+        val toReturn = rdd.map { 
+            //case record: RecordType =>
                 // We got the correct type after all. Assume all its members are
                 // correctly typed. No need to do anything.
-                record
+                //record
             case record: IndexedRecord =>
                 // We got an incorrect record type, since Parquet refused to
                 // load the right class. We need to correct the type not only of
                 // this record but of all its IndexedRecord-extending members.
-                fixRecordClass(config, record)
+                
+                // First load the Hadoop config from its bytes
+                val byteInput = new ByteArrayInputStream(bytes)
+                val dataInput = new DataInputStream(byteInput)
+                val loadedConfig = new Configuration
+                loadedConfig.readFields(dataInput)
+                fixRecordClass(loadedConfig, record)
+            case _ =>
+                throw new Exception("Loaded really wrong type") 
         }
+        
+        rdd.foreach {
+            case correct: RecordType =>
+                // Do nothing
+            case incorrect: IndexedRecord =>
+                throw new Exception("Incorrect record type!")
+        }
+        
+        toReturn*/
             
+    }
+    
+    /**
+     * Load a class in any way possible. Checks thread classloader, and current
+     * classloader.
+     */
+    def getClass(name: String): Class[_] = {
+        
+        var properClass = Thread.currentThread.getContextClassLoader
+                .loadClass(name)
+        
+        if(properClass == null) {
+            // Try the currentt classloader
+            properClass = Class.forName(name)
+        }
+        
+        if(properClass == null) {
+            throw new Exception("No class %s".format(name))
+        }
+        
+        properClass
+    
     }
     
     /**
@@ -152,13 +245,7 @@ object SequenceGraph {
         // IndexedRecord.
         val properClassName = schema.getFullName
         
-        // Resolve that class in our whole classpath. Use the parquet-mr
-        // ConfigurationUtil class that it should have used to look it up
-        // originally. This will complain if you're demanding that this method
-        // return one thing, but the thing you've deserialized is not one of
-        // those.
-        val properClass = ConfigurationUtil.getClassFromConfig(config, 
-            properClassName, m.erasure)
+        val properClass = getClass(properClassName)
             
         // Make a new instance of that, assuming that the class has a public no-
         // argument constructor, which the Avro code generator provides. Since
@@ -171,15 +258,21 @@ object SequenceGraph {
         // fields slist since it's an IndexedRecord.
         val numFields = schema.getFields.size
         
+        // Work out what class names each field has
+        val fieldClassnames = schema.getFields.map(_.schema.getFullName)
+        
+        // Get the classes for all the fields
+        val fieldClasses = fieldClassnames.map(getClass(_))
+        
         // Up-convert all the fields if necessary
-        (0 until numFields).map { (index) =>
+        (0 until numFields).zip(fieldClasses).map { case (index, fieldClass) =>
             (index, record.get(index) match {
                 // Figure out what to do with each field's value
                 case innerRecord: IndexedRecord =>
                     // If it's an IndexedRecord, make sure it has the correct
                     // actual type
                     fixRecordClass(config, innerRecord)
-                case other: java.lang.Object =>
+                case other =>
                     // Just pass through anything else
                     other
                 // TODO: Fix up stuff inside of arrays, or enums.

@@ -2,7 +2,7 @@ package edu.ucsc.genome.ExportVCF
 
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
-import edu.ucsc.genome.{AlleleGroup, Side, Adjacency, Anchor, Edge, Allele=>SGAllele, Position, SequenceGraphKryoProperties}
+import edu.ucsc.genome.{SequenceGraph, AlleleGroup, Side, Adjacency, Anchor, Edge, Allele=>SGAllele, Position, SequenceGraphKryoProperties}
 import org.broadinstitute.variant.variantcontext.{Allele, Genotype, VariantContext, GenotypeBuilder, GenotypesContext, VariantContextBuilder}
 import fi.tkk.ics.hadoop.bam.VariantContextWritable
 import parquet.hadoop.ParquetInputFormat
@@ -101,7 +101,23 @@ class ExportVCF (cluster: String, directory: String, vcfFile: String,
     val filePath = directory
 
 
-    ParquetInputFormat.setReadSupportClass(job, classOf[AvroReadSupport[Side]])
+    // Load sequence graph Sides.
+    val sides: RDD[Side] = SequenceGraph.readRDDFromParquet(sc,
+        filePath + "/Sides")
+        
+    // And AlleleGroups
+    val ag: RDD[AlleleGroup] = SequenceGraph.readRDDFromParquet(sc,
+        filePath + "/AlleleGroups")
+
+    // And Adjacencies
+    val ad: RDD[Adjacency] = SequenceGraph.readRDDFromParquet(sc,
+        filePath + "/Adjacencies")
+
+    // And Anchors
+    val an: RDD[Anchor] = SequenceGraph.readRDDFromParquet(sc,
+        filePath + "/Anchors")
+        
+    /*ParquetInputFormat.setReadSupportClass(job, classOf[AvroReadSupport[Side]])
     val sides: RDD[Side] = sc.newAPIHadoopFile(filePath + "/Sides",
                                                classOf[ParquetInputFormat[Side]], 
                                                classOf[Void], classOf[Side],
@@ -123,7 +139,7 @@ class ExportVCF (cluster: String, directory: String, vcfFile: String,
     val an = sc.newAPIHadoopFile(filePath + "/Anchors",
                                  classOf[ParquetInputFormat[Anchor]], 
                                  classOf[Void], classOf[Anchor],
-                                 ContextUtil.getConfiguration(job)).map(p => p._2).cache()
+                                 ContextUtil.getConfiguration(job)).map(p => p._2).cache()*/
  
     // get phasing sets
     // key all sides by their ids
