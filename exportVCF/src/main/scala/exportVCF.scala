@@ -27,7 +27,7 @@ import org.rogach.scallop._;
 
 object ExportVCF {
   def main(args: Array[String]) {
-  
+    
     // Option parsing code more or less stolen from various Scallop
     // examples.
     val opts = new ScallopConf(args) {
@@ -98,7 +98,6 @@ class ExportVCF (cluster: String, directory: String, vcfFile: String,
     val job = new Job(sc.hadoopConfiguration)
 
     // read data in
-
     val filePath = directory
 
 
@@ -127,13 +126,21 @@ class ExportVCF (cluster: String, directory: String, vcfFile: String,
                                  ContextUtil.getConfiguration(job)).map(p => p._2).cache()
  
     // get phasing sets
+    // key all sides by their ids
     val keyedSides = sides.keyBy(_.getId).cache()
+    // for each start anchor, key with the id of the left side, and join with the side
     val startAnch = an.keyBy(a => a.getEdge.getLeft)
       .join(keyedSides)
       .map(kv => kv._2._2.getPosition)
+    // for each end anchor, key with the id of the left side, and join with the side
     val endAnch = an.keyBy(a => a.getEdge.getRight)
       .join(keyedSides)
       .map(kv => kv._2._2.getPosition)
+    // to recover phasing sets, zip all anchors to discover regions that are phased, then
+    // get counts.
+    // regions that are phased will have multiple anchors show up at a single location
+    // and will have counts greater than 1
+    // we then group all anchors by contig, and build a phase set
     val phaseSets = startAnch.zip(endAnch)
       .map(r => (r, 1))
       .reduceByKey(_ + _)
@@ -145,10 +152,12 @@ class ExportVCF (cluster: String, directory: String, vcfFile: String,
         ranges.map(t => {
           val ((s, e), c) = t
 
+          // flip tuple around and get base positions on contig
           (c, s.getBase, e.getBase)
         }).map(kv => (kv._1, kv._2.toLong, kv._3.toLong))
-        .foreach(builder.add(_))
+        .foreach(builder.add(_)) // loop over and add anchors to phase set
 
+        // build phase sets for this contig
         builder.toSets()
       })
       .collect()
@@ -156,6 +165,9 @@ class ExportVCF (cluster: String, directory: String, vcfFile: String,
     // set contig and sample info in header
     SequenceGraphVCFOutputFormat.addSample(sample)
     
+    // add contigs to vcf header:
+    // map over sides to get position value, then get contig and turn into string and uniquify.
+    // then, pass to picard via hadoop-bam output format wrapper
     sides.map(_.getPosition)
       .map(_.getContig)
       .map(_.toString)
@@ -164,7 +176,8 @@ class ExportVCF (cluster: String, directory: String, vcfFile: String,
       .collect()
       .foreach(SequenceGraphVCFOutputFormat.addContig(_))
     
-    // get allele info
+    // get allele info:
+    // join with sides to recover position values
     val alleles = ag.keyBy(a => a.getEdge.getLeft)
       .join(keyedSides)
       .map(kv => (kv._2._2.getPosition, kv._2._1))
@@ -187,17 +200,28 @@ class ExportVCF (cluster: String, directory: String, vcfFile: String,
     println("VCF exported")
   }
 
+  /**
+   * Converts data to a Picard variant context.
+   *
+   * @param position Reference position of this polymorphism.
+   * @param alleles All alleles which segregate at this site
+   * @param phaseSets A list of all phase sets in this callset.
+   * @param sample Sample name.
+   * @return A Picard variant context.
+   */
   def convertToVariantContext(position: Position,
                               alleles: List[AlleleGroup],
                               phaseSets: Array[PhaseSet],
                               sample: String): VariantContextWritable = {
     // convert alleles to Picard allele
     val alleleNoGroup = alleles.flatMap((r: AlleleGroup) => r.getAllele() match {
-      case (a: SGAllele) => {
+      case (a: SGAllele) => { // we have an allele
         var l = List[SGAllele]()
 
+        // get ploidy lower bound
         val ploidy = r.getPloidy.getLower()
         
+        // create ploidy count of alleles
         for (i <- 0 until ploidy) {
           l = a :: l
         }
@@ -207,10 +231,19 @@ class ExportVCF (cluster: String, directory: String, vcfFile: String,
       case _ => List[SGAllele]()
     })
 
+    // get reference at site of variation
     val refBases = alleleNoGroup.head.getReferenceBases
 
+    // turn alleles into a set of bases
     val alleleBases = alleleNoGroup.map(_.getBases())
 
+    /**
+     * Turns a string of bases into a Picard Allele. Sets whether allele is the
+     * reference allele.
+     *
+     * @param bases Allele as a string of bases.
+     * @return A Picard allele corresponding to this string of bases.
+     */
     def buildAllele (bases: String): Allele = {
       val ref = (refBases == bases)
       
@@ -231,7 +264,11 @@ class ExportVCF (cluster: String, directory: String, vcfFile: String,
     // build genotypes
     val gb = new GenotypeBuilder(sample, alleleConvWoRef)
     
-    // check for phasing
+    // check for phasing:
+    // if phase set contains a phase set who is:
+    // - on the same contig
+    // - starts before and ends after
+    // our current position, then we are phased
     val contig = position.getContig()
     val pos = position.getBase()
     val matchingPhaseSet = phaseSets.filter(v => v.contig == contig)
@@ -245,7 +282,7 @@ class ExportVCF (cluster: String, directory: String, vcfFile: String,
     // finish making genotypes
     val genotype = gb.make()
 
-    // make genotype context...
+    // make genotype context... - ugly manipulation...
     val genotypeList: java.util.List[Genotype] = asList(List(genotype))
     val genotypeArrayList: java.util.ArrayList[Genotype] = new java.util.ArrayList(genotypeList)
     val sampleMap: java.util.Map[java.lang.String, java.lang.Integer] = asMap(Map(new java.lang.String(sample) -> new java.lang.Integer(0)))

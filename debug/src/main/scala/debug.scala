@@ -45,12 +45,14 @@ object Debug {
                               descr = "Show this message")
     }
 
+    // pull in kryo serializers, then start spark context
     SequenceGraphKryoProperties.setupContextProperties()
     val sc = new SparkContext("local", "debug")
     val job = new Job(sc.hadoopConfiguration)
 
     val filePath = opts.dirs.get.get
 
+    // load in sides and print json
     ParquetInputFormat.setReadSupportClass(job, classOf[AvroReadSupport[Side]])
     val sides: RDD[Side] = sc.newAPIHadoopFile(filePath + "/Sides",
                                                classOf[ParquetInputFormat[Side]], 
@@ -58,7 +60,8 @@ object Debug {
                                                ContextUtil.getConfiguration(job)).map(p => p._2)
     println (sides.count() + " Sides:")
     sides.foreach(println(_))
-    
+
+    // load in allele groups and print json    
     ParquetInputFormat.setReadSupportClass(job, classOf[AvroReadSupport[AlleleGroup]])
     val ag = sc.newAPIHadoopFile(filePath + "/AlleleGroups",
                                  classOf[ParquetInputFormat[AlleleGroup]], 
@@ -67,6 +70,7 @@ object Debug {
     println (ag.count() + " Allele Groups:")
     ag.foreach(println(_))
     
+    // load in adjacencies and print json
     ParquetInputFormat.setReadSupportClass(job, classOf[AvroReadSupport[Adjacency]])
     val ad = sc.newAPIHadoopFile(filePath + "/Adjacencies",
                                  classOf[ParquetInputFormat[Adjacency]], 
@@ -75,6 +79,7 @@ object Debug {
     println (ad.count() + " Adjacencies:")
     ad.foreach(println(_))
 
+    // load in anchors and print json
     ParquetInputFormat.setReadSupportClass(job, classOf[AvroReadSupport[Anchor]])
     val an = sc.newAPIHadoopFile(filePath + "/Anchors",
                                  classOf[ParquetInputFormat[Anchor]], 
