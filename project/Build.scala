@@ -18,6 +18,7 @@ object SGBuild extends Build {
             // We depend on the root sequence graphs library
             LocalProject("sequencegraphs")
         )
+
     lazy val debug = Project(id = "debug",
         base = file("debug")) dependsOn(
             // We depend on the root sequence graphs library
@@ -28,4 +29,5 @@ object SGBuild extends Build {
             // We depend on the root sequence graphs library
             LocalProject("sequencegraphs")
         )
+
 }

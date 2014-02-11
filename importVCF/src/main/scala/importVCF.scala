@@ -4,7 +4,12 @@ import scala.collection.mutable.HashMap
 
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
+
 import org.apache.spark.rdd.RDD
+
+import org.apache.spark.graphx
+import org.apache.spark.graphx._
+
 import edu.ucsc.genome._
 
 import java.io.File
@@ -618,14 +623,14 @@ object ImportVCF {
                 
                 // Find a Side where the first variant ended. TODO: deal with
                 // complex variants.
-                val prevSideID = firstChunk.alleleGroups.first.edge.right
+                val prevSideID = firstChunk.alleleGroups.head.edge.right
                 
                 // Get its Position.
                 val prevPos = firstChunk.getSide(prevSideID).get.position
                 
                 // Find a Side where the next variant started. TODO: deal with
                 // complex variants.
-                val nextSideID = secondChunk.alleleGroups.first.edge.right
+                val nextSideID = secondChunk.alleleGroups.head.edge.right
                 
                 // Get its Position.
                 val nextPos = secondChunk.getSide(nextSideID).get.position
