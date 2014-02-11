@@ -300,8 +300,6 @@ class SequenceGraph(sidesRDD: RDD[Side], alleleGroupsRDD: RDD[AlleleGroup],
         anchors.collect.foreach(writer.writeAnchor _)
         
     }
-    
-    
 }
 
 /**
