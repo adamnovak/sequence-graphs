@@ -228,6 +228,13 @@ class SequenceGraph(sidesRDD: RDD[Side], alleleGroupsRDD: RDD[AlleleGroup],
     val adjacencies = adjacenciesRDD
     val anchors = anchorsRDD
     
+    // We have an RDD of all edges, in case anyone is curious. We need to map
+    // the implicit converters ourselves since we don't have an implicit
+    // converter map for RDDS.
+    val edges: RDD[HasEdge] = alleleGroupsRDD.map(AlleleGroup2HasEdge _) 
+        .union(adjacenciesRDD.map(Adjacency2HasEdge _))
+        .union(anchorsRDD.map(Anchor2HasEdge _))
+    
     /**
      * Constructor to collect a bunch of SequenceGraphChunks together into a
      * SequenceGraph.

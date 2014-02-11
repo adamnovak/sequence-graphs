@@ -62,6 +62,35 @@ package object genome {
         new PloidyBounds(bounds._1, bounds._2, null)
     }
     
+    /**
+     * Magically wrap AlleleGroups in HasEdge objects.
+     *
+     * TODO: Upgrade to Scala 2.10 Implicit Classes(?) instead of this. But we'd
+     * have to get rid of case class-ness.
+     */
+    implicit def AlleleGroup2HasEdge(alleleGroup: AlleleGroup): HasEdge = {
+        AlleleGroupEdge(alleleGroup)
+    }
+    
+    /**
+     * Magically wrap Adjacencies in HasEdge objects.
+     *
+     * TODO: Upgrade to Scala 2.10 Implicit Classes(?) instead of this. But we'd
+     * have to get rid of case class-ness.
+     */
+    implicit def Adjacency2HasEdge(adjacency: Adjacency): HasEdge = {
+        AdjacencyEdge(adjacency)
+    }
+    
+    /**
+     * Magically wrap Anchors in HasEdge objects.
+     *
+     * TODO: Upgrade to Scala 2.10 Implicit Classes(?) instead of this. But we'd
+     * have to get rid of case class-ness.
+     */
+    implicit def Anchor2HasEdge(anchor: Anchor): HasEdge = {
+        AnchorEdge(anchor)
+    }
     
     
 }
