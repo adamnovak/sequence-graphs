@@ -304,32 +304,6 @@ object ImportVCF {
     }
     
     /**
-     * Function to pair up each element with a copy of its successor. RDD items
-     * must be sequentially numbered.
-     */
-    def pairUp[V: ClassManifest]
-        (rdd: RDD[(Long, V)]): RDD[((Long, V), (Long, V))] = {
-        
-        // Give everything the key of its successor.
-        val keyedBySuccessors = rdd.map { (kvPair) =>
-            (kvPair._1 + 1, kvPair._2)
-        }
-        
-        // Join up with the successors, transform, and return. We ought to drop
-        // the first and last things.
-        keyedBySuccessors.join(rdd).map { (item) =>
-            // Unpack the entries
-            val (successorKey: Long, (thing: V, successor: V)) = item
-            
-            // Return the thing we want: a pair of the thing and its successor,
-            // with both IDs.
-            ((successorKey - 1, thing), (successorKey, successor))
-        }
-        
-    }
-    
-    
-    /**
      * Run the given function for each pair of adjacent elements in the given
      * RDD. The first element will be involved in an invocation with None as the
      * first argument, and the last argument will be involved as an invocation
