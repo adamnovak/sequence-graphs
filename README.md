@@ -1,16 +1,5 @@
 ##Dependencies
 
-###To install Apache Spark
-
-If you are going to use Spark to run executors for a cluster, make sure to set `SPARK_HADOOP_VERSION=<your Hadoop version>` and `SPARK_YARN=<true or false depending on whether you want to use the new map-reduce>` first.
-
-```
-git clone https://github.com/apache/incubator-spark
-cd incubator-spark
-git checkout v0.8.1-incubating
-sbt publish-local
-```
-
 ###To install vcfimp
 
 ```
@@ -44,6 +33,14 @@ sbt stage
 
 ```
 sbt test
+```
+
+###Packaging
+
+A single, JAR which includes all dependencies can be created by running:
+
+```
+sbt assembly
 ```
 
 ###Running command-line tools

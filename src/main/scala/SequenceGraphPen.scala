@@ -1,6 +1,6 @@
 package edu.ucsc.genome
 
-import scala.Math
+import scala.math._
 
 /**
  * Provides a "pen" that can be used to "draw" Sequence Graph elements (Sides,

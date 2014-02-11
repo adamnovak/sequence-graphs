@@ -1,3 +1,7 @@
+import AssemblyKeys._
+
+assemblySettings
+
 // Build a tool to import a VCF to sequence graph format.
 
 packageArchetype.java_application
@@ -8,14 +12,14 @@ name := "importVCF"
 
 version := "0.1"
 
-scalaVersion := "2.9.3"
+scalaVersion := "2.10.3"
 
 // See unchecked warnings. See <http://stackoverflow.com/a/9417094/402891>
 scalacOptions ++= Seq("-unchecked")
 
-libraryDependencies += "org.apache.spark" %% "spark-core" % "0.8.1-incubating"
+libraryDependencies += "org.apache.spark" %% "spark-core" % "0.9.0-incubating"
 
-//libraryDependencies += "org.apache.spark" %% "spark-graphx" % "0.9.0-incubating"
+libraryDependencies += "org.apache.spark" %% "spark-graphx" % "0.9.0-incubating"
 
 // We need command-line options
 
@@ -47,3 +51,15 @@ resolvers += "Akka Repository" at "http://repo.akka.io/releases/"
 resolvers += "Hadoop-BAM" at "http://hadoop-bam.sourceforge.net/maven/"
 
 resolvers += "Sonatype" at "http://oss.sonatype.org/content/repositories/snapshots/"
+
+mainClass in assembly := Some("importVCF")
+
+mergeStrategy in assembly := {
+ case m if m.toLowerCase.endsWith("manifest.mf") => MergeStrategy.discard
+ case m if m.toLowerCase.matches("meta-inf.*\\.sf$") => MergeStrategy.discard
+ case "META-INF/services/org.apache.hadoop.fs.FileSystem" => MergeStrategy.concat
+ case "reference.conf" => MergeStrategy.concat
+ case "log4j.properties" => MergeStrategy.concat
+ case _ => MergeStrategy.first
+}
+

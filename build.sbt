@@ -1,9 +1,11 @@
+import AssemblyKeys._
+
+assemblySettings
+
 // Project info
 name := "Sequence Graph API"
 
 version := "0.1"
-
-scalaVersion := "2.9.3"
 
 // Set up the Avro code generator
 seq( sbtavro.SbtAvro.avroSettings : _*)
@@ -17,11 +19,11 @@ net.virtualvoid.sbt.graph.Plugin.graphSettings
 
 // This is a library, not an application, so no native packager setup is needed.
 
-// Now dependencies
+scalaVersion := "2.10.3"
 
-libraryDependencies += "org.apache.spark" %% "spark-core" % "0.8.1-incubating"
+libraryDependencies += "org.apache.spark" %% "spark-core" % "0.9.0-incubating"
 
-//libraryDependencies += "org.apache.spark" %% "spark-graphx" % "0.8.1-incubating"
+libraryDependencies += "org.apache.spark" %% "spark-graphx" % "0.9.0-incubating"
 
 // We need this library for testing
 
@@ -60,8 +62,17 @@ libraryDependencies += "samtools" % "samtools" % "1.93"
 
 libraryDependencies += "cofoja" % "cofoja" % "1.0"
 
+mergeStrategy in assembly := {
+ case m if m.toLowerCase.endsWith("manifest.mf") => MergeStrategy.discard
+ case m if m.toLowerCase.matches("meta-inf.*\\.sf$") => MergeStrategy.discard
+ case "META-INF/services/org.apache.hadoop.fs.FileSystem" => MergeStrategy.concat
+ case "reference.conf" => MergeStrategy.concat
+ case "log4j.properties" => MergeStrategy.concat
+ case _ => MergeStrategy.first
+}
+
+resolvers += "Sonatype" at "http://oss.sonatype.org/content/repositories/snapshots/"
+
 resolvers += "Akka Repository" at "http://repo.akka.io/releases/"
 
 resolvers += "Hadoop-BAM" at "http://hadoop-bam.sourceforge.net/maven/"
-
-resolvers += "Sonatype" at "http://oss.sonatype.org/content/repositories/snapshots/"

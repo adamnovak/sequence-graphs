@@ -10,7 +10,6 @@ import parquet.avro.{AvroParquetInputFormat, AvroReadSupport}
 import parquet.hadoop.util.ContextUtil
 import org.apache.hadoop.mapreduce.Job
 import org.apache.spark.rdd.RDD
-import edu.berkeley.cs.amplab.adam.rdd.AdamContext._
 import org.apache.hadoop.io.LongWritable
 import scala.collection.JavaConversions._
 
@@ -275,10 +274,10 @@ class ExportVCF (cluster: String, directory: String, vcfFile: String,
     val genotype = gb.make()
 
     // make genotype context... - ugly manipulation...
-    val genotypeList: java.util.List[Genotype] = asList(List(genotype))
+    val genotypeList: java.util.List[Genotype] = bufferAsJavaList(List(genotype).toBuffer)
     val genotypeArrayList: java.util.ArrayList[Genotype] = new java.util.ArrayList(genotypeList)
-    val sampleMap: java.util.Map[java.lang.String, java.lang.Integer] = asMap(Map(new java.lang.String(sample) -> new java.lang.Integer(0)))
-    val sampleOrder: java.util.List[String] = asList(List(new java.lang.String(sample)))
+    val sampleMap: java.util.Map[java.lang.String, java.lang.Integer] = mapAsJavaMap(Map(new java.lang.String(sample) -> new java.lang.Integer(0)))
+    val sampleOrder: java.util.List[String] = bufferAsJavaList(List(new java.lang.String(sample)).toBuffer)
     val gc = GenotypesContext.create(genotypeArrayList, sampleMap, sampleOrder)
 
     // build variant context

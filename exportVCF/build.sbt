@@ -1,4 +1,9 @@
-// Build a tool to dump a sequence graph as VCF
+
+import AssemblyKeys._
+
+assemblySettings
+
+// Build a tool to import a VCF to sequence graph format.
 
 packageArchetype.java_application
 
@@ -6,20 +11,39 @@ exportJars := true
 
 name := "exportVCF"
 
-version := "0.1"
+scalaVersion := "2.10.3"
 
-scalaVersion := "2.9.3"
+libraryDependencies += "org.apache.spark" %% "spark-core" % "0.9.0-incubating"
 
-libraryDependencies += "org.apache.spark" %% "spark-core" % "0.8.1-incubating"
+libraryDependencies += "org.apache.spark" %% "spark-graphx" % "0.9.0-incubating"
 
-//libraryDependencies += "org.apache.spark" %% "spark-graphx" % "0.9.0-incubating"
+// We need this library for testing
 
-// We need command-line options
+libraryDependencies += "org.scalatest" %% "scalatest" % "1.9.2" % "test"
+
+// We need to be able to write out graph pictures
+
+libraryDependencies += "org.kohsuke" % "graphviz-api" % "1.1"
+
+// We need to be able to write Avro in Parquet
+
+libraryDependencies += "com.twitter" % "parquet-avro" % "1.3.2"
 
 libraryDependencies += "org.rogach" %% "scallop" % "0.9.4"
 
-// add hadoop bam and everything
+// We need slf4j for logging
 
+libraryDependencies += "org.slf4j" % "slf4j-api" % "1.7.5"
+
+// We need Apache Commons Lang because it's useful (for escaping strings in .dot
+// files)
+libraryDependencies += "org.apache.commons" % "commons-lang3" % "3.2.1"
+
+// We need Apache Commons IO because "rm -Rf" takes about a hunderd lines of
+// Java.
+libraryDependencies += "commons-io" % "commons-io" % "2.4"
+
+// add hadoop bam and everything
 libraryDependencies += "fi.tkk.ics.hadoop.bam" % "hadoop-bam" % "6.1-SNAPSHOT"
 
 libraryDependencies += "variant" % "variant" % "1.93"
@@ -31,14 +55,6 @@ libraryDependencies += "picard" % "picard" % "1.93"
 libraryDependencies += "samtools" % "samtools" % "1.93"
 
 libraryDependencies += "cofoja" % "cofoja" % "1.0"
-
-// Get mesos ourselves
-
-libraryDependencies += "org.apache.mesos" % "mesos" % "0.13.0"
-
-// add adam
-
-libraryDependencies += "edu.berkeley.cs.amplab.adam" % "adam-core" % "0.6.1-SNAPSHOT"
 
 // Add the local Maven repository as a resolver, so we can use development ADAM
 // versions installed with "mvn install". This is in turn necessary in order to
@@ -59,8 +75,15 @@ resolvers += "Sonatype" at "http://oss.sonatype.org/content/repositories/snapsho
 // Maven repository, which we need to do in order to build against a version of
 // ADAM that itself has been built against the correct version of Hadoop.
 
-// See <http://www.scala-sbt.org/0.12.2/docs/Detailed-Topics/Library-
-// Management.html>
-externalResolvers <<= resolvers map { rs =>
-  Resolver.withDefaultResolvers(rs, mavenCentral = true)
+resolvers += "Akka Repository" at "http://repo.akka.io/releases/"
+
+mainClass in assembly := Some("exportVCF")
+
+mergeStrategy in assembly := {
+ case m if m.toLowerCase.endsWith("manifest.mf") => MergeStrategy.discard
+ case m if m.toLowerCase.matches("meta-inf.*\\.sf$") => MergeStrategy.discard
+ case "META-INF/services/org.apache.hadoop.fs.FileSystem" => MergeStrategy.concat
+ case "reference.conf" => MergeStrategy.concat
+ case "log4j.properties" => MergeStrategy.concat
+ case _ => MergeStrategy.first
 }

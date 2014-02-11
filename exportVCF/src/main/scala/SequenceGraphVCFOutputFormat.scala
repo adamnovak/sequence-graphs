@@ -33,7 +33,7 @@ class SequenceGraphVCFOutputFormat[K]
     * TODO: fix the code above-seems to be an issue in the VCFContigHeaderLine
     * */
 
-  val hdr = new VCFHeader(asSet(headerLines), asSet(SequenceGraphVCFOutputFormat.samples.map(new java.lang.String(_))))
+  val hdr = new VCFHeader(setAsJavaSet(headerLines), setAsJavaSet(SequenceGraphVCFOutputFormat.samples.map(new java.lang.String(_))))
 
   setHeader(hdr)
 }
