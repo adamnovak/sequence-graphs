@@ -1,5 +1,24 @@
 ##Dependencies
 
+##To install Spark 0.9.0 with Mesos support
+
+Support for the Mesos cluster manager in anything other than coarse scheduling mode is broken in Spark 0.9.0. In order to use Mesos in a reasonable scheduling mode, it is necessary to install a version of Spark with a patch that has not yet been merged into the main development repository.
+
+Make sure to set `SPARK_HADOOP_VERSION=<your Hadoop version>` and `SPARK_YARN=<true or false depending on whether you want to use the new map-reduce>`.
+
+```
+export SPARK_HADOOP_VERSION=<your Hadoop version>
+export SPARK_YARN=<whether you want to use YARN or not>
+
+git clone git@github.com:apache/incubator-spark.git
+cd incubator-spark
+git fetch git@github.com:bijaybisht/incubator-spark.git SPARK-1052
+git checkout -b SPARK-1052 FETCH_HEAD
+sbt clean
+sbt assembly
+sbt publish-local
+```
+
 ###To install vcfimp
 
 ```
