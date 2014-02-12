@@ -96,25 +96,20 @@ class ExportVCF (cluster: String, directory: String, vcfFile: String,
     println("Spark initialized")
     val job = new Job(sc.hadoopConfiguration)
 
-    // read data in
-    val filePath = directory
+    // Load a Sequence Graph
+    val sequenceGraph = new SequenceGraph(sc, directory)
 
-
-    // Load sequence graph Sides.
-    val sides: RDD[Side] = SequenceGraph.readRDDFromParquet(sc,
-        filePath + "/Sides")
+    // Pull out its Sides
+    val sides: RDD[Side] = sequenceGraph.sides
         
     // And AlleleGroups
-    val ag: RDD[AlleleGroup] = SequenceGraph.readRDDFromParquet(sc,
-        filePath + "/AlleleGroups")
+    val ag: RDD[AlleleGroup] = sequenceGraph.alleleGroups
 
     // And Adjacencies
-    val ad: RDD[Adjacency] = SequenceGraph.readRDDFromParquet(sc,
-        filePath + "/Adjacencies")
+    val ad: RDD[Adjacency] = sequenceGraph.adjacencies
 
     // And Anchors
-    val an: RDD[Anchor] = SequenceGraph.readRDDFromParquet(sc,
-        filePath + "/Anchors")
+    val an: RDD[Anchor] = sequenceGraph.anchors
  
     // get phasing sets
     // key all sides by their ids
