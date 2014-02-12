@@ -158,8 +158,8 @@ object ImportVCF {
         
         // Set the parallelism level to have enough reducers to not run out of
         // memory
-        System.setProperty("spark.default.parallelism", "16")
-
+        System.setProperty("spark.default.parallelism", "12")
+        
         // The first thing we need is a Spark context. We would like to be able
         // to make one against any Spark URL: either "local" or soemthing like
         // "mesos://wherever.biz:1234". We need to feed it all the jars it needs
