@@ -8,6 +8,7 @@ import scala.collection.JavaConversions._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
+import org.apache.spark.graphx._
 import org.apache.avro.generic.IndexedRecord
 
 // Import parquet
@@ -270,6 +271,59 @@ class SequenceGraph(sidesRDD: RDD[Side], alleleGroupsRDD: RDD[AlleleGroup],
             alleleGroups ++ other.alleleGroups, 
             adjacencies ++ other.adjacencies, 
             anchors ++ other.anchors)
+    }
+    
+    /**
+     * Produce a GraphX graph from this SequenceGraph. The nodes in the graph
+     * carry Sides, and the edges in the graph carry HasEdge objects, which in
+     * turn carry AlleleGroups, Adjacencies, and Anchors.
+     */
+    def graph: Graph[Side, HasEdge] = {
+        // Make an RDD for Sides by ID
+        val nodes: RDD[(Long, Side)] = sides.map { (side) =>
+            (side.id, side)
+        }
+        
+        // Make an RDD of all the edges as GraphX Edge objects (not
+        // SequenceGraph Edge objects) wrapping the HasEdge wrappers that hold
+        // the actual Anchors, Adjacencies, and AlleleGroups.
+        val graphEdges = edges.map { (edge) =>
+            new org.apache.spark.graphx.Edge(edge.edge.left, edge.edge.right,
+                edge)
+        }
+        
+        // Make and return the graph formed by these two RDDs.
+        Graph(nodes, graphEdges)
+    }
+    
+    /**
+     * Get all the edges (AlleleGroups, Adjacencies, or Anchors) that overlap
+     * the given range. An edge overlaps the range if it has at least one
+     * endpoint in the range, or if both its endpoints are on the same contig as
+     * the range and on opposite sides of the range.
+     */
+    def inRange(contig: String, start: Long, end: Long): RDD[HasEdge] = {
+        graph.triplets.filter { (triplet) =>
+            // Pull out the endpoint positions
+            val leftPos = triplet.srcAttr.position
+            val rightPos = triplet.dstAttr.position
+            
+            // Is the left Side in the range?
+            val leftInRange = (leftPos.contig == contig && 
+                leftPos.base >= start && leftPos.base <= end) 
+            // Is the right Side in the range?
+            val rightInRange = (rightPos.contig == contig && 
+                rightPos.base >= start && rightPos.base <= end)
+            // Are both Sides on the same contig as the range, but on opposite
+            // sides of the range?
+            val coversRange = (leftPos.contig == contig && 
+                rightPos.contig == contig && 
+                ((leftPos.base < start && rightPos.base > end) || 
+                (leftPos.base > end && rightPos.base < start)))
+                
+            // If any of those are true, we want this edge
+            leftInRange || rightInRange || coversRange
+        }.map(_.attr)
     }
     
     /**
