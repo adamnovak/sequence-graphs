@@ -1,6 +1,6 @@
 ##Dependencies
 
-##To install Spark 0.9.0 with Mesos support
+###To install Spark 0.9.0 with Mesos support
 
 Support for the Mesos cluster manager in anything other than coarse scheduling mode is broken in Spark 0.9.0. In order to use Mesos in a reasonable scheduling mode, it is necessary to install a version of Spark with a patch that has not yet been merged into the main development repository.
 
