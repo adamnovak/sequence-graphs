@@ -69,7 +69,8 @@ object SequenceGraph {
         // the writing.
         val recordClass = m.erasure
         
-        println("Writing out an RDD of %s".format(recordClass.getCanonicalName))
+        println("Writing out an RDD of %d %s".format(things.count, 
+            recordClass.getCanonicalName))
         
         // Get the schema Field object    
         val recordSchemaField = recordClass.getDeclaredField("SCHEMA$")
@@ -213,28 +214,86 @@ object SequenceGraph {
 }
 
 /**
- * Represents a Sequence Graph (or component thereof) as a series of Spark RDDs.
+ * Represents a Sequence Graph (or component thereof) as a GraphX graph. The
+ * nodes in the graph carry Sides, and the edges in the graph carry HasEdge
+ * objects, which in turn carry AlleleGroups, Adjacencies, and Anchors.
+ *    
  * Supports input/output to Parquet Avro, or dumping to any SequenceGraphWriter
  * in serial, and also some graph queries.
  */
-class SequenceGraph(sidesRDD: RDD[Side], alleleGroupsRDD: RDD[AlleleGroup], 
-    adjacenciesRDD: RDD[Adjacency], anchorsRDD: RDD[Anchor]) {
+class SequenceGraph(graph: Graph[Side, HasEdge]) {
     
+    // Import fake static methods
     import SequenceGraph._
     
-    // We keep around all the sequence graph parts. Constructor arguments don't
-    // magically become fields we can reference on other instances.
-    val sides = sidesRDD
-    val alleleGroups = alleleGroupsRDD
-    val adjacencies = adjacenciesRDD
-    val anchors = anchorsRDD
+    /**
+     * Extract all the Sides from this SequenceGraph.
+     */
+    def sides: RDD[Side] = {
+        graph.vertices.map(_._2)
+    }
     
-    // We have an RDD of all edges, in case anyone is curious. We need to map
-    // the implicit converters ourselves since we don't have an implicit
-    // converter map for RDDS.
-    val edges: RDD[HasEdge] = alleleGroupsRDD.map(AlleleGroup2HasEdge _) 
-        .union(adjacenciesRDD.map(Adjacency2HasEdge _))
-        .union(anchorsRDD.map(Anchor2HasEdge _))
+    /**
+     * Extract all the AlleleGroups from this SequenceGraph.
+     */
+    def alleleGroups: RDD[AlleleGroup] = {
+        graph.edges.map(_.attr).flatMap {
+            // Every AlleleGroup gets passed
+            case AlleleGroupEdge(alleleGroup) => Some(alleleGroup)
+            // Everything else gets thrown out
+            case _ => None
+        }
+    }
+    
+    /**
+     * Extract all the Adjacencies from this SequenceGraph.
+     */
+    def adjacencies: RDD[Adjacency] = {
+        graph.edges.map(_.attr).flatMap {
+            case AdjacencyEdge(adjacency) => Some(adjacency)
+            case _ => None
+        }
+    }
+    
+    /**
+     * Extract all the Anchors from this SequenceGraph.
+     */
+    def anchors: RDD[Anchor] = {
+        graph.edges.map(_.attr).flatMap {
+            case AnchorEdge(anchor) => Some(anchor)
+            case _ => None
+        }
+    }
+    
+    /**
+     * Make a SequenceGraph from separate RDDs of all the components.
+     */
+    def this(sidesRDD: RDD[Side], alleleGroupsRDD: RDD[AlleleGroup], 
+        adjacenciesRDD: RDD[Adjacency], anchorsRDD: RDD[Anchor]) {
+        
+        this({
+            // Make an RDD for Sides by ID
+            val nodes: RDD[(Long, Side)] = sidesRDD.keyBy(_.id)
+            
+            // Make an RDD of all the different edge types wrapped up in HasEdge
+            // objects. We have to map the implicit converters ourselves since
+            // we don't have a magic RDD implicit converter mapper.
+            val edges: RDD[HasEdge] = alleleGroupsRDD.map(AlleleGroup2HasEdge _) 
+                .union(adjacenciesRDD.map(Adjacency2HasEdge _))
+                .union(anchorsRDD.map(Anchor2HasEdge _))
+        
+            // Make an RDD of all the edges as GraphX Edge objects (not
+            // SequenceGraph Edge objects) wrapping the HasEdge wrappers that
+            // hold the actual Anchors, Adjacencies, and AlleleGroups.
+            val graphEdges = edges.map { (edge) =>
+                new org.apache.spark.graphx.Edge(edge.edge.left,
+                    edge.edge.right, edge)
+            }
+            
+            // Make and return the graph formed by these two RDDs.
+            Graph(nodes, graphEdges)
+        })
+    }
     
     /**
      * Constructor to collect a bunch of SequenceGraphChunks together into a
@@ -274,57 +333,39 @@ class SequenceGraph(sidesRDD: RDD[Side], alleleGroupsRDD: RDD[AlleleGroup],
     }
     
     /**
-     * Produce a GraphX graph from this SequenceGraph. The nodes in the graph
-     * carry Sides, and the edges in the graph carry HasEdge objects, which in
-     * turn carry AlleleGroups, Adjacencies, and Anchors.
+     * Get the subgraph formed only from edges that overlap the given range. An
+     * edge overlaps the range if it has at least one endpoint with a lower
+     * bound position in the range, or if both its endpoints' lower bound
+     * positions are on the same contig as the range and on opposite sides of
+     * the range.
+     *
      */
-    def graph: Graph[Side, HasEdge] = {
-        // Make an RDD for Sides by ID
-        val nodes: RDD[(Long, Side)] = sides.map { (side) =>
-            (side.id, side)
-        }
-        
-        // Make an RDD of all the edges as GraphX Edge objects (not
-        // SequenceGraph Edge objects) wrapping the HasEdge wrappers that hold
-        // the actual Anchors, Adjacencies, and AlleleGroups.
-        val graphEdges = edges.map { (edge) =>
-            new org.apache.spark.graphx.Edge(edge.edge.left, edge.edge.right,
-                edge)
-        }
-        
-        // Make and return the graph formed by these two RDDs.
-        Graph(nodes, graphEdges)
-    }
-    
-    /**
-     * Get all the edges (AlleleGroups, Adjacencies, or Anchors) that overlap
-     * the given range. An edge overlaps the range if it has at least one
-     * endpoint in the range, or if both its endpoints are on the same contig as
-     * the range and on opposite sides of the range.
-     */
-    def inRange(contig: String, start: Long, end: Long): RDD[HasEdge] = {
-        graph.triplets.filter { (triplet) =>
-            // Pull out the endpoint positions
-            val leftPos = triplet.srcAttr.position
-            val rightPos = triplet.dstAttr.position
+    def inRange(range: BaseRange): SequenceGraph = {
+        new SequenceGraph(graph.subgraph(epred = {
+            (triplet) =>
+            // Pull out the endpoint position lower bounds. For things placed on
+            // actual "reference" contigs, these will be real positions. For
+            // things like novel inserts these will be on the contig the insert
+            // went in to. TODO: Formalize this more.
+            val leftPos = triplet.srcAttr.lowerBound
+            val rightPos = triplet.dstAttr.lowerBound
             
             // Is the left Side in the range?
-            val leftInRange = (leftPos.contig == contig && 
-                leftPos.base >= start && leftPos.base <= end) 
+            val leftInRange = range contains leftPos 
             // Is the right Side in the range?
-            val rightInRange = (rightPos.contig == contig && 
-                rightPos.base >= start && rightPos.base <= end)
+            val rightInRange = range contains rightPos
             // Are both Sides on the same contig as the range, but on opposite
             // sides of the range?
-            val coversRange = (leftPos.contig == contig && 
-                rightPos.contig == contig && 
-                ((leftPos.base < start && rightPos.base > end) || 
-                (leftPos.base > end && rightPos.base < start)))
+            val coversRange = (leftPos.contig == range.contig && 
+                rightPos.contig == range.contig && 
+                ((leftPos.base < range.start && rightPos.base > range.end) || 
+                (leftPos.base > range.end && rightPos.base < range.start)))
                 
             // If any of those are true, we want this edge
             leftInRange || rightInRange || coversRange
-        }.map(_.attr)
+        }))
     }
+    
     
     /**
      * An operator that unions this sequence graph with the other one and

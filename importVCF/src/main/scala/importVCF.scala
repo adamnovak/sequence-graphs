@@ -36,10 +36,6 @@ import scala.util.Sorting
 // We want to parse command-line arguments
 import org.rogach.scallop._
 
-// We want reasonable logging from Parquet.
-import java.util.logging._
-import parquet.Log
-
 import org.apache.hadoop.mapreduce.Job
 
 /**
@@ -122,35 +118,7 @@ object ImportVCF {
         } 
         
         // Set up logging
-        
-        // Parquet "helpfully" forcibly adds an INFO-level logger to console if
-        // we don't configure its logger specifically (i.e. if we let its log
-        // messages pass through to the root logger). It also overrides any
-        // level we set on its logger, resetting it to INFO. See
-        // <https://github.com/Parquet/parquet-mr/blob/master/parquet-
-        // common/src/main/java/parquet/Log.java>
-        
-        // The solution is to add a warning-level console logger specifically
-        // for Parquet, and tell it not to propagate messages up to the root
-        // logger.
-        
-        // This could be done through the properties-file-based Java logging
-        // configuration mechanism, but that would require telling Java how to
-        // *find* the properties file, which in turn requires either setting a
-        // JVM command-line option to a filesystem path or messing about with
-        // the Java preferences API and/or resource streams. See
-        // <http://stackoverflow.com/q/805701/402891>
-        
-        // Get the logger Parquet is going to use (before Parquet's static
-        // logger initialization code can run)
-        val parquetLogger = Logger.getLogger(
-            classOf[Log].getPackage().getName())
-        // Attach our own ConsoleHandler for it
-        val consoleHandler = new ConsoleHandler()
-        consoleHandler.setLevel(Level.WARNING)
-        parquetLogger.addHandler(consoleHandler)
-        // Tell it not to send messages up
-        parquetLogger.setUseParentHandlers(false)
+        ConsoleUtil.quietParquet
         
         // Set up Spark.
         

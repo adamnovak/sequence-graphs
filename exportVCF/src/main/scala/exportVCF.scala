@@ -2,7 +2,7 @@ package edu.ucsc.genome.ExportVCF
 
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
-import edu.ucsc.genome.{SequenceGraph, AlleleGroup, Side, Adjacency, Anchor, Edge, Allele=>SGAllele, Position, SequenceGraphKryoProperties}
+import edu.ucsc.genome.{SequenceGraph, AlleleGroup, Side, Adjacency, Anchor, Edge, Allele=>SGAllele, Position, SequenceGraphKryoProperties, BaseRange, ConsoleUtil}
 import org.broadinstitute.variant.variantcontext.{Allele, Genotype, VariantContext, GenotypeBuilder, GenotypesContext, VariantContextBuilder}
 import fi.tkk.ics.hadoop.bam.VariantContextWritable
 import parquet.hadoop.ParquetInputFormat
@@ -37,7 +37,9 @@ object ExportVCF {
              |""".stripMargin)
              
       val cluster = opt[String](default = Some("local"),
-                descr = "Run against this cluster URL") 
+                descr = "Run against this cluster URL")
+                
+      val range = opt[String](descr = "range to extract, like chr1:1-10") 
       
       val directory = trailArg[String](required = true,
                                        descr = "Directory to read from")
@@ -51,15 +53,21 @@ object ExportVCF {
                               descr = "Show this message")
     } 
 
+    // Set up logging
+    ConsoleUtil.quietParquet
+
+    // Parse the range if one was provided.
+    val parsedRange: Option[BaseRange] = opts.range.get.map(new BaseRange(_))
+
     val export = new ExportVCF(opts.cluster.get.get, opts.directory.get.get, 
-        opts.vcfFile.get.get, opts.sample.get.get)
+        opts.vcfFile.get.get, opts.sample.get.get, parsedRange)
 
     export.export()
   }
 }
 
 class ExportVCF (cluster: String, directory: String, vcfFile: String, 
-    sample: String) extends Serializable {
+    sample: String, range: Option[BaseRange]) extends Serializable {
 
   def export() {
 
@@ -96,8 +104,12 @@ class ExportVCF (cluster: String, directory: String, vcfFile: String,
     println("Spark initialized")
     val job = new Job(sc.hadoopConfiguration)
 
-    // Load a Sequence Graph
-    val sequenceGraph = new SequenceGraph(sc, directory)
+    // Load a Sequence Graph, and optionally restrict it to the range we want to
+    // look in.
+    val sequenceGraph: SequenceGraph = range match {
+        case Some(thing) => new SequenceGraph(sc, directory).inRange(thing)
+        case None => new SequenceGraph(sc, directory)
+    }
 
     // Pull out its Sides
     val sides: RDD[Side] = sequenceGraph.sides
