@@ -7,8 +7,12 @@ import scala.util.parsing.combinator.RegexParsers
  * and parses/outputs contig:start-end notation. Semantically, runs from the
  * left Side of the start base to the right Side of the end base. Start must be
  * less than or equal to end. Contig may not contain ":".
+ *
+ * TODO: Un-serializable this. We only have it serializable because Kryo argues
+ * with scalatest and refuses to serialize it in tests.
  */
-class BaseRange(val contig: String, val start: Long, val end: Long) {
+class BaseRange(val contig: String, val start: Long, val end: Long) 
+    extends Serializable {
     
     if(start > end) {
         // We can't have backwards bounds
