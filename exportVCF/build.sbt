@@ -13,6 +13,11 @@ name := "exportVCF"
 
 scalaVersion := "2.10.3"
 
+// Don't generate path names that are too long for an encrypted home directory
+// on Ubuntu. eCryptfs has a 143-character limit. See
+// <https://bugs.launchpad.net/ubuntu/+source/linux/+bug/344878>
+scalacOptions ++= Seq("-Xmax-classfile-name", "130")
+
 libraryDependencies += "org.apache.spark" %% "spark-core" % "0.9.0-incubating"
 
 libraryDependencies += "org.apache.spark" %% "spark-graphx" % "0.9.0-incubating"
