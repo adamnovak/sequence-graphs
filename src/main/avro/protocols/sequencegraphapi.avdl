@@ -1,0 +1,34 @@
+// SKETCH of a POSSIBLE API for accessing a sequence graph
+@namespace("edu.ucsc.genome")
+protocol SequenceGraphAPI {
+    
+    import idl "../sequencegraph.avdl";
+    
+    // Defines an RPC protocol that provides access to a Sequence Graph.
+    // Designed with helpful advice from the Google people.
+    
+    // We want to have just flat lists of things that can be any of these types.
+    // Unfortunately we can't just name a union, so we use a named wrapper.
+    record GraphElement {
+        union {Side, AlleleGroup, Adjacency, Anchor} element;
+    }
+    
+    // We want to be able to send a paginated, super-large set of graph elements
+    record GraphElementResponse {
+        // We have a list of elements in the graph
+        array<GraphElement> elements;
+        // And a count of the total elements available on all pages
+        long total;
+        // And a string to get the next page. The next page may be empty.
+        string nextPageToken;
+    }
+    
+    // This is how you get the next page.
+    GraphElementResponse getNextPage(string nextPageToken);
+    
+    // Now the only actual method: request a range of a SequenceGraph.
+    GraphElementResponse search(string contig, long start, long end);
+    
+    
+    
+}
