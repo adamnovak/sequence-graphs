@@ -13,8 +13,8 @@ import org.apache.avro.generic.IndexedRecord
 
 // Import parquet
 import parquet.hadoop.{ParquetOutputFormat, ParquetInputFormat}
-import parquet.avro.{AvroParquetOutputFormat, AvroWriteSupport, 
-                     AvroReadSupport, AvroParquetWriter}
+import parquet.avro.{AvroParquetOutputFormat, AvroWriteSupport, AvroReadSupport,
+    AvroParquetWriter}
 import parquet.hadoop.util.{ContextUtil, ConfigurationUtil}
 
 // We need to make Paths for Parquet output.
@@ -339,6 +339,8 @@ class SequenceGraph(graph: Graph[Side, HasEdge]) {
      * positions are on the same contig as the range and on opposite sides of
      * the range.
      *
+     * Only vertices that have an edge overlapping the range will be preserved.
+     *
      */
     def inRange(range: BaseRange): SequenceGraph = {
         new SequenceGraph(graph.subgraph(epred = {
@@ -360,7 +362,23 @@ class SequenceGraph(graph: Graph[Side, HasEdge]) {
                 
             // If any of those are true, we want this edge
             leftInRange || rightInRange || coversRange
-        }))
+        }).filter(preprocess = { (subgraph) =>
+            // Label the subgraph vertices with their degrees. For some reason
+            // we don't have a plain joinVertices that produces a graph with a
+            // new type of vertex annotation, so we need to use this one and
+            // pass a function.
+            subgraph.outerJoinVertices(subgraph.degrees) {
+                // We're replacing the vertex labels with the degree counts.
+                // Things with degree 0 just don't appear, so we fill in for
+                // them.
+                (id, original, degree) => degree.getOrElse(0)
+            }
+        }, vpred = { (id: VertexId, degree: Int) =>
+            // Only pass vertices with edges on them. We get the vertex
+            // degrees by consulting the preprocessed graph, but actually
+            // act on the original graph.
+            degree > 0
+        }))            
     }
     
     

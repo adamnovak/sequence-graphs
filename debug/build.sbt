@@ -12,6 +12,11 @@ version := "0.1"
 
 scalaVersion := "2.10.3"
 
+// Don't generate path names that are too long for an encrypted home directory
+// on Ubuntu. eCryptfs has a 143-character limit. See
+// <https://bugs.launchpad.net/ubuntu/+source/linux/+bug/344878>
+scalacOptions ++= Seq("-Xmax-classfile-name", "130")
+
 libraryDependencies += "org.rogach" %% "scallop" % "0.9.4"
 
 // We get innovativemedicine's vcfimp VCF parser, which may not exist in any of
