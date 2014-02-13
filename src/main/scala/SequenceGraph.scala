@@ -281,7 +281,7 @@ class SequenceGraph(graph: Graph[Side, HasEdge]) {
             val edges: RDD[HasEdge] = alleleGroupsRDD.map(AlleleGroup2HasEdge _) 
                 .union(adjacenciesRDD.map(Adjacency2HasEdge _))
                 .union(anchorsRDD.map(Anchor2HasEdge _))
-        
+                
             // Make an RDD of all the edges as GraphX Edge objects (not
             // SequenceGraph Edge objects) wrapping the HasEdge wrappers that
             // hold the actual Anchors, Adjacencies, and AlleleGroups.
@@ -290,8 +290,16 @@ class SequenceGraph(graph: Graph[Side, HasEdge]) {
                     edge.edge.right, edge)
             }
             
-            // Make and return the graph formed by these two RDDs.
-            Graph(nodes, graphEdges)
+            // How many partitions should we have? Graph misbehaves (when we do
+            // inRange) if the node and edge RDDs have unequal numbers of
+            // partitions. To avoid a shuffle, we coalesce down to the minimum
+            // number of partitions.
+            val partitions = Math.min(nodes.partitions.size,
+                graphEdges.partitions.size)
+            
+            // Coalesce to an equal number of partitions, and make and return
+            // the graph formed by these two RDDs.
+            Graph(nodes.coalesce(partitions), graphEdges.coalesce(partitions))
         })
     }
     
