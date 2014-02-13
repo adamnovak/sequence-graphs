@@ -356,10 +356,7 @@ class SequenceGraph(graph: Graph[Side, HasEdge]) {
             val rightInRange = range contains rightPos
             // Are both Sides on the same contig as the range, but on opposite
             // sides of the range?
-            val coversRange = (leftPos.contig == range.contig && 
-                rightPos.contig == range.contig && 
-                ((leftPos.base < range.start && rightPos.base > range.end) || 
-                (leftPos.base > range.end && rightPos.base < range.start)))
+            val coversRange = range.between(leftPos, rightPos)
                 
             // If any of those are true, we want this edge
             leftInRange || rightInRange || coversRange

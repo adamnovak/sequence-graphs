@@ -46,6 +46,28 @@ class BaseRange(val contig: String, val start: Long, val end: Long)
     }
     
     /**
+     * Test if this range is completely between the given positions, and does
+     * not overlap them.
+     */
+    def between(position1: Position, position2: Position): Boolean = {
+        if(position1.contig != contig || position2.contig != contig) {
+            // We can't be between those positions, they're on some other
+            // contig.
+            false
+        } else if (position1.base > position2.base) {
+            // Flip them around
+            between(position2, position1)
+        } else if(position1.base < start && position2.base > end) {
+            // We actually are between these positions
+            true
+        } else {
+            // We aren't between these positions
+            false
+        }
+    
+    }
+    
+    /**
      * Output in contig:start-end format.
      */
     override def toString = "%s:%d-%d".format(contig, start, end)    
