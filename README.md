@@ -19,14 +19,6 @@ sbt assembly
 sbt publish-local
 ```
 
-###To install vcfimp
-
-```
-git clone https://github.com/adamnovak/vcfimp.git
-cd vcfimp
-sbt "+ vcfimp/publish-local"
-```
-
 ### To install ADAM
 
 ```
