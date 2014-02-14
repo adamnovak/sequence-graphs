@@ -30,10 +30,6 @@ libraryDependencies += "org.apache.spark" %% "spark-graphx" % "0.9.0-incubating"
 
 libraryDependencies += "org.rogach" %% "scallop" % "0.9.4"
 
-// We get innovativemedicine's vcfimp VCF parser, which may not exist in any of
-// our resolvers.
-libraryDependencies += "ca.innovativemedicine" %% "vcfimp" % "0.7.0"
-
 // We need a parallel VCF parser
 libraryDependencies += "fi.tkk.ics.hadoop.bam" % "hadoop-bam" % "6.1-SNAPSHOT"
 
