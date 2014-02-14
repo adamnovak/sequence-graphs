@@ -7,6 +7,10 @@ import org.apache.avro.ipc.{NettyServer, NettyTransceiver}
 import org.apache.avro.ipc.specific.{SpecificRequestor, SpecificResponder}
 import java.net.InetSocketAddress
 
+/**
+ * Tests for the SequenceGraphServer. Basically a translation and testification
+ * of <http://gbif.blogspot.com/2011/06/getting-started-with-avro-rpc.html>.
+ */
 class SequenceGraphServerTests extends FunSuite with SparkSuite {
 
     // Make a pen and draw a graph
