@@ -49,15 +49,28 @@ class SequenceGraphServer(graph: SequenceGraph) extends SequenceGraphAPI {
                 .union(subgraph.anchors.map(new GraphElement(_)))
                 
             // Make a new string token
-            val token: String = java.util.UUID.randomUUID.toString
-            
-            // Say the next page is partition 1 (if it exists)
-            val entry = (token, (elements, 1))
-            nextPages += entry
+            // Make a new string token
+            val nextToken: String = if(elements.partitions.size > 1) {
                 
+                // There is more to return
+                // Generate a new token
+                val generated = java.util.UUID.randomUUID.toString
+                
+                // Say the next page is the next partition
+                val entry = (generated, (elements, 1))
+                nextPages += entry
+                
+                // Send the token to the client.
+                generated
+            } else {
+                // This is the last page. Signal with an empty-string token
+                // sentinel.
+                ""
+            }
+            
             // Send partition 0
             new GraphElementResponse(getPartition(elements, 0).collect.toList, 
-                elements.count, token)
+                elements.count, nextToken)
         }
     }
     
@@ -78,28 +91,30 @@ class SequenceGraphServer(graph: SequenceGraph) extends SequenceGraphAPI {
                 val list = getPartition(elements, partition).collect.toList
                 
                 // Make a new string token
-                val nextToken: String = list match {
-                    // If we ran out justs end them to the forever empty token.
-                    case Nil => ""
-                    case _ => {
-                        // Generate a new token
-                        val generated = java.util.UUID.randomUUID.toString
-                        
-                        // Say the next page is the next partition (if it
-                        // exists)
-                        val entry = (generated, (elements, partition + 1))
-                        nextPages += entry
-                        
-                        generated
-                    }
+                val nextToken: String = if(elements.partitions.size > 
+                    partition + 1) {
+                    
+                    // There is more to return
+                    // Generate a new token
+                    val generated = java.util.UUID.randomUUID.toString
+                    
+                    // Say the next page is the next partition
+                    val entry = (generated, (elements, partition + 1))
+                    nextPages += entry
+                    
+                    // Send the token to the client.
+                    generated
+                } else {
+                    // This is the last page. Signal with an empty-string token
+                    // sentinel.
+                    ""
                 }
                 
                 // Send requested partition
                 new GraphElementResponse(list, elements.count, nextToken)
             } else {
                 // They're asking for something we ran out of.
-                // TODO: Don't suddenly say there were 0 results...
-                new GraphElementResponse(List(), 0, "") 
+                throw new BadRequestError
             }
         }
     }

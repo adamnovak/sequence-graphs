@@ -73,7 +73,7 @@ class SequenceGraphServerTests extends FunSuite with SparkSuite {
         
         var allParts: List[GraphElement] = Nil ++ page.elements
         
-        while(page.total > 0) {
+        while(page.nextPageToken != "") {
             // Download all the pages until we fall off the end. TODO: have a
             // better way to signal this that isn't an empty page meaning the
             // end.

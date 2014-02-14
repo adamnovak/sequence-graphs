@@ -17,18 +17,23 @@ protocol SequenceGraphAPI {
     record GraphElementResponse {
         // We have a list of elements in the graph
         array<GraphElement> elements;
-        // And a count of the total elements available on all pages (or 0 if you
-        // have run out of pages).
+        // And a count of the total elements available on all pages.
         long total;
-        // And a string to get the next page. The next page may be empty.
+        // And a string to get the next page, or "" if there is no next page.
         string nextPageToken;
     }
     
+    // Generic error thrown when the client misbehaves.
+    error BadRequestError {
+    }
+    
     // This is how you get the next page.
-    GraphElementResponse getNextPage(string nextPageToken);
+    GraphElementResponse getNextPage(string nextPageToken) 
+        throws BadRequestError;
     
     // Now the only actual method: request a range of a SequenceGraph.
-    GraphElementResponse search(string contig, long start, long end);
+    GraphElementResponse search(string contig, long start, long end) 
+        throws BadRequestError;
     
     
     
