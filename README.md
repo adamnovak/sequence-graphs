@@ -57,7 +57,8 @@ sbt assembly
 ###Running command-line tools
 
 ```
-./importVCF.sh --parquet-dir <output directory absolute path> <vcf file> <sample name>
-./importVCF.sh --cluster mesos://localhost:5050 --parquet-dir <output directory absolute path> <vcf file> <sample name> 
-./importVCF.sh --dot-file <output file name> <vcf file> <sample name>
+./importVCF.sh [--cluster <Spark cluster URL>] --parquet-dir <output directory absolute path> <vcf file> <sample name> 
+./importVCF.sh [--cluster <Spark cluster URL>] --dot-file <output file name> <vcf file> <sample name>
+
+./exportVCF.sh [--cluster <Spark cluster URL>] [--range <contig>:<start>-<end>] <parquet directory> <output directory absolute path> <sample name>
 ```
