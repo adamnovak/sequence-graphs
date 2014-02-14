@@ -5,13 +5,7 @@ import org.scalatest._
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
 
-class SequenceGraphTests extends FunSuite {
-
-    // Make sure Kryo is on.
-    SequenceGraphKryoProperties.setupContextProperties()
-
-    // Grab a SparkContext. Don't worry about jars since it's local
-    val sc = new SparkContext("local", "SequenceGraphTests")
+class SequenceGraphTests extends FunSuite with SparkSuite {
 
     // Make a pen and draw a graph
     val pen = new SequenceGraphPen
@@ -32,7 +26,7 @@ class SequenceGraphTests extends FunSuite {
     var graph: SequenceGraph = null
 
     test("can be created") {
-        // Set up the graph
+        // Set up the graph. sc is in scope since we are a SparkSuite
         graph = new SequenceGraph(sc.parallelize(List(chunk)))
     }
     

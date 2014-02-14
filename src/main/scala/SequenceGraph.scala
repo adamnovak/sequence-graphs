@@ -353,23 +353,33 @@ class SequenceGraph(graph: Graph[Side, HasEdge]) {
     def inRange(range: BaseRange): SequenceGraph = {
         new SequenceGraph(graph.subgraph(epred = {
             (triplet) =>
-            // Pull out the endpoint position lower bounds. For things placed on
-            // actual "reference" contigs, these will be real positions. For
-            // things like novel inserts these will be on the contig the insert
-            // went in to. TODO: Formalize this more.
-            val leftPos = triplet.srcAttr.lowerBound
-            val rightPos = triplet.dstAttr.lowerBound
             
-            // Is the left Side in the range?
-            val leftInRange = range contains leftPos 
-            // Is the right Side in the range?
-            val rightInRange = range contains rightPos
-            // Are both Sides on the same contig as the range, but on opposite
-            // sides of the range?
-            val coversRange = range.between(leftPos, rightPos)
+            if(triplet == null || triplet.srcAttr == null || 
+                triplet.dstAttr == null) {
+                // Pre-emptively fail if we managed to get nulls somehow. TODO:
+                // we shouldn't ever get nulls in here. ScalaTest is getting
+                // them when running tests somehow.
+                false
+            } else {
+            
+                // Pull out the endpoint position lower bounds. For things
+                // placed on actual "reference" contigs, these will be real
+                // positions. For things like novel inserts these will be on the
+                // contig the insert went in to. TODO: Formalize this more.
+                val leftPos = triplet.srcAttr.lowerBound
+                val rightPos = triplet.dstAttr.lowerBound
                 
-            // If any of those are true, we want this edge
-            leftInRange || rightInRange || coversRange
+                // Is the left Side in the range?
+                val leftInRange = range contains leftPos 
+                // Is the right Side in the range?
+                val rightInRange = range contains rightPos
+                // Are both Sides on the same contig as the range, but on
+                // opposite sides of the range?
+                val coversRange = range.between(leftPos, rightPos)
+                    
+                // If any of those are true, we want this edge
+                leftInRange || rightInRange || coversRange
+            }
         }).filter(preprocess = { (subgraph) =>
             // Label the subgraph vertices with their degrees. For some reason
             // we don't have a plain joinVertices that produces a graph with a

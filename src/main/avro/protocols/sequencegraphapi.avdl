@@ -17,7 +17,8 @@ protocol SequenceGraphAPI {
     record GraphElementResponse {
         // We have a list of elements in the graph
         array<GraphElement> elements;
-        // And a count of the total elements available on all pages
+        // And a count of the total elements available on all pages (or 0 if you
+        // have run out of pages).
         long total;
         // And a string to get the next page. The next page may be empty.
         string nextPageToken;
