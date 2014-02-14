@@ -6,14 +6,17 @@ import scala.collection.JavaConversions._
 import org.apache.spark.rdd.RDD
 
 /**
- * A class that implements the Avro-defined SequenceGraphAPI, allowing a
- * SequenceGraph to be queried via RPC calls. Thread safe by virtue of only
- * letting one operation be happening at a time.
+ * Represents an ongoing upload of a graph to a client. Keeps track of the RDD
+ * being sent, the next page to send, and the cached count of the RDD.
  */
-class SequenceGraphServer(graph: SequenceGraph) extends SequenceGraphAPI {
-
-    // Keep track of the next partition to send for every next page request.
-    var nextPages: Map[String, (RDD[GraphElement], Int)] = Map.empty
+class OngoingTransfer(toSend: RDD[GraphElement], page: Int, total: Long) {
+    
+    /**
+     * Start a new transfer of the given RDD.
+     */
+    def this(rdd: RDD[GraphElement]) = {
+        this(rdd, 0, rdd.count)
+    }
 
     /**
      * Grab the specified partition of the given RDD as its own RDD.
@@ -33,6 +36,54 @@ class SequenceGraphServer(graph: SequenceGraph) extends SequenceGraphAPI {
     }
 
     /**
+     * Count the number of pages remaining to send, after this one. When this
+     * reaches 0, the transfer is finished.
+     */
+    def pagesRemaining: Int = toSend.partitions.size - (page + 1)
+    
+    /**
+     * Check to see if this is the last page.
+     */
+    def isDone: Boolean = pagesRemaining == 0
+    
+    /**
+     * Get the graph elements for this page.
+     */
+    def getPage: List[GraphElement] = {
+        getPartition(toSend, page).collect.toList
+    }
+    
+    /**
+     * Make a GraphElementResponse to send this page to the client.
+     * Automatically sets the nextPageToken to a unique value if this was not
+     * the last page, or "" if this was the last page.
+     */
+    def response: GraphElementResponse = {
+        new GraphElementResponse(getPage, total, 
+            if(isDone) "" else java.util.UUID.randomUUID.toString)
+    }
+    
+    /**
+     * Make an OngoingTransfer to represent the need to send the next page. Make
+     * sure to check isDone on it before using it.
+     */
+    def advance: OngoingTransfer = {
+        new OngoingTransfer(toSend, page + 1, total)
+    }
+}
+
+/**
+ * A class that implements the Avro-defined SequenceGraphAPI, allowing a
+ * SequenceGraph to be queried via RPC calls. Thread safe by virtue of only
+ * letting one operation be happening at a time.
+ */
+class SequenceGraphServer(graph: SequenceGraph) extends SequenceGraphAPI {
+
+    // Keep track of the state of every in-progress transfer of pages to
+    // clients.
+    var nextPages: Map[String, OngoingTransfer] = Map.empty
+
+    /**
      * Get a subgraph of our SequenceGraph as a paginated response. Callable via
      * RPC.
      */
@@ -48,29 +99,20 @@ class SequenceGraphServer(graph: SequenceGraph) extends SequenceGraphAPI {
                 .union(subgraph.adjacencies.map(new GraphElement(_)))
                 .union(subgraph.anchors.map(new GraphElement(_)))
                 
-            // Make a new string token
-            // Make a new string token
-            val nextToken: String = if(elements.partitions.size > 1) {
-                
-                // There is more to return
-                // Generate a new token
-                val generated = java.util.UUID.randomUUID.toString
-                
-                // Say the next page is the next partition
-                val entry = (generated, (elements, 1))
-                nextPages += entry
-                
-                // Send the token to the client.
-                generated
-            } else {
-                // This is the last page. Signal with an empty-string token
-                // sentinel.
-                ""
-            }
+            // Make a transfer to send pages to the client.
+            val transfer = new OngoingTransfer(elements)
             
-            // Send partition 0
-            new GraphElementResponse(getPartition(elements, 0).collect.toList, 
-                elements.count, nextToken)
+            // Get the response for the first page
+            val response = transfer.response
+            
+            if(!transfer.isDone) {
+                // Remember that we have to continue the transfer of the next
+                // page in response to the token.
+                nextPages += ((response.nextPageToken, transfer.advance))
+            }
+                
+            // Send the response
+            response
         }
     }
     
@@ -81,37 +123,23 @@ class SequenceGraphServer(graph: SequenceGraph) extends SequenceGraphAPI {
         this.synchronized {
             if(nextPages contains token) {
             
-                // See what we're supposed to be sending
-                val (elements, partition) = nextPages(token)    
+                // Grab the ongoing transfer state.
+                val transfer = nextPages(token)    
                 
                 // Revoke the token
                 nextPages -= token  
                 
-                // Get the list to send back
-                val list = getPartition(elements, partition).collect.toList
+                // Work out what to send
+                val response = transfer.response
                 
-                // Make a new string token
-                val nextToken: String = if(elements.partitions.size > 
-                    partition + 1) {
-                    
-                    // There is more to return
-                    // Generate a new token
-                    val generated = java.util.UUID.randomUUID.toString
-                    
-                    // Say the next page is the next partition
-                    val entry = (generated, (elements, partition + 1))
-                    nextPages += entry
-                    
-                    // Send the token to the client.
-                    generated
-                } else {
-                    // This is the last page. Signal with an empty-string token
-                    // sentinel.
-                    ""
+                if(!transfer.isDone) {
+                    // Remember that we have to continue the transfer of the
+                    // next page in response to the token.
+                    nextPages += ((response.nextPageToken, transfer.advance))
                 }
                 
-                // Send requested partition
-                new GraphElementResponse(list, elements.count, nextToken)
+                // Send the response
+                response
             } else {
                 // They're asking for something we ran out of.
                 throw new BadRequestError

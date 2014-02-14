@@ -84,10 +84,12 @@ class SequenceGraphServerTests extends FunSuite with SparkSuite {
         
         // Now we downloaded the whole thing. Make sure it has what it should.
         assert(allParts.size == 3)
+        // 2 Sides
         assert(allParts.flatMap(_.element match {
             case side: Side => Some(side)
             case _ => None
         }).size == 2)
+        // And 1 AlleleGroup
         assert(allParts.flatMap(_.element match {
             case alleleGroup: AlleleGroup => Some(alleleGroup)
             case _ => None
