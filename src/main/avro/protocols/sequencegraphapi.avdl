@@ -17,8 +17,9 @@ protocol SequenceGraphAPI {
     record GraphElementResponse {
         // We have a list of elements in the graph
         array<GraphElement> elements;
-        // And a count of the total elements available on all pages.
-        long total;
+        // We don't send the total since that's potentially very expensive to
+        // compute with Spark. Instead we send a page count.
+        int pagesLeft;
         // And a string to get the next page, or "" if there is no next page.
         string nextPageToken;
     }

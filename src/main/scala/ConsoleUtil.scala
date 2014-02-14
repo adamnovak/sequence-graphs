@@ -1,9 +1,5 @@
 package edu.ucsc.genome
 
-// We want reasonable logging from Parquet.
-import java.util.logging._
-import parquet.Log
-
 /**
  * A collection of useful methods for setting up a command-line tool that hits
  * against the Sequence Graphs API. Mostly deals with the configuration of
@@ -29,6 +25,9 @@ object ConsoleUtil {
      * shouldn't, be quiet.
      */
     def quietParquet = {
+        import java.util.logging._
+        import parquet.Log
+
     
         // Parquet "helpfully" forcibly adds an INFO-level logger to console if
         // we don't configure its logger specifically (i.e. if we let its log
@@ -59,5 +58,19 @@ object ConsoleUtil {
         // Tell it not to send messages up
         parquetLogger.setUseParentHandlers(false)
     
+    }
+    
+    /**
+     * Make log4j's root logger report only actually dangerous things, without
+     * having to have a log4j.properties file packaged in your application's
+     * jar. This is useful when you are lazy and don't want to add extra
+     * resource files.
+     */
+    def quietLog4j = {
+        import org.apache.log4j.{LogManager, Level}
+        
+        // Show only WARNs or worse. See
+        // <http://stackoverflow.com/a/4598829/402891>
+        LogManager.getRootLogger().setLevel(Level.WARN);
     }
 }

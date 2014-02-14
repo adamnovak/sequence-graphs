@@ -37,14 +37,15 @@ class OngoingTransfer(toSend: RDD[GraphElement], page: Int, total: Long) {
 
     /**
      * Count the number of pages remaining to send, after this one. When this
-     * reaches 0, the transfer is finished.
+     * reaches 0, you have the last page. Will always be non-negative, even if
+     * the backing RDD doesn't actually have any partitions.
      */
-    def pagesRemaining: Int = toSend.partitions.size - (page + 1)
+    def pagesLeft: Int = Math.max(0, toSend.partitions.size - (page + 1))
     
     /**
      * Check to see if this is the last page.
      */
-    def isDone: Boolean = pagesRemaining == 0
+    def isDone: Boolean = pagesLeft == 0
     
     /**
      * Get the graph elements for this page.
@@ -59,7 +60,7 @@ class OngoingTransfer(toSend: RDD[GraphElement], page: Int, total: Long) {
      * the last page, or "" if this was the last page.
      */
     def response: GraphElementResponse = {
-        new GraphElementResponse(getPage, total, 
+        new GraphElementResponse(getPage, pagesLeft, 
             if(isDone) "" else java.util.UUID.randomUUID.toString)
     }
     

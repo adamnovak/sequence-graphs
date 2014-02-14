@@ -61,22 +61,32 @@ class SequenceGraphServerTests extends FunSuite with SparkSuite {
     }
     
     test("can look up an empty range") {
-        val page = client.search("chr1", 20, 25)
+        var page = client.search("chr1", 20, 25)
         
-        assert(page.total == 0)
+        // This page will be empty, but because of the way partitions work we
+        // don't know if it's the last page or not. We need to go through all
+        // the partitions server-side and make sure they all are empty.
+        
+        var allParts: List[GraphElement] = Nil ++ page.elements
+        
+        while(page.nextPageToken != "") {
+            // Download all the pages until we fall off the end.
+            page = client.getNextPage(page.nextPageToken)
+            
+            allParts ++= page.elements
+        }
+        
+        // Now we downloaded the whole thing. Make sure it is in fact empty.
+        assert(allParts.size == 0)
     }
     
     test("can look up a full range and get all pages") {
         var page = client.search("chr1", 11, 15)
         
-        assert(page.total == 3)
-        
         var allParts: List[GraphElement] = Nil ++ page.elements
         
         while(page.nextPageToken != "") {
-            // Download all the pages until we fall off the end. TODO: have a
-            // better way to signal this that isn't an empty page meaning the
-            // end.
+            // Download all the pages until we fall off the end.
             page = client.getNextPage(page.nextPageToken)
             
             allParts ++= page.elements
