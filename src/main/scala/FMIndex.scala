@@ -26,7 +26,7 @@ trait FMIndex {
      * Extract and return the given range of positions.
      */
     def extract(start: Long, end: Long): String
-
+    
 }
 
 /**
@@ -40,6 +40,29 @@ trait FancyFMIndex extends FMIndex {
      */
     def minUnique(characters: Iterator[String]): Long
 
-    
+}
 
+/**
+ * An implementation of an FMIndex that uses dbgfm and SWIG and JNI to do all
+ * the FMIndex things in C++. Takes a filename to a dbgfm-formatted index.
+ */
+abstract class JNIFMIndex(filename: String) extends FMIndex {
+    import uk.ac.sanger.dbgfm.{FMIndex => SangerFMIndex}
+    
+    // TODO: load JNI exactly once
+    
+    // TODO: Share in-memory copies if binary index
+    
+    // Keep a wrapped copy of the JNI-exposed class
+    val index = new SangerFMIndex(filename)
+    
+    def count(pattern: String): Long = index.count(pattern)
+    
+    def locate(pattern: String, occurrence: Long): Long = {
+        // TODO: make sure this really exists.
+        index.findInterval(pattern).getFirst + occurrence
+    }
+    
+    // TODO: Extract
+        
 }
