@@ -57,6 +57,9 @@ libraryDependencies += "commons-io" % "commons-io" % "2.4"
 // add hadoop bam and everything
 libraryDependencies += "fi.tkk.ics.hadoop.bam" % "hadoop-bam" % "6.1-SNAPSHOT"
 
+// We need FASTA reading capability.
+libraryDependencies += "org.biojava" % "biojava3-core" % "3.0.6"
+
 libraryDependencies += "variant" % "variant" % "1.93"
 
 libraryDependencies += "tribble" % "tribble" % "1.93"
@@ -81,3 +84,5 @@ resolvers += "Sonatype" at "http://oss.sonatype.org/content/repositories/snapsho
 resolvers += "Akka Repository" at "http://repo.akka.io/releases/"
 
 resolvers += "Hadoop-BAM" at "http://hadoop-bam.sourceforge.net/maven/"
+
+resolvers += "BioJava repository" at "http://www.biojava.org/download/maven/"

@@ -1,5 +1,7 @@
 package edu.ucsc.genome
 
+import scala.collection.JavaConversions._
+
 // We use edu.ucsc.genome.Position objects to represent our positions. Contig is
 // the actual haplotype name, base is the index from the start of the forward
 // strand, and face is the strand (LEFT for forward strand, RIGHT for reverse
@@ -121,8 +123,100 @@ class RLCSAGrepFMIndex(basename: String) extends BruteForceFMIndex {
         // Run the command to get all the occurrence positions (in global
         // concatenated coordinates), and asynchronously map its resulting lines
         // to longs.
+        // TODO: Use the -r option and look up contig name and strand.
         Seq("rlcsa_grep", "-s", pattern, basename).lines.map { (line) =>
             new Position("index", line.replace("\n", "").toLong, Face.LEFT)
         }.iterator
     }
+}
+
+/**
+ * Builds an RLCSA-format index at the given base name, merging things in if the
+ * index already exists.
+ *
+ * Handles all the complexity of reverse-complementing FASTA records, turning
+ * them into RLCSA null-terminated-string files, and maintaining a list of all
+ * haplotypes by sequence number.
+ */
+class RLCSABuilder(basename: String) {
+    import org.biojava3.core.sequence.io._
+    import org.biojava3.core.sequence._
+    import java.io._
+    import java.nio.file._
+    import scala.sys.process._
+    import org.apache.commons.io._
+    
+    /**
+     * Read all the sequences in the given FASTA file, index them and their
+     * reverse complements, and merge that into the main index. The contig names
+     * will be the FASTA IDs from the file.
+     *
+     * Note that this will place a couple copies of the FASTA data on /tmp.
+     */
+    def add(filename: String) = {
+        // Get a temporary directory
+        val scratchDirectory = Files.createTempDirectory("rlcsa")
+        
+        // Work out the name of the basename file that will store the haplotypes
+        val haplotypes = scratchDirectory.resolve("haplotypes").toString
+        // Open it up for writing
+        val haplotypesWriter = new FileWriter(haplotypes)
+    
+        // Read all the FASTA records
+        val records: java.util.HashMap[String, DNASequence] = FastaReaderHelper
+            .readFastaDNASequence(new File(filename))
+        
+        records.foreach { case (id, sequence) =>
+            // Write each record to the haplotypes file
+            // TODO: do we need to force capitalization here?
+            haplotypesWriter.write(sequence.getSequenceAsString)
+            // Terminated by a null
+            haplotypesWriter.write("\0")
+            
+            // And then the reverse complement
+            haplotypesWriter.write(sequence.getReverseComplement
+                .getSequenceAsString)
+            haplotypesWriter.write("\0")
+        }
+        
+        haplotypesWriter.close
+        
+        // TODO: Don't keep records in memory while doing the merge
+        
+        // Index the haplotypes file with build_rlcsa. Use some hardcoded number
+        // of threads.
+        Seq("build_rlcsa", haplotypes, "10").!
+        
+        // Now merge in the index
+        merge(haplotypes)
+        
+        // Get rid of the temporary index files
+        FileUtils.deleteDirectory(new File(scratchDirectory
+            .toString))
+            
+        // TODO: Keep the contig names in order and merge them in to the big
+        // list of contig names.
+        
+    }
+    
+    /**
+     * Merge in the index specified by otherBasename, or take it as our own
+     * index if we don't have one yet. When this function returns, the
+     * otherBasename files are no longer needed and can be deleted.
+     */
+    def merge(otherBasename: String) = {
+        if(Files.exists(Paths.get(basename + ".array"))) {
+            // We have an index already. Run a merge command.
+            Seq("merge_rlcsa", basename, otherBasename, "10").!
+        } else {
+            // Take this index, renaming it to basename.whatever
+            Files.copy(Paths.get(otherBasename + ".array"),
+                Paths.get(basename + ".array"))
+            Files.copy(Paths.get(otherBasename + ".parameters"),
+                Paths.get(basename + ".parameters"))
+            Files.copy(Paths.get(otherBasename + ".sa_samples"),
+                Paths.get(basename + ".sa_samples"))
+        }
+    }
+    
 }
