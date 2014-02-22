@@ -205,17 +205,17 @@ class RLCSABuilder(basename: String) {
      * otherBasename files are no longer needed and can be deleted.
      */
     def merge(otherBasename: String) = {
-        if(Files.exists(Paths.get(basename + ".array"))) {
+        if(Files.exists(Paths.get(basename + ".rlcsa.array"))) {
             // We have an index already. Run a merge command.
             Seq("merge_rlcsa", basename, otherBasename, "10").!
         } else {
             // Take this index, renaming it to basename.whatever
-            Files.copy(Paths.get(otherBasename + ".array"),
-                Paths.get(basename + ".array"))
-            Files.copy(Paths.get(otherBasename + ".parameters"),
-                Paths.get(basename + ".parameters"))
-            Files.copy(Paths.get(otherBasename + ".sa_samples"),
-                Paths.get(basename + ".sa_samples"))
+            Files.copy(Paths.get(otherBasename + ".rlcsa.array"),
+                Paths.get(basename + ".rlcsa.array"))
+            Files.copy(Paths.get(otherBasename + ".rlcsa.parameters"),
+                Paths.get(basename + ".rlcsa.parameters"))
+            Files.copy(Paths.get(otherBasename + ".rlcsa.sa_samples"),
+                Paths.get(basename + ".rlcsa.sa_samples"))
         }
     }
     
