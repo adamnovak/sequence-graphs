@@ -1,6 +1,7 @@
 package edu.ucsc.genome
 
 import scala.collection.JavaConversions._
+import scala.io.Source
 
 // We use edu.ucsc.genome.Position objects to represent our positions. Contig is
 // the actual haplotype name, base is the index from the start of the forward
@@ -44,7 +45,9 @@ trait FancyFMIndex extends FMIndex {
     /**
      * Return the position to which the given base in the given string uniquely
      * maps, or None if it does not uniquely map. Maps by upstream context (so
-     * base 0, for example, probably won't map).
+     * base 1, for example, probably won't map).
+     *
+     * Uses 1-based indexing for position and for base index.
      */
     def map(context: String, base: Int): Option[Position]
 
@@ -81,19 +84,32 @@ trait BruteForceFMIndex extends FancyFMIndex {
         // Map based on upstream context
         
         // Grab what's upstream. TODO: will this copy a whole chromosome?
-        val upstreamContext = context.substring(0, base + 1).reverse.iterator
+        val upstreamContext = context.substring(0, base).reverse.iterator
         
         minUnique(upstreamContext) match {
             case Some(neededCharacters) => 
                 // We can map with a certain amoutn of context. Grab that
                 // context and map.
                 
-                // TODO: Roll all these operations together at the C level so we
-                // can just backwards search until we have a unique match or
-                // fail.
-                // TODO: Make this work with longs.
-                Some(locate(context.substring(base - neededCharacters.toInt + 1, 
-                    base + 1)).next)
+                // Grab the Position of the first base in the upstream context,
+                // if we lay the last base down where it maps.
+                val mappingPosition = locate(context.substring(
+                    base - neededCharacters.toInt, base)).next
+                
+                // Fix it up to be the Position of the base we are actually
+                // mapping (last one in the substring, since we map by upstream
+                // context)
+                mappingPosition.face match {
+                    case Face.LEFT =>
+                        // Go downstream
+                        mappingPosition.base += neededCharacters
+                    case Face.RIGHT =>
+                        // Go upstream
+                        mappingPosition.base -= neededCharacters
+                }
+                
+                // Return the fixed up position to say we mapped.
+                Some(mappingPosition)
             case None =>
                 // We either ran out of context or found nothing matching.
                 None
@@ -113,6 +129,15 @@ trait BruteForceFMIndex extends FancyFMIndex {
 class RLCSAGrepFMIndex(basename: String) extends BruteForceFMIndex {
     import scala.sys.process._
 
+    // Load the contig size TSV, into an array of (name, size) by index.
+    val chromSizes = Source.fromFile(basename + ".chrom.sizes").getLines.map { 
+        (line) =>
+        
+        val parts = line.split("\t")
+        // Parse out contig names and sizes.
+        (parts(0), parts(1).toLong) 
+    }.toArray
+
     def count(pattern: String): Long = {
         // Just run the command to count occurrences and intify its only output
         // line.
@@ -120,12 +145,40 @@ class RLCSAGrepFMIndex(basename: String) extends BruteForceFMIndex {
     }
     
     def locate(pattern: String): Iterator[Position] = {
-        // Run the command to get all the occurrence positions (in global
-        // concatenated coordinates), and asynchronously map its resulting lines
-        // to longs.
-        // TODO: Use the -r option and look up contig name and strand.
-        Seq("rlcsa_grep", "-s", pattern, basename).lines.map { (line) =>
-            new Position("index", line.replace("\n", "").toLong, Face.LEFT)
+        // Run the command to get all the occurrence positions (as (2 * contig
+        // number + orientation), coordinate pairs) and asynchronously map its
+        // resulting lines to longs. TODO: Use the -r option and look up contig
+        // name and strand.
+        Seq("rlcsa_grep", "-r", pattern, basename).lines.map { (line) =>
+            // Split into text index and position
+            val parts = line.replace("\n", "").split(", ")
+            val textIndex = parts(0).toInt
+            val position = parts(1).toLong
+            
+            // Compute the haplotype for the text index
+            val contig: Int = textIndex / 2
+            
+            // Compute the orientation (0 for forward, 1 for reverse) that this
+            // text means on that haplotype.
+            val orientation = textIndex % 2
+            
+            // Look up the contig name and length
+            val (contigName, contigLength) = chromSizes(contig)
+            
+            // Work out what the position on the forward strand is. This is the
+            // first base in the pattern.
+            val contigIndex = if(orientation == 0) {
+                position
+            } else {
+                // Add 1 so that if we were at position contigLength we are now
+                // at position 1.
+                contigLength - position + 1
+            }
+            
+            // Make a new Position talking about the right base of the right
+            // strand of the right contig.
+            new Position(contigName, contigIndex, 
+                if(orientation == 0) Face.LEFT else Face.RIGHT)
         }.iterator
     }
 }
@@ -133,6 +186,13 @@ class RLCSAGrepFMIndex(basename: String) extends BruteForceFMIndex {
 /**
  * Builds an RLCSA-format index at the given base name, merging things in if the
  * index already exists.
+ *
+ * Keeps the RLCSA files at the filenames that RLCSA derives from the given
+ * basename, and the contig/node list at <basename>.chrom.sizes with <contig
+ * name>\t<size> on each line, in the same order as the contigs appear in the
+ * index. Note that the index contains each haplotype forwards and backwards,
+ * but this file contains only one entry per haplotype, so e.g. index text 5 is
+ * the reverse strand of the haplotype mentioned on line 3.
  *
  * Handles all the complexity of reverse-complementing FASTA records, turning
  * them into RLCSA null-terminated-string files, and maintaining a list of all
@@ -143,6 +203,7 @@ class RLCSABuilder(basename: String) {
     import org.biojava3.core.sequence._
     import java.io._
     import java.nio.file._
+    import scala.io._
     import scala.sys.process._
     import org.apache.commons.io._
     
@@ -161,10 +222,13 @@ class RLCSABuilder(basename: String) {
         val haplotypes = scratchDirectory.resolve("haplotypes").toString
         // Open it up for writing
         val haplotypesWriter = new FileWriter(haplotypes)
+        
+        // Open the main index contig size list for appending
+        val contigWriter = new FileWriter(basename + ".chrom.sizes", true)
     
-        // Read all the FASTA records
+        // Read all the FASTA records, lazily loading sequence
         val records: java.util.HashMap[String, DNASequence] = FastaReaderHelper
-            .readFastaDNASequence(new File(filename))
+            .readFastaDNASequence(new File(filename), true)
         
         records.foreach { case (id, sequence) =>
             // Write each record to the haplotypes file
@@ -177,9 +241,13 @@ class RLCSABuilder(basename: String) {
             haplotypesWriter.write(sequence.getReverseComplement
                 .getSequenceAsString)
             haplotypesWriter.write("\0")
+            
+            // Save the name and size in the sizes file
+            contigWriter.write("%s\t%d\n".format(id, sequence.size))
         }
         
         haplotypesWriter.close
+        contigWriter.close
         
         // TODO: Don't keep records in memory while doing the merge
         
@@ -193,9 +261,6 @@ class RLCSABuilder(basename: String) {
         // Get rid of the temporary index files
         FileUtils.deleteDirectory(new File(scratchDirectory
             .toString))
-            
-        // TODO: Keep the contig names in order and merge them in to the big
-        // list of contig names.
         
     }
     
@@ -218,5 +283,12 @@ class RLCSABuilder(basename: String) {
                 Paths.get(basename + ".rlcsa.sa_samples"))
         }
     }
+    
+    /**
+     * Produce an FMIndex allowing you to query the built index. The FMIndex
+     * will only work properly until the index is updated again, at which point
+     * you should call this method again and get a new one.
+     */
+    def getIndex: RLCSAGrepFMIndex = new RLCSAGrepFMIndex(basename)
     
 }
