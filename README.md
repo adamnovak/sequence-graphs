@@ -32,6 +32,19 @@ Make sure to edit `pom.xml`, following the instructions to fill in your Hadoop v
 MAVEN_OPTS="-Xmx512m -XX:MaxPermSize=128m" mvn clean package install
 ```
 
+### To Install RLCSA
+
+Mapping inton sequence graphs relies on the Run-Length-Compressed Suffix Arrays (RLCSA) library. More specifically, a fork of the library with the appropriate bindings is required. (Right now these "bindings" are additional command-line tool options, but eventually they will be proper SWIG bindings.) To install RLCSA:
+
+```
+git clone git@github.com:adamnovak/rlcsa.git
+cd rlcsa
+make
+make rlcsa_grep
+```
+
+Make sure to add the RLCSA directory to your `$PATH`, so that the Sequence Graphs library can run RLCSA command-line tools.
+
 ##Installation
 
 ###Building
