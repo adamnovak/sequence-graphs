@@ -34,16 +34,15 @@ MAVEN_OPTS="-Xmx512m -XX:MaxPermSize=128m" mvn clean package install
 
 ### To Install RLCSA
 
-Mapping inton sequence graphs relies on the Run-Length-Compressed Suffix Arrays (RLCSA) library. More specifically, a fork of the library with the appropriate bindings is required. (Right now these "bindings" are additional command-line tool options, but eventually they will be proper SWIG bindings.) To install RLCSA:
+Mapping inton sequence graphs relies on the Run-Length-Compressed Suffix Arrays (RLCSA) library. More specifically, a fork of the library with FMD-Index support and the appropriate SWIG bindings is required. To install RLCSA's SWIG bindings in your local Maven repository:
 
 ```
 git clone git@github.com:adamnovak/rlcsa.git
 cd rlcsa
-make
-make rlcsa_grep
+make jar-install
 ```
 
-Make sure to add the RLCSA directory to your `$PATH`, so that the Sequence Graphs library can run RLCSA command-line tools.
+If this doesn't work, make sure you have SWIG, Maven, and JDK 7+ installed, that your $JAVA_HOME environment variable is set, and that you are building on Linux. Building and loading natives for other platforms (OS X) will require enhancements to the current RLCSA build system.
 
 ##Installation
 

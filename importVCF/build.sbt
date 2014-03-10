@@ -46,6 +46,9 @@ libraryDependencies += "org.slf4j" % "slf4j-log4j12" % "1.7.5"
 // We need an slf4j-api to go with our implementation
 libraryDependencies += "org.slf4j" % "slf4j-api" % "1.7.5"
 
+// RLCSA comes from the local Maven repo. See
+// <http://stackoverflow.com/a/10778151/402891>
+resolvers += "Local Maven" at Path.userHome.asFile.toURI.toURL + ".m2/repository"
 
 resolvers += "Akka Repository" at "http://repo.akka.io/releases/"
 

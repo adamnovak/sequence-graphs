@@ -75,6 +75,10 @@ mergeStrategy in assembly := {
  case _ => MergeStrategy.first
 }
 
+// RLCSA comes from the local Maven repo. See
+// <http://stackoverflow.com/a/10778151/402891>
+resolvers += "Local Maven" at Path.userHome.asFile.toURI.toURL + ".m2/repository"
+
 resolvers += "Sonatype" at "http://oss.sonatype.org/content/repositories/snapshots/"
 
 resolvers += "Akka Repository" at "http://repo.akka.io/releases/"

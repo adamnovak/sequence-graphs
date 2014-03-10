@@ -65,6 +65,7 @@ libraryDependencies += "cofoja" % "cofoja" % "1.0"
 // versions installed with "mvn install". This is in turn necessary in order to
 // use any Hadoop version other than the one that the official ADAM artifacts
 // are built against. See <http://stackoverflow.com/a/10778151/402891>
+// This is also necessary for using RLCSA.
 
 resolvers += "Local Maven" at Path.userHome.asFile.toURI.toURL + ".m2/repository"
 
