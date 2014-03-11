@@ -39,6 +39,8 @@ Mapping inton sequence graphs relies on the Run-Length-Compressed Suffix Arrays 
 ```
 git clone git@github.com:adamnovak/rlcsa.git
 cd rlcsa
+make
+make rlcsa_grep
 make jar-install
 ```
 

@@ -184,6 +184,132 @@ class RLCSAGrepFMIndex(basename: String) extends BruteForceFMIndex {
 }
 
 /**
+ * A class that uses the RLCSA FMD-Index extension via SWIG bindings.
+ */
+class FMDIndex(basename: String) extends BruteForceFMIndex {
+    import fi.helsinki.cs.rlcsa.{FMD, RLCSAUtil, MapAttemptResult, 
+        MappingVector, Mapping}
+    
+    // We keep a native FMD for the given basename
+    val fmd = new FMD(basename)
+    
+    // We load the contig file
+    val contigData: Array[(String, Long)] = Source.fromFile(basename +
+        ".chrom.sizes").getLines.map { (line) =>
+        
+            // Split each line on the tab
+            val parts = line.split("\t")
+            // Make the second item a long
+            (parts(0), parts(1).toLong)
+        
+        }.toArray
+        
+    // We keep the contig names
+    
+    /**
+     * Get the Position for a given offset in a given text. Returns the Position
+     * for the start of that offset in that text (so left side of base 1 for
+     * forward-strand offset 0, and right side of the last base for reverse-
+     * strand offset 0).
+     */
+    def getPosition(text: Int, offset: Long): Position = {
+        // Work out how far we are into what strand of what contig.
+        val contigNumber: Int = text / 2
+        val contigStrand: Int = text % 2
+        
+        // What contig name is that contig number?
+        val contigName = contigData(contigNumber)._1
+        // How long is that contig?
+        val contigLength = contigData(contigNumber)._2
+        // What face should we use for that strand?
+        val face = contigStrand match {
+            case 0 => Face.LEFT
+            case 1 => Face.RIGHT
+        }
+        
+        // What position should we use on that strand?
+        val position = contigStrand match {
+            case 0 => offset + 1
+            case 1 => contigLength - offset
+        }
+        
+        // Make a Position representing wherever we've decided this base really
+        // goes.
+        new Position(contigName, position, face)
+    }
+    
+    def count(pattern: String): Long = RLCSAUtil.length(fmd.count(pattern))
+    
+    def locate(pattern: String): Iterator[Position] = {
+        // Look up the range.
+        val range = fmd.count(pattern)
+        
+        // Get a USIntArray of locations. We have to free it
+        val locations = fmd.locate(range)
+        
+        // Make a list in our onw memory to copy to.
+        var items: List[Position] = Nil
+        
+        for(i <- 0L until RLCSAUtil.length(range)) {
+            // Get each result location. TODO: We can only go up to the max int
+            // value here.
+            val location = RLCSAUtil.USIntArray_getitem(locations, i.toInt)
+            
+            // Get a text number and an offset
+            val textAndOffset = fmd.getRelativePosition(location)
+            
+            // Cons it onto the list.
+            items = getPosition(textAndOffset.getFirst.toInt,
+                textAndOffset.getSecond) :: items
+        }
+        
+        // Free the C array of locations
+        RLCSAUtil.delete_USIntArray(locations)
+        
+        // Give back an iterator for the list.
+        // TODO: Do this iteration on demand.
+        return items.iterator
+    }
+    
+    override def map(context: String, base: Int): Option[Position] = {
+        // Map a single base
+        
+        // Map (0-based) and get a MapAttemptResult
+        val mapping: MapAttemptResult = fmd.mapPosition(context, base - 1)
+        
+        if(mapping.getIs_mapped) {
+            // Get the single actual mapped position
+            val position = mapping.getPosition.getForward_start
+            
+            // Get a pointer to the same value
+            val positionPointer = RLCSAUtil.copy_USIntPointer(position)
+            
+            // Convert to an SA coordinate
+            fmd.convertToSAIndex(positionPointer);
+            
+            // Locate it, and then report position as a (text, offset) pair.
+            // This will give us the position of the first base in the pattern,
+            // which lets us infer the position of the last base in the pattern.
+            val textAndOffset = fmd.getRelativePosition(fmd.locate(
+                RLCSAUtil.USIntPointer_value(positionPointer)));
+                
+            // Free the pointer's memory
+            RLCSAUtil.delete_USIntPointer(positionPointer);
+                
+            // Make a Position, accounting for the offset from the left end of
+            // the pattern due to pattern length, and report that.
+            Some(getPosition(textAndOffset.getFirst.toInt,
+                textAndOffset.getSecond))
+            
+        } else {
+            None
+        }
+        
+    }
+
+}
+
+/**
  * Builds an RLCSA-format index at the given base name, merging things in if the
  * index already exists.
  *
@@ -273,6 +399,15 @@ class RLCSABuilder(basename: String) {
         if(Files.exists(Paths.get(basename + ".rlcsa.array"))) {
             // We have an index already. Run a merge command.
             Seq("merge_rlcsa", basename, otherBasename, "10").!
+            
+            // Open our contig list for writing
+            val contigWriter = new FileWriter(basename + ".chrom.sizes", true)
+            
+            Source.fromFile(otherBasename + ".chrom.sizes").getLines.foreach { 
+                // Write each contig from the new thing into our contig list.
+                contigWriter.write _
+            }
+            
         } else {
             // Take this index, renaming it to basename.whatever
             Files.copy(Paths.get(otherBasename + ".rlcsa.array"),
@@ -281,6 +416,8 @@ class RLCSABuilder(basename: String) {
                 Paths.get(basename + ".rlcsa.parameters"))
             Files.copy(Paths.get(otherBasename + ".rlcsa.sa_samples"),
                 Paths.get(basename + ".rlcsa.sa_samples"))
+            Files.copy(Paths.get(otherBasename + ".chrom.sizes"),
+                Paths.get(basename + ".chrom.sizes"))
         }
     }
     
