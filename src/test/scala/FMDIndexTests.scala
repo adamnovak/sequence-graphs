@@ -13,7 +13,6 @@ class FMDIndexTests extends RLCSASuite {
     var index: FMDIndex = null;
 
     test("FMDIndex can be created") {
-        val a = new fi.helsinki.cs.rlcsa.RLCSANativeLoader
         index = new FMDIndex(basename)
     }
     
