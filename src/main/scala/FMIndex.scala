@@ -394,19 +394,14 @@ class RLCSABuilder(basename: String) {
      * Merge in the index specified by otherBasename, or take it as our own
      * index if we don't have one yet. When this function returns, the
      * otherBasename files are no longer needed and can be deleted.
+     *
+     * DOES NOT handle merging chromosome size files; those are taken care of in
+     * add().
      */
-    def merge(otherBasename: String) = {
+    private def merge(otherBasename: String) = {
         if(Files.exists(Paths.get(basename + ".rlcsa.array"))) {
             // We have an index already. Run a merge command.
             Seq("merge_rlcsa", basename, otherBasename, "10").!
-            
-            // Open our contig list for writing
-            val contigWriter = new FileWriter(basename + ".chrom.sizes", true)
-            
-            Source.fromFile(otherBasename + ".chrom.sizes").getLines.foreach { 
-                // Write each contig from the new thing into our contig list.
-                contigWriter.write _
-            }
             
         } else {
             // Take this index, renaming it to basename.whatever
@@ -416,8 +411,6 @@ class RLCSABuilder(basename: String) {
                 Paths.get(basename + ".rlcsa.parameters"))
             Files.copy(Paths.get(otherBasename + ".rlcsa.sa_samples"),
                 Paths.get(basename + ".rlcsa.sa_samples"))
-            Files.copy(Paths.get(otherBasename + ".chrom.sizes"),
-                Paths.get(basename + ".chrom.sizes"))
         }
     }
     
@@ -426,6 +419,6 @@ class RLCSABuilder(basename: String) {
      * will only work properly until the index is updated again, at which point
      * you should call this method again and get a new one.
      */
-    def getIndex: RLCSAGrepFMIndex = new RLCSAGrepFMIndex(basename)
+    def getIndex: FMIndex = new RLCSAGrepFMIndex(basename)
     
 }
