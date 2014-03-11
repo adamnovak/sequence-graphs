@@ -207,12 +207,13 @@ class FMDIndex(basename: String) extends BruteForceFMIndex {
     // We keep the contig names
     
     /**
-     * Get the Position for a given offset in a given text. Returns the Position
-     * for the start of that offset in that text (so left side of base 1 for
-     * forward-strand offset 0, and right side of the last base for reverse-
-     * strand offset 0).
+     * Get the Position for the last character in a pattern found at a given
+     * offset in a given text, when the pattern has the given length. Returns
+     * the Position for the start of that offset in that text (so left side of
+     * base 1 for forward-strand offset 0, and right side of the last base for
+     * reverse- strand offset 0).
      */
-    def getPosition(text: Int, offset: Long): Position = {
+    def getPosition(text: Int, offset: Long, patternLength: Int): Position = {
         // Work out how far we are into what strand of what contig.
         val contigNumber: Int = text / 2
         val contigStrand: Int = text % 2
@@ -229,8 +230,12 @@ class FMDIndex(basename: String) extends BruteForceFMIndex {
         
         // What position should we use on that strand?
         val position = contigStrand match {
-            case 0 => offset + 1
-            case 1 => contigLength - offset
+            // Forward strand we just go to the end of the pattern
+            case 0 => offset + patternLength
+            // On the reverse strand we start at the end and go back, but when
+            // patternLength is 1 and offset is 0 we must return contigLength,
+            // so we need the + 1.
+            case 1 => contigLength - (offset + patternLength) + 1
         }
         
         // Make a Position representing wherever we've decided this base really
@@ -260,7 +265,7 @@ class FMDIndex(basename: String) extends BruteForceFMIndex {
             
             // Cons it onto the list.
             items = getPosition(textAndOffset.getFirst.toInt,
-                textAndOffset.getSecond) :: items
+                textAndOffset.getSecond, pattern.size) :: items
         }
         
         // Free the C array of locations
@@ -299,7 +304,7 @@ class FMDIndex(basename: String) extends BruteForceFMIndex {
             // Make a Position, accounting for the offset from the left end of
             // the pattern due to pattern length, and report that.
             Some(getPosition(textAndOffset.getFirst.toInt,
-                textAndOffset.getSecond))
+                textAndOffset.getSecond, mapping.getCharacters.toInt))
             
         } else {
             None
