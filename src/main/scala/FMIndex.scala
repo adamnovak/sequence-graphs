@@ -585,10 +585,11 @@ class RLCSABuilder(basename: String) {
     }
     
     /**
-     * Produce an FMIndex allowing you to query the built index. The FMIndex
-     * will only work properly until the index is updated again, at which point
-     * you should call this method again and get a new one.
+     * Produce a FamcyFMIndex allowing you to query and map to the built index.
+     * The FancyFMIndex will only work properly until the index is updated
+     * again, at which point you should call this method again and get a new
+     * one.
      */
-    def getIndex: FMIndex = new RLCSAGrepFMIndex(basename)
+    def getIndex: FancyFMIndex = new FMDIndex(basename)
     
 }
