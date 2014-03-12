@@ -34,22 +34,153 @@ trait FMIndex {
 trait FancyFMIndex extends FMIndex {
     
     /**
-     * Return the minimum number of characters from the iterator required to get
-     * exactly one unique match, or None if no unique match exists. Interprets
-     * the iterator as specifying characters in reverse string order (so
-     * characters will be pulled off and prepended to the start of the search
-     * pattern).
-     */
-    def minUnique(characters: Iterator[Char]): Option[Long]
-    
-    /**
      * Return the position to which the given base in the given string uniquely
      * maps, or None if it does not uniquely map. Maps by upstream context (so
      * base 1, for example, probably won't map).
      *
+     * If the position's face is `Face.LEFT`, then the base mapped corresponds
+     * to the base it was mapped to. If it is `Face.RIGHT`, it corresponds to
+     * the reverse complement of the base it was mapped to.
+     *
      * Uses 1-based indexing for position and for base index.
      */
-    def map(context: String, base: Int): Option[Position]
+    def leftMap(context: String, base: Int): Option[Position]
+    
+    /**
+     * Map each position in the given string by upstream context, returning a
+     * sequence of corresponding Positions, or None for bases that don't map.
+     *
+     * If the position's face is `Face.LEFT`, then the base mapped corresponds
+     * to the base it was mapped to. If it is `Face.RIGHT`, it corresponds to
+     * the reverse complement of the base it was mapped to.
+     */
+    def leftMap(context: String): Seq[Option[Position]]
+    
+    /**
+     * Return the position to which the given base in the given string uniquely
+     * maps, or None if it does not uniquely map. Maps by downstream context.
+     *
+     * Uses 1-based indexing for position and for base index.
+     *
+     * If the position's face is `Face.RIGHT`, then the base mapped corresponds
+     * to the base it was mapped to. If it is `Face.LEFT`, it corresponds to
+     * the reverse complement of the base it was mapped to.
+     *
+     * By default, this is implemented by left-mapping the reverse complement.
+     */
+    def rightMap(context: String, base: Int): Option[Position] = {
+        // Flip the sequence around
+        val reverseComplement = context.reverseComplement
+        
+        // Left-map the corresponding base in the reverse complement.
+        leftMap(reverseComplement, reverseComplement.size - (base - 1))
+    }
+    
+    /**
+     * Map each position in the given string by downstream context, returning a
+     * sequence of corresponding Positions, or None for bases that don't map.
+     *
+     * If the position's face is `Face.RIGHT`, then the base mapped corresponds
+     * to the base it was mapped to. If it is `Face.LEFT`, it corresponds to
+     * the reverse complement of the base it was mapped to.
+     *
+     * By default, this is implemented by left-mapping the reverse complement.
+     */
+    def rightMap(context: String): Seq[Option[Position]] = {
+        // Flip the sequence around
+        val reverseComplement = context.reverseComplement
+        
+        // Map it
+        val mappings = leftMap(reverseComplement) 
+        
+        // Reverse the mappings (but leave the Sides unchanged).
+        mappings.reverse
+    }
+    
+    /**
+     * Disambiguate a left mapping and a right mapping to produce an overall
+     * mapping for a base, with left-mapping semantics (i.e. left face means
+     * forward strand).
+     *
+     * TODO: Make this something fancy with monads.
+     */
+    protected def disambiguate(leftMapping: Option[Position], 
+        rightMapping: Option[Position]): Option[Position] = {
+        
+        (leftMapping, rightMapping) match {
+            case (Some(leftPosition), Some(rightPosition)) =>
+                // Only in this case do we have to check to ensure the mapping isn't
+                // ambiguous.
+                if(leftPosition.contig == rightPosition.contig && 
+                    leftPosition.base == rightPosition.base && 
+                    leftPosition.face == !rightPosition.face) {
+                    
+                    // They match (as opposite faces of the same base). Return the
+                    // left one since we have left-mapping semantics.
+                    Some(leftPosition)
+                } else {
+                    // They don't match. Ambiguous mappings don't count
+                    None
+                }
+            case (Some(leftPosition), None) =>
+                // Pass through the left mapping since we only have that.
+                Some(leftPosition)
+            case (None, Some(rightPosition)) => 
+                // Right-only-mappings get faces flipped around to match our adopted
+                // left-mapping semantics. Unary ! for Faces is defined in
+                // package.scala.
+                Some(new Position(rightPosition.contig, rightPosition.base, 
+                !rightPosition.face))
+            case (None, None) =>
+                // It didn't map on either side.
+                None
+        }
+    }
+    
+    /**
+     * Map the given base in the given string on both sides. Returns the
+     * position to which it maps, if it maps unambiguously, or None otherwise.
+     *
+     *
+     * If the position's face is `Face.LEFT`, then the base mapped corresponds
+     * to the base it was mapped to. If it is `Face.RIGHT`, it corresponds to
+     * the reverse complement of the base it was mapped to. This is a slight
+     * semantic asymetry.
+     * 
+     * By default, this is implemented by left-mapping and right-mapping the
+     * base, and aggregating the results.
+     */
+    def map(context: String, base: Int): Option[Position] = {
+        // Map on each side
+        val leftMapping = leftMap(context, base)
+        val rightMapping = rightMap(context, base)
+        
+        // Disambiguate the two mappings and return the result
+        disambiguate(leftMapping, rightMapping)
+    }
+    
+    /**
+     * Map each position in the given string on both sides, returning a
+     * sequence of corresponding Positions, or None for bases that don't map.
+     *
+     * If the position's face is `Face.LEFT`, then the base mapped corresponds
+     * to the base it was mapped to. If it is `Face.RIGHT`, it corresponds to
+     * the reverse complement of the base it was mapped to. This is a slight
+     * semantic asymetry.
+     *
+     * By default, this is implemented by left-mapping and right-mapping the
+     * string, and aggregating the results.
+     */
+    def map(context: String): Seq[Option[Position]] = {
+        // Map on each side
+        val leftMappings = leftMap(context)
+        val rightMappings = rightMap(context)
+    
+        // Zip them together and disambiguate each pair. Note that (a, b).zipped
+        // is of a type that provides a map that takes binary functions, while
+        // a.zip(b).map takes only unary functions.
+        (leftMappings, rightMappings).zipped  map(disambiguate(_, _))
+    }
 
 }
 
@@ -61,6 +192,13 @@ trait FancyFMIndex extends FMIndex {
  */
 trait BruteForceFMIndex extends FancyFMIndex {
 
+    /**
+     * Return the minimum number of characters from the iterator required to get
+     * exactly one unique match, or None if no unique match exists. Interprets
+     * the iterator as specifying characters in reverse string order (so
+     * characters will be pulled off and prepended to the start of the search
+     * pattern).
+     */
     def minUnique(characters: Iterator[Char]): Option[Long] = {
         var pattern = ""
         
@@ -80,7 +218,7 @@ trait BruteForceFMIndex extends FancyFMIndex {
         
     }
     
-    def map(context: String, base: Int): Option[Position] = {
+    def leftMap(context: String, base: Int): Option[Position] = {
         // Map based on upstream context
         
         // Grab what's upstream. TODO: will this copy a whole chromosome?
@@ -114,6 +252,10 @@ trait BruteForceFMIndex extends FancyFMIndex {
                 // We either ran out of context or found nothing matching.
                 None
         }
+    }
+    
+    def leftMap(context: String): Seq[Option[Position]] = {
+        (0 until context.size).map(leftMap(context, _))
     }
     
 }
@@ -186,7 +328,7 @@ class RLCSAGrepFMIndex(basename: String) extends BruteForceFMIndex {
 /**
  * A class that uses the RLCSA FMD-Index extension via SWIG bindings.
  */
-class FMDIndex(basename: String) extends BruteForceFMIndex {
+class FMDIndex(basename: String) extends FancyFMIndex {
     import fi.helsinki.cs.rlcsa.{FMD, RLCSAUtil, MapAttemptResult, 
         MappingVector, Mapping}
     
@@ -276,7 +418,7 @@ class FMDIndex(basename: String) extends BruteForceFMIndex {
         return items.iterator
     }
     
-    override def map(context: String, base: Int): Option[Position] = {
+    def leftMap(context: String, base: Int): Option[Position] = {
         // Map a single base
         
         // Map (0-based) and get a MapAttemptResult
@@ -310,6 +452,29 @@ class FMDIndex(basename: String) extends BruteForceFMIndex {
             None
         }
         
+    }
+    
+    def leftMap(context: String): Seq[Option[Position]] = {
+        // Map a whole string
+        
+        // Do the actual mapping
+        val mappings = fmd.map(context)
+        
+        for {
+            i <- (0L until mappings.size)
+            mapping <- Some(mappings.get(i.toInt))
+        } yield {
+            if(mapping.getIs_mapped) {
+                // Turn the (text, index) pair for this mapping into a Position.
+                // It's already been corrected for pattern length, so pretend
+                // it's a length-1 pattern.
+                Some(getPosition(mapping.getLocation.getFirst.toInt, 
+                    mapping.getLocation.getSecond, 1))
+            } else {
+                // This didn't map, so the corresponding entry should be None
+                None
+            }
+        }
     }
 
 }

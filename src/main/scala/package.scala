@@ -92,6 +92,37 @@ package object genome {
         AnchorEdge(anchor)
     }
     
+    /**
+     * Magically provide DNA methods on strings.
+     */
+    implicit class DNAString(string: String) {
+        /**
+         * Return the reverse complement of this promoted string. All letters in
+         * the string must be {A, C, G, T, N}, with no gaps or lower-case
+         * characters.
+         */
+        def reverseComplement: String = {
+            string.reverse.map {
+                case 'A' => 'T'
+                case 'C' => 'G'
+                case 'G' => 'C'
+                case 'T' => 'A'
+                case 'N' => 'N'
+            }
+        }
+    }
     
+    /**
+     * Magically allow us to do nice things with Faces.
+     */
+    implicit class RichFace(face: Face) {
+        /** 
+         * Flip faces with unary !
+         */
+        def unary_! : Face = face match {
+            case Face.LEFT => Face.RIGHT
+            case Face.RIGHT => Face.LEFT
+        }
+    }
 }
 

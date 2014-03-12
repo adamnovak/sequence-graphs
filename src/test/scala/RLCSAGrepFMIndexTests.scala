@@ -32,21 +32,21 @@ class RLCSAGrepFMIndexTests extends RLCSASuite {
         assert(index.count("AA") == 2)
     }
     
-    test("fails to map ambiguous thing") {
-        val mapping = index.map("AATCTACTGC", 2)
+    test("fails to left-map ambiguous thing") {
+        val mapping = index.leftMap("AATCTACTGC", 2)
         assert(mapping == None)
     }
     
-    test("maps entire contig") {
-        val position = index.map("AATCTACTGC", 10).get
+    test("left-maps last base of contig") {
+        val position = index.leftMap("AATCTACTGC", 10).get
         
         assert(position.contig == "seq1")
         assert(position.base == 10)
         assert(position.face == Face.LEFT)
     }
     
-    test("maps reverse complement") {
-        val position = index.map("GCTAGTAGCTT", 11).get
+    test("left-maps last base of reverse complement") {
+        val position = index.leftMap("GCTAGTAGCTT", 11).get
         
         assert(position.contig == "seq2")
         assert(position.base == 1)
