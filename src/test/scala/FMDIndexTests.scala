@@ -123,6 +123,31 @@ class FMDIndexTests extends RLCSASuite {
         
     }
     
+    test("left-maps unambiguous bases in reverse complement") {
+        val pattern = "GCAGTAGATT"
+        val mappings: Seq[Option[Position]] = index.leftMap(pattern)
+        
+        println(pattern.zip(mappings).mkString("\n"))
+        
+        // The last 8 characters ought to map this way too.
+        assert(mappings.map {
+            case Some(_) => 1
+            case None => 0
+        }.sum == 8)
+        
+        mappings.foreach {
+            case Some(mapping) => {
+                // Everything mapped should be mapped on the left
+                assert(mapping.face == Face.RIGHT)
+                // And on this contig
+                assert(mapping.contig == "seq1")
+            }
+            case None => {}
+        }
+        
+        
+    }
+    
     test("right-maps unambiguous bases in contig") {
         val pattern = "AATCTACTGC"
         val mappings: Seq[Option[Position]] = index.rightMap(pattern)
@@ -201,6 +226,82 @@ class FMDIndexTests extends RLCSASuite {
         
         val mapping = index.map(pattern, 5)
         assert(mapping == None)
+    }
+    
+    test("left-maps correctly to 1-item ranges") {
+        import fi.helsinki.cs.rlcsa.{RangeEncoder, RangeVector}
+        
+        // BWT space is ((# of contigs) + (totoal contig length)) * 2 in size.
+        // We know that RLCSASuite has 2 sequences, one of 10 bases and one of
+        // 11.
+        val bwtSize = (2 + (10 + 11)) * 2
+        
+        println("BWT Size: %s".format(bwtSize))
+        
+        // Make a RangeVector that says every base in BWT space is in a
+        // different range. Use a block size of 32.
+        val rangeEncoder = new RangeEncoder(32)
+        // Set it to 1 everywhere
+        rangeEncoder.addRun(0, bwtSize)
+        rangeEncoder.flush()
+        
+        // Make a RangeVector from it
+        val rangeVector = new RangeVector(rangeEncoder, bwtSize)
+        
+        // Now try mapping with the range vector
+        val pattern = "AATCTACTGC"
+        val mappings: Seq[Long] = index.leftMap(rangeVector, pattern)
+        
+        println(pattern.zip(mappings).mkString("\n"))
+        
+        // The last 8 characters ought to map
+        assert(mappings(0) === -1)
+        assert(mappings(1) === -1)
+        
+        assert(mappings.map {
+            case -1 => 0
+            case _ => 1
+        }.sum === 8)
+        
+    }
+    
+    test("left-maps correctly to 1-item ranges on reverse complement") {
+        import fi.helsinki.cs.rlcsa.{RangeEncoder, RangeVector}
+        
+        // BWT space is ((# of contigs) + (totoal contig length)) * 2 in size.
+        // We know that RLCSASuite has 2 sequences, one of 10 bases and one of
+        // 11.
+        val bwtSize = (2 + (10 + 11)) * 2
+        
+        println("BWT Size: %s".format(bwtSize))
+        
+        // Make a RangeVector that says every base in BWT space is in a
+        // different range. Use a block size of 32.
+        val rangeEncoder = new RangeEncoder(32)
+        // Set it to 1 everywhere
+        rangeEncoder.addRun(0, bwtSize)
+        rangeEncoder.flush()
+        
+        // Make a RangeVector from it
+        val rangeVector = new RangeVector(rangeEncoder, bwtSize)
+        
+        // TODO: Fixturize this range thing.
+        
+        // Now try mapping with the range vector
+        val pattern = "GCAGTAGATT"
+        val mappings: Seq[Long] = index.leftMap(rangeVector, pattern)
+        
+        println(pattern.zip(mappings).mkString("\n"))
+        
+        // The last 8 characters ought to map this way around also.
+        assert(mappings(0) === -1)
+        assert(mappings(1) === -1)
+        
+        assert(mappings.map {
+            case -1 => 0
+            case _ => 1
+        }.sum === 8)
+        
     }
     
 }

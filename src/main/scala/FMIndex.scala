@@ -2,6 +2,7 @@ package edu.ucsc.genome
 
 import scala.collection.JavaConversions._
 import scala.io.Source
+import fi.helsinki.cs.rlcsa.RangeVector
 
 // We use edu.ucsc.genome.Position objects to represent our positions. Contig is
 // the actual haplotype name, base is the index from the start of the forward
@@ -55,6 +56,13 @@ trait FancyFMIndex extends FMIndex {
      * the reverse complement of the base it was mapped to.
      */
     def leftMap(context: String): Seq[Option[Position]]
+    
+    /**
+     * Map each position in the given string to a range starting with a 1 in the
+     * given RangeVector, or -1 if the FM-index search interval for the base
+     * doesn't get contained in exactly 1 range.
+     */
+    def leftMap(ranges: RangeVector, context: String): Seq[Long]
     
     /**
      * Return the position to which the given base in the given string uniquely
@@ -257,6 +265,9 @@ trait BruteForceFMIndex extends FancyFMIndex {
     def leftMap(context: String): Seq[Option[Position]] = {
         (0 until context.size).map(leftMap(context, _))
     }
+    
+    // TODO: Implement this or drop this class
+    def leftMap(ranges: RangeVector, context: String): Seq[Long] = Nil
     
 }
 
@@ -474,6 +485,20 @@ class FMDIndex(basename: String) extends FancyFMIndex {
                 // This didn't map, so the corresponding entry should be None
                 None
             }
+        }
+    }
+    
+    def leftMap(ranges: RangeVector, context: String): Seq[Long] = {
+        // Map a whole string to ranges with a range vector
+        
+        // FMD does all the work.
+        val mappings = fmd.map(ranges, context)
+        
+        for {
+            i <- (0L until mappings.size)
+        } yield {
+            // Convert vector to a Scala Seq
+            mappings.get(i.toInt)
         }
     }
 

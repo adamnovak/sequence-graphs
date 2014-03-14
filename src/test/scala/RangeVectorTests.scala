@@ -23,6 +23,7 @@ class RangeVectorTests extends FunSuite {
         encoder.addRun(1, 1)
         encoder.addRun(9, 2)
         encoder.addRun(19, 1)
+        // You also need to flush or your last (aggregated) run can get lost.
         encoder.flush()
     }
     
