@@ -1,6 +1,9 @@
 package edu.ucsc.genome
 
 import java.util.{TreeMap, NoSuchElementException}
+import fi.helsinki.cs.rlcsa._
+import scala.collection.JavaConversions._
+import scala.collection.mutable.ArrayBuffer
 
 /**
  * Represents a mutable map from non-overlapping intervals of longs to some
@@ -99,5 +102,61 @@ class IntervalMap[ValueType] extends Serializable {
     def update(start: Long, end: Long, value: ValueType): Unit = {
         update((start, end), value)
     }
+    
+    /**
+     * Turn into a RangeVector and sequence of values for ranges in that vector,
+     * for efficient mapping.
+     *
+     * TODO: Cache the result.
+     */
+    def bake: (RangeVector, Seq[Option[ValueType]]) = {
+        // Make a new encoder with this arbitrary block size.
+        val encoder = new RangeEncoder(32)
+        
+        // Make an ArrayBuffer to store pointers to the things we map to by
+        // RangeVector range number. Some "ranges" may really be the ranges
+        // between ranges we have values for, so this needs to be full of
+        // Options.
+        val rangeMapping = new ArrayBuffer[Option[ValueType]]
+        
+        // Keep track of the end of the last interval, so you know if you
+        // skipped anything.
+        var lastEnd: Long = -1
+        
+        map.foreach { case (start, (end, value)) =>
+            if(start != lastEnd + 1) {
+                // We skipped something. Add a fake range at this number.
+                rangeMapping += None
+            }
+            
+            // Go through intervals (in order, since it's a sorted map).
+            // Mark the start of each.
+            encoder.addBit(start)
+            // Mark the position after the end of each in case we skip
+            // something.
+            encoder.addBit(end + 1)
+            
+            // Say that this range belongs to this value
+            rangeMapping += Some(value)
+            
+            // Save the endpoint of the interval
+            lastEnd = end
+        }
+        
+        // Finish and return the RangeVector and out range to value mapping.
+        encoder.flush()
+        (new RangeVector(encoder, lastEnd + 1), rangeMapping)
+    }
+    
+    /**
+     * Convert to a RangeVector for efficient mapping.
+     */
+    def rangeVector: RangeVector = bake._1
+    
+    /**
+     * Get the array of values by interval index, for mapping back from ranges
+     * in our RangeVector representation to the actual values in the map.
+     */
+    def valueArray: Seq[Option[ValueType]] = bake._2
 }
 
