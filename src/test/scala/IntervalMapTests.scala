@@ -15,12 +15,14 @@ class IntervalMapTests extends FunSuite {
         map = new IntervalMap[String]
     }
     
-    test("can insert") {
-        map((5, 10)) = "Hello"
+    test("can insert and merge") {
+        map((9, 10)) = "Hello"
+        map((5, 6)) = "Hello"
+        map((7, 8)) = "Hello"
         map((1, 4)) = "World"
     }
     
-    test("can retrieve exactly") {
+    test("can retrieve exactly by merged interval") {
         assert(map.get(5, 10) === Some("Hello"))
         assert(map.get(1, 4) === Some("World"))
         

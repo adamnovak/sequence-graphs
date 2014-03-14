@@ -60,7 +60,7 @@ class IntervalMap[ValueType] extends Serializable {
     }
     
     /**
-     * Get the value for the interval covering the viven interval. Throws an
+     * Get the value for the interval covering the given interval. Throws an
      * exception if no such value exists.
      */
     def apply(interval: (Long, Long)): ValueType = {
@@ -82,7 +82,8 @@ class IntervalMap[ValueType] extends Serializable {
     
     /**
      * Store the given value at the given interval. It must not overlap with any
-     * other interval.
+     * other interval. If it is immediately adjacent to an interval with the
+     * same value on either side (or both), the intervals will be coalesced.
      */
     def update(interval: (Long, Long), value: ValueType): Unit = {
         if(interval._2 < interval._1) {
@@ -91,9 +92,50 @@ class IntervalMap[ValueType] extends Serializable {
                 .format(interval._1, interval._2))
         }
         
-        // Just assume we don't overlap, for speed. Stick the interval end and
-        // the value in under the interval start.
-        map.put(interval._1, (interval._2, value))
+        // Where should we start our interval, accounting for whether we need to
+        // take over the interval to the left?
+        val mergedStart = {
+            // Load the entry to the left of where we want to go, or null.
+            map.lowerEntry(interval._1) match {
+                case null =>
+                    // We have no neighbor, so don't move start
+                    interval._1
+                case neighbor =>
+                    if(neighbor.getValue == (interval._1 - 1, value)) {
+                        // Our neighbor has our value and ends right before we
+                        // start. Remove it and steal its start.
+                        map.remove(neighbor.getKey)
+                        neighbor.getKey
+                    } else {
+                        // Our neighbor doesn't need merging
+                        interval._1                    
+                    }
+            }
+        }
+        
+        // And similarly for the end and the interval to our right
+        val mergedEnd = {
+            // Load the entry to the right of where we want to go, or null.
+            map.higherEntry(interval._2) match {
+                case null =>
+                    // We have no neighbor, so don't move end
+                    interval._2
+                case neighbor =>
+                    if(neighbor.getKey == (interval._2 + 1) &&
+                        neighbor.getValue._2 == value) {
+                        // Our neighbor has our value and starts right after we
+                        // end. Remove it and steal its end.
+                        map.remove(neighbor.getKey)
+                        neighbor.getValue._1
+                    } else {
+                        // Our neighbor doesn't need merging
+                        interval._2                    
+                    }
+            }
+        }
+        
+        // Stick the merged end and the value in under the merged start.
+        map.put(mergedStart, (mergedEnd, value))
     }
     
     /**
