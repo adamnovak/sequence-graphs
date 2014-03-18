@@ -304,20 +304,40 @@ class FMDIndexTests extends RLCSASuite {
         
     }
     
-    test("finds a left-mapped base in BWT") {
-        val position = index.leftMap("AATCTACTGC", 3).get
-        val bwtIndex = index.inverseLocate(position)
+    test("locate works by index") {
+        // Get the location of the first non-end character in the BWT. 0-3 are
+        // $.
+        val position = index.locate(4)
+        // The first suffix is going to be the one that starts AAG: all of seq2.
+        assert(position.contig === "seq2")
+        // Sequence position is 1-based.
+        assert(position.base === 1)
+        assert(position.face === Face.LEFT)
         
-        // BWT space is ((# of contigs) + (total contig length)) * 2 in size.
-        // We know that RLCSASuite has 2 sequences, one of 10 bases and one of
-        // 11.
-        val bwtSize = (2 + (10 + 11)) * 2
-        
-        // Make sure wherever we found it, it wasn't the after-the-end index in
-        // the BWT.
-        assert(bwtIndex != bwtSize)
-        
-        // TODO: Have some idea of what the right place for this is.
+        // And the second one ought to be AAT: all of seq1
+        val position2 = index.locate(5)
+        assert(position2.contig === "seq1")
+        assert(position2.base === 1)
+        assert(position2.face === Face.LEFT)
+    }
+    
+    test("inverseLocate works correctly") {
+        // Make sure we match the test above
+        assert(index.inverseLocate(new Position("seq2", 1, Face.LEFT)) === 4)
+        assert(index.inverseLocate(new Position("seq1", 1, Face.LEFT)) === 5)
+    }
+    
+    test("locate inverts inverseLocate") {
+        // Let's try every base on seq1 (length 10), for both strands
+        for(i <- 1 until 11) {
+            // Check the left sides
+            val pos = new Position("seq1", i, Face.LEFT)
+            assert(index.locate(index.inverseLocate(pos)) === pos)
+            
+            // And the right sides
+            val pos2 = new Position("seq1", i, Face.RIGHT)
+            assert(index.locate(index.inverseLocate(pos2)) === pos2)
+        }
     }
     
 }

@@ -371,7 +371,9 @@ class FMDIndex(basename: String) extends FancyFMIndex {
      * base 1 for forward-strand offset 0, and right side of the last base for
      * reverse- strand offset 0).
      */
-    def getPosition(text: Int, offset: Long, patternLength: Int): Position = {
+    def getPosition(text: Int, offset: Long,
+        patternLength: Int = 1): Position = {
+        
         // Work out how far we are into what strand of what contig.
         val contigNumber: Int = text / 2
         val contigStrand: Int = text % 2
@@ -435,28 +437,61 @@ class FMDIndex(basename: String) extends FancyFMIndex {
     }
     
     /**
+     * Given a BWT index, return the Position of that base's upstream side.
+     */
+    def locate(bwtPosition: Long): Position = {
+        // Get a pointer to the BWT position
+        val positionPointer = RLCSAUtil.copy_USIntPointer(bwtPosition)
+        
+        // Convert to an SA coordinate
+        fmd.convertToSAIndex(positionPointer);
+        
+        println("BWT %d = SA %d".format(bwtPosition,
+            RLCSAUtil.USIntPointer_value(positionPointer)))
+        
+        // Locate it, and then report position as a (text, offset) pair.
+        val textAndOffset = fmd.getRelativePosition(fmd.locate(
+            RLCSAUtil.USIntPointer_value(positionPointer)));
+        
+        // Convert that to a Position
+        return getPosition(textAndOffset.getFirst.toInt, 
+            textAndOffset.getSecond)
+    }
+    
+    /**
      * Given a Position on a contig in this FMDIndex, return the internal BWT
      * position corresponding to that Position, such as might be inside a range
      * in a RangeVector or IntervalTree.
+     * TODO: Does not check that the given Position is in-range on the text.
      */
     def inverseLocate(position: Position): Long = {
+        println("Inverse-locating %s".format(position))
+        
         // Look up the contig used in the Position
         val (contigNumber, contigLength) = contigInverse(position.contig)
+        
+        println("Looking at contig %d".format(contigNumber))
         
         // What text index corresponds to the strand of the contig this Position
         // lives on? Forward texts are even, reverse ones are odd. TODO: This is
         // kind of sort of the inverse of getPosition. Tie these together.
-        val text = contigNumber * 2 + (if(position.face == Face.LEFT) 1 else 0)
+        val text = contigNumber * 2 + (if(position.face == Face.LEFT) 0 else 1)
+        
+        println("This strand is text %d".format(text))
         
         // What's the offset in the text?
         val offset = if(position.face == Face.LEFT) {
-            // We're on the forward strand, so no change.
-            position.base
+            // We're on the forward strand, so no change. Just convert from
+            // 1-based Position coordinates to 0-based text coordinates.
+            position.base - 1
         } else {
             // We're on the reverse strand, so we need to flip around and count
-            // from the "start" of the reverse complement.
+            // from the "start" of the reverse complement. This automatically
+            // adjusts for the 1-based to 0-based conversion.
             contigLength - position.base
         }
+        
+        println("Looking at offset %d in strand".format(offset))
         
         // Pack the two together in the right type to send down to C++
         val textAndOffset: pair_type = new pair_type(text, offset)
@@ -465,12 +500,26 @@ class FMDIndex(basename: String) extends FancyFMIndex {
         // coordinate space.
         val absolutePosition = fmd.getAbsolutePosition(textAndOffset)
         
+        println("Corresponds to absolute string position %d"
+            .format(absolutePosition))
+            
+        val relativePosition = fmd.getRelativePosition(absolutePosition)
+        
+        println("Which maps back to text %d index %d".format(
+            relativePosition.getFirst, relativePosition.getSecond))
+        
         // Un-locate this SA value to find the index in the SA at which it
         // occurs.
         val SAIndex = fmd.inverseLocate(absolutePosition)
         
-        // Convert to a BWT position and return.
-        SAIndex + fmd.getNumberOfSequences
+        println("Inverse-locates to SA index %d".format(SAIndex))
+        
+        // Convert to a BWT index
+        val BWTIndex = SAIndex + fmd.getNumberOfSequences
+        
+        println("Which is BWT index %d".format(BWTIndex))
+        
+        BWTIndex
     }
     
     def leftMap(context: String, base: Int): Option[Position] = {
