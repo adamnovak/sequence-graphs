@@ -341,12 +341,12 @@ class RLCSAGrepFMIndex(basename: String) extends BruteForceFMIndex {
  */
 class FMDIndex(basename: String) extends FancyFMIndex {
     import fi.helsinki.cs.rlcsa.{FMD, RLCSAUtil, MapAttemptResult, 
-        MappingVector, Mapping}
+        MappingVector, Mapping, pair_type}
     
     // We keep a native FMD for the given basename
     val fmd = new FMD(basename)
     
-    // We load the contig file
+    // We load the contig file, keeping contig names by index
     val contigData: Array[(String, Long)] = Source.fromFile(basename +
         ".chrom.sizes").getLines.map { (line) =>
         
@@ -357,7 +357,12 @@ class FMDIndex(basename: String) extends FancyFMIndex {
         
         }.toArray
         
-    // We keep the contig names
+    // We also keep (index, length) by contig name. TODO: make this more
+    // efficient/use an on-disk database or something.
+    val contigInverse: Map[String, (Int, Long)] = contigData.zipWithIndex.map {
+        case ((contig: String, length: Long), index: Int) =>
+            (contig, (index, length))
+    }.toMap
     
     /**
      * Get the Position for the last character in a pattern found at a given
@@ -410,7 +415,7 @@ class FMDIndex(basename: String) extends FancyFMIndex {
         
         for(i <- 0L until RLCSAUtil.length(range)) {
             // Get each result location. TODO: We can only go up to the max int
-            // value here.
+            // value in terms of number of locations.
             val location = RLCSAUtil.USIntArray_getitem(locations, i.toInt)
             
             // Get a text number and an offset
@@ -427,6 +432,45 @@ class FMDIndex(basename: String) extends FancyFMIndex {
         // Give back an iterator for the list.
         // TODO: Do this iteration on demand.
         return items.iterator
+    }
+    
+    /**
+     * Given a Position on a contig in this FMDIndex, return the internal BWT
+     * position corresponding to that Position, such as might be inside a range
+     * in a RangeVector or IntervalTree.
+     */
+    def inverseLocate(position: Position): Long = {
+        // Look up the contig used in the Position
+        val (contigNumber, contigLength) = contigInverse(position.contig)
+        
+        // What text index corresponds to the strand of the contig this Position
+        // lives on? Forward texts are even, reverse ones are odd. TODO: This is
+        // kind of sort of the inverse of getPosition. Tie these together.
+        val text = contigNumber * 2 + (if(position.face == Face.LEFT) 1 else 0)
+        
+        // What's the offset in the text?
+        val offset = if(position.face == Face.LEFT) {
+            // We're on the forward strand, so no change.
+            position.base
+        } else {
+            // We're on the reverse strand, so we need to flip around and count
+            // from the "start" of the reverse complement.
+            contigLength - position.base
+        }
+        
+        // Pack the two together in the right type to send down to C++
+        val textAndOffset: pair_type = new pair_type(text, offset)
+        
+        // Turn the text and offset into an SA value in the combined all-text
+        // coordinate space.
+        val absolutePosition = fmd.getAbsolutePosition(textAndOffset)
+        
+        // Un-locate this SA value to find the index in the SA at which it
+        // occurs.
+        val SAIndex = fmd.inverseLocate(absolutePosition)
+        
+        // Convert to a BWT position and return.
+        SAIndex + fmd.getNumberOfSequences
     }
     
     def leftMap(context: String, base: Int): Option[Position] = {

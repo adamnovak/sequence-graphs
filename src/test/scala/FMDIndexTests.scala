@@ -268,7 +268,7 @@ class FMDIndexTests extends RLCSASuite {
     test("left-maps correctly to 1-item ranges on reverse complement") {
         import fi.helsinki.cs.rlcsa.{RangeEncoder, RangeVector}
         
-        // BWT space is ((# of contigs) + (totoal contig length)) * 2 in size.
+        // BWT space is ((# of contigs) + (total contig length)) * 2 in size.
         // We know that RLCSASuite has 2 sequences, one of 10 bases and one of
         // 11.
         val bwtSize = (2 + (10 + 11)) * 2
@@ -302,6 +302,22 @@ class FMDIndexTests extends RLCSASuite {
             case _ => 1
         }.sum === 8)
         
+    }
+    
+    test("finds a left-mapped base in BWT") {
+        val position = index.leftMap("AATCTACTGC", 3).get
+        val bwtIndex = index.inverseLocate(position)
+        
+        // BWT space is ((# of contigs) + (total contig length)) * 2 in size.
+        // We know that RLCSASuite has 2 sequences, one of 10 bases and one of
+        // 11.
+        val bwtSize = (2 + (10 + 11)) * 2
+        
+        // Make sure wherever we found it, it wasn't the after-the-end index in
+        // the BWT.
+        assert(bwtIndex != bwtSize)
+        
+        // TODO: Have some idea of what the right place for this is.
     }
     
 }

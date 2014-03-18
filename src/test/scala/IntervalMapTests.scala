@@ -16,10 +16,10 @@ class IntervalMapTests extends FunSuite {
     }
     
     test("can insert and merge") {
-        map((9, 10)) = "Hello"
-        map((5, 6)) = "Hello"
-        map((7, 8)) = "Hello"
-        map((1, 4)) = "World"
+        map(9, 10) = "Hello"
+        map(5, 6) = "Hello"
+        map(7, 8) = "Hello"
+        map(1, 4) = "World"
     }
     
     test("can retrieve exactly by merged interval") {
