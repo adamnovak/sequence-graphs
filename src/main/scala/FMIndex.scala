@@ -60,7 +60,7 @@ trait FancyFMIndex extends FMIndex {
     /**
      * Map each position in the given string to a range starting with a 1 in the
      * given RangeVector, or -1 if the FM-index search interval for the base
-     * doesn't get contained in exactly 1 range.
+     * doesn't get contained in exactly 1 range. Uses the left context.
      */
     def leftMap(ranges: RangeVector, context: String): Seq[Long]
     
@@ -106,13 +106,30 @@ trait FancyFMIndex extends FMIndex {
     }
     
     /**
+     * Map each position in the given string to a range starting with a 1 in the
+     * given RangeVector, or -1 if the FM-index search interval for the base
+     * doesn't get contained in exactly 1 range. Uses the right context.
+     */
+    def rightMap(ranges: RangeVector, context: String): Seq[Long] = {
+        // Flip the sequence around
+        val reverseComplement = context.reverseComplement
+        
+        // Map it
+        val mappings = leftMap(ranges, reverseComplement) 
+        
+        // Reverse the mappings (but leave the range numbers unchanged).
+        mappings.reverse
+    }
+    
+    /**
      * Disambiguate a left mapping and a right mapping to produce an overall
      * mapping for a base, with left-mapping semantics (i.e. left face means
      * forward strand).
      *
-     * TODO: Make this something fancy with monads.
+     * TODO: Make this something fancy with monads. TODO: Don't call down into
+     * this from ReferenceStructure. Move this itno some utility place.
      */
-    protected def disambiguate(leftMapping: Option[Position], 
+    def disambiguate(leftMapping: Option[Position], 
         rightMapping: Option[Position]): Option[Position] = {
         
         (leftMapping, rightMapping) match {
@@ -168,13 +185,9 @@ trait FancyFMIndex extends FMIndex {
     }
     
     /**
-     * Map each position in the given string on both sides, returning a
-     * sequence of corresponding Positions, or None for bases that don't map.
-     *
-     * If the position's face is `Face.LEFT`, then the base mapped corresponds
-     * to the base it was mapped to. If it is `Face.RIGHT`, it corresponds to
-     * the reverse complement of the base it was mapped to. This is a slight
-     * semantic asymetry.
+     * Map each position in the given string to a range starting with a 1 in the
+     * given RangeVector, or -1 if the FM-index search interval for the base
+     * doesn't get contained in exactly 1 range.
      *
      * By default, this is implemented by left-mapping and right-mapping the
      * string, and aggregating the results.
@@ -189,7 +202,7 @@ trait FancyFMIndex extends FMIndex {
         // a.zip(b).map takes only unary functions.
         (leftMappings, rightMappings).zipped  map(disambiguate(_, _))
     }
-
+    
 }
 
 /**
@@ -342,6 +355,10 @@ class RLCSAGrepFMIndex(basename: String) extends BruteForceFMIndex {
 class FMDIndex(basename: String) extends FancyFMIndex {
     import fi.helsinki.cs.rlcsa.{FMD, RLCSAUtil, MapAttemptResult, 
         MappingVector, Mapping, pair_type}
+    
+    if(basename == null) {
+        throw new Exception("Cannot create FMDIndex with a null basename.")
+    }
     
     // We keep a native FMD for the given basename
     val fmd = new FMD(basename)
