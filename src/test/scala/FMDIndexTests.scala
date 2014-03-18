@@ -127,8 +127,6 @@ class FMDIndexTests extends RLCSASuite {
         val pattern = "GCAGTAGATT"
         val mappings: Seq[Option[Position]] = index.leftMap(pattern)
         
-        println(pattern.zip(mappings).mkString("\n"))
-        
         // The last 8 characters ought to map this way too.
         assert(mappings.map {
             case Some(_) => 1
@@ -236,8 +234,6 @@ class FMDIndexTests extends RLCSASuite {
         // 11.
         val bwtSize = (2 + (10 + 11)) * 2
         
-        println("BWT Size: %s".format(bwtSize))
-        
         // Make a RangeVector that says every base in BWT space is in a
         // different range. Use a block size of 32.
         val rangeEncoder = new RangeEncoder(32)
@@ -251,8 +247,6 @@ class FMDIndexTests extends RLCSASuite {
         // Now try mapping with the range vector
         val pattern = "AATCTACTGC"
         val mappings: Seq[Long] = index.leftMap(rangeVector, pattern)
-        
-        println(pattern.zip(mappings).mkString("\n"))
         
         // The last 8 characters ought to map
         assert(mappings(0) === -1)
@@ -273,8 +267,6 @@ class FMDIndexTests extends RLCSASuite {
         // 11.
         val bwtSize = (2 + (10 + 11)) * 2
         
-        println("BWT Size: %s".format(bwtSize))
-        
         // Make a RangeVector that says every base in BWT space is in a
         // different range. Use a block size of 32.
         val rangeEncoder = new RangeEncoder(32)
@@ -290,8 +282,6 @@ class FMDIndexTests extends RLCSASuite {
         // Now try mapping with the range vector
         val pattern = "GCAGTAGATT"
         val mappings: Seq[Long] = index.leftMap(rangeVector, pattern)
-        
-        println(pattern.zip(mappings).mkString("\n"))
         
         // The last 8 characters ought to map this way around also.
         assert(mappings(0) === -1)

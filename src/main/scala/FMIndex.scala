@@ -446,9 +446,6 @@ class FMDIndex(basename: String) extends FancyFMIndex {
         // Convert to an SA coordinate
         fmd.convertToSAIndex(positionPointer);
         
-        println("BWT %d = SA %d".format(bwtPosition,
-            RLCSAUtil.USIntPointer_value(positionPointer)))
-        
         // Locate it, and then report position as a (text, offset) pair.
         val textAndOffset = fmd.getRelativePosition(fmd.locate(
             RLCSAUtil.USIntPointer_value(positionPointer)));
@@ -465,19 +462,13 @@ class FMDIndex(basename: String) extends FancyFMIndex {
      * TODO: Does not check that the given Position is in-range on the text.
      */
     def inverseLocate(position: Position): Long = {
-        println("Inverse-locating %s".format(position))
-        
         // Look up the contig used in the Position
         val (contigNumber, contigLength) = contigInverse(position.contig)
-        
-        println("Looking at contig %d".format(contigNumber))
         
         // What text index corresponds to the strand of the contig this Position
         // lives on? Forward texts are even, reverse ones are odd. TODO: This is
         // kind of sort of the inverse of getPosition. Tie these together.
         val text = contigNumber * 2 + (if(position.face == Face.LEFT) 0 else 1)
-        
-        println("This strand is text %d".format(text))
         
         // What's the offset in the text?
         val offset = if(position.face == Face.LEFT) {
@@ -491,8 +482,6 @@ class FMDIndex(basename: String) extends FancyFMIndex {
             contigLength - position.base
         }
         
-        println("Looking at offset %d in strand".format(offset))
-        
         // Pack the two together in the right type to send down to C++
         val textAndOffset: pair_type = new pair_type(text, offset)
         
@@ -500,26 +489,14 @@ class FMDIndex(basename: String) extends FancyFMIndex {
         // coordinate space.
         val absolutePosition = fmd.getAbsolutePosition(textAndOffset)
         
-        println("Corresponds to absolute string position %d"
-            .format(absolutePosition))
-            
         val relativePosition = fmd.getRelativePosition(absolutePosition)
-        
-        println("Which maps back to text %d index %d".format(
-            relativePosition.getFirst, relativePosition.getSecond))
         
         // Un-locate this SA value to find the index in the SA at which it
         // occurs.
         val SAIndex = fmd.inverseLocate(absolutePosition)
         
-        println("Inverse-locates to SA index %d".format(SAIndex))
-        
-        // Convert to a BWT index
-        val BWTIndex = SAIndex + fmd.getNumberOfSequences
-        
-        println("Which is BWT index %d".format(BWTIndex))
-        
-        BWTIndex
+        // Convert to a BWT index and return
+        SAIndex + fmd.getNumberOfSequences
     }
     
     def leftMap(context: String, base: Int): Option[Position] = {
