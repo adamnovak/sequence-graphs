@@ -248,6 +248,8 @@ class FMDIndexTests extends RLCSASuite {
         val pattern = "AATCTACTGC"
         val mappings: Seq[Long] = index.leftMap(rangeVector, pattern)
         
+        println((pattern, mappings).zipped.mkString("\n"))
+        
         // The last 8 characters ought to map
         assert(mappings(0) === -1)
         assert(mappings(1) === -1)
@@ -257,6 +259,44 @@ class FMDIndexTests extends RLCSASuite {
             case _ => 1
         }.sum === 8)
         
+        // There should be 9 distint values: 8 mapping locations and two -1s
+        assert(mappings.distinct.size === 9)
+        
+    }
+    
+    test("right-maps correctly to 1-item ranges") {
+        import fi.helsinki.cs.rlcsa.{RangeEncoder, RangeVector}
+        
+        // BWT space is ((# of contigs) + (totoal contig length)) * 2 in size.
+        // We know that RLCSASuite has 2 sequences, one of 10 bases and one of
+        // 11.
+        val bwtSize = (2 + (10 + 11)) * 2
+        
+        // Make a RangeVector that says every base in BWT space is in a
+        // different range. Use a block size of 32.
+        val rangeEncoder = new RangeEncoder(32)
+        // Set it to 1 everywhere
+        rangeEncoder.addRun(0, bwtSize)
+        rangeEncoder.flush()
+        
+        // Make a RangeVector from it
+        val rangeVector = new RangeVector(rangeEncoder, bwtSize)
+        
+        // Now try mapping with the range vector
+        val pattern = "AATCTACTGC"
+        val mappings: Seq[Long] = index.rightMap(rangeVector, pattern)
+        
+        // The first 8 characters ought to map
+        assert(mappings.map {
+            case -1 => 0
+            case _ => 1
+        }.sum === 8)
+        
+        assert(mappings(8) === -1)
+        assert(mappings(9) === -1)
+        
+        // There should be 9 distint values: 8 mapping locations and two -1s
+        assert(mappings.distinct.size === 9)
     }
     
     test("left-maps correctly to 1-item ranges on reverse complement") {
@@ -292,6 +332,8 @@ class FMDIndexTests extends RLCSASuite {
             case _ => 1
         }.sum === 8)
         
+        // There should be 9 distint values: 8 mapping locations and two -1s
+        assert(mappings.distinct.size === 9)
     }
     
     test("locate works by index") {

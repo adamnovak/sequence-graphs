@@ -146,6 +146,16 @@ class IntervalMap[ValueType] extends Serializable {
     }
     
     /**
+     * Convert this IntervalMap into a string.
+     */
+    def mkString(separator: String = "") = {
+        map.map { case (start, (end, value)) =>
+            // Make an entry for each entry
+            "(%d-%d: %s)".format(start, end, value)
+        }.mkString(separator) // String them all together
+    }
+    
+    /**
      * Turn into a RangeVector and sequence of values for ranges in that vector,
      * for efficient mapping.
      *

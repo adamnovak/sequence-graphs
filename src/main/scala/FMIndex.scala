@@ -61,8 +61,20 @@ trait FancyFMIndex extends FMIndex {
      * Map each position in the given string to a range starting with a 1 in the
      * given RangeVector, or -1 if the FM-index search interval for the base
      * doesn't get contained in exactly 1 range. Uses the left context.
+     * 
+     * This one comes pre-implemented in terms of right-mapping since the right-
+     * sided one is more natural to implement on an FMD-index.
      */
-    def leftMap(ranges: RangeVector, context: String): Seq[Long]
+    def leftMap(ranges: RangeVector, context: String): Seq[Long] = {
+        // Flip the sequence around
+        val reverseComplement = context.reverseComplement
+        
+        // Map it
+        val mappings = rightMap(ranges, reverseComplement) 
+        
+        // Reverse the mappings (but leave the range numbers unchanged).
+        mappings.reverse
+    }
     
     /**
      * Return the position to which the given base in the given string uniquely
@@ -110,16 +122,7 @@ trait FancyFMIndex extends FMIndex {
      * given RangeVector, or -1 if the FM-index search interval for the base
      * doesn't get contained in exactly 1 range. Uses the right context.
      */
-    def rightMap(ranges: RangeVector, context: String): Seq[Long] = {
-        // Flip the sequence around
-        val reverseComplement = context.reverseComplement
-        
-        // Map it
-        val mappings = leftMap(ranges, reverseComplement) 
-        
-        // Reverse the mappings (but leave the range numbers unchanged).
-        mappings.reverse
-    }
+    def rightMap(ranges: RangeVector, context: String): Seq[Long]
     
     /**
      * Disambiguate a left mapping and a right mapping to produce an overall
@@ -280,7 +283,7 @@ trait BruteForceFMIndex extends FancyFMIndex {
     }
     
     // TODO: Implement this or drop this class
-    def leftMap(ranges: RangeVector, context: String): Seq[Long] = Nil
+    def rightMap(ranges: RangeVector, context: String): Seq[Long] = Nil
     
 }
 
@@ -575,7 +578,7 @@ class FMDIndex(basename: String) extends FancyFMIndex {
         }
     }
     
-    def leftMap(ranges: RangeVector, context: String): Seq[Long] = {
+    def rightMap(ranges: RangeVector, context: String): Seq[Long] = {
         // Map a whole string to ranges with a range vector
         
         // FMD does all the work.

@@ -77,6 +77,9 @@ class CollapsedReferenceStructure(base: ReferenceStructure, contig: String)
         // TODO: We're doing our own disambiguation here. Unify with the
         // FMDIndex disambiguate.
         
+        println("Mapping with intervals:")
+        println(intervals.mkString("\n"))
+        
         // Map the bases in the string to optional range numbers, on the left
         val leftMappings = base.getIndex.leftMap(intervals.rangeVector, pattern)
         
@@ -96,6 +99,12 @@ class CollapsedReferenceStructure(base: ReferenceStructure, contig: String)
             case -1 => None
             case rangeNumber => intervals.valueArray(rangeNumber.toInt)
         }
+        
+        println("Left positions:")
+        println((leftMappings, leftPositions).zipped.mkString("\n"))
+        println("Right positions:")
+        println((rightMappings, rightPositions).zipped.mkString("\n"))
+        println("Disambiguating...")
         
         // Disambiguate the alternative mappings, producing a sequence of final
         // mappings. TODO: Don't be calling down into a completely different
@@ -136,8 +145,12 @@ class CollapsedReferenceStructure(base: ReferenceStructure, contig: String)
             // Merge this face
             
             // What Position will we produce? It's in our structure's contig,
-            // with the next free base number.
-            val newPosition = new Position(contig, base, face)
+            // with the next free base number. TODO: We're inverting the face
+            // because we need to store the positions correspondign to the left
+            // faces of the things we merge (left-mapping semantics) as the
+            // right faces of the things we merge them into (because of the
+            // range-mapping functions' low-level right-mapping semantics.)
+            val newPosition = new Position(contig, base, !face)
             
             // What positions is it based on?
             val toMerge = Seq(new Position(contig1, base1, face), 
@@ -160,8 +173,12 @@ class CollapsedReferenceStructure(base: ReferenceStructure, contig: String)
         for(face <- Seq(Face.LEFT, Face.RIGHT)) {
             // Pass this face
             
-            // What Position will we re-name this to?
-            val position = new Position(contig, base, face)
+            // What Position will we re-name this to? TODO: We're inverting the
+            // face because we need to store the positions correspondign to the
+            // left faces of the things we pass (left-mapping semantics) as the
+            // right faces of the things we pass them up as (because of the
+            // range-mapping functions' low-level right-mapping semantics.)
+            val position = new Position(contig, base, !face)
                 
             // Actually add the position
             addPosition(position, Seq(new Position(passContig, passBase, face)))
