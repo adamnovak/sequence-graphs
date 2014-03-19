@@ -16,6 +16,63 @@ class ReferenceStructureTests extends RLCSASuite {
         stringReference = new StringReferenceStructure(basename)
     }
     
+    test("maps all bases in contig") {
+    
+        val pattern = "AATCTACTGC"
+        val mappings: Seq[Option[Position]] = stringReference.map(pattern)
+        
+        // The first 8 characters ought to map.
+        assert(mappings.map {
+            case Some(_) => 1
+            case None => 0
+        }.sum == 10)
+        
+        mappings.foreach {
+            case Some(mapping) => {
+                // Everything mapped should be mapped on the left, since map has
+                // left-mapping semantics for its output.
+                assert(mapping.face == Face.LEFT)
+                // And on this contig
+                assert(mapping.contig == "seq1")
+            }
+            case None => {}
+        }
+        
+    }
+    
+    test("maps all bases in reverse complement") {
+    
+        val pattern = "GCTAGTAGCTT"
+        val mappings: Seq[Option[Position]] = stringReference.map(pattern)
+        
+        // The first 8 characters ought to map.
+        assert(mappings.map {
+            case Some(_) => 1
+            case None => 0
+        }.sum == 11)
+        
+        mappings.foreach {
+            case Some(mapping) => {
+                // Everything mapped should be mapped on the right, since map
+                // has left-mapping semantics for its output and we're mapping
+                // to a reverse strand.
+                assert(mapping.face == Face.RIGHT)
+                // And on this contig
+                assert(mapping.contig == "seq2")
+            }
+            case None => {}
+        }
+        
+    }
+    
+    test("discards side-ambiguous mappings") {
+        // Splice a couple sequences together on that T at base 5
+        val pattern = "AATCTAGTAGCTT"
+        
+        val mapping = stringReference.map(pattern)(4)
+        assert(mapping == None)
+    }
+    
     test("CollapsedReferenceStructure can be created on top") {
         collapsedReference = new CollapsedReferenceStructure(stringReference,
             "merged")

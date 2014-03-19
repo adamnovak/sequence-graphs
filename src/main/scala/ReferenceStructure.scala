@@ -10,17 +10,80 @@ package edu.ucsc.genome
  */
 trait ReferenceStructure {
     /**
+     * Disambiguate a left mapping and a right mapping to produce an overall
+     * mapping for a base, with left-mapping semantics (i.e. left face means
+     * forward strand).
+     */
+    def disambiguate(leftMapping: Option[Position], 
+        rightMapping: Option[Position]): Option[Position] = {
+        
+        (leftMapping, rightMapping) match {
+            case (Some(leftPosition), Some(rightPosition)) =>
+                // Only in this case do we have to check to ensure the mapping isn't
+                // ambiguous.
+                if(leftPosition.contig == rightPosition.contig && 
+                    leftPosition.base == rightPosition.base && 
+                    leftPosition.face == !rightPosition.face) {
+                    
+                    // They match (as opposite faces of the same base). Return the
+                    // left one since we have left-mapping semantics.
+                    Some(leftPosition)
+                } else {
+                    // They don't match. Ambiguous mappings don't count
+                    None
+                }
+            case (Some(leftPosition), None) =>
+                // Pass through the left mapping since we only have that.
+                Some(leftPosition)
+            case (None, Some(rightPosition)) => 
+                // Right-only-mappings get faces flipped around to match our adopted
+                // left-mapping semantics. Unary ! for Faces is defined in
+                // package.scala.
+                Some(new Position(rightPosition.contig, rightPosition.base, 
+                !rightPosition.face))
+            case (None, None) =>
+                // It didn't map on either side.
+                None
+        }
+    }
+    
+    /**
      * Map a string on both sides. Returns a sequence of Positions to which each
      * base maps, with None for bases that don't map. All the Position UUIDs
      * returned, which are (contig, base) pairs, will be specific to this level.
+     *
+     * If the position's face is `Face.LEFT`, then the base mapped corresponds
+     * to the base it was mapped to. If it is `Face.RIGHT`, it corresponds to
+     * the reverse complement of the base it was mapped to. This is a slight
+     * semantic asymetry.
+     * 
+     * This is implemented by left-mapping and right-mapping the
+     * base, and aggregating the results.
      */
-    def map(pattern: String): Seq[Option[Position]]
+    def map(context: String): Seq[Option[Position]] = {
+        // Map on each side
+        val leftMappings = map(context, Face.LEFT)
+        val rightMappings = map(context, Face.RIGHT)
+    
+        // Zip them together and disambiguate each pair. Note that (a, b).zipped
+        // is of a type that provides a map that takes binary functions, while
+        // a.zip(b).map takes only unary functions.
+        (leftMappings, rightMappings).zipped  map(disambiguate(_, _))
+    }
+    
+    // Stuff to define in implementations
     
     /**
      * Get the bottom-level FMDIndex, which upper-level ReferenceStructures need
      * in order to perform mapping operations efficiently.
      */
     def getIndex: FMDIndex
+    
+    /**
+     * Map all bases in the given string to Positions using the context on the
+     * given face.
+     */
+    def map(context: String, face: Face): Seq[Option[Position]]
 }
 
 /**
@@ -36,7 +99,9 @@ class StringReferenceStructure(basename: String) extends ReferenceStructure {
     val index = new FMDIndex(basename)
 
     // Map with our index
-    def map(pattern: String): Seq[Option[Position]] = index.map(pattern)
+    def map(pattern: String, face: Face): Seq[Option[Position]] = {
+        getIndex.map(pattern, face)
+    }
 
     // Expose our index to the level above us.
     def getIndex = index
@@ -73,43 +138,14 @@ class CollapsedReferenceStructure(base: ReferenceStructure, contig: String)
     }
     
     // We map using the ranges thing.
-    def map(pattern: String): Seq[Option[Position]] = {
-        // TODO: We're doing our own disambiguation here. Unify with the
-        // FMDIndex disambiguate.
-        
-        println("Mapping with intervals:")
-        println(intervals.mkString("\n"))
-        
-        // Map the bases in the string to optional range numbers, on the left
-        val leftMappings = base.getIndex.leftMap(intervals.rangeVector, pattern)
-        
-        // Also map on the right, to completely different range numbers
-        val rightMappings = base.getIndex.rightMap(intervals.rangeVector,
-            pattern)
-            
-        // Convert to Positions by looking up in the interval value array.
-        val leftPositions = leftMappings.map {
+    def map(pattern: String, face: Face): Seq[Option[Position]] = {
+        getIndex.map(intervals.rangeVector, pattern, face).map {
+            // An range number of -1 means it didn't map 
             case -1 => None
-            // TODO: Change valueArray from a Seq to a map from long to
-            // whatever, so it can hold a whole genome's worth of stuff.
-            case rangeNumber => intervals.valueArray(rangeNumber.toInt)
+            // Otherwise go get the Position for the range it mapped to (or None
+            // if there's no position for that range).
+            case range => intervals.valueArray(range.toInt)
         }
-           
-        val rightPositions = rightMappings.map {
-            case -1 => None
-            case rangeNumber => intervals.valueArray(rangeNumber.toInt)
-        }
-        
-        println("Left positions:")
-        println((leftMappings, leftPositions).zipped.mkString("\n"))
-        println("Right positions:")
-        println((rightMappings, rightPositions).zipped.mkString("\n"))
-        println("Disambiguating...")
-        
-        // Disambiguate the alternative mappings, producing a sequence of final
-        // mappings. TODO: Don't be calling down into a completely different
-        // object.
-        (leftPositions, rightPositions).zipped.map(getIndex.disambiguate(_, _))
     }
     
     // We return our base's index as our own.

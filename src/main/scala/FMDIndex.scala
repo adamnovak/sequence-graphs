@@ -142,6 +142,8 @@ class FMDIndex(basename: String) {
      * Convert a BWT index in this index to a Position. If the BWT index is on
      * the forward strand, it will be a Position with a LEFT face; if it is on
      * the reverse strand, it will be a position with a RIGHT face.
+     *
+     * TODO: Consistent capitalization with function above?
      */
     def bwtToPosition(bwt: Long): Position = {
         // Convert from BWT coordinates to SA coordinates, locate it, and then
@@ -199,13 +201,13 @@ class FMDIndex(basename: String) {
     }
     
     ////////////////////////////////////////////////////////////////////////////
-    // Left and right mapping to positions or BWT ranges
+    // Left- and right-mapping single bases to Positions
     ////////////////////////////////////////////////////////////////////////////
     
     /**
      * Return the position to which the given base in the given string uniquely
-     * maps, or None if it does not uniquely map. Maps by upstream context (so
-     * base 1, for example, probably won't map).
+     * maps, or None if it does not uniquely map. Maps by context on the
+     * specified face.
      *
      * If the position's face is `Face.LEFT`, then the base mapped corresponds
      * to the base it was mapped to. If it is `Face.RIGHT`, it corresponds to
@@ -213,236 +215,128 @@ class FMDIndex(basename: String) {
      *
      * Uses 1-based indexing for position and for base index.
      */
-    def leftMap(context: String, base: Int): Option[Position] = {
+    def map(context: String, base: Int, face: Face): Option[Position] = {
         // Map a single base
         
-        // Map (0-based) and get a MapAttemptResult
-        val mapping: MapAttemptResult = fmd.mapPosition(context, base - 1)
-        
-        if(mapping.getIs_mapped) {
-            // Get the single actual mapped BWT position
-            val bwt = mapping.getPosition.getForward_start
-            
-            // Convert to a Position (for the very first character in the
-            // pattern)
-            val position = bwtToPosition(bwt)
-            
-            // On the forward strand, we have to offset right by
-            // (mapping.getCharacters - 1), since we've gotten the position of
-            // the leftmost character in the pattern and we really want that of
-            // this specific character. Unfortunately, on the reverse strand, we
-            // have to offset left by the same amount, since the pattern in that
-            // case is running backwards in genome coordinates.
-            val offset = position.face match {
-                case Face.LEFT => mapping.getCharacters - 1
-                case Face.RIGHT => -(mapping.getCharacters - 1)
-            }
-            
-            // Make a new Position, accounting for the offset from the left end
-            // of the pattern due to pattern length, and report that.
-            Some(new Position(position.contig, position.base + offset,
-                position.face))
-            
-        } else {
-            None
-        }
-        
-    }
-    
-    /**
-     * Map each position in the given string by upstream context, returning a
-     * sequence of corresponding Positions, or None for bases that don't map.
-     *
-     * If the position's face is `Face.LEFT`, then the base mapped corresponds
-     * to the base it was mapped to. If it is `Face.RIGHT`, it corresponds to
-     * the reverse complement of the base it was mapped to.
-     */
-    def leftMap(context: String): Seq[Option[Position]] = {
-        // Map a whole string
-        
-        // Do the actual mapping
-        val mappings = fmd.map(context)
-        
-        for {
-            i <- (0L until mappings.size)
-            mapping <- Some(mappings.get(i.toInt))
-        } yield {
-            if(mapping.getIs_mapped) {
-                // Turn the (text, index) pair for this mapping into a Position.
-                // It's already been corrected for pattern length.
-                Some(pairToPosition(mapping.getLocation))
-            } else {
-                // This didn't map, so the corresponding entry should be None
-                None
-            }
-        }
-    }
-    
-    /**
-     * Map each position in the given string to a range starting with a 1 in the
-     * given RangeVector, or -1 if the FM-index search interval for the base
-     * doesn't get contained in exactly 1 range. Uses the left context.
-     * 
-     * This one comes pre-implemented in terms of right-mapping since the right-
-     * sided one is more natural to implement on an FMD-index.
-     */
-    def leftMap(ranges: RangeVector, context: String): Seq[Long] = {
-        // Flip the sequence around
-        val reverseComplement = context.reverseComplement
-        
-        // Map it
-        val mappings = rightMap(ranges, reverseComplement) 
-        
-        // Reverse the mappings (but leave the range numbers unchanged).
-        mappings.reverse
-    }
-    
-    /**
-     * Return the position to which the given base in the given string uniquely
-     * maps, or None if it does not uniquely map. Maps by downstream context.
-     *
-     * Uses 1-based indexing for position and for base index.
-     *
-     * If the position's face is `Face.RIGHT`, then the base mapped corresponds
-     * to the base it was mapped to. If it is `Face.LEFT`, it corresponds to
-     * the reverse complement of the base it was mapped to.
-     *
-     * By default, this is implemented by left-mapping the reverse complement.
-     */
-    def rightMap(context: String, base: Int): Option[Position] = {
-        // Flip the sequence around
-        val reverseComplement = context.reverseComplement
-        
-        // Left-map the corresponding base in the reverse complement.
-        leftMap(reverseComplement, reverseComplement.size - (base - 1))
-    }
-    
-    /**
-     * Map each position in the given string by downstream context, returning a
-     * sequence of corresponding Positions, or None for bases that don't map.
-     *
-     * If the position's face is `Face.RIGHT`, then the base mapped corresponds
-     * to the base it was mapped to. If it is `Face.LEFT`, it corresponds to
-     * the reverse complement of the base it was mapped to.
-     *
-     * By default, this is implemented by left-mapping the reverse complement.
-     */
-    def rightMap(context: String): Seq[Option[Position]] = {
-        // Flip the sequence around
-        val reverseComplement = context.reverseComplement
-        
-        // Map it
-        val mappings = leftMap(reverseComplement) 
-        
-        // Reverse the mappings (but leave the Sides unchanged).
-        mappings.reverse
-    }
-    
-    /**
-     * Map each position in the given string to a range starting with a 1 in the
-     * given RangeVector, or -1 if the FM-index search interval for the base
-     * doesn't get contained in exactly 1 range. Uses the right context.
-     */
-    def rightMap(ranges: RangeVector, context: String): Seq[Long] = {
-        // Map a whole string to ranges with a range vector
-        
-        // FMD does all the work.
-        val mappings = fmd.map(ranges, context)
-        
-        for {
-            i <- (0L until mappings.size)
-        } yield {
-            // Convert vector to a Scala Seq
-            mappings.get(i.toInt)
-        }
-    }
-    
-    ////////////////////////////////////////////////////////////////////////////
-    // Two-sided, ambiguity-proof mapping to positions only
-    ////////////////////////////////////////////////////////////////////////////
-    
-    /**
-     * Disambiguate a left mapping and a right mapping to produce an overall
-     * mapping for a base, with left-mapping semantics (i.e. left face means
-     * forward strand).
-     *
-     * TODO: Make this something fancy with monads. TODO: Don't call down into
-     * this from ReferenceStructure. Move this itno some utility place.
-     */
-    def disambiguate(leftMapping: Option[Position], 
-        rightMapping: Option[Position]): Option[Position] = {
-        
-        (leftMapping, rightMapping) match {
-            case (Some(leftPosition), Some(rightPosition)) =>
-                // Only in this case do we have to check to ensure the mapping isn't
-                // ambiguous.
-                if(leftPosition.contig == rightPosition.contig && 
-                    leftPosition.base == rightPosition.base && 
-                    leftPosition.face == !rightPosition.face) {
+        face match {
+            case Face.RIGHT =>
+                // Map the reverse complement on the other strand and flip
+                // around.
+                map(context.reverseComplement, context.size - (base - 1),
+                    Face.LEFT) 
+            case Face.LEFT =>
+                // Map (0-based) and get a MapAttemptResult
+                val mapping: MapAttemptResult = fmd.mapPosition(context,
+                    base - 1)
+                
+                if(mapping.getIs_mapped) {
+                    // Get the single actual mapped BWT position
+                    val bwt = mapping.getPosition.getForward_start
                     
-                    // They match (as opposite faces of the same base). Return the
-                    // left one since we have left-mapping semantics.
-                    Some(leftPosition)
+                    // Convert to a Position (for the very first character in
+                    // the pattern)
+                    val position = bwtToPosition(bwt)
+                    
+                    // On the forward strand, we have to offset right by
+                    // (mapping.getCharacters - 1), since we've gotten the
+                    // position of the leftmost character in the pattern and we
+                    // really want that of this specific character.
+                    // Unfortunately, on the reverse strand, we have to offset
+                    // left by the same amount, since the pattern in that case
+                    // is running backwards in genome coordinates.
+                    val offset = position.face match {
+                        case Face.LEFT => mapping.getCharacters - 1
+                        case Face.RIGHT => -(mapping.getCharacters - 1)
+                    }
+                    
+                    // Make a new Position, accounting for the offset from the
+                    // left end of the pattern due to pattern length, and report
+                    // that.
+                    Some(new Position(position.contig, position.base + offset,
+                        position.face))
+                    
                 } else {
-                    // They don't match. Ambiguous mappings don't count
                     None
                 }
-            case (Some(leftPosition), None) =>
-                // Pass through the left mapping since we only have that.
-                Some(leftPosition)
-            case (None, Some(rightPosition)) => 
-                // Right-only-mappings get faces flipped around to match our adopted
-                // left-mapping semantics. Unary ! for Faces is defined in
-                // package.scala.
-                Some(new Position(rightPosition.contig, rightPosition.base, 
-                !rightPosition.face))
-            case (None, None) =>
-                // It didn't map on either side.
-                None
         }
     }
     
+    ////////////////////////////////////////////////////////////////////////////
+    // Left- and right-mapping entire strings to Positions per base.
+    ////////////////////////////////////////////////////////////////////////////
+    
     /**
-     * Map the given base in the given string on both sides. Returns the
-     * position to which it maps, if it maps unambiguously, or None otherwise.
-     *
+     * Map each position in the given string by context on the given face,
+     * returning a sequence of corresponding Positions, or None for bases that
+     * don't map.
      *
      * If the position's face is `Face.LEFT`, then the base mapped corresponds
      * to the base it was mapped to. If it is `Face.RIGHT`, it corresponds to
-     * the reverse complement of the base it was mapped to. This is a slight
-     * semantic asymetry.
-     * 
-     * By default, this is implemented by left-mapping and right-mapping the
-     * base, and aggregating the results.
+     * the reverse complement of the base it was mapped to.
      */
-    def map(context: String, base: Int): Option[Position] = {
-        // Map on each side
-        val leftMapping = leftMap(context, base)
-        val rightMapping = rightMap(context, base)
+    def map(context: String, face: Face): Seq[Option[Position]] = {
+        // Map a whole string
         
-        // Disambiguate the two mappings and return the result
-        disambiguate(leftMapping, rightMapping)
+        face match {
+            case Face.RIGHT =>
+                // Map reverse complement on the other strand and flip around.
+                map(context.reverseComplement, Face.LEFT).reverse
+            case Face.LEFT =>
+                // Do the actual mapping on this strand.
+                val mappings = fmd.map(context)
+                
+                for {
+                    i <- (0L until mappings.size)
+                    mapping <- Some(mappings.get(i.toInt))
+                } yield {
+                    if(mapping.getIs_mapped) {
+                        // Turn the (text, index) pair for this mapping into a
+                        // Position. It's already been corrected for pattern
+                        // length.
+                        Some(pairToPosition(mapping.getLocation))
+                    } else {
+                        // This didn't map, so the corresponding entry should be
+                        // None
+                        None
+                    }
+                }
+        }
     }
     
+    ////////////////////////////////////////////////////////////////////////////
+    // Left- and right-mapping entire strings to range indices per base.
+    ////////////////////////////////////////////////////////////////////////////
+
     /**
      * Map each position in the given string to a range starting with a 1 in the
-     * given RangeVector, or -1 if the FM-index search interval for the base
-     * doesn't get contained in exactly 1 range.
+     * given RangeVector, or to -1 if the FM-index search interval for the base
+     * doesn't get contained in exactly 1 range. Uses the context on the given
+     * face.
      *
-     * By default, this is implemented by left-mapping and right-mapping the
-     * string, and aggregating the results.
+     * The RangeVector specifies bi-ranges, where each range has a corresponding
+     * reverse-complement range present. A range describes a right context.
      */
-    def map(context: String): Seq[Option[Position]] = {
-        // Map on each side
-        val leftMappings = leftMap(context)
-        val rightMappings = rightMap(context)
-    
-        // Zip them together and disambiguate each pair. Note that (a, b).zipped
-        // is of a type that provides a map that takes binary functions, while
-        // a.zip(b).map takes only unary functions.
-        (leftMappings, rightMappings).zipped  map(disambiguate(_, _))
+    def map(ranges: RangeVector, context: String, face: Face): Seq[Long] = {
+        face match {
+            case Face.LEFT =>
+                // Map the reverse complement on the other strand and flip
+                // around.
+                map(ranges, context.reverseComplement, Face.RIGHT).reverse
+            case Face.RIGHT =>
+                // Do the actual mapping (on the right this time, since ranges
+                // specify a downstream context).
+                
+                // FMD does all the work.
+                val mappings = fmd.map(ranges, context)
+                
+                for {
+                    i <- (0L until mappings.size)
+                } yield {
+                    // Convert vector to a Scala Seq
+                    mappings.get(i.toInt)
+                }
+        }
     }
-
 }
 
 /**

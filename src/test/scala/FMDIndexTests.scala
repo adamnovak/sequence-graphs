@@ -115,12 +115,12 @@ class FMDIndexTests extends RLCSASuite {
     }
     
     test("fails to left-map left-ambiguous thing") {
-        val mapping = index.leftMap("AATCTACTGC", 2)
+        val mapping = index.map("AATCTACTGC", 2, Face.LEFT)
         assert(mapping == None)
     }
     
     test("right-maps left-ambiguous thing") {
-        val position = index.rightMap("AATCTACTGC", 2).get
+        val position = index.map("AATCTACTGC", 2, Face.RIGHT).get
         
         assert(position.contig === "seq1")
         assert(position.base === 2)
@@ -128,7 +128,7 @@ class FMDIndexTests extends RLCSASuite {
     }
     
     test("left-maps last base of contig") {
-        val position = index.leftMap("AATCTACTGC", 10).get
+        val position = index.map("AATCTACTGC", 10, Face.LEFT).get
         
         assert(position.contig === "seq1")
         assert(position.base === 10)
@@ -136,7 +136,7 @@ class FMDIndexTests extends RLCSASuite {
     }
     
     test("left-maps last base of reverse complement") {
-        val position = index.leftMap("GCTAGTAGCTT", 11).get
+        val position = index.map("GCTAGTAGCTT", 11, Face.LEFT).get
         
         assert(position.contig === "seq2")
         assert(position.base === 1)
@@ -145,7 +145,7 @@ class FMDIndexTests extends RLCSASuite {
     
     test("left-maps unambiguous bases in contig") {
         val pattern = "AATCTACTGC"
-        val mappings: Seq[Option[Position]] = index.leftMap(pattern)
+        val mappings: Seq[Option[Position]] = index.map(pattern, Face.LEFT)
         
         // The last 8 characters ought to map.
         assert(mappings.map {
@@ -168,7 +168,7 @@ class FMDIndexTests extends RLCSASuite {
     
     test("left-maps unambiguous bases in reverse complement") {
         val pattern = "GCAGTAGATT"
-        val mappings: Seq[Option[Position]] = index.leftMap(pattern)
+        val mappings: Seq[Option[Position]] = index.map(pattern, Face.LEFT)
         
         // The last 8 characters ought to map this way too.
         assert(mappings.map {
@@ -191,7 +191,7 @@ class FMDIndexTests extends RLCSASuite {
     
     test("right-maps unambiguous bases in contig") {
         val pattern = "AATCTACTGC"
-        val mappings: Seq[Option[Position]] = index.rightMap(pattern)
+        val mappings: Seq[Option[Position]] = index.map(pattern, Face.RIGHT)
         
         // The first 8 characters ought to map.
         assert(mappings.map {
@@ -210,63 +210,6 @@ class FMDIndexTests extends RLCSASuite {
         }
         
         
-    }
-    
-    test("maps all bases in contig") {
-    
-        val pattern = "AATCTACTGC"
-        val mappings: Seq[Option[Position]] = index.map(pattern)
-        
-        // The first 8 characters ought to map.
-        assert(mappings.map {
-            case Some(_) => 1
-            case None => 0
-        }.sum == 10)
-        
-        mappings.foreach {
-            case Some(mapping) => {
-                // Everything mapped should be mapped on the left, since map has
-                // left-mapping semantics for its output.
-                assert(mapping.face == Face.LEFT)
-                // And on this contig
-                assert(mapping.contig == "seq1")
-            }
-            case None => {}
-        }
-        
-    }
-    
-    test("maps all bases in reverse complement") {
-    
-        val pattern = "GCTAGTAGCTT"
-        val mappings: Seq[Option[Position]] = index.map(pattern)
-        
-        // The first 8 characters ought to map.
-        assert(mappings.map {
-            case Some(_) => 1
-            case None => 0
-        }.sum == 11)
-        
-        mappings.foreach {
-            case Some(mapping) => {
-                // Everything mapped should be mapped on the right, since map
-                // has left-mapping semantics for its output and we're mapping
-                // to a reverse strand.
-                assert(mapping.face == Face.RIGHT)
-                // And on this contig
-                assert(mapping.contig == "seq2")
-            }
-            case None => {}
-        }
-        
-    }
-    
-    test("discards side-ambiguous mappings") {
-        // Splice a couple sequences together on that T at base 5
-        val pattern = "AATCTAGTAGCTT"
-        
-        val mapping = index.map(pattern, 5)
-        assert(mapping == None)
     }
     
     test("left-maps correctly to 1-item ranges") {
@@ -289,7 +232,7 @@ class FMDIndexTests extends RLCSASuite {
         
         // Now try mapping with the range vector
         val pattern = "AATCTACTGC"
-        val mappings: Seq[Long] = index.leftMap(rangeVector, pattern)
+        val mappings: Seq[Long] = index.map(rangeVector, pattern, Face.LEFT)
         
         println((pattern, mappings).zipped.mkString("\n"))
         
@@ -327,7 +270,7 @@ class FMDIndexTests extends RLCSASuite {
         
         // Now try mapping with the range vector
         val pattern = "AATCTACTGC"
-        val mappings: Seq[Long] = index.rightMap(rangeVector, pattern)
+        val mappings: Seq[Long] = index.map(rangeVector, pattern, Face.RIGHT)
         
         // The first 8 characters ought to map
         assert(mappings.map {
@@ -364,7 +307,7 @@ class FMDIndexTests extends RLCSASuite {
         
         // Now try mapping with the range vector
         val pattern = "GCAGTAGATT"
-        val mappings: Seq[Long] = index.leftMap(rangeVector, pattern)
+        val mappings: Seq[Long] = index.map(rangeVector, pattern, Face.LEFT)
         
         // The last 8 characters ought to map this way around also.
         assert(mappings(0) === -1)
