@@ -123,7 +123,7 @@ class CollapsedReferenceStructure(base: ReferenceStructure, contig: String)
     def addPosition(newPosition: Position, bottomPositions: Seq[Position]) = {
         bottomPositions.foreach { bottomPosition =>
             // Find the BWT index for this Position
-            val bwtIndex = getIndex.inverseLocate(bottomPosition)
+            val bwtIndex = getIndex.positionToBWT(bottomPosition)
             
             // Store this new position in there, collecting with adjacent BWT
             // things if possible.

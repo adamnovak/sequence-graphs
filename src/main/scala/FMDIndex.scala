@@ -80,9 +80,8 @@ class FMDIndex(basename: String) {
             // Get a text number and an offset
             val textAndOffset = fmd.getRelativePosition(location)
             
-            // Cons it onto the list.
-            items = getPosition(textAndOffset.getFirst.toInt,
-                textAndOffset.getSecond, pattern.size) :: items
+            // Make a Position and cons it onto the list.
+            items = pairToPosition(textAndOffset) :: items
         }
         
         // Free the C array of locations
@@ -94,80 +93,20 @@ class FMDIndex(basename: String) {
     }
     
     ////////////////////////////////////////////////////////////////////////////
-    // Convert between Positions and BWT coordinates
+    // Convert between Positions, text-offset pairs and BWT coordinates
     ////////////////////////////////////////////////////////////////////////////
     
     /**
-     * Get the Position for the last character in a pattern found at a given
-     * offset in a given text, when the pattern has the given length. Returns
-     * the Position for the start of that offset in that text (so left side of
-     * base 1 for forward-strand offset 0, and right side of the last base for
-     * reverse- strand offset 0).
+     * Convert a Position to a BWT index in this index. If the Position is a
+     * LEFT face, it will be on the forward strand; if it is a RIGHT face, it
+     * will be on the reverse strand.
      */
-    def getPosition(text: Int, offset: Long,
-        patternLength: Int = 1): Position = {
-        
-        // Work out how far we are into what strand of what contig.
-        val contigNumber: Int = text / 2
-        val contigStrand: Int = text % 2
-        
-        // What contig name is that contig number?
-        val contigName = contigData(contigNumber)._1
-        // How long is that contig?
-        val contigLength = contigData(contigNumber)._2
-        // What face should we use for that strand?
-        val face = contigStrand match {
-            case 0 => Face.LEFT
-            case 1 => Face.RIGHT
-        }
-        
-        // What position should we use on that strand?
-        val position = contigStrand match {
-            // Forward strand we just go to the end of the pattern
-            case 0 => offset + patternLength
-            // On the reverse strand we start at the end and go back, but when
-            // patternLength is 1 and offset is 0 we must return contigLength,
-            // so we need the + 1.
-            case 1 => contigLength - (offset + patternLength) + 1
-        }
-        
-        // Make a Position representing wherever we've decided this base really
-        // goes.
-        new Position(contigName, position, face)
-    }
-    
-    /**
-     * Given a BWT index, return the Position of that base's upstream side.
-     */
-    def locate(bwtPosition: Long): Position = {
-        // Get a pointer to the BWT position
-        val positionPointer = RLCSAUtil.copy_USIntPointer(bwtPosition)
-        
-        // Convert to an SA coordinate
-        fmd.convertToSAIndex(positionPointer);
-        
-        // Locate it, and then report position as a (text, offset) pair.
-        val textAndOffset = fmd.getRelativePosition(fmd.locate(
-            RLCSAUtil.USIntPointer_value(positionPointer)));
-        
-        // Convert that to a Position
-        return getPosition(textAndOffset.getFirst.toInt, 
-            textAndOffset.getSecond)
-    }
-    
-    /**
-     * Given a Position on a contig in this FMDIndex, return the internal BWT
-     * position corresponding to that Position, such as might be inside a range
-     * in a RangeVector or IntervalTree.
-     * TODO: Does not check that the given Position is in-range on the text.
-     */
-    def inverseLocate(position: Position): Long = {
+    def positionToBWT(position: Position): Long = {
         // Look up the contig used in the Position
         val (contigNumber, contigLength) = contigInverse(position.contig)
         
         // What text index corresponds to the strand of the contig this Position
-        // lives on? Forward texts are even, reverse ones are odd. TODO: This is
-        // kind of sort of the inverse of getPosition. Tie these together.
+        // lives on? Forward texts are even, reverse ones are odd.
         val text = contigNumber * 2 + (if(position.face == Face.LEFT) 0 else 1)
         
         // What's the offset in the text?
@@ -199,6 +138,66 @@ class FMDIndex(basename: String) {
         SAIndex + fmd.getNumberOfSequences
     }
     
+    /**
+     * Convert a BWT index in this index to a Position. If the BWT index is on
+     * the forward strand, it will be a Position with a LEFT face; if it is on
+     * the reverse strand, it will be a position with a RIGHT face.
+     */
+    def bwtToPosition(bwt: Long): Position = {
+        // Convert from BWT coordinates to SA coordinates, locate it, and then
+        // report position as a (text, offset) pair.
+        val textAndOffset = fmd.getRelativePosition(fmd.locate(bwt - 
+            fmd.getNumberOfSequences));
+        
+        // Convert that pair to a Position
+        pairToPosition(textAndOffset)
+    }
+    
+    /**
+     * Convert a text and offset pair (which some C++-level mapping functions
+     * use) to a Position. If the text is a forward- strand text, the position's
+     * face will be LEFT; otherwise it will be RIGHT.
+     */
+    def pairToPosition(textAndOffset: pair_type): Position = {
+        // Pull out the text and offset
+        pairToPosition(textAndOffset.getFirst.toInt, textAndOffset.getSecond)
+    }
+    
+    /**
+     * Convert a text number and offset length to a Position. If the text is a
+     * forward- strand text, the position's face will be LEFT; otherwise it will
+     * be RIGHT.
+     */
+    def pairToPosition(text: Int, offset: Long): Position = {
+        // Work out how far we are into what strand of what contig.
+        val contigNumber: Int = text / 2
+        val contigStrand: Int = text % 2
+        
+        // What contig name is that contig number?
+        val contigName = contigData(contigNumber)._1
+        // How long is that contig?
+        val contigLength = contigData(contigNumber)._2
+        
+        // What face should we use for that strand?
+        val face = contigStrand match {
+            case 0 => Face.LEFT
+            case 1 => Face.RIGHT
+        }
+        
+        // What base number should we use on that strand?
+        val base = contigStrand match {
+            // On the forward strand, the first position is base 1
+            case 0 => offset + 1
+            // On the reverse strand we start at the end and go back.
+            // Automatically corrects for 0/1-based-ness.
+            case 1 => contigLength - offset
+        }
+        
+        // Make a Position representing wherever we've decided this base really
+        // goes.
+        new Position(contigName, base, face)
+    }
+    
     ////////////////////////////////////////////////////////////////////////////
     // Left and right mapping to positions or BWT ranges
     ////////////////////////////////////////////////////////////////////////////
@@ -221,28 +220,28 @@ class FMDIndex(basename: String) {
         val mapping: MapAttemptResult = fmd.mapPosition(context, base - 1)
         
         if(mapping.getIs_mapped) {
-            // Get the single actual mapped position
-            val position = mapping.getPosition.getForward_start
+            // Get the single actual mapped BWT position
+            val bwt = mapping.getPosition.getForward_start
             
-            // Get a pointer to the same value
-            val positionPointer = RLCSAUtil.copy_USIntPointer(position)
+            // Convert to a Position (for the very first character in the
+            // pattern)
+            val position = bwtToPosition(bwt)
             
-            // Convert to an SA coordinate
-            fmd.convertToSAIndex(positionPointer);
+            // On the forward strand, we have to offset right by
+            // (mapping.getCharacters - 1), since we've gotten the position of
+            // the leftmost character in the pattern and we really want that of
+            // this specific character. Unfortunately, on the reverse strand, we
+            // have to offset left by the same amount, since the pattern in that
+            // case is running backwards in genome coordinates.
+            val offset = position.face match {
+                case Face.LEFT => mapping.getCharacters - 1
+                case Face.RIGHT => -(mapping.getCharacters - 1)
+            }
             
-            // Locate it, and then report position as a (text, offset) pair.
-            // This will give us the position of the first base in the pattern,
-            // which lets us infer the position of the last base in the pattern.
-            val textAndOffset = fmd.getRelativePosition(fmd.locate(
-                RLCSAUtil.USIntPointer_value(positionPointer)));
-                
-            // Free the pointer's memory
-            RLCSAUtil.delete_USIntPointer(positionPointer);
-                
-            // Make a Position, accounting for the offset from the left end of
-            // the pattern due to pattern length, and report that.
-            Some(getPosition(textAndOffset.getFirst.toInt,
-                textAndOffset.getSecond, mapping.getCharacters.toInt))
+            // Make a new Position, accounting for the offset from the left end
+            // of the pattern due to pattern length, and report that.
+            Some(new Position(position.contig, position.base + offset,
+                position.face))
             
         } else {
             None
@@ -270,10 +269,8 @@ class FMDIndex(basename: String) {
         } yield {
             if(mapping.getIs_mapped) {
                 // Turn the (text, index) pair for this mapping into a Position.
-                // It's already been corrected for pattern length, so pretend
-                // it's a length-1 pattern.
-                Some(getPosition(mapping.getLocation.getFirst.toInt, 
-                    mapping.getLocation.getSecond, 1))
+                // It's already been corrected for pattern length.
+                Some(pairToPosition(mapping.getLocation))
             } else {
                 // This didn't map, so the corresponding entry should be None
                 None

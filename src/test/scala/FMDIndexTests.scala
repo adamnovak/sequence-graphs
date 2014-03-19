@@ -16,43 +16,86 @@ class FMDIndexTests extends RLCSASuite {
         index = new FMDIndex(basename)
     }
     
-    test("getPosition works at start of forward strand") {
-        val position = index.getPosition(0, 0, 1)
+    test("pairToPosition works at start of forward strand") {
+        val position = index.pairToPosition(0, 0)
         
-        assert(position.contig == "seq1")
-        assert(position.base == 1)
-        assert(position.face == Face.LEFT)
+        assert(position.contig === "seq1")
+        assert(position.base === 1)
+        assert(position.face === Face.LEFT)
     }
     
-    test("getPosition works at start of a reverse strand") {
-        val position = index.getPosition(1, 0, 1)
-        assert(position.contig == "seq1")
-        assert(position.base == 10)
-        assert(position.face == Face.RIGHT)
+    test("pairToPosition works at start of a reverse strand") {
+        val position = index.pairToPosition(1, 0)
+        assert(position.contig === "seq1")
+        assert(position.base === 10)
+        assert(position.face === Face.RIGHT)
     }
     
-    test("getPosition works at end of a forward strand") {
-        val position = index.getPosition(0, 9, 1)
+    test("pairToPosition works at end of a forward strand") {
+        val position = index.pairToPosition(0, 9)
         
-        assert(position.contig == "seq1")
-        assert(position.base == 10)
-        assert(position.face == Face.LEFT)
+        assert(position.contig === "seq1")
+        assert(position.base === 10)
+        assert(position.face === Face.LEFT)
     }
     
-    test("getPosition works at end of a reverse strand") {
-        val position = index.getPosition(1, 9, 1)
+    test("pairToPosition works at end of a reverse strand") {
+        val position = index.pairToPosition(1, 9)
         
-        assert(position.contig == "seq1")
-        assert(position.base == 1)
-        assert(position.face == Face.RIGHT)
+        assert(position.contig === "seq1")
+        assert(position.base === 1)
+        assert(position.face === Face.RIGHT)
     }
     
-    test("getPosition works on a whole strand") {
-        val position = index.getPosition(0, 0, 10)
+    test("positionToBWT inverts bwtToPosition") {
+        // BWT space is ((# of contigs) + (totoal contig length)) * 2 in size.
+        // We know that RLCSASuite has 2 sequences, one of 10 bases and one of
+        // 11.
+        val bwtSize = (2 + (10 + 11)) * 2
+        // The actual letters in the BWT start after the 2 * # of texts text end
+        // characters
+        val bwtStart = 2 * 2
         
-        assert(position.contig == "seq1")
-        assert(position.base == 10)
-        assert(position.face == Face.LEFT)
+        for(bwt <- bwtStart until bwtSize) {
+            // For a bunch of positions in the BWT
+            assert(index.positionToBWT(index.bwtToPosition(bwt)) === bwt)
+        }
+    }
+    
+    test("bwtToPosition works by index") {
+        // Get the location of the first non-end character in the BWT. 0-3 are
+        // $.
+        val position = index.bwtToPosition(4)
+        // The first suffix is going to be the one that starts AAG: all of seq2.
+        assert(position.contig === "seq2")
+        // Sequence position is 1-based.
+        assert(position.base === 1)
+        assert(position.face === Face.LEFT)
+        
+        // And the second one ought to be AAT: all of seq1
+        val position2 = index.bwtToPosition(5)
+        assert(position2.contig === "seq1")
+        assert(position2.base === 1)
+        assert(position2.face === Face.LEFT)
+    }
+    
+    test("positionToBWT works correctly") {
+        // Make sure we match the test above
+        assert(index.positionToBWT(new Position("seq2", 1, Face.LEFT)) === 4)
+        assert(index.positionToBWT(new Position("seq1", 1, Face.LEFT)) === 5)
+    }
+    
+    test("bwtToPosition inverts positionToBWT") {
+        // Let's try every base on seq1 (length 10), for both strands
+        for(i <- 1 until 11) {
+            // Check the left sides
+            val pos = new Position("seq1", i, Face.LEFT)
+            assert(index.bwtToPosition(index.positionToBWT(pos)) === pos)
+            
+            // And the right sides
+            val pos2 = new Position("seq1", i, Face.RIGHT)
+            assert(index.bwtToPosition(index.positionToBWT(pos2)) === pos2)
+        }
     }
     
     test("does not find missing substring") {
@@ -79,25 +122,25 @@ class FMDIndexTests extends RLCSASuite {
     test("right-maps left-ambiguous thing") {
         val position = index.rightMap("AATCTACTGC", 2).get
         
-        assert(position.contig == "seq1")
-        assert(position.base == 2)
-        assert(position.face == Face.RIGHT)
+        assert(position.contig === "seq1")
+        assert(position.base === 2)
+        assert(position.face === Face.RIGHT)
     }
     
     test("left-maps last base of contig") {
         val position = index.leftMap("AATCTACTGC", 10).get
         
-        assert(position.contig == "seq1")
-        assert(position.base == 10)
-        assert(position.face == Face.LEFT)
+        assert(position.contig === "seq1")
+        assert(position.base === 10)
+        assert(position.face === Face.LEFT)
     }
     
     test("left-maps last base of reverse complement") {
         val position = index.leftMap("GCTAGTAGCTT", 11).get
         
-        assert(position.contig == "seq2")
-        assert(position.base == 1)
-        assert(position.face == Face.RIGHT)
+        assert(position.contig === "seq2")
+        assert(position.base === 1)
+        assert(position.face === Face.RIGHT)
     }
     
     test("left-maps unambiguous bases in contig") {
@@ -334,42 +377,6 @@ class FMDIndexTests extends RLCSASuite {
         
         // There should be 9 distint values: 8 mapping locations and two -1s
         assert(mappings.distinct.size === 9)
-    }
-    
-    test("locate works by index") {
-        // Get the location of the first non-end character in the BWT. 0-3 are
-        // $.
-        val position = index.locate(4)
-        // The first suffix is going to be the one that starts AAG: all of seq2.
-        assert(position.contig === "seq2")
-        // Sequence position is 1-based.
-        assert(position.base === 1)
-        assert(position.face === Face.LEFT)
-        
-        // And the second one ought to be AAT: all of seq1
-        val position2 = index.locate(5)
-        assert(position2.contig === "seq1")
-        assert(position2.base === 1)
-        assert(position2.face === Face.LEFT)
-    }
-    
-    test("inverseLocate works correctly") {
-        // Make sure we match the test above
-        assert(index.inverseLocate(new Position("seq2", 1, Face.LEFT)) === 4)
-        assert(index.inverseLocate(new Position("seq1", 1, Face.LEFT)) === 5)
-    }
-    
-    test("locate inverts inverseLocate") {
-        // Let's try every base on seq1 (length 10), for both strands
-        for(i <- 1 until 11) {
-            // Check the left sides
-            val pos = new Position("seq1", i, Face.LEFT)
-            assert(index.locate(index.inverseLocate(pos)) === pos)
-            
-            // And the right sides
-            val pos2 = new Position("seq1", i, Face.RIGHT)
-            assert(index.locate(index.inverseLocate(pos2)) === pos2)
-        }
     }
     
 }
