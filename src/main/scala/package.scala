@@ -117,11 +117,30 @@ package object genome {
      */
     implicit class RichFace(face: Face) {
         /** 
-         * Flip faces with unary !
+         * Flip Faces with unary !
          */
         def unary_! : Face = face match {
             case Face.LEFT => Face.RIGHT
             case Face.RIGHT => Face.LEFT
+        }
+    }
+    
+    /**
+     * Magically allow us to do nice things with Positions.
+     */
+    implicit class RichPosition(position: Position) {
+        /** 
+         * Flip Position faces with unary !
+         */
+        def unary_! : Position = {
+            // Flip the face around
+            val newFace = position.face match {
+                case Face.LEFT => Face.RIGHT
+                case Face.RIGHT => Face.LEFT
+            }
+            
+            // Make a new Position
+            new Position(position.contig, position.base, newFace)
         }
     }
 }

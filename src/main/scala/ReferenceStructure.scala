@@ -1,4 +1,5 @@
 package edu.ucsc.genome
+import scala.collection.immutable.HashMap
 
 /**
  * Represents a Reference Structure: a phased or unphased sequence graph, with a
@@ -80,6 +81,13 @@ trait ReferenceStructure {
     def getIndex: FMDIndex
     
     /**
+     * Given a Position on this level, get the BWT ranges corresponding to it.
+     * At the bottom level, `Face.LEFT` positions are on the forward strand, and
+     * `Face.RIGHT` positions are on the reverse. Ranges are inclusive.
+     */
+    def getRanges(position: Position): Seq[(Long, Long)]
+    
+    /**
      * Map all bases in the given string to Positions using the context on the
      * given face.
      */
@@ -105,6 +113,13 @@ class StringReferenceStructure(basename: String) extends ReferenceStructure {
 
     // Expose our index to the level above us.
     def getIndex = index
+    
+    def getRanges(position: Position): Seq[(Long, Long)] = {
+        // Ranges for positions are just the BWT indices corresponding to them.
+        val bwtPosition = index.positionToBWT(position)
+        
+        Seq((bwtPosition, bwtPosition))
+    }
 }
 
 /**
@@ -118,9 +133,14 @@ class StringReferenceStructure(basename: String) extends ReferenceStructure {
  */
 class CollapsedReferenceStructure(base: ReferenceStructure, contig: String) 
     extends ReferenceStructure {
-
+    
     // We have an IntervalMap of intervals we merge to what we merge them into.
     val intervals = new IntervalMap[Position]
+    
+    // We also keep a map from parent Positions at this level to the lower-level
+    // Positions they merge, which is necessary to get the ranges for a
+    // Position. TODO: can we simplify this?
+    var children: HashMap[Position, Seq[Position]] = HashMap.empty
     
     // We keep track of the next base ID that is free
     var nextId: Long = 1
@@ -137,14 +157,16 @@ class CollapsedReferenceStructure(base: ReferenceStructure, contig: String)
         toReturn
     }
     
-    // We map using the ranges thing.
+    // We map using the range-based mapping mode on the index.
     def map(pattern: String, face: Face): Seq[Option[Position]] = {
         getIndex.map(intervals.rangeVector, pattern, face).map {
             // An range number of -1 means it didn't map 
             case -1 => None
             // Otherwise go get the Position for the range it mapped to (or None
-            // if there's no position for that range).
-            case range => intervals.valueArray(range.toInt)
+            // if there's no position for that range). Make sure to flip it
+            // around, to compensate for range mapping producing right-side
+            // contexts on the forward strand instead of left-side ones.
+            case range => intervals.valueArray(range.toInt).map(!_)
         }
     }
     
@@ -152,72 +174,62 @@ class CollapsedReferenceStructure(base: ReferenceStructure, contig: String)
     def getIndex = base.getIndex
     
     /**
-     * Add a new Position at this level, created by merging the given sequence
-     * of bottom-level positions. A given bottom-level position may be used only
-     * once.
+     * Given a sequence of Positions from the previous level, create a new base
+     * that merges all the given Positions into its left face, and the opposite
+     * faces of all the given positions into its right face. Returns the
+     * Position of the left face of the base thus created.
      */
-    def addPosition(newPosition: Position, bottomPositions: Seq[Position]) = {
-        bottomPositions.foreach { bottomPosition =>
-            // Find the BWT index for this Position
-            val bwtIndex = getIndex.positionToBWT(bottomPosition)
-            
-            // Store this new position in there, collecting with adjacent BWT
-            // things if possible.
-            intervals(bwtIndex, bwtIndex) = newPosition
+    def addBase(toMerge: Seq[Position]): Position = {
+        // First make a new position left face (i.e. forward orientation).
+        val newLeft = new Position(contig, nextBase, Face.LEFT)
+        // And a flipped version for the right
+        val newRight = !newLeft
+        
+        for(position <- toMerge; range <- base.getRanges(position)) {
+            // Add in all the left side intervals pointing to our new left.
+            intervals(range) = newLeft
         }
+        
+        for(position <- toMerge; range <- base.getRanges(!position)) {
+            // Add in all the right side intervals pointing to our new right
+            intervals(range) = newRight
+        }
+        
+        // Add child lists
+        children += ((newLeft, toMerge))
+        children += ((newRight, toMerge.map(!_)))
+        
+        // Return our left-face Position
+        newLeft
+    }
+    
+    def getRanges(position: Position): Seq[(Long, Long)] = {
+        // Just concatenate the ranges from all the clildren. TODO: Merging
+        // ranges
+        children(position).flatMap(base.getRanges(_))
     }
     
     /**
-     * Shorthand way to merge both Sides of a pair of positions into a new
-     * position.
+     * Add a new base using the given Position as its left side, and the
+     * opposite face of that position's base as its right side.
+     */
+    def addBase(position: Position): Position = addBase(Seq(position))
+    
+    /**
+     * Shorthand way to merge two bases from the lower level, in the same
+     * orientation.
      */
     def merge(contig1: String, base1: Long, contig2: String, base2: Long) = {
-        
-        // Assign the next free base number to the merged position. It gets used
-        // for both left and right sides, which make sense.
-        val base = nextBase
-        
-        for(face <- Seq(Face.LEFT, Face.RIGHT)) {
-            // Merge this face
-            
-            // What Position will we produce? It's in our structure's contig,
-            // with the next free base number. TODO: We're inverting the face
-            // because we need to store the positions correspondign to the left
-            // faces of the things we merge (left-mapping semantics) as the
-            // right faces of the things we merge them into (because of the
-            // range-mapping functions' low-level right-mapping semantics.)
-            val newPosition = new Position(contig, base, !face)
-            
-            // What positions is it based on?
-            val toMerge = Seq(new Position(contig1, base1, face), 
-                new Position(contig2, base2, face))
-                
-            // Actually add the position merging them together.
-            addPosition(newPosition, toMerge)
-        }
+        // Turn the two contig, base pairs into a sequence of Positions.
+        addBase(Seq(new Position(contig1, base1, Face.LEFT),
+            new Position(contig2, base2, Face.LEFT)))
     }
     
     /**
-     * Shorthand way of just taking a position from the bottom-level graph without
-     * merging it with anything.
+     * Shorthand way to pass a base from the lower level up to this level.
      */
     def pass(passContig: String, passBase: Long) = {
-        // Assign the next free base number to the merged position. It gets used
-        // for both left and right sides, which make sense.
-        val base = nextBase
-    
-        for(face <- Seq(Face.LEFT, Face.RIGHT)) {
-            // Pass this face
-            
-            // What Position will we re-name this to? TODO: We're inverting the
-            // face because we need to store the positions correspondign to the
-            // left faces of the things we pass (left-mapping semantics) as the
-            // right faces of the things we pass them up as (because of the
-            // range-mapping functions' low-level right-mapping semantics.)
-            val position = new Position(contig, base, !face)
-                
-            // Actually add the position
-            addPosition(position, Seq(new Position(passContig, passBase, face)))
-        }
+        // Make the contig, base pair into a position.
+        addBase(new Position(passContig, passBase, Face.LEFT))
     }
 }
