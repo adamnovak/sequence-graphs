@@ -2,8 +2,8 @@ package edu.ucsc.genome
 
 /**
  * An implicitly-convertable-to class for Sequence Graph objects that have (or
- * are represented by) edges in the graph: AlleleGroups, Adjacencies, and
- * Anchors.
+ * are represented by) edges in the graph: Sites, Breakpoints, Abstractions,
+ * AlleleGroups, Adjacencies, and Anchors.
  *
  * We do this instead of a type class since you can't have a list of type class
  * instances of different underlying types and polymorphically dispatch added
@@ -36,5 +36,26 @@ case class AdjacencyEdge(owner: Adjacency) extends HasEdge {
  * A class to say that Anchors are edges.
  */
 case class AnchorEdge(owner: Anchor) extends HasEdge {
+    def edge = owner.edge
+}
+
+/**
+ * A class to say that Sites are edges.
+ */
+case class SiteEdge(owner: Site) extends HasEdge {
+    def edge = owner.edge
+}
+
+/**
+ * A class to say that Breakpoints are edges.
+ */
+case class BreakpointEdge(owner: Breakpoint) extends HasEdge {
+    def edge = owner.edge
+}
+
+/**
+ * A class to say that Generalizations are edges.
+ */
+case class GeneralizationEdge(owner: Generalization) extends HasEdge {
     def edge = owner.edge
 }

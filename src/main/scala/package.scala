@@ -25,7 +25,8 @@ package edu.ucsc
 package object genome {
     
     /**
-     * Define an ordering for Positions implicitly, rather than trying to edit the code-generated Avro code to add it.
+     * Define an ordering for Positions implicitly, rather than trying to edit
+     * the code-generated Avro code to add it.
      */
     implicit val positionOrdering = Ordering.by { (position: Position) =>
         (position.contig, position.base, position.face)
@@ -90,6 +91,38 @@ package object genome {
      */
     implicit def Anchor2HasEdge(anchor: Anchor): HasEdge = {
         AnchorEdge(anchor)
+    }
+    
+    /**
+     * Magically wrap Sites in HasEdge objects.
+     *
+     * TODO: Upgrade to Scala 2.10 Implicit Classes(?) instead of this. But we'd
+     * have to get rid of case class-ness.
+     */
+    implicit def Site2HasEdge(site: Site): HasEdge = {
+        SiteEdge(site)
+    }
+    
+    /**
+     * Magically wrap Breakpoints in HasEdge objects.
+     *
+     * TODO: Upgrade to Scala 2.10 Implicit Classes(?) instead of this. But we'd
+     * have to get rid of case class-ness.
+     */
+    implicit def Breakpoint2HasEdge(breakpoint: Breakpoint): HasEdge = {
+        BreakpointEdge(breakpoint)
+    }
+    
+    /**
+     * Magically wrap Generalization in HasEdge objects.
+     *
+     * TODO: Upgrade to Scala 2.10 Implicit Classes(?) instead of this. But we'd
+     * have to get rid of case class-ness.
+     */
+    implicit def Generalization2HasEdge(
+        generalization: Generalization): HasEdge = {
+        
+        GeneralizationEdge(generalization)
     }
     
     /**

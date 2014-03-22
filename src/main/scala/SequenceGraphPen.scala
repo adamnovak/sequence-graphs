@@ -33,43 +33,13 @@ import scala.math._
  * ID to start at, and the number of IDs it is allowed to generate (before
  * infringing on some other parallel task's ID space). All of these are
  * optional.
+ *
  */
 class SequenceGraphPen(genome: String = "", idStart: Long = 0, 
     idCount: Long = -1) {
 
-    // Compute the actual ID limit, which may or many not be present, but if
-    // present should be what the caller passed.
-    val idLimit = idCount match {
-        case -1 => None
-        case other => Some(idStart + other)
-    }
-
-    // Keep track of the next ID available to allocate
-    var nextID = idStart
-    
-    /**
-     * Allocate and return an ID. If we have run out of IDs, raise an exception.
-     */
-    protected def id: Long = {
-        // Grab the next ID value
-        val toReturn = nextID
-        // Say the next next ID is 1 after that one
-        nextID += 1
-        
-        idLimit.map { (limit) =>
-            if(toReturn >= limit) {
-                // Complain we ran out of IDs
-                throw new Exception(
-                    "Pen can't allocate %d from ID block of %d at %d".format(
-                    toReturn, idCount, idStart))
-            }
-        }
-        
-        
-        
-        // Return the ID we generated
-        toReturn
-    }
+    // Keep around a source of IDs.
+    val source = new IDSource(idStart, idCount)
     
     /**
      * Produce a new Side on the given contig, with the given base and face.
@@ -83,14 +53,15 @@ class SequenceGraphPen(genome: String = "", idStart: Long = 0,
         // that position. We could also have Sides in complicated insert graphs
         // that have just UUID positions, but they still have a lower bound in
         // our linear coordinate system.
-        new Side(id, position, isReference, position)
+        new Side(source.id, position, isReference, position)
     }
     
     /**
      * Make a new Edge between the Sides with the given IDs. This is not the
      * same as adjacencies; drawAdjacency draws those.
      */
-    def drawEdge(left: Long, right: Long): Edge = new Edge(id, left, right)
+    def drawEdge(left: Long, right: Long): Edge = new Edge(source.id, left,
+        right)
     
     /**
      * Make a new AlleleGroup between the given pair of Side IDs, carrying the

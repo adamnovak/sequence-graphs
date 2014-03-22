@@ -81,9 +81,8 @@ protocol ReferenceGraphTypes {
         // The Edge in the graph that represents this Site.
         Edge edge;
         
-        // A list of Alleles possible at the Site. The 0th Allele is taken to be
-        // the "reference" allele, while the others are alternates.
-        array<Allele> alleles;         
+        // The base that should be present at this Site.
+        string base;         
     }
     
     record Breakpoint {
@@ -99,6 +98,14 @@ protocol ReferenceGraphTypes {
         // path consisting only of reference adjacencies and sites with nonempty
         // reference alleles.
         boolean isReference;   
+    }
+    
+    record Generalization {
+        // Represents the idea that the first Side that the Edge connects is an
+        // instance of the second Side that the Edge connects.
+        
+        // The Edge in the graph that represents this Abstraction relationship.
+        Edge edge;
     }
     
     // Telomeres are represented by Sides that are not involved in Site edges,

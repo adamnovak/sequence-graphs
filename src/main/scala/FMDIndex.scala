@@ -50,6 +50,26 @@ class FMDIndex(basename: String) {
     }.toMap
     
     ////////////////////////////////////////////////////////////////////////////
+    // Metadata Operations
+    ////////////////////////////////////////////////////////////////////////////
+    
+    /**
+     * Get all the contig names in the index, in order.
+     */
+    def contigs: Seq[String] = {
+        contigData.map(_._1)
+    }
+        
+    
+    /**
+     * Get the length of the contig with the given name.
+     */
+    def contigLength(contig: String): Long = {
+        // We store (index, length) tuples by name.
+        contigInverse(contig)._2
+    }
+    
+    ////////////////////////////////////////////////////////////////////////////
     // FM-Index Operations
     ////////////////////////////////////////////////////////////////////////////
     
@@ -97,11 +117,11 @@ class FMDIndex(basename: String) {
     ////////////////////////////////////////////////////////////////////////////
     
     /**
-     * Convert a Position to a BWT index in this index. If the Position is a
-     * LEFT face, it will be on the forward strand; if it is a RIGHT face, it
-     * will be on the reverse strand.
+     * Convert a Position into a text number and offset in that text. If the
+     * Position is a LEFT face, it will be on the forward strand; if it is a
+     * RIGHT face, it will be on the reverse strand.
      */
-    def positionToBWT(position: Position): Long = {
+    def positionToPair(position: Position): (Int, Long) = {
         // Look up the contig used in the Position
         val (contigNumber, contigLength) = contigInverse(position.contig)
         
@@ -120,6 +140,19 @@ class FMDIndex(basename: String) {
             // adjusts for the 1-based to 0-based conversion.
             contigLength - position.base
         }
+        
+        // Return the text and offset
+        (text, offset)
+    }
+    
+    /**
+     * Convert a Position to a BWT index in this index. If the Position is a
+     * LEFT face, it will be on the forward strand; if it is a RIGHT face, it
+     * will be on the reverse strand.
+     */
+    def positionToBWT(position: Position): Long = {
+        // Turn the position into a text and offset.
+        val (text, offset) = positionToPair(position)
         
         // Pack the two together in the right type to send down to C++
         val textAndOffset: pair_type = new pair_type(text, offset)
@@ -199,6 +232,25 @@ class FMDIndex(basename: String) {
         // goes.
         new Position(contigName, base, face)
     }
+    
+    ////////////////////////////////////////////////////////////////////////////
+    // Extracting sequence
+    ////////////////////////////////////////////////////////////////////////////
+    
+    /**
+     * Return the base letter corresponding to the given Position.
+     */
+    def display(position: Position): String = {
+        // Find the text and offset for this position.
+        val (text, offset) = positionToPair(position)
+        
+        // Make a single-item range.
+        val rangeToGrab = new pair_type(offset, offset)
+        
+        // Grab the single-character string.
+        fmd.display(text, rangeToGrab)
+    }
+    
     
     ////////////////////////////////////////////////////////////////////////////
     // Left- and right-mapping single bases to Positions

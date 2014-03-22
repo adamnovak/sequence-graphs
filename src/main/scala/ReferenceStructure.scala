@@ -142,20 +142,8 @@ class CollapsedReferenceStructure(base: ReferenceStructure, contig: String)
     // Position. TODO: can we simplify this?
     var children: HashMap[Position, Seq[Position]] = HashMap.empty
     
-    // We keep track of the next base ID that is free
-    var nextId: Long = 1
-    
-    /**
-     * Produce the next free base number.
-     */
-    def nextBase: Long = {
-        // Keep the last value
-        val toReturn = nextId
-        // Increment
-        nextId += 1
-        // Return the value we kept
-        toReturn
-    }
+    // We have an IDSource for base IDs
+    val source = new IDSource(1)
     
     // We map using the range-based mapping mode on the index.
     def map(pattern: String, face: Face): Seq[Option[Position]] = {
@@ -181,7 +169,7 @@ class CollapsedReferenceStructure(base: ReferenceStructure, contig: String)
      */
     def addBase(toMerge: Seq[Position]): Position = {
         // First make a new position left face (i.e. forward orientation).
-        val newLeft = new Position(contig, nextBase, Face.LEFT)
+        val newLeft = new Position(contig, source.id, Face.LEFT)
         // And a flipped version for the right
         val newRight = !newLeft
         
