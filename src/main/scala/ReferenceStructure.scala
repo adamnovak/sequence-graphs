@@ -98,13 +98,15 @@ trait ReferenceStructure {
  * A ReferenceStructure for phased sequence graphs (i.e. string haplotypes).
  * Backed by an FMDIndex.
  *
- * Takes a string basename for the index to load, as created with RLCSABuilder.
  * Positions are all on contigs in that index.
  */
-class StringReferenceStructure(basename: String) extends ReferenceStructure {
+class StringReferenceStructure(index: FMDIndex) extends ReferenceStructure {
     
-    // Make our FMDIndex
-    val index = new FMDIndex(basename)
+    /**
+     * Make a new StringReferenceStructure from an index basename, describing an
+     * FMD-index as would be created with RLCSABuilder.
+     */
+    def this(basename: String) = this(new FMDIndex(basename))
 
     // Map with our index
     def map(pattern: String, face: Face): Seq[Option[Position]] = {
@@ -164,12 +166,18 @@ class CollapsedReferenceStructure(base: ReferenceStructure, contig: String)
     /**
      * Given a sequence of Positions from the previous level, create a new base
      * that merges all the given Positions into its left face, and the opposite
-     * faces of all the given positions into its right face. Returns the
-     * Position of the left face of the base thus created.
+     * faces of all the given positions into its right face. Uses the specified
+     * Position if given (must be a left Face), or creates a new Position
+     * otherwise. Returns the Position of the left face of the base thus
+     * created.
      */
-    def addBase(toMerge: Seq[Position]): Position = {
-        // First make a new position left face (i.e. forward orientation).
-        val newLeft = new Position(contig, source.id, Face.LEFT)
+    def addBase(toMerge: Seq[Position], target: Position = null): Position = {
+        // First make a new position left face (i.e. forward orientation) if
+        // needed.
+        val newLeft = target match {
+            case null => new Position(contig, source.id, Face.LEFT)
+            case thing => thing
+        }
         // And a flipped version for the right
         val newRight = !newLeft
         

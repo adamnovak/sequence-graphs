@@ -5,6 +5,8 @@ import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
 import org.apache.spark.graphx._
 
+import scala.reflect._
+
 /**
  * Represents the kind of reference structure that a level in a reference
  * hierarchy is (i.e. what merging scheme is used to produce it).
@@ -73,31 +75,38 @@ case class NonSymmetric(context: Int) extends MergingScheme {
 
 /**
  * Represents a reference hierarchy composed of reference structures at
- * different levels. Defined by a bottom-level index, a possibly-complete graph
- * of Sides, Sites, Adjacencies, and Generalizations (with no negative vertex
- * IDs), and a merging scheme for building each level.
+ * different levels. Defined by a bottom-level index, a merging scheme for
+ * building each level, and a possibly finished, or possibly null, graph of
+ * Sides, Sites, Adjacencies, and Generalizations (with no negative vertex IDs).
  */
 class ReferenceHierarchy(sc: SparkContext, index: FMDIndex,
-    var graph: Graph[Side, HasEdge], schemes: Seq[MergingScheme]) {
+    schemes: Seq[MergingScheme], var graph: Graph[Side, HasEdge] = null) {
     
     // Find the next available ID: the max in the graph we got, or 0.
     // Assumes the graph we got doesn't use any negative IDs.
-    var nextAvailableID: Long = graph.vertices.map(_._1)
-        // Add in all the edge IDs too
-        .union(graph.edges.map(_.attr.edge.id))
-        // Get 1 after the largest, or 0.
-        .fold(-1)((a, b) => if(a > b) a else b) + 1
+    var nextAvailableID: Long = graph match {
+        case null => 0
+        case _ => graph.vertices.map(_._1)
+            // Add in all the edge IDs too
+            .union(graph.edges.map(_.attr.edge.id))
+            // Get 1 after the largest, or 0.
+            .fold(-1)((a, b) => if(a > b) a else b) + 1
+    }
      
     // Make an IDSource for generating sequentila IDs. 
     val source = new IDSource(nextAvailableID)
     
+    // Keep a Seq of ReferenceStructure levels, from bottom to top
+    var levels: Seq[ReferenceStructure] = Nil
+    
     /**
      * Build a completely new graph by merging, starting from our bottom-level
-     * contigs.
+     * contigs. Also build the levels list.
      */
     def initialize = {
-        // Make an empty RDD of sides for our graph
-        var sides: RDD[Side] = sc.parallelize(Nil)
+        // Make an empty RDD of sides for our graph, paired with the hierarchy
+        // levels they live at, starting at 0 on the bottom.
+        var sides: RDD[(Side, Int)] = sc.parallelize(Nil)
         // And another empty RDD of various types of edges
         var edges: RDD[HasEdge] = sc.parallelize(Nil)
         
@@ -106,31 +115,65 @@ class ReferenceHierarchy(sc: SparkContext, index: FMDIndex,
             val (newSides, newEdges) = makeContigGraph(contig)
             
             // Add them to our growing collections of graph parts.
-            sides = sides.union(newSides)
+            sides = sides.union(newSides.map((_, 0)))
             edges = edges.union(newEdges)
         }
         
-        // Keep the graph of just the previous level, starting from this bottom
-        // level.
-        var lastGraph = makeGraph(sides, edges)
+        // Keep a graph of just each level by itself, without level labels,
+        // starting from this bottom level.
+        var levelGraph = makeGraph(sides.map(_._1), edges)
         
-        for(scheme <- schemes) {
+        for((scheme, schemeIndex) <- schemes.zipWithIndex) {
             // Make new sides and edges from merging on the last graph. TODO:
             // this will eventually need to be able to map things, for some
             // schemes.
-            val (newSides, newEdges) = scheme.createNewLevel(lastGraph, source)
+            val (newSides, newEdges) = scheme.createNewLevel(levelGraph, source)
             
-            // Make a new last graph with just the new stuff
-            lastGraph = makeGraph(newSides, newEdges)
+            // Make a new graph with just the new stuff, and keep it for the
+            // next iteration.
+            levelGraph = makeGraph(newSides, newEdges)
             
-            // Roll these sides and edges into the collection.
-            sides = sides.union(newSides)
+            // Roll these sides and edges into the collection we are going to
+            // use to create the big unioned graph. We can't just union our
+            // small graphs. Make sure to tag the sides with their level,
+            // starting at 1 for the first merged level.
+            sides = sides.union(newSides.map((_, schemeIndex + 1)))
             edges = edges.union(newEdges)
         }
         
-        // Now we've created levels for all of our schemes. Make our final
-        // graph.
-        graph = makeGraph(sides, edges)
+        // Now we've created levels for all of our schemes. Make our overall
+        // graph, with level labels. We need to explain that the Sides to get
+        // the IDs from are the first things in the tuples.
+        val labeledGraph = makeGraph(sides, edges,
+            {(tuple: (Side, Int)) => tuple._1})
+        
+        // Make the final graph with the labels stripped
+        graph = labeledGraph.mapVertices {
+            (id, data) => data._1
+        }
+        
+        // Now we made the graph; we need to look at it and make the actual
+        // levels we use for mapping.
+        
+        // Initialize the levels list with just the bottom-level structure
+        levels = List(new StringReferenceStructure(index))
+        
+        for(levelNumber <- 1 until schemes.size + 1) {
+            // For each reference structure we need to build on top, from the
+            // bottom up...
+            
+            // Find all the tripples for Generalization edges feeding into that
+            // level.
+            
+            // Get only the ones going in to left Faces.
+            
+            // Group them by destination Position
+        
+            // Collect to the master
+            
+            // Add a new base with the correct Position for each.
+        }
+        
     }
     
     /**
@@ -230,13 +273,14 @@ class ReferenceHierarchy(sc: SparkContext, index: FMDIndex,
     
     /**
      * Perform the necessary gymnastics to make a GraphX graph out of some sides
-     * and some edges.
+     * and some edges. Sides may be annotated by being placed in tuples or
+     * something, so you need to provide a function to unpack them.
      */
-    def makeGraph(sides: RDD[Side], edges: RDD[HasEdge]): 
-        Graph[Side, HasEdge] = {
+    def makeGraph[T](sides: RDD[T], edges: RDD[HasEdge],
+        sideFunction: T => Side)(implicit t: ClassTag[T]): Graph[T, HasEdge] = {
         
         // Make an RDD for Sides by ID
-        val nodes: RDD[(Long, Side)] = sides.keyBy(_.id)
+        val nodes: RDD[(Long, T)] = sides.keyBy(side => sideFunction(side).id)
         
         // Make an RDD of all the edges as GraphX Edge objects (not
         // SequenceGraph Edge objects) wrapping the HasEdge wrappers.
@@ -245,16 +289,24 @@ class ReferenceHierarchy(sc: SparkContext, index: FMDIndex,
                 edge.edge.right, edge)
         }
         
-        // How many partitions should we have? Graph misbehaves (when we do
-        // inRange) if the node and edge RDDs have unequal numbers of
-        // partitions. To avoid a shuffle, we coalesce down to the minimum
-        // number of partitions.
+        // How many partitions should we have? Graph misbehaves if the node and
+        // edge RDDs have unequal numbers of partitions. To avoid a shuffle, we
+        // coalesce down to the minimum number of partitions.
         val partitions = Math.min(nodes.partitions.size,
             graphEdges.partitions.size)
         
         // Coalesce to an equal number of partitions, and make and return
         // the graph formed by these two RDDs.
         Graph(nodes.coalesce(partitions), graphEdges.coalesce(partitions))
+    }
+    
+    /**
+     * Make a graph from unannotated Sides and their edges.
+     */
+    def makeGraph(sides: RDD[Side], edges: RDD[HasEdge]):
+        Graph[Side, HasEdge] = {
+        
+        makeGraph(sides, edges, identity)
     }
     
 }
