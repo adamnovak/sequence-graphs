@@ -30,22 +30,86 @@ case class Unmerged extends MergingScheme {
         
         // IDs in the old graph must be distinct from IDs in this new graph.
         
+        // Grab the SparkContext
         val sc = lowerLevel.edges.sparkContext
         
         // How many vertices are there?
         val vertexCount = lowerLevel.vertices.count
         
         // Get a new ID for each
+        val sideIDStart: Long = ids.ids(vertexCount)
         
-        // Join with the existing vertices to annotate with new IDs
+        // Get a new ID for the generalization from each.
+        val generalizationIDStart = ids.ids(vertexCount)
         
-        // Fix up and return edge copies for each triple
+        // Get a new ID for each existing edge.
+        val edgeIDStart = ids.ids(lowerLevel.edges.count)
+        
+        // Get an ID to name the contig after. TODO: use level height.
+        val contigID = ids.id
+        
+        // Assign each to a vertex.
+        val annotations = SparkUtil.zipWithIndex(lowerLevel.vertices).map {
+            case ((vertexID, vertex), index) => 
+                (vertexID, index + sideIDStart)
+        }
+        
+        // Join those annotations into the graph. TODO: find a way to do these
+        // both as VertexRDDs.
+        val annotatedGraph = lowerLevel.outerJoinVertices(annotations) {
+            // Each vertex is now the vertex and the annotation, which we know
+            // exists for every vertex.
+            (vertexID, vertex, annotation) => (vertex, annotation.get)
+        }
+        
+        val newSides = annotatedGraph.vertices.map { 
+            // Fix up and return Side copies for each vertex
+            case (vertexID, (side, newID)) =>
+                // Make a copy of the Side and set its ID.
+                val newSide = Side.newBuilder(side).setId(newID).build
+                
+                // Fix its Position to be on a contig for this new level.
+                // TODO: do this in order somehow, for compression of runs.
+                newSide.position.contig = "merged%d".format(contigID)
+                newSide.position.base = newID
+                
+                // Return it
+                newSide
+        }
+        
+        
+        val newEdges = SparkUtil.zipWithIndex(annotatedGraph.triplets).map { 
+            case (triplet, index) =>
+                
+                // Fix up and return edge copies for each triplet
+                val clone = triplet.attr.clone
+                
+                // Set the left node ID to the new ID for the left node
+                clone.edge.left = triplet.srcAttr._2
+                // And similarly for the right node
+                clone.edge.right = triplet.dstAttr._2
+                
+                // And give it a new ID
+                clone.edge.id = index + edgeIDStart
+                
+                // Return it
+                clone
+        }
 
         // Add Generalizations from old Sides to new Sides.
+        val generalizations: RDD[HasEdge] = SparkUtil.zipWithIndex(
+            annotatedGraph.vertices).map { 
+            
+            // Make a new Generalization from the old vertex to the new one,
+            // using the appropriate edge ID based on the index of the vertex.
+            case ((vertexID, (side, newID)), index) =>
+                new Generalization(new Edge(vertexID, newID, 
+                    index + generalizationIDStart))
+        }
         
-        // Fix up and return Side copies for each vertex
-        
-        (sc.parallelize(Nil), sc.parallelize(Nil))
+        // Send back the Sides and the edges (both ones in the upper level and
+        // ones leading into it).
+        (newSides, newEdges.union(generalizations))
     }
 }
 
@@ -179,7 +243,10 @@ class ReferenceHierarchy(sc: SparkContext, index: FMDIndex,
             // For each reference structure we need to build on top, from the
             // bottom up...
             
-            // Make a new ReferenceStructure on top of the previous one.
+            // Make a new ReferenceStructure on top of the previous one. The
+            // contig passed here should never get used since we don't let the
+            // ReferenceStructure auto-generate any Positions; they're all
+            // specified by the merged graphs.
             val newStructure = new CollapsedReferenceStructure(levels.head, 
                 "level%d".format(levelNumber))
             

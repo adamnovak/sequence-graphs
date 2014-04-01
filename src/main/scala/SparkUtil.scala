@@ -17,6 +17,30 @@ import org.apache.spark.graphx._
 object SparkUtil {
 
     /**
+     * Annotate every item in the given RDD with its index.
+     */
+    def zipWithIndex[T](rdd: RDD[T]): RDD[(T, Long)] = {
+        
+        // Count the number of items in each partition. Note that partition
+        // iterators aren't infinite so we can use length on them.
+        val partitionCounts = rdd.mapPartitions(i => Some(i.length).iterator)
+        
+        // Broadcast that
+        val broadcastCounts = rdd.context.broadcast(partitionCounts.collect)
+        
+        rdd.mapPartitionsWithIndex({ (partition, iterator) =>
+            // For each partition, count up the number of things before it to
+            // get a base index.
+            val baseIndex = broadcastCounts.value.take(partition).sum
+        
+            // Put base index + partition index with each item.
+            iterator.zipWithIndex.map {
+                case (value, index) => (value, index + baseIndex)
+            }
+        }, preservesPartitioning = true)
+    }
+    
+    /**
      * Run the given function for each pair of adjacent elements in the given
      * RDD. The first element will be involved in an invocation with None as the
      * first argument, and the last argument will be involved as an invocation
@@ -121,8 +145,6 @@ object SparkUtil {
                 function(pair(0), pair(1))
             }
         }
-        
-        
         
     }
 

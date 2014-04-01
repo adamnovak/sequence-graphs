@@ -24,7 +24,7 @@ class IDSource(idStart: Long = 0, idCount: Long = -1) {
         // Say the next next ID is 1 after that one
         nextID += 1
         
-        idLimit.map { (limit) =>
+        idLimit.map { limit =>
             if(toReturn >= limit) {
                 // Complain we ran out of IDs
                 throw new Exception(
@@ -35,6 +35,34 @@ class IDSource(idStart: Long = 0, idCount: Long = -1) {
         
         // Return the ID we generated
         toReturn
+    }
+    
+    /**
+     * Allocate a whole block of the given number of IDs. If we would
+     * run out of IDs, raise an exception.
+     *
+     * Return the first ID allocated; the block is contiguous, extending up from
+     * there.
+     */
+    def ids(count: Long): Long = {
+        // What's the first ID we're going to use?
+        val firstID = nextID
+        
+        // Skip ahead to after this whole block.
+        nextID += count
+        
+        idLimit.map { limit =>
+            // We have a limit
+            if(nextID > limit) {
+                // We've run out.
+                throw new Exception(
+                    "Source can't allocate %d to %d from ID block of %d at %d"
+                    .format(firstID, nextID, idCount, idStart))
+            }
+        }
+        
+        // Return the first ID
+        firstID
     }
     
     /**

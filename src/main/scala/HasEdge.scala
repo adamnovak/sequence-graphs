@@ -14,8 +14,22 @@ package edu.ucsc.genome
  *
  * Implicit conversions to case subclasses of this type exist in package.scala.
  */
-trait HasEdge {
+trait HasEdge extends Cloneable {
+    /**
+     * Get the Edge that this HasEdge has.
+     */
     def edge: Edge
+    
+    /**
+     * Do a deep clone of this HasEdge, so we can then mutate the edge without
+     * affecting the original.
+     *
+     * We need to provide an implementation here, since the (concrete)
+     * java.lang.Object implementation can't be replaced with a public abstract
+     * version here. See <http://stackoverflow.com/questions/8618937/scala-
+     * specifying-public-method-overriding-protected-method>
+     */
+    override def clone: HasEdge = throw new CloneNotSupportedException
 }
 
 /**
@@ -23,6 +37,9 @@ trait HasEdge {
  */
 case class AlleleGroupEdge(owner: AlleleGroup) extends HasEdge {
     def edge = owner.edge
+    override def clone = {
+        new AlleleGroupEdge(AlleleGroup.newBuilder(owner).build)
+    }
 }
 
 /**
@@ -30,6 +47,9 @@ case class AlleleGroupEdge(owner: AlleleGroup) extends HasEdge {
  */
 case class AdjacencyEdge(owner: Adjacency) extends HasEdge {
     def edge = owner.edge
+    override def clone = {
+        new AdjacencyEdge(Adjacency.newBuilder(owner).build)
+    }
 }
 
 /**
@@ -37,6 +57,9 @@ case class AdjacencyEdge(owner: Adjacency) extends HasEdge {
  */
 case class AnchorEdge(owner: Anchor) extends HasEdge {
     def edge = owner.edge
+    override def clone = {
+        new AnchorEdge(Anchor.newBuilder(owner).build)
+    }
 }
 
 /**
@@ -44,6 +67,9 @@ case class AnchorEdge(owner: Anchor) extends HasEdge {
  */
 case class SiteEdge(owner: Site) extends HasEdge {
     def edge = owner.edge
+    override def clone = {
+        new SiteEdge(Site.newBuilder(owner).build)
+    }
 }
 
 /**
@@ -51,6 +77,9 @@ case class SiteEdge(owner: Site) extends HasEdge {
  */
 case class BreakpointEdge(owner: Breakpoint) extends HasEdge {
     def edge = owner.edge
+    override def clone = {
+        new BreakpointEdge(Breakpoint.newBuilder(owner).build)
+    }
 }
 
 /**
@@ -58,4 +87,7 @@ case class BreakpointEdge(owner: Breakpoint) extends HasEdge {
  */
 case class GeneralizationEdge(owner: Generalization) extends HasEdge {
     def edge = owner.edge
+    override def clone = {
+        new GeneralizationEdge(Generalization.newBuilder(owner).build)
+    }
 }
