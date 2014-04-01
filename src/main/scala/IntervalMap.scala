@@ -199,8 +199,14 @@ class IntervalMap[ValueType] extends Serializable {
         
         // Finish and return the RangeVector and out range to value mapping.
         encoder.flush()
-        println("Making vector up to %d".format(lastEnd + 1))
-        (new RangeVector(encoder, lastEnd + 1), rangeMapping)
+        
+        // Where should we tell the vector its last position is? Really only
+        // affects select results. RLCSA crashes if we send a 0, so make sure
+        // this is at least 1 even if we are empty.
+        val vectorEnd = Math.max(lastEnd + 1, 1)
+        
+        println("Making vector up to %d".format(vectorEnd))
+        (new RangeVector(encoder, vectorEnd), rangeMapping)
     }
     
     /**

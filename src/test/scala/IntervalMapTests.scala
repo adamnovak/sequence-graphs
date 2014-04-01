@@ -79,8 +79,13 @@ class IntervalMapTests extends FunSuite {
         assert(emptyMap.valueArray.size === 0)
         
         val iterator = new RangeVectorIterator(emptyMap.rangeVector)
+        // TODO: this probably ought to properly be 1, as 0 is past the end of a
+        // truly empty vector, but we can't make a RangeVector that doesn't have
+        // at least one space (which is implicitly a 0) or the vanilla RLCSA
+        // code crashes.
         assert(iterator.rank(0) === 0)
-        assert(iterator.rank(100) === 0)
+        // This is past the end, and thus has rank 1 on an empty vector.
+        assert(iterator.rank(100) === 1)
     } 
 
 
