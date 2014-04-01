@@ -156,7 +156,15 @@ class CollapsedReferenceStructure(base: ReferenceStructure, contig: String)
             // if there's no position for that range). Make sure to flip it
             // around, to compensate for range mapping producing right-side
             // contexts on the forward strand instead of left-side ones.
-            case range => intervals.valueArray(range.toInt).map(!_)
+            case range => 
+                if(range < intervals.valueArray.length) {
+                    // We got a range that an interval is defined for.
+                    intervals.valueArray(range.toInt).map(!_)
+                } else {
+                    // We probably got the 1-past-the-end range. Maybe our
+                    // IntervalMap is empty?
+                    None
+                }
         }
     }
     

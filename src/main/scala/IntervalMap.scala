@@ -163,7 +163,6 @@ class IntervalMap[ValueType] extends Serializable {
      */
     def bake: (RangeVector, Seq[Option[ValueType]]) = {
         // Make a new encoder with this arbitrary block size.
-        println("Making encoder")
         val encoder = new RangeEncoder(32)
         
         // Make an ArrayBuffer to store pointers to the things we map to by
@@ -205,19 +204,24 @@ class IntervalMap[ValueType] extends Serializable {
         // this is at least 1 even if we are empty.
         val vectorEnd = Math.max(lastEnd + 1, 1)
         
-        println("Making vector up to %d".format(vectorEnd))
         (new RangeVector(encoder, vectorEnd), rangeMapping)
     }
     
+    // Cache the bake result. After this is referenced, no more intervals may be
+    // added.
+    lazy val baked = bake
+    
     /**
-     * Convert to a RangeVector for efficient mapping.
+     * Convert to a RangeVector for efficient mapping. After this is called, no
+     * more intervals may be added.
      */
-    def rangeVector: RangeVector = bake._1
+    def rangeVector: RangeVector = baked._1
     
     /**
      * Get the array of values by interval index, for mapping back from ranges
-     * in our RangeVector representation to the actual values in the map.
+     * in our RangeVector representation to the actual values in the map. After
+     * this is called, no more intervals may be added.
      */
-    def valueArray: Seq[Option[ValueType]] = bake._2
+    def valueArray: Seq[Option[ValueType]] = baked._2
 }
 

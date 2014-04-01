@@ -21,19 +21,22 @@ class ReferenceStructureTests extends RLCSASuite {
         val pattern = "AATCTACTGC"
         val mappings: Seq[Option[Position]] = stringReference.map(pattern)
         
+        println("All bases in contig")
+        println(mappings.mkString)
+        
         // All 10 characters ought to map.
         assert(mappings.map {
             case Some(_) => 1
             case None => 0
-        }.sum == 10)
+        }.sum === 10)
         
         mappings.foreach {
             case Some(mapping) => {
                 // Everything mapped should be mapped on the left, since map has
                 // left-mapping semantics for its output.
-                assert(mapping.face == Face.LEFT)
+                assert(mapping.face === Face.LEFT)
                 // And on this contig
-                assert(mapping.contig == "seq1")
+                assert(mapping.contig === "seq1")
             }
             case None => {}
         }
@@ -49,16 +52,16 @@ class ReferenceStructureTests extends RLCSASuite {
         assert(mappings.map {
             case Some(_) => 1
             case None => 0
-        }.sum == 11)
+        }.sum === 11)
         
         mappings.foreach {
             case Some(mapping) => {
                 // Everything mapped should be mapped on the right, since map
                 // has left-mapping semantics for its output and we're mapping
                 // to a reverse strand.
-                assert(mapping.face == Face.RIGHT)
+                assert(mapping.face === Face.RIGHT)
                 // And on this contig
-                assert(mapping.contig == "seq2")
+                assert(mapping.contig === "seq2")
             }
             case None => {}
         }
