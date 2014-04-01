@@ -162,6 +162,8 @@ class ReferenceHierarchy(sc: SparkContext, index: FMDIndex,
             // For each reference structure we need to build on top, from the
             // bottom up...
             
+            // TODO: Finish this
+            
             // Find all the tripples for Generalization edges feeding into that
             // level.
             
@@ -171,7 +173,8 @@ class ReferenceHierarchy(sc: SparkContext, index: FMDIndex,
         
             // Collect to the master
             
-            // Add a new base with the correct Position for each.
+            // Add a new base with the correct destination Position subsuming
+            // the source Positions of each group.
         }
         
     }
@@ -238,8 +241,8 @@ class ReferenceHierarchy(sc: SparkContext, index: FMDIndex,
         // And a growing list of Sites/Breakpoints
         var edges: List[HasEdge] = Nil
         
-        for(base <- 0L until index.contigLength(contig)) {
-            // Make positions for the base
+        for(base <- 1L until index.contigLength(contig) + 1) {
+            // Make positions for the base, accounting for 1-based indexing
             val leftPosition = new Position(contig, base, Face.LEFT)
             val rightPosition = new Position(contig, base, Face.RIGHT)
             
@@ -248,7 +251,7 @@ class ReferenceHierarchy(sc: SparkContext, index: FMDIndex,
                 leftPosition)
             val rightSide = new Side(source.id, rightPosition, false,
                 rightPosition)
-                
+            
             // Make the Site edge with the base for this position that we pull
             // from the FMDIndex. TODO: it might be much easier to just display
             // the whole contig and then iterate through that.

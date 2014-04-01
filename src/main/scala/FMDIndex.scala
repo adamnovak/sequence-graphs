@@ -125,6 +125,13 @@ class FMDIndex(basename: String) {
         // Look up the contig used in the Position
         val (contigNumber, contigLength) = contigInverse(position.contig)
         
+        if(position.base < 1) {
+            // Catch and complain about people who forgot that positions are
+            // 1-based.
+            throw new Exception("Base in %s below minimum base index of 1"
+                .format(position))
+        }
+        
         // What text index corresponds to the strand of the contig this Position
         // lives on? Forward texts are even, reverse ones are odd.
         val text = contigNumber * 2 + (if(position.face == Face.LEFT) 0 else 1)
