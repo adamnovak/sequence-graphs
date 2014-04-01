@@ -21,13 +21,30 @@ trait MergingScheme {
 }
 
 /**
- * Represents the bottom-level not-actually-merged merging scheme.
+ * Represents a not-actually-merged merging scheme. Just passes everything
+ * through, with new IDs.
  */
 case class Unmerged extends MergingScheme {
     def createNewLevel(lowerLevel: Graph[Side, HasEdge], ids: IDSource): 
         (RDD[Side], RDD[HasEdge]) = {
-        // TODO: Implement this
+        
+        // IDs in the old graph must be distinct from IDs in this new graph.
+        
         val sc = lowerLevel.edges.sparkContext
+        
+        // How many vertices are there?
+        val vertexCount = lowerLevel.vertices.count
+        
+        // Get a new ID for each
+        
+        // Join with the existing vertices to annotate with new IDs
+        
+        // Fix up and return edge copies for each triple
+
+        // Add Generalizations from old Sides to new Sides.
+        
+        // Fix up and return Side copies for each vertex
+        
         (sc.parallelize(Nil), sc.parallelize(Nil))
     }
 }
