@@ -25,6 +25,39 @@ class ReferenceHierarchyTests extends RLCSASuite with SparkSuite {
         assert(hierarchy.levels.size === 3)
     }
     
+    test("maps on level 0") {
+        val pattern = "AATCTACTGC"
+        val mappings: Seq[Option[Position]] = hierarchy.levels(0).map(pattern)
+        
+        // All 10 characters ought to map.
+        assert(mappings.map {
+            case Some(_) => 1
+            case None => 0
+        }.sum === 10)
+    }
+    
+    test("maps on level 1") {
+        val pattern = "AATCTACTGC"
+        val mappings: Seq[Option[Position]] = hierarchy.levels(1).map(pattern)
+        
+        // All 10 characters ought to map.
+        assert(mappings.map {
+            case Some(_) => 1
+            case None => 0
+        }.sum === 10)
+    }
+    
+    test("maps on level 2") {
+        val pattern = "AATCTACTGC"
+        val mappings: Seq[Option[Position]] = hierarchy.levels(2).map(pattern)
+        
+        // All 10 characters ought to map.
+        assert(mappings.map {
+            case Some(_) => 1
+            case None => 0
+        }.sum === 10)
+    }
+    
     
     
 }

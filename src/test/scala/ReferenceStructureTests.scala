@@ -21,7 +21,7 @@ class ReferenceStructureTests extends RLCSASuite {
         val pattern = "AATCTACTGC"
         val mappings: Seq[Option[Position]] = stringReference.map(pattern)
         
-        // The first 8 characters ought to map.
+        // All 10 characters ought to map.
         assert(mappings.map {
             case Some(_) => 1
             case None => 0

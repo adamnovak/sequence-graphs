@@ -103,8 +103,8 @@ case class Unmerged extends MergingScheme {
             // Make a new Generalization from the old vertex to the new one,
             // using the appropriate edge ID based on the index of the vertex.
             case ((vertexID, (side, newID)), index) =>
-                new Generalization(new Edge(vertexID, newID, 
-                    index + generalizationIDStart))
+                new Generalization(new Edge(index + generalizationIDStart, 
+                    vertexID, newID))
         }
         
         // Send back the Sides and the edges (both ones in the upper level and
