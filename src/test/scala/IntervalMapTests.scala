@@ -44,6 +44,11 @@ class IntervalMapTests extends FunSuite {
         assert(map.get(-100, 100) === None)
     }
     
+    test("ignores out-of-range intervals") {
+        assert(map.get(0, 0) === None)
+        assert(map.get(100, 100) === None)
+    }
+    
     test("correctly creates the value array") {
         val array = map.valueArray
         
@@ -67,6 +72,16 @@ class IntervalMapTests extends FunSuite {
         // use it, so we don't bother testing it.
         
     }
+    
+    test("works when empty") {
+        val emptyMap = new IntervalMap[String]
+        assert(emptyMap.get(1, 3) === None)
+        assert(emptyMap.valueArray.size === 0)
+        
+        val iterator = new RangeVectorIterator(emptyMap.rangeVector)
+        assert(iterator.rank(0) === 0)
+        assert(iterator.rank(100) === 0)
+    } 
 
 
 }

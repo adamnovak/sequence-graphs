@@ -163,6 +163,7 @@ class IntervalMap[ValueType] extends Serializable {
      */
     def bake: (RangeVector, Seq[Option[ValueType]]) = {
         // Make a new encoder with this arbitrary block size.
+        println("Making encoder")
         val encoder = new RangeEncoder(32)
         
         // Make an ArrayBuffer to store pointers to the things we map to by
@@ -178,6 +179,7 @@ class IntervalMap[ValueType] extends Serializable {
         map.foreach { case (start, (end, value)) =>
             if(start != lastEnd + 1) {
                 // We skipped something. Add a fake range at this number.
+                // TODO: test this at the start of everything.
                 rangeMapping += None
             }
             
@@ -197,6 +199,7 @@ class IntervalMap[ValueType] extends Serializable {
         
         // Finish and return the RangeVector and out range to value mapping.
         encoder.flush()
+        println("Making vector up to %d".format(lastEnd + 1))
         (new RangeVector(encoder, lastEnd + 1), rangeMapping)
     }
     

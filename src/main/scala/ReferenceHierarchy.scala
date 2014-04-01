@@ -243,6 +243,9 @@ class ReferenceHierarchy(sc: SparkContext, index: FMDIndex,
             // For each reference structure we need to build on top, from the
             // bottom up...
             
+            println("=========================================================")
+            println("MAKING LEVEL %d".format(levelNumber))
+            
             // Make a new ReferenceStructure on top of the previous one. The
             // contig passed here should never get used since we don't let the
             // ReferenceStructure auto-generate any Positions; they're all
@@ -263,7 +266,7 @@ class ReferenceHierarchy(sc: SparkContext, index: FMDIndex,
                     // We found a generalization going into the appropriate
                     // level, on the left side of something.
                     case (generalization: GeneralizationEdge, Face.LEFT, 
-                        levelNumber) => true
+                        nodeLevel) => nodeLevel == levelNumber
                     // We found something else
                     case _ => false
                 }
@@ -280,6 +283,9 @@ class ReferenceHierarchy(sc: SparkContext, index: FMDIndex,
             
             
             for((destination, sources) <- positionsCollected) {
+                println("Creating new position: %s".format(destination))
+                sources.foreach(source => println("From %s".format(source)))
+                
                 // Add a new base with the correct destination Position
                 // subsuming the source Positions of each group.
                 newStructure.addBase(sources, destination)
