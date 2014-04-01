@@ -504,6 +504,16 @@ class RLCSABuilder(basename: String) {
     }
     
     /**
+     * Print checksums of the built index to the console.
+     */
+    def checksum = {
+        Seq("md5sum", basename + ".rlcsa.array").!
+        Seq("md5sum", basename + ".rlcsa.parameters").!
+        Seq("md5sum", basename + ".rlcsa.sa_samples").!
+        Seq("md5sum", basename + ".chrom.sizes").!
+    }
+    
+    /**
      * Produce an FMDIndex allowing you to query and map to the built index.
      * The FMDIndex will only work properly until the index is updated
      * again, at which point you should call this method again and get a new

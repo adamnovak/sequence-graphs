@@ -4,6 +4,7 @@ import org.scalatest._
 import java.io._
 import java.nio.file._
 import org.apache.commons.io._
+import scala.sys.process._
 
 /**
  * A test utility class that provides an RLCSA FMD-index fixture on disk.
@@ -55,6 +56,9 @@ abstract class RLCSASuite extends FunSuite with BeforeAndAfterAll {
         
         // Add it to the index
         builder.add(fasta2)
+        
+        // Print its checksum
+        builder.checksum
     }
     
     override def afterAll = {

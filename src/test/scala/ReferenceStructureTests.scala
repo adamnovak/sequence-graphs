@@ -22,7 +22,7 @@ class ReferenceStructureTests extends RLCSASuite {
         val mappings: Seq[Option[Position]] = stringReference.map(pattern)
         
         println("All bases in contig")
-        println(mappings.mkString)
+        println(mappings.mkString("\n"))
         
         // All 10 characters ought to map.
         assert(mappings.map {
