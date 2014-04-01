@@ -97,7 +97,7 @@ class ReferenceHierarchy(sc: SparkContext, index: FMDIndex,
     val source = new IDSource(nextAvailableID)
     
     // Keep a Seq of ReferenceStructure levels, from bottom to top
-    var levels: Seq[ReferenceStructure] = Nil
+    var levels: List[ReferenceStructure] = Nil
     
     /**
      * Build a completely new graph by merging, starting from our bottom-level
@@ -162,20 +162,52 @@ class ReferenceHierarchy(sc: SparkContext, index: FMDIndex,
             // For each reference structure we need to build on top, from the
             // bottom up...
             
+            // Make a new ReferenceStructure on top of the previous one.
+            val newStructure = new CollapsedReferenceStructure(levels.head, 
+                "level%d".format(levelNumber))
+            
             // TODO: Finish this
             
             // Find all the tripples for Generalization edges feeding into that
             // level.
+            val generalizations = labeledGraph.subgraph { triplet =>
+                (triplet.attr, triplet.dstAttr._1.position.face, 
+                    triplet.dstAttr._2) match {
+                    // Break out based on edge type, destination face, and
+                    // destination layer.
+                    
+                    // We found a generalization going into the appropriate
+                    // level, on the left side of something.
+                    case (generalization: GeneralizationEdge, Face.LEFT, 
+                        levelNumber) => true
+                    // We found something else
+                    case _ => false
+                }
+            }
             
-            // Get only the ones going in to left Faces.
-            
-            // Group them by destination Position
+            // Group Positions to merge by destination Position. TODO: do we
+            // need to use longs here instead of Positions as keys?
+            val positionsToMerge = generalizations.triplets.map { triplet =>
+                (triplet.dstAttr._1.position, triplet.srcAttr._1.position)
+            }.groupByKey
         
             // Collect to the master
+            val positionsCollected = positionsToMerge.collect
             
-            // Add a new base with the correct destination Position subsuming
-            // the source Positions of each group.
+            
+            for((destination, sources) <- positionsCollected) {
+                // Add a new base with the correct destination Position
+                // subsuming the source Positions of each group.
+                newStructure.addBase(sources, destination)
+            }
+            
+            // Put the new structure on top of the stack.
+            levels = newStructure :: levels
         }
+        
+        // Now we've built all the reference structure levels. Flip them over,
+        // so they go from bottom to top.
+        levels = levels.reverse
         
     }
     
