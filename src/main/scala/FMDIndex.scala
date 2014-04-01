@@ -336,6 +336,8 @@ class FMDIndex(basename: String) {
     def map(context: String, face: Face): Seq[Option[Position]] = {
         // Map a whole string
         
+        println("Mapping face %s".format(face))
+        
         face match {
             case Face.RIGHT =>
                 // Map reverse complement on the other strand and flip around.
@@ -348,6 +350,10 @@ class FMDIndex(basename: String) {
                     i <- (0L until mappings.size)
                     mapping <- Some(mappings.get(i.toInt))
                 } yield {
+                    println("Mapped: %b Location: %d,%d".format(
+                        mapping.getIs_mapped, mapping.getLocation.getFirst, 
+                        mapping.getLocation.getSecond))
+                
                     if(mapping.getIs_mapped) {
                         // Turn the (text, index) pair for this mapping into a
                         // Position. It's already been corrected for pattern

@@ -18,17 +18,61 @@ class ReferenceStructureTests extends RLCSASuite {
     
     test("maps all bases in contig") {
     
+        println("====Starting Problematic Test====")
+    
         val pattern = "AATCTACTGC"
-        val mappings: Seq[Option[Position]] = stringReference.map(pattern)
         
-        println("All bases in contig")
-        println(mappings.mkString("\n"))
+        val leftMappings = stringReference.getIndex.map(pattern, Face.LEFT)
+        val rightMappings = stringReference.getIndex.map(pattern, Face.RIGHT)
+    
+        // Zip them together and disambiguate each pair. Note that (a, b).zipped
+        // is of a type that provides a map that takes binary functions, while
+        // a.zip(b).map takes only unary functions.
+        val mappings = (leftMappings, rightMappings).zipped  map(stringReference.disambiguate(_, _))
+        
+        //val mappings: Seq[Option[Position]] = stringReference.map(pattern)
         
         // All 10 characters ought to map.
-        assert(mappings.map {
+        val mapped = mappings.map {
             case Some(_) => 1
             case None => 0
-        }.sum === 10)
+        }.sum
+        
+        if(mapped != 10) {
+            // Here is where we have problems.
+            println("!!! Problem detected")
+            
+            // Wait for the user to acknowledge this
+            System.in.read
+            
+            println("!!! Problem detected")
+            
+            println("Incorrect mappings:")
+            println(mappings.mkString("\n"))
+            
+            println("Left was:")
+            println(leftMappings.mkString("\n"))
+            
+            println("Right was:")
+            println(rightMappings.mkString("\n"))
+            
+            // Try again
+            val mappings2 = stringReference.map(pattern)
+            
+            val mapped2 = mappings2.map {
+                case Some(_) => 1
+                case None => 0
+            }.sum
+            
+            println("On second attempt: %d/10 map:".format(mapped2))
+            
+            println(mappings2.mkString("\n"))
+            
+            // Wait for the user to acknowledge this
+            System.in.read
+        }
+        
+        assert(mapped === 10)
         
         mappings.foreach {
             case Some(mapping) => {
