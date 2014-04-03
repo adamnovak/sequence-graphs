@@ -13,58 +13,32 @@ import scala.reflect._
  */
 trait MergingScheme {
     /**
-     * Given a lower-level graph, create Sides and Edges for the next level up
-     * according to this merging scheme.
+     * Given a lower-level graph and a place to get new unique IDs, create Sides
+     * and Edges for the next level up according to this merging scheme.
      */
-    def createNewLevel(lowerLevel: Graph[Side, HasEdge], ids: IDSource): 
-        (RDD[Side], RDD[HasEdge])
-}
-
-/**
- * Represents a not-actually-merged merging scheme. Just passes everything
- * through, with new IDs.
- */
-case class Unmerged extends MergingScheme {
     def createNewLevel(lowerLevel: Graph[Side, HasEdge], ids: IDSource): 
         (RDD[Side], RDD[HasEdge]) = {
         
-        // IDs in the old graph must be distinct from IDs in this new graph.
+        // Call scheme-specific logic to decide what nodes to merge.
+        val annotatedGraph = annotate(lowerLevel, ids)
         
-        // Grab the SparkContext
-        val sc = lowerLevel.edges.sparkContext
+        // Reserve some IDs for new edges.
         
-        // How many vertices are there?
-        val vertexCount = lowerLevel.vertices.count
+        // Get a new ID for the generalization from each vertex on the lower
+        // level.
+        val generalizationIDStart = ids.ids(lowerLevel.vertices.count)
         
-        // Get a new ID for each
-        val sideIDStart: Long = ids.ids(vertexCount)
-        
-        // Get a new ID for the generalization from each.
-        val generalizationIDStart = ids.ids(vertexCount)
-        
-        // Get a new ID for each existing edge.
+        // Get a new ID for each existing edge on the lower level.
         val edgeIDStart = ids.ids(lowerLevel.edges.count)
         
         // Get an ID to name the contig after. TODO: use level height.
         val contigID = ids.id
         
-        // Assign each to a vertex.
-        val annotations = SparkUtil.zipWithIndex(lowerLevel.vertices).map {
-            case ((vertexID, vertex), index) => 
-                (vertexID, index + sideIDStart)
-        }
-        
-        // Join those annotations into the graph. TODO: find a way to do these
-        // both as VertexRDDs.
-        val annotatedGraph = lowerLevel.outerJoinVertices(annotations) {
-            // Each vertex is now the vertex and the annotation, which we know
-            // exists for every vertex.
-            (vertexID, vertex, annotation) => (vertex, annotation.get)
-        }
-        
+        // Copy all the Sides and change their IDs
         val newSides = annotatedGraph.vertices.map { 
             // Fix up and return Side copies for each vertex
             case (vertexID, (side, newID)) =>
+            
                 // Make a copy of the Side and set its ID.
                 val newSide = Side.newBuilder(side).setId(newID).build
                 
@@ -77,7 +51,7 @@ case class Unmerged extends MergingScheme {
                 newSide
         }
         
-        
+        // Copy all the Edges and change their IDs.
         val newEdges = SparkUtil.zipWithIndex(annotatedGraph.triplets).map { 
             case (triplet, index) =>
                 
@@ -110,6 +84,47 @@ case class Unmerged extends MergingScheme {
         // Send back the Sides and the edges (both ones in the upper level and
         // ones leading into it).
         (newSides, newEdges.union(generalizations))
+    
+    }
+        
+    /**
+     * Given a lower-level graph and a place to get new unique IDs, create an
+     * annotated graph where each Side is paired with a number identifying the
+     * new Side it ought to be merged into. These numbers are not unique; sides
+     * sharing a number wil be merged together.
+     */
+    def annotate(lowerLevel: Graph[Side, HasEdge], ids: IDSource):
+        Graph[(Side, Long), HasEdge]
+}
+
+/**
+ * Represents a not-actually-merged merging scheme. Just passes everything
+ * through, with new IDs.
+ */
+case class Unmerged extends MergingScheme {
+    def annotate(lowerLevel: Graph[Side, HasEdge], ids: IDSource): 
+        Graph[(Side, Long), HasEdge] = {
+        
+        // IDs in the old graph must be distinct from IDs in this new graph.
+
+        // Get a new ID for each vertex
+        val sideIDStart: Long = ids.ids(lowerLevel.vertices.count)
+        
+        // Assign each to a vertex.
+        val annotations = SparkUtil.zipWithIndex(lowerLevel.vertices).map {
+            case ((vertexID, vertex), index) => 
+                (vertexID, index + sideIDStart)
+        }
+        
+        // Join those annotations into the graph. TODO: find a way to do these
+        // both as VertexRDDs.
+        lowerLevel.outerJoinVertices(annotations) {
+            // Each vertex is now the vertex and the annotation, which we know
+            // exists for every vertex.
+            (vertexID, vertex, annotation) => (vertex, annotation.get)
+        }
+        
+        
     }
 }
 
@@ -118,11 +133,11 @@ case class Unmerged extends MergingScheme {
  * now.
  */
 case class ContextDriven extends MergingScheme {
-    def createNewLevel(lowerLevel: Graph[Side, HasEdge], ids: IDSource): 
-        (RDD[Side], RDD[HasEdge]) = {
+    def annotate(lowerLevel: Graph[Side, HasEdge], ids: IDSource): 
+        Graph[(Side, Long), HasEdge] = {
+        
         // TODO: Implement this
-        val sc = lowerLevel.edges.sparkContext
-        (sc.parallelize(Nil), sc.parallelize(Nil))
+        null
     }
 }
 
@@ -133,24 +148,24 @@ case class ContextDriven extends MergingScheme {
  * You have to iterate to a fixed point.
  */
 case class Symmetric(context: Int) extends MergingScheme {
-    def createNewLevel(lowerLevel: Graph[Side, HasEdge], ids: IDSource): 
-        (RDD[Side], RDD[HasEdge]) = {
+    def annotate(lowerLevel: Graph[Side, HasEdge], ids: IDSource): 
+        Graph[(Side, Long), HasEdge] = {
+        
         // TODO: Implement this
-        val sc = lowerLevel.edges.sparkContext
-        (sc.parallelize(Nil), sc.parallelize(Nil))
+        null
     }
 }
 
 /**
- * Represents the symmetric merging scheme requiring the given amount of context
- * on one side.
+ * Represents the nonsymmetric merging scheme requiring the given amount of
+ * context on one side.
  */
 case class NonSymmetric(context: Int) extends MergingScheme {
-    def createNewLevel(lowerLevel: Graph[Side, HasEdge], ids: IDSource): 
-        (RDD[Side], RDD[HasEdge]) = {
+    def annotate(lowerLevel: Graph[Side, HasEdge], ids: IDSource): 
+        Graph[(Side, Long), HasEdge] = {
+        
         // TODO: Implement this
-        val sc = lowerLevel.edges.sparkContext
-        (sc.parallelize(Nil), sc.parallelize(Nil))
+        Unmerged().annotate(lowerLevel, ids)
     }
 }
 
@@ -211,8 +226,12 @@ class ReferenceHierarchy(sc: SparkContext, index: FMDIndex,
             val (newSides, newEdges) = scheme.createNewLevel(levelGraph, source)
             
             // Make a new graph with just the new stuff, and keep it for the
-            // next iteration.
-            levelGraph = makeGraph(newSides, newEdges)
+            // next iteration. But make sure we don't include ghost nodes at the
+            // lower ends of the generalization edges. TODO: Don't mix and
+            // immediately unmix these things.
+            levelGraph = makeGraph(newSides, newEdges).subgraph(vpred = {
+                (vertexID, vertex) => vertex != null
+            })
             
             // Roll these sides and edges into the collection we are going to
             // use to create the big unioned graph. We can't just union our
