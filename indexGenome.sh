@@ -2,13 +2,13 @@
 # indexGenome.sh: download and time the indexing of the human genome.
 set -e
 
-DIR=indexGenome2
+DIR=indexGenome
 
 mkdir -p ${DIR}
 cd ${DIR}
 
 # What's the index to accumulate in?
-BASENAME=hg18
+BASENAME=hg19
 
 rm -f ${BASENAME}.*
 

@@ -52,7 +52,7 @@ libraryDependencies += "org.apache.commons" % "commons-lang3" % "3.2.1"
 libraryDependencies += "commons-io" % "commons-io" % "2.4"
 
 // add hadoop bam and everything
-libraryDependencies += "fi.tkk.ics.hadoop.bam" % "hadoop-bam" % "6.1-SNAPSHOT"
+libraryDependencies += "fi.tkk.ics.hadoop.bam" % "hadoop-bam" % "6.1"
 
 libraryDependencies += "variant" % "variant" % "1.93"
 

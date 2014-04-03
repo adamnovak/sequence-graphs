@@ -31,7 +31,7 @@ libraryDependencies += "org.apache.spark" %% "spark-graphx" % "0.9.0-incubating"
 libraryDependencies += "org.rogach" %% "scallop" % "0.9.4"
 
 // We need a parallel VCF parser
-libraryDependencies += "fi.tkk.ics.hadoop.bam" % "hadoop-bam" % "6.1-SNAPSHOT"
+libraryDependencies += "fi.tkk.ics.hadoop.bam" % "hadoop-bam" % "6.1"
 
 // We need log4j so we can tell Spark to be somewhat quieter and not swamp out
 // output.
