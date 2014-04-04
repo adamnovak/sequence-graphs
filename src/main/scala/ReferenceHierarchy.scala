@@ -34,18 +34,45 @@ trait MergingScheme {
         // Get an ID to name the contig after. TODO: use level height.
         val contigID = ids.id
         
-        // Copy all the Sides and change their IDs
-        val newSides = annotatedGraph.vertices.map { 
-            // Fix up and return Side copies for each vertex
-            case (vertexID, (side, newID)) =>
-            
+        // Make Sides for each pair of sets of merged Sides.
+        
+        // Collect Sides by new ID, and sort by (contig, base)
+        val setsToMerge = annotatedGraph.vertices.groupBy {
+            // Group by newID
+            case (vertexID, (side, newID)) => newID
+        }.map {
+            case (newID, annotatedSides) => 
+                (newID, annotatedSides.map {
+                    // Turn into (newID, list of sides)
+                    case (vertexID, (side, _)) => side
+                }
+                // And make sure that list of sides is sorted by (contig, base)
+                .sortBy(_.position.contig)
+                .sortBy(_.position.base))
+        }
+        
+        // Create all the merged Sides and with their IDs
+        val newSides = setsToMerge.map { 
+            case (newID, sides) =>
+                
+                // Make the new Side, adopting the Face of the first thing in
+                // the list. There must be one Side at least in each list, or
+                // the list wouldn't exist.
+                val firstSide = sides(0)
+                
                 // Make a copy of the Side and set its ID.
-                val newSide = Side.newBuilder(side).setId(newID).build
+                val newSide = Side.newBuilder(firstSide).setId(newID).build
                 
                 // Fix its Position to be on a contig for this new level.
                 // TODO: do this in order somehow, for compression of runs.
                 newSide.position.contig = "merged%d".format(contigID)
                 newSide.position.base = newID
+                // Keep its Face as whatever it had originally. The other side
+                // of that base will also be the first Side of its group sorted
+                // by (contig, base) if we are always merging both sides of
+                // bases, so we will have a partner that is our opposite face.
+                
+                // TODO: fix up lowerBounds and other Side fields.
                 
                 // Return it
                 newSide
@@ -69,6 +96,11 @@ trait MergingScheme {
                 // Return it
                 clone
         }
+        
+        // TODO: do something about collapsing multi-edges, since we grabbed
+        // Breakpoint and Site edges from everything we merged. We also need to
+        // do something about edge base polarity: we need the base that goes
+        // with the pair of Sides we picked to pull face from.
 
         // Add Generalizations from old Sides to new Sides.
         val generalizations: RDD[HasEdge] = SparkUtil.zipWithIndex(
