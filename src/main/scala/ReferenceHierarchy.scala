@@ -21,21 +21,8 @@ trait MergingScheme {
         
         // Call scheme-specific logic to decide what nodes to merge.
         val annotatedGraph = annotate(lowerLevel, ids)
-        
-        // Reserve some IDs for new edges.
-        
-        // Get a new ID for the generalization from each vertex on the lower
-        // level.
-        val generalizationIDStart = ids.ids(lowerLevel.vertices.count)
-        
-        // Get a new ID for each existing edge on the lower level.
-        val edgeIDStart = ids.ids(lowerLevel.edges.count)
-        
-        // Get an ID to name the contig after. TODO: use level height.
-        val contigID = ids.id
-        
+
         // Make Sides for each pair of sets of merged Sides.
-        
         // Collect Sides by new ID, and sort by (contig, base)
         val setsToMerge = annotatedGraph.vertices.groupBy {
             // Group by newID
@@ -50,6 +37,10 @@ trait MergingScheme {
                 .sortBy(_.position.contig)
                 .sortBy(_.position.base))
         }
+        
+        // Get an ID to name the contig after on the new layer. TODO: use level
+        // height.
+        val contigID = ids.id
         
         // Create all the merged Sides and with their IDs
         val newSides = setsToMerge.map { 
@@ -78,10 +69,50 @@ trait MergingScheme {
                 newSide
         }
         
-        // Copy all the Edges and change their IDs.
-        val newEdges = SparkUtil.zipWithIndex(annotatedGraph.triplets).map { 
+        // Find one Site edge to represent every new merged pair of Sides, and
+        // fix it up. We assume that both Sides of each Site edge are going to
+        // be merged into corrsponding Sides of a new Site edge.
+        val siteTriplets = annotatedGraph.triplets.filter { triplet => 
+            // Select only the Sites
+            triplet.attr.isInstanceOf[SiteEdge]
+        }
+        // Group with the other Sites that are getting merged into this new Site.
+        .groupBy { triplet =>
+            Math.min(triplet.srcAttr._2, triplet.dstAttr._2)
+        }
+        // Take an arbitrary triplet to represent each Site. It will have its ID
+        // and endpoints fixed up.
+        .map { case (_, triplets) => triplets(0) }
+        
+        // Find one Breakpoint edge to represent all the breakpoints between a
+        // pair of new Sides, in any order.
+        val breakpointTriplets = annotatedGraph.triplets.filter { triplet => 
+            // Select only the Breakpoints
+            triplet.attr.isInstanceOf[BreakpointEdge]
+        }
+        // Group with the other Breakpoints between these new Sites.
+        .groupBy { triplet =>
+            // Pull out the two new IDs we are connecting
+            val srcID = triplet.srcAttr._2
+            val dstID = triplet.dstAttr._2
+            
+            // Put into a tuple in order.
+            (Math.min(srcID, dstID), Math.max(srcID, dstID))
+        }
+        // Take an arbitrary triplet to represent each connection. It will have
+        // its ID and endpoints fixed up.
+        .map { case (_, triplets) => triplets(0) }
+        
+        // Put the filtered Site and Breakpoint triplets together.
+        val keptEdges = siteTriplets.union(breakpointTriplets)
+            
+        // Get a new ID for each kept edge.
+        val edgeIDStart = ids.ids(keptEdges.count)
+            
+        // Copy all the Site and Breakpoint triplets and change their IDs and
+        // endpoints.
+        val newEdges = SparkUtil.zipWithIndex(keptEdges).map {
             case (triplet, index) =>
-                
                 // Fix up and return edge copies for each triplet
                 val clone = triplet.attr.clone
                 
@@ -97,10 +128,9 @@ trait MergingScheme {
                 clone
         }
         
-        // TODO: do something about collapsing multi-edges, since we grabbed
-        // Breakpoint and Site edges from everything we merged. We also need to
-        // do something about edge base polarity: we need the base that goes
-        // with the pair of Sides we picked to pull face from.
+        // Get a new ID for the generalization from each vertex on the lower
+        // level.
+        val generalizationIDStart = ids.ids(lowerLevel.vertices.count)
 
         // Add Generalizations from old Sides to new Sides.
         val generalizations: RDD[HasEdge] = SparkUtil.zipWithIndex(
