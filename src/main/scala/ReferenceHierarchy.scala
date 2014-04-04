@@ -5,6 +5,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
 import org.apache.spark.graphx._
 
+
 import scala.reflect._
 
 /**
@@ -229,6 +230,194 @@ case class NonSymmetric(context: Int) extends MergingScheme {
         // TODO: Implement this
         Unmerged().annotate(lowerLevel, ids)
     }
+    
+    /**
+     * Run a Pregel search to find all the upstream contexts of length exactly
+     * length (not counting the base that the node belongs to, which is also
+     * included) for each node.
+     */
+    def runSearch(graph: Graph[Side, HasEdge], length: Int): 
+        Graph[List[String], HasEdge] = {
+        
+        // First, run the search to completion, so each node has a list of
+        // SearchStates with no breadcrumbs left.
+        
+        // Set up the initial graph.
+        val searchGraph: Graph[List[SearchState], HasEdge] = graph
+            .mapVertices((_, _) => Nil)
+        
+        // What should we start out with for each node? A search state
+        // programmed to cross to the other side of its Site, then go down depth
+        // and back up depth again.
+        val initialMessage = List(new SearchState(length * 2 + 1))
+        
+        // Define all the Pregel functions.
+        
+        /**
+         * Figure out what to do at each vertex.
+         */
+        def vertexProgram(id: VertexId, attr: List[SearchState],
+            msgSum: List[SearchState]): List[SearchState] = {
+            
+            // The search states on this node are the ones we just got.
+            msgSum
+        }
+        
+        
+        /**
+         * Figure out what messages should be sent along each edge. Runs once
+         * per edge.
+         */
+        def sendMessage(edge: EdgeTriplet[List[SearchState], HasEdge]): 
+            Iterator[(VertexId, List[SearchState])] = {
+         
+            // We should send one searchstate in each direction for each search
+            // state at a node that hasn't reached its end.
+            
+            // Get the messages from the source vertex, and tag with the
+            // destination ID
+            val fromSrc: List[(VertexId, List[SearchState])] = edge.srcAttr
+                .map(_.getMessagesOver(edge.srcId, edge))
+                .map((edge.dstId, _))
+                
+            // Get the messages from the destination vertex, and tag with the
+            // source ID
+            val fromDst: List[(VertexId, List[SearchState])] = edge.dstAttr
+                .map(_.getMessagesOver(edge.dstId, edge))
+                .map((edge.srcId, _))
+            
+            // Make an iterator for both of these lists.
+            fromSrc.iterator ++ fromDst.iterator
+        }
+        
+        /**
+         * Combine two messages coming into a node.
+         */
+        def messageCombiner(a: List[SearchState], b: List[SearchState]): 
+            List[SearchState] = {
+            
+            // Just concatenate the lists
+            a ++ b
+        }
+        
+        // Run Pregel for enough iterations for every search state to get to the
+        // other side of its Site, then down to depth and back up again.
+        val pregelGraph = Pregel(searchGraph, initialMessage, 
+            length * 2 + 1)(vertexProgram _, sendMessage _, messageCombiner _)
+        
+        // Map so each node has a list of Strings, on the strand corresponding
+        // to upstream.
+        pregelGraph.mapVertices { (id, states) => 
+            // Join all the characters each state found into a string.
+            states.map(_.characters.mkString)
+        }
+    }
+    
+    
+}
+
+/**
+ * Represents the state of a search in a reference structure. Wants to traverse
+ * edges alternating between Breakpoints and Sites, splitting up at every branch
+ * point, going out to a specified depth of Sites, and collecting the base
+ * sequences from the paths traversed.
+ *
+ * Each search traverses the Site it starts at, and ends at the *opposite* side,
+ * with the contexts of the *opposite* side. Since each Site has two Sides, each
+ * Side still ends up with a list of search states that traversed its upstream
+ * context.
+ *
+ * breadcrumbs is a stack of the path we took, in terms of node IDs we need to
+ * go back to.
+ *
+ * characters is a stack of string characters we encountered.
+ *
+ * depthRemaining is the total number of edges left to traverse. After
+ * traversing the initial Site edge, this is 2 * the number of characters we
+ * still have to get, and is even if we have to take a Breakpoint and odd if we
+ * have to take a Site.
+ *
+ */
+class SearchState(val depthRemaining: Int, val breadcrumbs: List[Long] = Nil, 
+    val characters: List[Char] = Nil)  {
+    
+    
+    
+    /**
+     * Get all the messages (SearchStates, should only ever be 1) that should be
+     * sent form the given vertex over the given edge.
+     */
+    def getMessagesOver(sender: VertexId, 
+        edge: EdgeTriplet[List[SearchState], HasEdge]) : List[SearchState] = {
+        
+        if(depthRemaining > 0) {
+            // Traverse edges downwards.
+            edge.attr match {
+                case siteEdge: SiteEdge =>
+                    if(depthRemaining % 2 == 1) {
+                        // Use Site edges when odd
+                        
+                        // Work out what character to add: edge's or reverse
+                        // complement? We take the forward character when we
+                        // traverse the edge *backwards*, since we're builing
+                        // our string from end to start.
+                        val charToAdd = sender match {
+                            case id if id == edge.srcId =>
+                                // Pull it out as a char first. We're going
+                                // forwards, so take the reverse complement.
+                                siteEdge.owner.base(0).reverseComplement
+                            case _ =>
+                                // We're going backwards, so leave the character
+                                // alone after we pull it out.
+                                siteEdge.owner.base(0)
+                        }
+                        
+                        // Leave a breadcrumb so we come back here, if
+                        // applicable.
+                        val newBreadcrumbs = characters match {
+                            // Don't leave a breadcrumb on the very first node.
+                            // So we'll return to the opposite Side of our Site.
+                            case Nil => breadcrumbs
+                            // Leave breadcrumbs when crossing all subsequent
+                            // Sites.
+                            case _ => sender :: breadcrumbs
+                        }
+                        
+                        // Add in this character and continue down.
+                        List(new SearchState(depthRemaining - 1, newBreadcrumbs,
+                            charToAdd :: characters))
+                    } else {
+                        // Don't use Site edges when even
+                        Nil
+                    }
+                case breakpointEdge : BreakpointEdge =>
+                    if(depthRemaining % 2 == 0) {
+                        // Use breakpoint edges when even.
+                    
+                        // Send a copy along this edge, reducing
+                        // depthRemaining and adding a breadcrumb.
+                        List(new SearchState(depthRemaining - 1,
+                            sender :: breadcrumbs, characters))
+                    } else {
+                        Nil
+                    }
+            }
+        } else {
+            // We're going back up.
+            breadcrumbs match {
+                case head :: rest if head == edge.otherVertexId(sender) =>
+                    // This is the edge we came down. Go back up it and pop it
+                    // off the stack.
+                    List(new SearchState(depthRemaining, rest, characters))
+                case _ =>
+                    // Don't send any other messages.
+                    Nil
+            }
+            
+        }
+        
+    }
+    
 }
 
 /**

@@ -135,7 +135,20 @@ package object genome {
          * characters.
          */
         def reverseComplement: String = {
-            string.reverse.map {
+            string.reverse.map(_.reverseComplement)
+        }
+    }
+    
+    /**
+     * Magically provide DNA methods on characters.
+     */
+    implicit class DNAChar(char: Char) {
+        /**
+         * Return the reverse complement of this promoted char. The character
+         * must be {A, C, G, T, N}, with no gaps or lower-case characters.
+         */
+        def reverseComplement: Char = {
+            char match {
                 case 'A' => 'T'
                 case 'C' => 'G'
                 case 'G' => 'C'
