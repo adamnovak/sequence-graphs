@@ -98,6 +98,39 @@ class FMDIndexTests extends RLCSASuite {
         }
     }
     
+    test("displays characters correctly") {
+        val seq1 = "AATCTACTGC"
+        
+        println("seq1: %s")
+        
+        val got1 = seq1.zipWithIndex.map { case (char, offset) =>
+            // Display the appropriate base and see what we get.
+            val displayed = index.display(new Position("seq1", offset + 1,
+                Face.LEFT))
+            
+            println("\t%s vs. %s".format(char, displayed))
+            
+            displayed
+        }.mkString
+        
+        val seq2 = "AAGCTACTAGC"
+        
+        println("seq2:")
+        
+        val got2 = seq2.zipWithIndex.map { case (char, offset) =>
+            // Display the appropriate base and see what we get.
+            val displayed = index.display(new Position("seq2", offset + 1,
+                Face.LEFT))
+            
+            println("\t%s vs. %s".format(char, displayed))
+            
+            displayed
+        }.mkString
+        
+        assert(seq1 === got1)
+        assert(seq2 === got2)
+    }
+    
     test("does not find missing substring") {
         assert(index.count("AAAAA") == 0)
     }

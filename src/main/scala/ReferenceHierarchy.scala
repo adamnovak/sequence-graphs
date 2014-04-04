@@ -566,6 +566,9 @@ class ReferenceHierarchy(sc: SparkContext, index: FMDIndex,
             (id, data) => data._1
         }
         
+        // Dump the graph
+        new GraphvizWriter("hierarchy.dot").writeGraph(graph)
+        
         // Now we made the graph; we need to look at it and make the actual
         // levels we use for mapping.
         
@@ -770,4 +773,110 @@ class ReferenceHierarchy(sc: SparkContext, index: FMDIndex,
         makeGraph(sides, edges, identity)
     }
     
+}
+
+/**
+ * Class to dump a hierarchy graph to a file in GraphViz format.
+ */
+class GraphvizWriter(file: String) {
+    // We want to write files.
+    import java.io._
+    
+    // We need to write escaped strings. See
+    // <http://stackoverflow.com/a/9914380/402891> and
+    // <http://commons.apache.org/proper/commons-
+    // lang/apidocs/org/apache/commons/lang3/StringEscapeUtils.html>
+    import org.apache.commons.lang.StringEscapeUtils.escapeJava
+    
+    // Open the file for writing. See
+    // <http://www.tutorialspoint.com/scala/scala_file_io.htm>
+    val graphWriter = new java.io.PrintWriter(new File(file))
+    
+    // Write a header
+    graphWriter.write("digraph hierarchy {\n")
+    
+    // Set up edge styles
+    graphWriter.write("edge [arrowsize=\"0\"];\n")
+    
+    // And node styles
+    graphWriter.write("node [shape=\"point\"];\n")
+    
+    /**
+     * Write out a graph.
+     */
+    def writeGraph(graph: Graph[Side, HasEdge]) = {
+        // Write all the Sides
+        graph.vertices.map(_._2).collect.foreach(writeSide _)
+        // Write all the edges by type
+        graph.edges.map(_.attr).collect.foreach {
+            case edge: SiteEdge => writeSite(edge)
+            case edge: BreakpointEdge => writeBreakpoint(edge)
+            case edge: GeneralizationEdge => writeGeneralization(edge)
+            case _ => throw new Exception("Unhandled edge type")
+        }
+        
+        close()
+    }
+    
+    // Implementations for writing edges and nodes.
+    
+    def writeSite(edge: SiteEdge) : Unit = {
+        // What should we label it?
+        val label = edge.owner.base
+        
+        // Make an edge for every Site.
+        // TODO: escape labels
+        graphWriter.write(
+            "%d -> %d [label=\"%s\",arrowsize=\"1\",color=\"#ff0000\"];\n"
+            .format(edge.edge.left, edge.edge.right,
+            escapeJava(label)))
+    }
+    
+    def writeBreakpoint(edge: BreakpointEdge) : Unit = {
+        // Make an edge for every Breakpoint
+        graphWriter.write("%d -> %d;\n".format(
+            edge.edge.left, edge.edge.right))
+    }
+    
+    def writeGeneralization(edge: GeneralizationEdge) : Unit ={
+        // Make an edge for every Generalization
+        graphWriter.write("%d -> %d [arrowsize=\"1\",color=\"#00ff00\"];\n"
+            .format(edge.edge.left, edge.edge.right))
+    }
+    
+    def writeSide(side: Side) : Unit = {
+        // What should we write on the Side?
+        val label = "%s:%d-%s".format(side.position.contig, side.position.base,
+            side.position.face match {
+                case Face.LEFT => "L"
+                case Face.RIGHT => "R"
+            })
+            
+        // Getting the label on the point is tricky. See
+        // <http://marc.info/?l=graphviz-interest&m=126029250410816>
+            
+        // Write out a node to label the side (because point nodes can't have
+        // real labels)
+        graphWriter.write("L%d [shape=\"plaintext\",label=\"%s\"];\n"
+            .format(side.id, escapeJava(label)))
+
+        // Write out the Side without a label
+        graphWriter.write("%d;\n"
+            .format(side.id))
+            
+        // Connect them with an edge
+        graphWriter.write(
+            "{rank=same %d -> L%d [dir=\"none\",style=\"dotted\"];}\n"
+            .format(side.id, side.id))
+    }
+    
+    def close() {
+        // Close the graph block
+        graphWriter.write("}\n")
+        
+        // Close the file
+        graphWriter.close()
+        
+        println("Wrote %s".format(file))
+    }
 }

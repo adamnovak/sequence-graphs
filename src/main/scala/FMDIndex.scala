@@ -254,8 +254,15 @@ class FMDIndex(basename: String) {
         // Make a single-item range.
         val rangeToGrab = new pair_type(offset, offset)
         
-        // Grab the single-character string.
-        fmd.display(text, rangeToGrab)
+        // Grab the single-character array.
+        val array = fmd.display(text, rangeToGrab)
+        
+        val toReturn = RLCSAUtil.UCharArray_getitem(array, 0)
+        
+        // Java should free the array I think...
+        // TODO: Free the array?
+        
+        toReturn.toString
     }
     
     
