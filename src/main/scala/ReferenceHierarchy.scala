@@ -251,55 +251,6 @@ case class NonSymmetric(context: Int) extends MergingScheme {
         // and back up depth again.
         val initialMessage = List(new SearchState(length * 2 + 1))
         
-        // Define all the Pregel functions.
-        
-        /**
-         * Figure out what to do at each vertex.
-         */
-        def vertexProgram(id: VertexId, attr: List[SearchState],
-            msgSum: List[SearchState]): List[SearchState] = {
-            
-            // The search states on this node are the ones we just got.
-            msgSum
-        }
-        
-        
-        /**
-         * Figure out what messages should be sent along each edge. Runs once
-         * per edge.
-         */
-        def sendMessage(edge: EdgeTriplet[List[SearchState], HasEdge]): 
-            Iterator[(VertexId, List[SearchState])] = {
-         
-            // We should send one searchstate in each direction for each search
-            // state at a node that hasn't reached its end.
-            
-            // Get the messages from the source vertex, and tag with the
-            // destination ID
-            val fromSrc: List[(VertexId, List[SearchState])] = edge.srcAttr
-                .map(_.getMessagesOver(edge.srcId, edge))
-                .map((edge.dstId, _))
-                
-            // Get the messages from the destination vertex, and tag with the
-            // source ID
-            val fromDst: List[(VertexId, List[SearchState])] = edge.dstAttr
-                .map(_.getMessagesOver(edge.dstId, edge))
-                .map((edge.srcId, _))
-            
-            // Make an iterator for both of these lists.
-            fromSrc.iterator ++ fromDst.iterator
-        }
-        
-        /**
-         * Combine two messages coming into a node.
-         */
-        def messageCombiner(a: List[SearchState], b: List[SearchState]): 
-            List[SearchState] = {
-            
-            // Just concatenate the lists
-            a ++ b
-        }
-        
         // Run Pregel for enough iterations for every search state to get to the
         // other side of its Site, then down to depth and back up again.
         val pregelGraph = Pregel(searchGraph, initialMessage, 
@@ -313,6 +264,53 @@ case class NonSymmetric(context: Int) extends MergingScheme {
         }
     }
     
+    /**
+     * Figure out what to do at each vertex.
+     */
+    def vertexProgram(id: VertexId, attr: List[SearchState],
+        msgSum: List[SearchState]): List[SearchState] = {
+        
+        // The search states on this node are the ones we just got.
+        msgSum
+    }
+    
+    
+    /**
+     * Figure out what messages should be sent along each edge. Runs once per
+     * edge.
+     */
+    def sendMessage(edge: EdgeTriplet[List[SearchState], HasEdge]): 
+        Iterator[(VertexId, List[SearchState])] = {
+     
+        // We should send one searchstate in each direction for each search
+        // state at a node that hasn't reached its end.
+        
+        // Get the messages from the source vertex, and tag with the
+        // destination ID
+        val fromSrc: List[(VertexId, List[SearchState])] = edge.srcAttr
+            .map(_.getMessagesOver(edge.srcId, edge))
+            .map((edge.dstId, _))
+            
+        // Get the messages from the destination vertex, and tag with the
+        // source ID
+        val fromDst: List[(VertexId, List[SearchState])] = edge.dstAttr
+            .map(_.getMessagesOver(edge.dstId, edge))
+            .map((edge.srcId, _))
+        
+        // Make an iterator for both of these lists.
+        fromSrc.iterator ++ fromDst.iterator
+    }
+    
+    /**
+     * Combine two messages coming into a node.
+     */
+    def messageCombiner(a: List[SearchState], b: List[SearchState]): 
+        List[SearchState] = {
+        
+        // Just concatenate the lists
+        a ++ b
+    }
+
     
 }
 
