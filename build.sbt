@@ -17,6 +17,9 @@ seq( sbtavro.SbtAvro.avroSettings : _*)
 // Set up dependency graph drawing
 net.virtualvoid.sbt.graph.Plugin.graphSettings
 
+// Set up test stack traces
+testOptions in Test += Tests.Argument("-oF")
+
 // This is a library, not an application, so no native packager setup is needed.
 
 scalaVersion := "2.10.3"

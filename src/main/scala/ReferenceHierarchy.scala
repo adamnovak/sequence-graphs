@@ -54,14 +54,18 @@ trait MergingScheme {
                 // Make a copy of the Side and set its ID.
                 val newSide = Side.newBuilder(firstSide).setId(newID).build
                 
-                // Fix its Position to be on a contig for this new level.
-                // TODO: do this in order somehow, for compression of runs.
-                newSide.position.contig = "merged%d".format(contigID)
-                newSide.position.base = newID
+                // Fix its Position to be on a contig for this new level. Just
+                // rename its contig and use its original base number, since
+                // we're guaranteed the partner can do the same.
+                newSide.position.contig = "%s-merged%d"
+                    .format(newSide.position.contig, contigID)
                 // Keep its Face as whatever it had originally. The other side
                 // of that base will also be the first Side of its group sorted
                 // by (contig, base) if we are always merging both sides of
                 // bases, so we will have a partner that is our opposite face.
+                
+                // TODO: Maybe re-number bases here to have something to do with
+                // Site edge IDs?
                 
                 // TODO: fix up lowerBounds and other Side fields.
                 
@@ -169,11 +173,20 @@ case class Unmerged extends MergingScheme {
         
         // IDs in the old graph must be distinct from IDs in this new graph.
 
+        // How many new IDs do we need?
+        val vertexCount = lowerLevel.vertices.count 
+
         // Get a new ID for each vertex
-        val sideIDStart: Long = ids.ids(lowerLevel.vertices.count)
+        val sideIDStart: Long = ids.ids(vertexCount)
+        
+        println("Unmerged: re-numbering %d vertices as %d-%d"
+            .format(vertexCount, sideIDStart, vertexCount + sideIDStart))
+        
+        // Attach indices to vertices
+        val indexed = SparkUtil.zipWithIndex(lowerLevel.vertices)
         
         // Assign each to a vertex.
-        val annotations = SparkUtil.zipWithIndex(lowerLevel.vertices).map {
+        val annotations = indexed.map {
             case ((vertexID, vertex), index) => 
                 (vertexID, index + sideIDStart)
         }
@@ -388,7 +401,7 @@ case class NonSymmetric(context: Int) extends MergingScheme {
  *
  */
 class SearchState(val depthRemaining: Int, val breadcrumbs: List[Long] = Nil, 
-    val characters: List[Char] = Nil)  {
+    val characters: List[Char] = Nil) extends Serializable  {
     
     
     
@@ -598,8 +611,8 @@ class ReferenceHierarchy(sc: SparkContext, index: FMDIndex,
                 (triplet.dstAttr._1.position, triplet.srcAttr._1.position)
             }.groupByKey
         
-            // Collect to the master
-            val positionsCollected = positionsToMerge.collect
+            // Collect to the master, and sort by destination base
+            val positionsCollected = positionsToMerge.collect.sortBy(_._1.base)
             
             
             for((destination, sources) <- positionsCollected) {
@@ -613,6 +626,9 @@ class ReferenceHierarchy(sc: SparkContext, index: FMDIndex,
             
             // Put the new structure on top of the stack.
             levels = newStructure :: levels
+            
+            // Dump the new structure's positions
+            println(newStructure.children.keys.toSeq.sortBy(_.base).mkString("\n"))
         }
         
         // Now we've built all the reference structure levels. Flip them over,
