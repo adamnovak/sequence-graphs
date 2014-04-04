@@ -27,9 +27,9 @@ scalaVersion := "2.10.3"
 scalacOptions ++= Seq("-Xmax-classfile-name", "130")
 
 // We need Spark and GraphX
-libraryDependencies += "org.apache.spark" %% "spark-core" % "0.9.0-incubating"
+libraryDependencies += "org.apache.spark" %% "spark-core" % "1.0.0-incubating-SNAPSHOT"
 
-libraryDependencies += "org.apache.spark" %% "spark-graphx" % "0.9.0-incubating"
+libraryDependencies += "org.apache.spark" %% "spark-graphx" % "1.0.0-incubating-SNAPSHOT"
 
 // We need RLCSA (with appropriate natives) for mapping. Install from
 // https://github.com/adamnovak/rlcsa

@@ -18,9 +18,9 @@ scalaVersion := "2.10.3"
 // <https://bugs.launchpad.net/ubuntu/+source/linux/+bug/344878>
 scalacOptions ++= Seq("-Xmax-classfile-name", "130")
 
-libraryDependencies += "org.apache.spark" %% "spark-core" % "0.9.0-incubating"
+libraryDependencies += "org.apache.spark" %% "spark-core" % "1.0.0-incubating-SNAPSHOT"
 
-libraryDependencies += "org.apache.spark" %% "spark-graphx" % "0.9.0-incubating"
+libraryDependencies += "org.apache.spark" %% "spark-graphx" % "1.0.0-incubating-SNAPSHOT"
 
 // We need this library for testing
 

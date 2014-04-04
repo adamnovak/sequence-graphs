@@ -23,9 +23,9 @@ libraryDependencies += "org.rogach" %% "scallop" % "0.9.4"
 // our resolvers.
 libraryDependencies += "ca.innovativemedicine" %% "vcfimp" % "0.7.0"
 
-libraryDependencies += "org.apache.spark" %% "spark-core" % "0.9.0-incubating"
+libraryDependencies += "org.apache.spark" %% "spark-core" % "1.0.0-incubating-SNAPSHOT"
 
-libraryDependencies += "org.apache.spark" %% "spark-graphx" % "0.9.0-incubating"
+libraryDependencies += "org.apache.spark" %% "spark-graphx" % "1.0.0-incubating-SNAPSHOT"
 
 // We need this library for testing
 
