@@ -5,7 +5,6 @@ import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
 import org.apache.spark.graphx._
 
-
 import scala.reflect._
 
 /**
@@ -227,8 +226,59 @@ case class NonSymmetric(context: Int) extends MergingScheme {
     def annotate(lowerLevel: Graph[Side, HasEdge], ids: IDSource): 
         Graph[(Side, Long), HasEdge] = {
         
-        // TODO: Implement this
-        Unmerged().annotate(lowerLevel, ids)
+        // Go tag each Side with all the contexts of exactly the right length
+        // that it appears in.
+        val contextGraph = runSearch(lowerLevel, context)
+        
+        // Group Sides by context string
+        val idsByContext = contextGraph.vertices.flatMap { 
+            case (id, (side, contexts)) => contexts.map((_, id))
+        }.groupByKey
+        
+        // Make a new graph where each Side is in a connected component with all
+        // other Sides sharing a context with it. The sides are the sides from
+        // the original graph, but the edges are made from the grouped ID sets.
+        
+        // Put together the edges
+        val componentEdges = idsByContext.flatMap { case (context, sideIds) =>
+            // We can't get here with an empty ID list. We only want to add
+            // edges between the first thing and any subsequent things.
+            val first = sideIds(0)
+            val rest = sideIds.drop(1)
+            
+            rest.map { other =>
+                new org.apache.spark.graphx.Edge(first, other, Unit)
+            }
+        }
+        
+        // Put together the connected components input graph and solve. Now we
+        // have a graph where the vertex IDs are side IDs, and the vertex
+        // attributes are the components that those side IDs ought to be merged
+        // in to.
+        val componentGraph = Graph(lowerLevel.vertices, componentEdges)
+            .connectedComponents()
+            
+        // What's the maximum vertex value in the component graph? We can't need
+        // more than that many + 1 IDs.
+        val maxComponent = componentGraph.vertices.map(_._2).fold(0)(Math.max _)
+            
+        // Re-number the connected components so they don't conflict with the
+        // original values. What base number should we use for them? We ened to
+        // reserve enough so that when we offset the max component by this
+        // amount, we'll be safely under the number we reserved.
+        val componentIdStart = ids.ids(maxComponent + 1)
+        
+        // This holds the annotated vertices for our final graph.
+        val annotatedVertices = lowerLevel.vertices
+            .innerZipJoin(componentGraph.vertices) { (id, side, component) =>
+                // Annotate each side with an unused ID corresponding to its
+                // connected component in the graph where vertices were
+                // connected if they shared a context of the right length.
+                (side, componentIdStart + component)            
+            }
+        
+        // Stick the annotated vertices back together with their original edges.
+        Graph(annotatedVertices, lowerLevel.edges)
     }
     
     /**
