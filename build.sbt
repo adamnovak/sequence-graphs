@@ -55,8 +55,11 @@ libraryDependencies += "org.apache.commons" % "commons-lang3" % "3.2.1"
 // Java.
 libraryDependencies += "commons-io" % "commons-io" % "2.4"
 
+// We need Google Guava for its UnionFind disjoint sets data structure.
+libraryDependencies += "com.google.guava" % "guava" % "16.0.1"
+
 // add hadoop bam and everything
-libraryDependencies += "fi.tkk.ics.hadoop.bam" % "hadoop-bam" % "6.1-SNAPSHOT"
+libraryDependencies += "fi.tkk.ics.hadoop.bam" % "hadoop-bam" % "6.1"
 
 // We need FASTA reading capability.
 libraryDependencies += "org.biojava" % "biojava3-core" % "3.0.6"
