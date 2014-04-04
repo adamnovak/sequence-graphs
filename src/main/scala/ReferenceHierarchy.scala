@@ -237,14 +237,14 @@ case class NonSymmetric(context: Int) extends MergingScheme {
      * included) for each node.
      */
     def runSearch(graph: Graph[Side, HasEdge], length: Int): 
-        Graph[List[String], HasEdge] = {
+        Graph[(Side, List[String]), HasEdge] = {
         
         // First, run the search to completion, so each node has a list of
         // SearchStates with no breadcrumbs left.
         
         // Set up the initial graph.
-        val searchGraph: Graph[List[SearchState], HasEdge] = graph
-            .mapVertices((_, _) => Nil)
+        val searchGraph: Graph[(Side, List[SearchState]), HasEdge] = graph
+            .mapVertices((id, side) => (side, Nil) )
         
         // What should we start out with for each node? A search state
         // programmed to cross to the other side of its Site, then go down depth
@@ -258,20 +258,21 @@ case class NonSymmetric(context: Int) extends MergingScheme {
         
         // Map so each node has a list of Strings, on the strand corresponding
         // to upstream.
-        pregelGraph.mapVertices { (id, states) => 
-            // Join all the characters each state found into a string.
-            states.map(_.characters.mkString)
+        pregelGraph.mapVertices { (id, attr) => 
+            // Join all the characters each state found into a string. Keep the
+            // Side as is.
+            (attr._1, attr._2.map(_.characters.mkString))
         }
     }
     
     /**
      * Figure out what to do at each vertex.
      */
-    def vertexProgram(id: VertexId, attr: List[SearchState],
-        msgSum: List[SearchState]): List[SearchState] = {
+    def vertexProgram(id: VertexId, attr: (Side, List[SearchState]),
+        msgSum: List[SearchState]): (Side, List[SearchState]) = {
         
-        // The search states on this node are the ones we just got.
-        msgSum
+        // The search states on this node are replaced by the ones we just got.
+        (attr._1, msgSum)
     }
     
     
@@ -279,7 +280,7 @@ case class NonSymmetric(context: Int) extends MergingScheme {
      * Figure out what messages should be sent along each edge. Runs once per
      * edge.
      */
-    def sendMessage(edge: EdgeTriplet[List[SearchState], HasEdge]): 
+    def sendMessage(edge: EdgeTriplet[(Side, List[SearchState]), HasEdge]): 
         Iterator[(VertexId, List[SearchState])] = {
      
         // We should send one searchstate in each direction for each search
@@ -287,13 +288,13 @@ case class NonSymmetric(context: Int) extends MergingScheme {
         
         // Get the messages from the source vertex, and tag with the
         // destination ID
-        val fromSrc: List[(VertexId, List[SearchState])] = edge.srcAttr
+        val fromSrc: List[(VertexId, List[SearchState])] = edge.srcAttr._2
             .map(_.getMessagesOver(edge.srcId, edge))
             .map((edge.dstId, _))
             
         // Get the messages from the destination vertex, and tag with the
         // source ID
-        val fromDst: List[(VertexId, List[SearchState])] = edge.dstAttr
+        val fromDst: List[(VertexId, List[SearchState])] = edge.dstAttr._2
             .map(_.getMessagesOver(edge.dstId, edge))
             .map((edge.srcId, _))
         
@@ -346,7 +347,8 @@ class SearchState(val depthRemaining: Int, val breadcrumbs: List[Long] = Nil,
      * sent form the given vertex over the given edge.
      */
     def getMessagesOver(sender: VertexId, 
-        edge: EdgeTriplet[List[SearchState], HasEdge]) : List[SearchState] = {
+        edge: EdgeTriplet[(Side, List[SearchState]), HasEdge]): 
+        List[SearchState] = {
         
         if(depthRemaining > 0) {
             // Traverse edges downwards.
