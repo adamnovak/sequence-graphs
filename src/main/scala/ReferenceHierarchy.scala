@@ -728,7 +728,7 @@ class ReferenceHierarchy(sc: SparkContext, index: FMDIndex,
         }
         
         // Dump the final graph
-        new GraphvizWriter("hierarchy.dot").writeGraph(graph)
+        new GraphvizWriter("hierarchy.dot").writeSubgraphs(labeledGraph)
         
         // Now we made the graph; we need to look at it and make the actual
         // levels we use for mapping.
@@ -749,8 +749,6 @@ class ReferenceHierarchy(sc: SparkContext, index: FMDIndex,
             // specified by the merged graphs.
             val newStructure = new CollapsedReferenceStructure(levels.head, 
                 "level%d".format(levelNumber))
-            
-            // TODO: Finish this
             
             // Find all the tripples for Generalization edges feeding into that
             // level.
@@ -970,6 +968,42 @@ class GraphvizWriter(file: String) {
         close()
     }
     
+    /**
+     * Write a graph where each vertex is labeled with a subgraph.
+     */
+    def writeSubgraphs(graph: Graph[(Side, Int), HasEdge]) = {
+        
+        // Put all the Sides into seqs, keyed by subgraph, and collect.
+        val verticesBySubgraph = graph.vertices.map { 
+            case (id, (side, subgraph)) =>
+                (subgraph, side)
+        }.groupByKey.collect
+        
+        verticesBySubgraph.foreach { case (subgraph, vertices) =>
+            // Start a subgraph. Make sure to start it's name with "cluster".
+            // See <http://www.graphviz.org/Gallery/directed/cluster.html>
+            graphWriter.write("subgraph cluster%d {\n".format(subgraph))
+            // Style it so we can see it.
+            graphWriter.write("style=filled;\ncolor=lightgrey;\n")
+            
+            // Do each vertex
+            vertices.foreach(writeSide _)
+            
+            // End the subgraph
+            graphWriter.write("}\n")
+        }
+        
+        // Write all the edges by type
+        graph.edges.map(_.attr).collect.foreach {
+            case edge: SiteEdge => writeSite(edge)
+            case edge: BreakpointEdge => writeBreakpoint(edge)
+            case edge: GeneralizationEdge => writeGeneralization(edge)
+            case _ => throw new Exception("Unhandled edge type")
+        }
+        
+        close()
+    }
+    
     // Implementations for writing edges and nodes.
     
     def writeSite(edge: SiteEdge) : Unit = {
@@ -1018,7 +1052,7 @@ class GraphvizWriter(file: String) {
             
         // Connect them with an edge
         graphWriter.write(
-            "{rank=same %d -> L%d [dir=\"none\",style=\"dotted\"];}\n"
+            "%d -> L%d [dir=\"none\",style=\"dotted\"];\n"
             .format(side.id, side.id))
     }
     
