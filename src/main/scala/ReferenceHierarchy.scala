@@ -985,6 +985,8 @@ class GraphvizWriter(file: String) {
             graphWriter.write("subgraph cluster%d {\n".format(subgraph))
             // Style it so we can see it.
             graphWriter.write("style=filled;\ncolor=lightgrey;\n")
+            // Label it with the level
+            graphWriter.write("label = \"Level %d\"\n".format(subgraph + 1))
             
             // Do each vertex
             vertices.foreach(writeSide _)
