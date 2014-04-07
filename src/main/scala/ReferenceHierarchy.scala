@@ -26,12 +26,12 @@ trait MergingScheme {
         // Collect Sides by new ID, and sort by (contig, base)
         val setsToMerge = annotatedGraph.vertices.groupBy {
             // Group by newID
-            case (vertexID, (side, newID)) => newID
+            case (vertexId, (side, newID)) => newID
         }.map {
             case (newID, annotatedSides) => 
                 (newID, annotatedSides.map {
                     // Turn into (newID, list of sides)
-                    case (vertexID, (side, _)) => side
+                    case (vertexId, (side, _)) => side
                 }
                 // And make sure that list of sides is sorted by (contig, base)
                 .sortBy(_.position.contig)
@@ -142,9 +142,9 @@ trait MergingScheme {
             
             // Make a new Generalization from the old vertex to the new one,
             // using the appropriate edge ID based on the index of the vertex.
-            case ((vertexID, (side, newID)), index) =>
+            case ((vertexId, (side, newID)), index) =>
                 new Generalization(new Edge(index + generalizationIDStart, 
-                    vertexID, newID))
+                    vertexId, newID))
         }
         
         // Send back the Sides and the edges (both ones in the upper level and
@@ -187,8 +187,8 @@ case class Unmerged extends MergingScheme {
         
         // Assign each to a vertex.
         val annotations = indexed.map {
-            case ((vertexID, vertex), index) => 
-                (vertexID, index + sideIDStart)
+            case ((vertexId, vertex), index) => 
+                (vertexId, index + sideIDStart)
         }
         
         // Join those annotations into the graph. TODO: find a way to do these
@@ -196,7 +196,7 @@ case class Unmerged extends MergingScheme {
         lowerLevel.outerJoinVertices(annotations) {
             // Each vertex is now the vertex and the annotation, which we know
             // exists for every vertex.
-            (vertexID, vertex, annotation) => (vertex, annotation.get)
+            (vertexId, vertex, annotation) => (vertex, annotation.get)
         }
         
         
@@ -243,7 +243,8 @@ case class NonSymmetric(context: Int) extends MergingScheme {
         // that it appears in.
         val contextGraph = runSearch(lowerLevel, context)
         
-        // Group Sides by context string
+        // Group Sides by context string. We assume that no more than a
+        // reasonable number of Sides share a context string.
         val idsByContext = contextGraph.vertices.flatMap { 
             case (id, (side, contexts)) => contexts.map((_, id))
         }.groupByKey
@@ -253,44 +254,79 @@ case class NonSymmetric(context: Int) extends MergingScheme {
         // the original graph, but the edges are made from the grouped ID sets.
         
         // Put together the edges
-        val componentEdges = idsByContext.flatMap { case (context, sideIds) =>
+        val contextEdges = idsByContext.flatMap { case (context, sideIds) =>
             // We can't get here with an empty ID list. We only want to add
-            // edges between the first thing and any subsequent things.
+            // edges between the first side that has a context and any
+            // subsequent side sharing that context..
             val first = sideIds(0)
             val rest = sideIds.drop(1)
             
             rest.map { other =>
-                new org.apache.spark.graphx.Edge(first, other, Unit)
+                // Make these edges as true, since they connect things in the
+                // same component.
+                new org.apache.spark.graphx.Edge(first, other, true)
             }
         }
         
-        // Put together the connected components input graph and solve. Now we
-        // have a graph where the vertex IDs are side IDs, and the vertex
-        // attributes are the components that those side IDs ought to be merged
-        // in to.
-        val componentGraph = Graph(lowerLevel.vertices, componentEdges)
-            .connectedComponents()
+        println("Making complement edges")
+        
+        // Add all the Sites as edges, marking connected components that must be
+        // complementary.
+        val complementEdges = lowerLevel.edges.flatMap { edge =>
+            // Look at the edge attribute type.
+            edge.attr match {
+                case siteEdge: SiteEdge => 
+                    // We need an edge with attribute false for this Site, so
+                    // its two Sides end up in complementary components.
+                    Some(new org.apache.spark.graphx.Edge(edge.srcId,
+                        edge.dstId, false))
+                case _ =>
+                    // We need to drop this edge
+                    None
+            }
+        }
+        
+        println("Made complement edges")
+        
+        // Put together the complementary connected components input graph and
+        // solve, so that each component has at most one complementary
+        // component, and Sides connect complementary components. Now we have a
+        // graph where the vertex IDs are side IDs, and the vertex attributes
+        // are the components that those side IDs ought to be merged into. If
+        // two nodes share the same attribute, they need to merge.
+        val componentGraph = ComplementaryConnectedComponents.run(
+            SparkUtil.graph(lowerLevel.vertices, 
+            contextEdges.union(complementEdges)))
+        
+        println("Finding max component")
             
         // What's the maximum vertex value in the component graph? We can't need
-        // more than that many + 1 IDs.
+        // more than that many + 1 IDs. TODO: Assumes no negative IDs.
         val maxComponent = componentGraph.vertices.map(_._2).fold(0)(Math.max _)
+        
+        println("Max component: %d".format(maxComponent))
             
-        // Re-number the connected components so they don't conflict with the
-        // original values. What base number should we use for them? We ened to
+        // Re-number the components so they don't conflict with the original
+        // vertex id values. What base number should we use for them? We ened to
         // reserve enough so that when we offset the max component by this
         // amount, we'll be safely under the number we reserved.
         val componentIdStart = ids.ids(maxComponent + 1)
+        
+        println("Zip joining")
         
         // This holds the annotated vertices for our final graph.
         val annotatedVertices = lowerLevel.vertices
             .innerZipJoin(componentGraph.vertices) { (id, side, component) =>
                 // Annotate each side with an unused ID corresponding to its
-                // connected component in the graph where vertices were
-                // connected if they shared a context of the right length.
+                // component
                 (side, componentIdStart + component)            
             }
         
+        println("Zip joined")
+        
         // Stick the annotated vertices back together with their original edges.
+        // We can use Graph here since we know we didn't change the partition
+        // counn for annotatedVertices since we split it off of lowerLevel.
         Graph(annotatedVertices, lowerLevel.edges)
     }
     
@@ -299,7 +335,7 @@ case class NonSymmetric(context: Int) extends MergingScheme {
      * length (not counting the base that the node belongs to, which is also
      * included) for each node.
      */
-    def runSearch(graph: Graph[Side, HasEdge], length: Int): 
+    protected def runSearch(graph: Graph[Side, HasEdge], length: Int): 
         Graph[(Side, List[String]), HasEdge] = {
         
         // First, run the search to completion, so each node has a list of
@@ -329,9 +365,9 @@ case class NonSymmetric(context: Int) extends MergingScheme {
     }
     
     /**
-     * Figure out what to do at each vertex.
+     * Figure out what to do at each vertex in the context search.
      */
-    def vertexProgram(id: VertexId, attr: (Side, List[SearchState]),
+    protected def vertexProgram(id: VertexId, attr: (Side, List[SearchState]),
         msgSum: List[SearchState]): (Side, List[SearchState]) = {
         
         // The search states on this node are replaced by the ones we just got.
@@ -340,10 +376,11 @@ case class NonSymmetric(context: Int) extends MergingScheme {
     
     
     /**
-     * Figure out what messages should be sent along each edge. Runs once per
-     * edge.
+     * Figure out what messages should be sent along each edge in the context
+     * search. Runs once per edge per iteration.
      */
-    def sendMessage(edge: EdgeTriplet[(Side, List[SearchState]), HasEdge]): 
+    protected def sendMessage(
+        edge: EdgeTriplet[(Side, List[SearchState]), HasEdge]): 
         Iterator[(VertexId, List[SearchState])] = {
      
         // We should send one searchstate in each direction for each search
@@ -366,7 +403,7 @@ case class NonSymmetric(context: Int) extends MergingScheme {
     }
     
     /**
-     * Combine two messages coming into a node.
+     * Combine two messages coming into a node in the context search.
      */
     def messageCombiner(a: List[SearchState], b: List[SearchState]): 
         List[SearchState] = {
@@ -376,6 +413,144 @@ case class NonSymmetric(context: Int) extends MergingScheme {
     }
 
     
+}
+
+
+/**
+ * A modified version of the connected components algorithm where you have two
+ * types of edges. One type of edge links nodes into the same component. The
+ * other type of edge links "complementary" components. Components are merged
+ * such that each component has at most one complementary component.
+ *
+ * In this particular problem, the first type of edges are the shared-context
+ * edges, and the second type are Site edges. If two Sides of one Site share a
+ * component, the other two Sides need to also share a component.
+ *
+ * Based on the GraphX library code. See <https://github.com/amplab/graphx/
+ * blob/master/graphx/src/main/scala/org/apache/spark/graphx/lib/ConnectedCompon
+ * ents.scala>.
+ */
+object ComplementaryConnectedComponents {
+
+    // What type should messages be? Also the type of vertex attributes. Holds
+    // component id and complementary component ID.
+    type Message = (Long, Long)
+
+    /**
+     * Compute the "Complementary Connected Components" component membership of
+     * each vertex.  Return a graph where each vertex has the lowest vertex ID
+     * of any vertex in its component, and each component has at most one
+     * complementary component.
+     *
+     * Edge attributes should be true for edges that link vertices in the same
+     * component, and false for edges that link vertices that must be in
+     * complementary components.
+     *
+     */
+    def run[VD: ClassTag](graph: Graph[VD, Boolean]):
+        Graph[VertexId, Boolean] = {
+        
+        // We implement this by having each node track the minimum vertex ID in
+        // its component, and the minimum vertex ID in its complementary
+        // component.
+        
+        // Label the graph vertices with their IDs as their min component value,
+        // and the max long as their complementary component value.
+        val startingGraph = graph.mapVertices { 
+            case (id: VertexId, _) => (id, Long.MaxValue)
+        }
+        
+        // Start with an initial message of the max possible values (which will
+        // do nothing).
+        val initialMessage = (Long.MaxValue, Long.MaxValue)
+        
+        // Run Pregel to tag each vertex with its component and complementary
+        // component. Run until we stop sending any messages.
+        val solvedGraph = Pregel(startingGraph, initialMessage, 
+            activeDirection=EdgeDirection.Either)(vertexProgram, sendMessage, 
+            messageCombiner)
+          
+        // Return the graph with just the actual component IDs, dropping the
+        // complementary IDs.
+        solvedGraph.mapVertices {
+            case (id, attr) => attr._1
+        }
+    } 
+    
+    /**
+     * Given a vertex ID, its vertex attribute, and the message it got, return
+     * its new attribute.
+     */
+    protected def vertexProgram(id: VertexId, attr: Message,
+        message: Message): Message = {
+        
+        // Just use the message combiner to get the min of everything.
+        val toReturn = messageCombiner(attr, message)
+        
+        println("Vertex %d had %s, got %s, adopted %s".format(id, attr, message, toReturn))
+        
+        toReturn
+    }
+    
+    /**
+     * Given an edge triplet, return an iterator of the destination IDs and
+     * message values to send over the edge.
+     */
+    protected def sendMessage(edge: EdgeTriplet[Message, Boolean]): 
+        Iterator[(VertexId, Message)] = {
+        
+        // Grab the source and destination tuples.
+        val src = edge.srcAttr
+        val dst = edge.dstAttr
+        
+        // Make a List of (id, message) pairs to send.
+        var toSend: List[(VertexId, Message)] = Nil
+        
+        if(edge.attr) {
+            // This edge links nodes in the same component.
+            
+            if(src._1 > dst._1 || src._2 > dst._2) {
+                // We need to tell the source about the destination.
+                println("Tell source about dest")
+                toSend ::= ((edge.srcId, dst))
+            }
+            
+            if(dst._1 > src._1 || dst._2 > src._2) {
+                // We need to tell the destination about the source.
+                println("Tell dest about source")
+                toSend ::= ((edge.dstId, src))
+            }
+        } else {
+            // This edge links nodes in complementary components.
+            
+            if(src._1 > dst._2 || src._2 > dst._1) {
+                // We need to tell the source about the destination, backwards.
+                println("Tell source about !dest")
+                toSend ::= ((edge.srcId, (dst._2, dst._1)))
+            }
+            
+            if(dst._1 > src._2 || dst._2 > src._1) {
+                // We need to tell the destination about the source, backwards.
+                println("Tell dest about !source")
+                toSend ::= ((edge.dstId, (src._2, src._1)))
+            }
+        }
+        
+        println(toSend.mkString("\n"))
+        
+        // Send all the messages
+        toSend.iterator
+    }
+    
+    /**
+     * Given two messages (each of which is a component ID and a complementary
+     * component ID), return a message with the minimum component ID and the
+     * minimum complementary component ID.
+     */
+    def messageCombiner(a: Message, b: Message): Message = {
+        // Just (manually) map min over the zipped tuples.
+        (Math.min(a._1, b._1), Math.min(a._2, b._2))
+    }
 }
 
 /**
@@ -544,7 +719,7 @@ class ReferenceHierarchy(sc: SparkContext, index: FMDIndex,
             // lower ends of the generalization edges. TODO: Don't mix and
             // immediately unmix these things.
             levelGraph = makeGraph(newSides, newEdges).subgraph(vpred = {
-                (vertexID, vertex) => vertex != null
+                (vertexId, vertex) => vertex != null
             })
             
             // Roll these sides and edges into the collection we are going to
@@ -567,7 +742,7 @@ class ReferenceHierarchy(sc: SparkContext, index: FMDIndex,
         }
         
         // Dump the graph
-        new GraphvizWriter("hierarchy.dot").writeGraph(graph)
+        new GraphvizWriter("hierarchy.dot").writeGraph(levelGraph)
         
         // Now we made the graph; we need to look at it and make the actual
         // levels we use for mapping.
@@ -753,15 +928,9 @@ class ReferenceHierarchy(sc: SparkContext, index: FMDIndex,
                 edge.edge.right, edge)
         }
         
-        // How many partitions should we have? Graph misbehaves if the node and
-        // edge RDDs have unequal numbers of partitions. To avoid a shuffle, we
-        // coalesce down to the minimum number of partitions.
-        val partitions = Math.min(nodes.partitions.size,
-            graphEdges.partitions.size)
-        
         // Coalesce to an equal number of partitions, and make and return
         // the graph formed by these two RDDs.
-        Graph(nodes.coalesce(partitions), graphEdges.coalesce(partitions))
+        SparkUtil.graph(nodes, graphEdges)
     }
     
     /**

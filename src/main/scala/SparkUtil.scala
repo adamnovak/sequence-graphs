@@ -8,6 +8,8 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.graphx
 import org.apache.spark.graphx._
 
+import scala.reflect.ClassTag
+
 /**
  * Object of utility methods for Spark/GraphX, extending it with operations it
  * does not natively support.
@@ -146,6 +148,27 @@ object SparkUtil {
             }
         }
         
+    }
+    
+    /**
+     * Make a graph from an RDD of vertices (keyed by ID) and an RDD of Edges.
+     * You would think that you could just use GraphX's built-in Graph.apply to
+     * do this (as it has the same signature), but that method has an
+     * undocumented requirement that the vertex and edge RDDs have the same
+     * number of partitions. This function allows vertex and edge RDDs with any
+     * number of partitions, and coalesces to the minimum number.
+     */
+    def graph[VD: ClassTag, ED: ClassTag](nodes: RDD[(VertexId, VD)], 
+        edges: RDD[org.apache.spark.graphx.Edge[ED]]): Graph[VD, ED] = {
+    
+        // How many partitions should we have? Graph misbehaves if the node and
+        // edge RDDs have unequal numbers of partitions. To avoid a shuffle, we
+        // coalesce down to the minimum number of partitions.
+        val partitions = Math.min(nodes.partitions.size, edges.partitions.size)
+        
+        // Coalesce to an equal number of partitions, and make and return
+        // the graph formed by these two RDDs.
+        Graph(nodes.coalesce(partitions), edges.coalesce(partitions))
     }
 
 }
