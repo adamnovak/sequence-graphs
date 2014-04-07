@@ -179,9 +179,6 @@ case class Unmerged extends MergingScheme {
         // Get a new ID for each vertex
         val sideIDStart: Long = ids.ids(vertexCount)
         
-        println("Unmerged: re-numbering %d vertices as %d-%d"
-            .format(vertexCount, sideIDStart, vertexCount + sideIDStart))
-        
         // Attach indices to vertices
         val indexed = SparkUtil.zipWithIndex(lowerLevel.vertices)
         
@@ -268,8 +265,6 @@ case class NonSymmetric(context: Int) extends MergingScheme {
             }
         }
         
-        println("Making complement edges")
-        
         // Add all the Sites as edges, marking connected components that must be
         // complementary.
         val complementEdges = lowerLevel.edges.flatMap { edge =>
@@ -286,43 +281,40 @@ case class NonSymmetric(context: Int) extends MergingScheme {
             }
         }
         
-        println("Made complement edges")
+        // Put together the complementary connected components input graph.
+        // Union the two edge RDDs and coalesce to the number of partitions in
+        // the vertexRDD we are re-using. Should preserve the vertex index
+        // structure.
+        val problemGraph =  Graph(lowerLevel.vertices, 
+            contextEdges.union(complementEdges)
+            .coalesce(lowerLevel.vertices.partitions.size))
         
-        // Put together the complementary connected components input graph and
-        // solve, so that each component has at most one complementary
+        
+        // Solve, so that each component has at most one complementary
         // component, and Sides connect complementary components. Now we have a
         // graph where the vertex IDs are side IDs, and the vertex attributes
         // are the components that those side IDs ought to be merged into. If
         // two nodes share the same attribute, they need to merge.
-        val componentGraph = ComplementaryConnectedComponents.run(
-            SparkUtil.graph(lowerLevel.vertices, 
-            contextEdges.union(complementEdges)))
+        val componentGraph = ComplementaryConnectedComponents.run(problemGraph)
         
-        println("Finding max component")
-            
         // What's the maximum vertex value in the component graph? We can't need
         // more than that many + 1 IDs. TODO: Assumes no negative IDs.
         val maxComponent = componentGraph.vertices.map(_._2).fold(0)(Math.max _)
         
-        println("Max component: %d".format(maxComponent))
-            
         // Re-number the components so they don't conflict with the original
         // vertex id values. What base number should we use for them? We ened to
         // reserve enough so that when we offset the max component by this
         // amount, we'll be safely under the number we reserved.
         val componentIdStart = ids.ids(maxComponent + 1)
         
-        println("Zip joining")
-        
-        // This holds the annotated vertices for our final graph.
+        // This holds the annotated vertices for our final graph. Since we have
+        // the same vertices we can use the cheap join.
         val annotatedVertices = lowerLevel.vertices
             .innerZipJoin(componentGraph.vertices) { (id, side, component) =>
                 // Annotate each side with an unused ID corresponding to its
                 // component
                 (side, componentIdStart + component)            
             }
-        
-        println("Zip joined")
         
         // Stick the annotated vertices back together with their original edges.
         // We can use Graph here since we know we didn't change the partition
@@ -485,11 +477,7 @@ object ComplementaryConnectedComponents {
         message: Message): Message = {
         
         // Just use the message combiner to get the min of everything.
-        val toReturn = messageCombiner(attr, message)
-        
-        println("Vertex %d had %s, got %s, adopted %s".format(id, attr, message, toReturn))
-        
-        toReturn
+        messageCombiner(attr, message)
     }
     
     /**
@@ -511,13 +499,11 @@ object ComplementaryConnectedComponents {
             
             if(src._1 > dst._1 || src._2 > dst._2) {
                 // We need to tell the source about the destination.
-                println("Tell source about dest")
                 toSend ::= ((edge.srcId, dst))
             }
             
             if(dst._1 > src._1 || dst._2 > src._2) {
                 // We need to tell the destination about the source.
-                println("Tell dest about source")
                 toSend ::= ((edge.dstId, src))
             }
         } else {
@@ -525,18 +511,14 @@ object ComplementaryConnectedComponents {
             
             if(src._1 > dst._2 || src._2 > dst._1) {
                 // We need to tell the source about the destination, backwards.
-                println("Tell source about !dest")
                 toSend ::= ((edge.srcId, (dst._2, dst._1)))
             }
             
             if(dst._1 > src._2 || dst._2 > src._1) {
                 // We need to tell the destination about the source, backwards.
-                println("Tell dest about !source")
                 toSend ::= ((edge.dstId, (src._2, src._1)))
             }
         }
-        
-        println(toSend.mkString("\n"))
         
         // Send all the messages
         toSend.iterator
@@ -722,6 +704,10 @@ class ReferenceHierarchy(sc: SparkContext, index: FMDIndex,
                 (vertexId, vertex) => vertex != null
             })
             
+            // Dump the graph for this particular level to its own dot file.
+            new GraphvizWriter("level%d.dot".format(schemeIndex + 1))
+                .writeGraph(levelGraph)
+            
             // Roll these sides and edges into the collection we are going to
             // use to create the big unioned graph. We can't just union our
             // small graphs. Make sure to tag the sides with their level,
@@ -741,8 +727,8 @@ class ReferenceHierarchy(sc: SparkContext, index: FMDIndex,
             (id, data) => data._1
         }
         
-        // Dump the graph
-        new GraphvizWriter("hierarchy.dot").writeGraph(levelGraph)
+        // Dump the final graph
+        new GraphvizWriter("hierarchy.dot").writeGraph(graph)
         
         // Now we made the graph; we need to look at it and make the actual
         // levels we use for mapping.
@@ -804,9 +790,6 @@ class ReferenceHierarchy(sc: SparkContext, index: FMDIndex,
             
             // Put the new structure on top of the stack.
             levels = newStructure :: levels
-            
-            // Dump the new structure's positions
-            println(newStructure.children.keys.toSeq.sortBy(_.base).mkString("\n"))
         }
         
         // Now we've built all the reference structure levels. Flip them over,

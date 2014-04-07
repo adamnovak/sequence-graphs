@@ -51,9 +51,6 @@ class ReferenceHierarchyTests extends RLCSASuite with SparkSuite {
         val pattern = "AATCTACTGC"
         val mappings: Seq[Option[Position]] = hierarchy.levels(2).map(pattern)
         
-        println("Level 2")
-        println(mappings.mkString("\n"))
-        
         // All 10 characters ought to map.
         assert(mappings.map {
             case Some(_) => 1
