@@ -247,22 +247,24 @@ class FMDIndex(basename: String) {
     /**
      * Return the base letter corresponding to the given Position.
      */
-    def display(position: Position): String = {
+    def display(position: Position): Char = {
         // Find the text and offset for this position.
         val (text, offset) = positionToPair(position)
         
         // Make a single-item range.
         val rangeToGrab = new pair_type(offset, offset)
         
-        // Grab the single-character array.
+        // Grab the single-character array. This is really an array of shorts,
+        // since Java bytes are signed and these are "unsigned chars", so a
+        // short is needed to store the numerically-correct value.
         val array = fmd.display(text, rangeToGrab)
         
-        val toReturn = RLCSAUtil.UCharArray_getitem(array, 0)
+        
+        // Get the (only) item in the array, and convert to to a Char
+        RLCSAUtil.UCharArray_getitem(array, 0).asInstanceOf[Char]
         
         // Java should free the array I think...
         // TODO: Free the array?
-        
-        toReturn.toString
     }
     
     

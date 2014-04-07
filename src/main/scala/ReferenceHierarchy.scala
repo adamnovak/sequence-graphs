@@ -717,7 +717,7 @@ class ReferenceHierarchy(sc: SparkContext, index: FMDIndex,
             // from the FMDIndex. TODO: it might be much easier to just display
             // the whole contig and then iterate through that.
             edges = new Site(new Edge(source.id, leftSide.id, rightSide.id), 
-                index.display(leftPosition)) :: edges
+                index.display(leftPosition).toString) :: edges
                 
             if(sides != Nil) {
                 // And the Breakpoint edge to the previous Site, if any
