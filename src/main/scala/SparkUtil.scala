@@ -7,6 +7,7 @@ import org.apache.spark.rdd.RDD
 
 import org.apache.spark.graphx
 import org.apache.spark.graphx._
+import org.apache.spark.Partitioner
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
 
@@ -191,13 +192,24 @@ object SparkUtil {
         val nodesBefore = nodes.partitions.size
         val edgesBefore = edges.partitions.size
     
+        // Partition nodes RDD with its default partitioner. This hopefully
+        // prevents GraphImpl from changing the number of partitions after we
+        // pass it to Graph, and then complaining that its RDDs don't have equal
+        // numbers of partitions. See <https://github.com/amplab/grap
+        // hx/blob/f8544981a6d05687fa950639cb1eb3c31e9b6bf5/graphx/src/main/scal
+        // a/org/apache/spark/graphx/Graph.scala>
+        val nodePartitioner = Partitioner.defaultPartitioner(nodes)
+        val nodesPartitioned = nodes.partitionBy(nodePartitioner)
+        // Edges can't partitionBy since they aren't a PairRDD.
+    
         // How many partitions should we have? Graph misbehaves if the node and
         // edge RDDs have unequal numbers of partitions. To avoid a shuffle, we
         // coalesce down to the minimum number of partitions.
-        val partitions = Math.min(nodes.partitions.size, edges.partitions.size)
+        val partitions = Math.min(nodesPartitioned.partitions.size,
+            edges.partitions.size)
         
         // Coalesce
-        val nodesCoalesced = nodes.coalesce(partitions)
+        val nodesCoalesced = nodesPartitioned.coalesce(partitions)
         val edgesCoalesced = edges.coalesce(partitions)
         
         // How many partitions are in use after?
