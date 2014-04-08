@@ -187,14 +187,29 @@ object SparkUtil {
     def graph[VD: ClassTag, ED: ClassTag](nodes: RDD[(VertexId, VD)], 
         edges: RDD[org.apache.spark.graphx.Edge[ED]]): Graph[VD, ED] = {
     
+        // How many partitions are in use in our input?
+        val nodesBefore = nodes.partitions.size
+        val edgesBefore = edges.partitions.size
+    
         // How many partitions should we have? Graph misbehaves if the node and
         // edge RDDs have unequal numbers of partitions. To avoid a shuffle, we
         // coalesce down to the minimum number of partitions.
         val partitions = Math.min(nodes.partitions.size, edges.partitions.size)
         
+        // Coalesce
+        val nodesCoalesced = nodes.coalesce(partitions)
+        val edgesCoalesced = edges.coalesce(partitions)
+        
+        // How many partitions are in use after?
+        val nodesAfter = nodesCoalesced.partitions.size
+        val edgesAfter = edgesCoalesced.partitions.size
+        
+        println("Coalesced to from %d/%d to %d/%d".format(nodesBefore, 
+            edgesBefore, nodesAfter, edgesAfter))
+        
         // Coalesce to an equal number of partitions, and make and return
         // the graph formed by these two RDDs.
-        Graph(nodes.coalesce(partitions), edges.coalesce(partitions))
+        Graph(nodesCoalesced, edgesCoalesced)
     }
     
     /**

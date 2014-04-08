@@ -14,6 +14,7 @@ import edu.ucsc.genome._
 
 import java.io.File
 import java.nio.file.Paths
+import org.apache.commons.io.FileUtils
 
 // We want to be able to loop over Java iterators: load a bunch of conversions.
 // See <http://stackoverflow.com/a/1625252/402891>
@@ -96,6 +97,22 @@ object CreateIndex {
         // Get the index path
         val indexPath = opts.index.get.get
         
+        // make a File for it.
+        val directory = new File(indexPath)
+        
+        if(directory.exists) {
+            if(directory.isDirectory) {
+                // Delete the directory if it exists.
+                FileUtils.deleteDirectory(directory)
+            } else {
+                // Delete it if it's a file, too.
+                directory.delete
+            }
+        }
+        
+        // Create it again
+        directory.mkdir
+        
         // Pick an index basename
         val basename = indexPath + "/index.basename"
         
@@ -119,7 +136,7 @@ object CreateIndex {
         println("Hierarchy created! Saving...")
         
         // Save it to the given path
-        hierarchy.save(indexPath)
+        hierarchy.save(indexPath + "/hierarchy")
     }
 }
 

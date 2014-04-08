@@ -243,9 +243,17 @@ case class NonSymmetric(context: Int) extends MergingScheme {
     def annotate(lowerLevel: Graph[Side, HasEdge], ids: IDSource): 
         Graph[(Side, Long), HasEdge] = {
         
+        println(("Annotating lower level with %d vertex partitions and %d " + 
+            "edge partitions").format(lowerLevel.vertices.partitions.size, 
+            lowerLevel.edges.partitions.size))
+        
+        println("Annotating")
+        
         // Go tag each Side with all the contexts of exactly the right length
         // that it appears in.
         val contextGraph = runSearch(lowerLevel, context)
+        
+        println("Grouping by context")
         
         // Group Sides by context string. We assume that no more than a
         // reasonable number of Sides share a context string.
@@ -256,6 +264,8 @@ case class NonSymmetric(context: Int) extends MergingScheme {
         // Make a new graph where each Side is in a connected component with all
         // other Sides sharing a context with it. The sides are the sides from
         // the original graph, but the edges are made from the grouped ID sets.
+        
+        println("Making context edges")
         
         // Put together the edges
         val contextEdges = idsByContext.flatMap { case (context, sideIds) =>
@@ -271,6 +281,8 @@ case class NonSymmetric(context: Int) extends MergingScheme {
                 new org.apache.spark.graphx.Edge(first, other, true)
             }
         }
+        
+        println("Making complementary edges")
         
         // Add all the Sites as edges, marking connected components that must be
         // complementary.
@@ -288,6 +300,8 @@ case class NonSymmetric(context: Int) extends MergingScheme {
             }
         }
         
+        println("Making problem graph")
+        
         // Put together the complementary connected components input graph.
         // Union the two edge RDDs and coalesce to the number of partitions in
         // the vertexRDD we are re-using. Should preserve the vertex index
@@ -297,12 +311,16 @@ case class NonSymmetric(context: Int) extends MergingScheme {
             .coalesce(lowerLevel.vertices.partitions.size))
         
         
+        println("Solving Complementary Connected Components")
+        
         // Solve, so that each component has at most one complementary
         // component, and Sides connect complementary components. Now we have a
         // graph where the vertex IDs are side IDs, and the vertex attributes
         // are the components that those side IDs ought to be merged into. If
         // two nodes share the same attribute, they need to merge.
         val componentGraph = ComplementaryConnectedComponents.run(problemGraph)
+        
+        println("Finding free IDs")
         
         // What's the maximum vertex value in the component graph? We can't need
         // more than that many + 1 IDs. TODO: Assumes no negative IDs.
@@ -313,6 +331,8 @@ case class NonSymmetric(context: Int) extends MergingScheme {
         // reserve enough so that when we offset the max component by this
         // amount, we'll be safely under the number we reserved.
         val componentIdStart = ids.ids(maxComponent + 1)
+        
+        println("Zipping")
         
         // This holds the annotated vertices for our final graph. Since we have
         // the same vertices we can use the cheap join.
@@ -326,7 +346,10 @@ case class NonSymmetric(context: Int) extends MergingScheme {
         // Stick the annotated vertices back together with their original edges.
         // We can use Graph here since we know we didn't change the partition
         // counn for annotatedVertices since we split it off of lowerLevel.
-        Graph(annotatedVertices, lowerLevel.edges)
+        val toReturn = Graph(annotatedVertices, lowerLevel.edges)
+        
+        println("Annotated")
+        toReturn
     }
     
     /**
@@ -340,6 +363,8 @@ case class NonSymmetric(context: Int) extends MergingScheme {
         // First, run the search to completion, so each node has a list of
         // SearchStates with no breadcrumbs left.
         
+        println("Creating search graph")
+        
         // Set up the initial graph.
         val searchGraph: Graph[(Side, List[SearchState]), HasEdge] = graph
             .mapVertices((id, side) => (side, Nil) )
@@ -349,10 +374,14 @@ case class NonSymmetric(context: Int) extends MergingScheme {
         // and back up depth again.
         val initialMessage = List(new SearchState(length * 2 + 1))
         
+        println("Running Pregel")
+        
         // Run Pregel for enough iterations for every search state to get to the
         // other side of its Site, then down to depth and back up again.
         val pregelGraph = Pregel(searchGraph, initialMessage, 
             length * 2 + 1)(vertexProgram _, sendMessage _, messageCombiner _)
+        
+        println("Preparing answers")
         
         // Map so each node has a list of Strings, on the strand corresponding
         // to upstream.
@@ -1015,7 +1044,13 @@ class ReferenceHierarchy(sc: SparkContext, var index: FMDIndex) {
         
         // Coalesce to an equal number of partitions, and make and return
         // the graph formed by these two RDDs.
-        SparkUtil.graph(nodes, graphEdges)
+        val toReturn = SparkUtil.graph(nodes, graphEdges)
+        
+        println("Made %d/%d graph".format(toReturn.vertices.partitions.size, 
+            toReturn.edges.partitions.size))
+        
+        toReturn
+        
     }
     
     /**

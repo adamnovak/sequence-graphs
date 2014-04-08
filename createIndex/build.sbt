@@ -43,6 +43,10 @@ libraryDependencies += "org.slf4j" % "slf4j-log4j12" % "1.7.5"
 // We need an slf4j-api to go with our implementation
 libraryDependencies += "org.slf4j" % "slf4j-api" % "1.7.5"
 
+// We need Apache Commons IO because "rm -Rf" takes about a hunderd lines of
+// Java.
+libraryDependencies += "commons-io" % "commons-io" % "2.4"
+
 // RLCSA comes from the local Maven repo. See
 // <http://stackoverflow.com/a/10778151/402891>
 resolvers += "Local Maven" at Path.userHome.asFile.toURI.toURL + ".m2/repository"

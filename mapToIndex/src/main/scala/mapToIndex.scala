@@ -100,7 +100,7 @@ object MapToIndex {
         val pattern = opts.pattern.get.get 
 
         // Make the ReferenceHierarchy from the index we built
-        val hierarchy = new ReferenceHierarchy(sc, indexPath)
+        val hierarchy = new ReferenceHierarchy(sc, indexPath + "/hierarchy")
         
         println("Hierarchy loaded! Mapping...")
         
