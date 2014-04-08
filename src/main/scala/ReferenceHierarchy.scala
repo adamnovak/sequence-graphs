@@ -1065,6 +1065,23 @@ class ReferenceHierarchy(sc: SparkContext, var index: FMDIndex) {
         makeGraph(sides, edges, identity)
     }
     
+    /**
+     * Dump the graph to the given filename in GraphViz format.
+     */
+    def dump(filename: String) = {
+        // Make a writer to write with.
+        val writer = new GraphvizWriter(filename)
+        
+        if(labeledGraph != null) {
+            // We have the labeled graph, so we can dump with level annotations.
+            writer.writeSubgraphs(labeledGraph)
+        } else {
+            // We have to dump without level annotations. I guess we were
+            // loaded.
+            writer.writeGraph(graph)
+        }
+    }
+    
 }
 
 /**

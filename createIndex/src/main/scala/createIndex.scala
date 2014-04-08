@@ -119,6 +119,8 @@ object CreateIndex {
         // Build the FMD-index with the building class
         val builder = new RLCSABuilder(basename)
         
+        builder.checksum
+        
         // Grab the list of FASTAs to load
         val fastas: List[String] = opts.fastas.get.get
         
@@ -137,6 +139,20 @@ object CreateIndex {
         
         // Save it to the given path
         hierarchy.save(indexPath + "/hierarchy")
+        
+        // Dump it as graphviz
+        hierarchy.dump("hierarchy.dot")
+        
+        // Check mapping
+        val pattern = "AATCTACTGC"
+        for((level, levelIndex) <- hierarchy.levels.zipWithIndex) {
+            // Map to each level.
+            val mappings: Seq[Option[Position]] = level.map(pattern)
+            
+            // Print the mappings
+            println("Level %d:".format(levelIndex))
+            println(mappings.mkString("\n"))
+        }
     }
 }
 
