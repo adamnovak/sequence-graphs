@@ -13,11 +13,11 @@ class ReferenceHierarchyTests extends RLCSASuite with SparkSuite {
     test("ReferenceHierarchy can be created") {
         // Use the SparkContext sc from SparkSuite, and the index basename from
         // RLCSASuite.
-        hierarchy = new ReferenceHierarchy(sc, new FMDIndex(basename), 
-            Seq(Unmerged(), NonSymmetric(2)))
+        hierarchy = new ReferenceHierarchy(sc, new FMDIndex(basename))
+            
             
         // Build the graphs and hierarchy levels.
-        hierarchy.initialize
+        hierarchy.initialize(Seq(Unmerged(), NonSymmetric(2)))
     }
     
     test("has the appropriate number of levels") {
@@ -58,6 +58,22 @@ class ReferenceHierarchyTests extends RLCSASuite with SparkSuite {
         }.sum === 10)
     }
     
+    test("can save") {
+        hierarchy.save("hierarchy.ref")
+    }
+    
+    test("can load and map") {
+        val hierarchy2 = new ReferenceHierarchy(sc, "hierarchy.ref")
+        
+        val pattern = "AATCTACTGC"
+        val mappings: Seq[Option[Position]] = hierarchy2.levels(2).map(pattern)
+        
+        // All 10 characters ought to map.
+        assert(mappings.map {
+            case Some(_) => 1
+            case None => 0
+        }.sum === 10)
+    }
     
     
 }

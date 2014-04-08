@@ -15,12 +15,16 @@ import fi.helsinki.cs.rlcsa.RangeVector
  * containing each sequence and its reverse complement. Internally, uses the
  * RLCSA FMD-Index extension via SWIG bindings.
  *
+ * Can be serialized, but just keeps a reference to the filename of the on-disk
+ * index, so it's not going to work very well across different machines unless
+ * the index is in a consistent place.
+ *
  * Supported operations:
  * - Basic FM-Index operations (count, locate)
  * - Mapping to genome Positions, or to specified BWT ranges, based on left or 
  *   right context.
  */
-class FMDIndex(basename: String) {
+class FMDIndex(var basename: String) extends Serializable {
     import fi.helsinki.cs.rlcsa.{FMD, RLCSAUtil, MapAttemptResult, 
         MappingVector, Mapping, pair_type}
     
@@ -28,11 +32,15 @@ class FMDIndex(basename: String) {
         throw new Exception("Cannot create FMDIndex with a null basename.")
     }
     
-    // We keep a native FMD for the given basename
-    val fmd = new FMD(basename)
+    // We keep a native FMD for the given basename, which we reload after every
+    // serialization.
+    @transient 
+    lazy val fmd = new FMD(basename)
     
-    // We load the contig file, keeping contig names by index
-    val contigData: Array[(String, Long)] = Source.fromFile(basename +
+    // We load the contig file, keeping contig names by index, every time we
+    // deserialize.
+    @transient
+    lazy val contigData: Array[(String, Long)] = Source.fromFile(basename +
         ".chrom.sizes").getLines.map { (line) =>
         
             // Split each line on the tab
@@ -42,12 +50,15 @@ class FMDIndex(basename: String) {
         
         }.toArray
         
-    // We also keep (index, length) by contig name. TODO: make this more
-    // efficient/use an on-disk database or something.
-    val contigInverse: Map[String, (Int, Long)] = contigData.zipWithIndex.map {
-        case ((contig: String, length: Long), index: Int) =>
-            (contig, (index, length))
-    }.toMap
+    // We also keep (index, length) by contig name. Also reloaded after
+    // serialization. TODO: make this more efficient/use an on-disk database or
+    // something.
+    @transient
+    lazy val contigInverse: Map[String, (Int, Long)] = 
+        contigData.zipWithIndex.map {
+            case ((contig: String, length: Long), index: Int) =>
+                (contig, (index, length))
+        }.toMap
     
     ////////////////////////////////////////////////////////////////////////////
     // Metadata Operations

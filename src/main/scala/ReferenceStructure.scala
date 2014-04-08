@@ -8,8 +8,11 @@ import scala.collection.immutable.HashMap
  * Internally, has two implementations: one for the bottom-level collection of
  * haplotypes, and one for a higher-level graph that merges nodes from the level
  * below.
+ *
+ * Must be serializable, but re-loading the serialized version can depend on
+ * references to external index files (like the FMD-index).
  */
-trait ReferenceStructure {
+trait ReferenceStructure extends Serializable {
     /**
      * Disambiguate a left mapping and a right mapping to produce an overall
      * mapping for a base, with left-mapping semantics (i.e. left face means

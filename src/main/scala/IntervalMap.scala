@@ -209,6 +209,7 @@ class IntervalMap[ValueType] extends Serializable {
     
     // Cache the bake result. After this is referenced, no more intervals may be
     // added.
+    @transient
     lazy val baked = bake
     
     /**

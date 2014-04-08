@@ -9,209 +9,6 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
 import org.apache.spark.graphx._
-import org.apache.avro.generic.IndexedRecord
-
-// Import parquet
-import parquet.hadoop.{ParquetOutputFormat, ParquetInputFormat}
-import parquet.avro.{AvroParquetOutputFormat, AvroWriteSupport, AvroReadSupport,
-    AvroParquetWriter}
-import parquet.hadoop.util.{ContextUtil, ConfigurationUtil}
-
-// We need to make Paths for Parquet output.
-import org.apache.hadoop.fs.Path
-
-// And we use a hack to get at the (static) schemas of generic things
-import org.apache.avro.Schema
-
-// And more hacks to get things into the right type when Parquet Avro ignores
-// our classpath.
-import org.apache.avro.io.{EncoderFactory, DecoderFactory}
-import org.apache.avro.generic.GenericDatumWriter
-import org.apache.avro.specific.SpecificDatumReader
-
-// import hadoop stuff
-import org.apache.hadoop.mapreduce.Job
-import org.apache.hadoop.conf.Configuration
-
-/**
- * Sequence Graph companion object for important IO methods. TODO: move this to
- * some other utility thing.
- */
-object SequenceGraph {
-
-    /**
-     * Given an RDD of Avro records of type RecordType, writes them to a
-     * Parquet file in the specified directory. Any other Parquet data in that
-     * directory will be overwritten.
-     *
-     * The caller must have set up Kryo serialization with
-     * `SequenceGraphKryoProperties.setupContextProperties()`, so that Avro
-     * records can be efficiently serialized to send them to the Spark workers.
-     *
-     */
-    protected def writeRDDToParquet[RecordType <: IndexedRecord](
-        things: RDD[RecordType], directory: String)
-        (implicit m: Manifest[RecordType]) = {
-        
-        // Every time we switch Avro schemas, we need a new Job. So we create
-        // our own.
-        val job = new Job()
-                
-        // Set up Parquet to write using Avro for this job
-        ParquetOutputFormat.setWriteSupportClass(job, classOf[AvroWriteSupport])
-        
-        // Go get the static SCHEMA$ for the Avro record type. We can't do it
-        // the normal way (RecordType.SCHEMA$) because Scala keeps static things
-        // in companion objects with the same names as the types they really
-        // belong to, and type parameters don't automatically bring them along.
-        
-        // First we need the class of the record, which we need anyway for doing
-        // the writing.
-        val recordClass = m.erasure
-        
-        println("Writing out an RDD of %d %s".format(things.count, 
-            recordClass.getCanonicalName))
-        
-        // Get the schema Field object    
-        val recordSchemaField = recordClass.getDeclaredField("SCHEMA$")
-        // Get the static value of this field. Argument is ignored for static
-        // fields, so pass null. See <http://docs.oracle.com/javase/7/docs/api/j
-        // ava/lang/reflect/Field.html#get%28java.lang.Object%29>
-        val recordSchema = recordSchemaField.get(null).asInstanceOf[Schema]
-        
-        // Set the Avro schema to use for this job
-        AvroParquetOutputFormat.setSchema(job, recordSchema)
-        
-        // Make a PairRDD of serializeable-wrapped Avro records, with null keys.
-        val pairRDD = things.map(thing => (null, thing))
-        
-        // Save the PairRDD to a Parquet file in our output directory. The keys
-        // are void, the values are RecordTypes, the output format is a
-        // ParquetOutputFormat for RecordTypes, and the configuration of the job
-        // we set up is used.
-        pairRDD.saveAsNewAPIHadoopFile(directory, classOf[Void], 
-            recordClass, classOf[ParquetOutputFormat[RecordType]],
-            job.getConfiguration)
-            
-        println("RDD written")
-                    
-    }
-    
-    /**
-     * Utility method to read a Parquet Avro format RDD. Handles the problem
-     * that comes up when records are read in as the base specific record rather
-     * than the actual code-generated type, which occurs when parquet-mr and
-     * your code-generated types are in different jars.
-     */
-    def readRDDFromParquet[RecordType <: IndexedRecord](sc: SparkContext, 
-        directory: String)
-        (implicit m: Manifest[RecordType]): RDD[RecordType] = {
-        
-        // Every time we switch Avro schemas, we need a new Job. So we create
-        // our own.
-        val job = new Job(sc.hadoopConfiguration)
-        
-        // Configure Parquet to read the correct Avro thing. This may not
-        // actually work to produce the right record type, but it's worth a
-        // shot.
-        ParquetInputFormat.setReadSupportClass(job, 
-            classOf[AvroReadSupport[RecordType]])
-            
-        // Grab the configuration from the job, so things can load classes.
-        val config = ContextUtil.getConfiguration(job)
-        
-        // Get the class of the record type. The type checker isn't too sure
-        // this is going to work, but I'm pretty sure this is how manifests
-        // work.
-        val recordClass: java.lang.Class[RecordType] = m.erasure.asInstanceOf[
-            java.lang.Class[RecordType]]
-            
-        // Read in the records as an RDD. We treat this as an RDD of the base
-        // IndexedRecord type, which both the correct code-generated class and
-        // the incorrect base specific record are instances of. We need to
-        // specify the type for the method since Scala can't figure it out.
-        val rdd: RDD[IndexedRecord] = sc.newAPIHadoopFile[java.lang.Void,
-            RecordType,parquet.hadoop.ParquetInputFormat[RecordType]](directory, 
-            classOf[ParquetInputFormat[RecordType]], classOf[Void], 
-            recordClass, config)
-            .map(p => p._2)
-            
-            
-        // TODO: Check if we need this slow serialization loop to fix types.
-        rdd.mapPartitions { (loadedIterator: Iterator[IndexedRecord]) =>
-            // Do per-partition setup so we don't reflect in the inner loop.
-            
-            // Get the schema Field object for the requested record type   
-            val recordSchemaField = recordClass.getDeclaredField("SCHEMA$")
-            // Get the static value of this field. Argument is ignored for
-            // static fields, so pass null. See <http://docs.oracle.com/javase/7
-            // /docs/api/java/lang/reflect/Field.html#get%28java.lang.Object%29>
-            val recordSchema = recordSchemaField.get(null).asInstanceOf[Schema]
-            
-            // Make a reader that produces things of the right type
-            val datumReader = new SpecificDatumReader[RecordType](recordClass)
-        
-            loadedIterator.map { (loaded: IndexedRecord) =>
-            
-                // Serailize and de-serialize with Avro to get into the
-                // appropriate type. Avro deserialization will load with the
-                // thread context classloader (or the classloader of the class
-                // we pass it), even though ParquetAvro deserialization won't.
-                
-                // This seems like a hack, but it's much easier to implement
-                // than walking and fixing up the whole object graph from
-                // ParquetAvro ourselves.
-                
-                // TODO: Fix the underlying bug and make ParquetAvro use the
-                // thread context classloader.
-               
-                
-                // Make an output stream that saves in a byte array
-                val byteOutput = new ByteArrayOutputStream
-                
-                // Get an Avro Encoder to write to it, using the schema it was
-                // read with.
-                // TODO: Switch to binary encoding/decoding.
-                val encoder = EncoderFactory.get.jsonEncoder(loaded.getSchema,
-                    byteOutput)
-                
-                // Get a GenericDatumWriter to write to the encoder, using the
-                // schema it was read with.
-                val writer = new GenericDatumWriter[IndexedRecord](
-                    loaded.getSchema)
-                
-                // Write
-                writer.write(loaded, encoder)            
-                encoder.flush()
-                
-                // Grab the bytes
-                val bytes = byteOutput.toByteArray
-                
-                // Make an input stream
-                val byteInput = new ByteArrayInputStream(bytes)
-                
-                // Make an Avro Decoder for the correct class, using our version of
-                // the schema.
-                val decoder = DecoderFactory.defaultFactory
-                    .jsonDecoder(recordSchema, byteInput)
-                
-                try {
-                    // Read
-                    datumReader.read(null.asInstanceOf[RecordType], decoder)
-                } catch {
-                    case _: java.io.EOFException =>
-                        // This will happen if you're trying to read with the
-                        // wrong schema. TODO: fix schema migration.
-                        throw new Exception("Check schema versions. EOF in: %s"
-                            .format(new String(bytes)))
-                }
-            
-            }
-        
-        }.cache
-        
-    }
-}
 
 /**
  * Represents a Sequence Graph (or component thereof) as a GraphX graph. The
@@ -222,9 +19,6 @@ object SequenceGraph {
  * in serial, and also some graph queries.
  */
 class SequenceGraph(graph: Graph[Side, HasEdge]) {
-    
-    // Import fake static methods
-    import SequenceGraph._
     
     /**
      * Extract all the Sides from this SequenceGraph.
@@ -322,10 +116,10 @@ class SequenceGraph(graph: Graph[Side, HasEdge]) {
     def this(sc: SparkContext, directory: String) {
         // For some reason we need to SequenceGraph. this stuff even though we
         // imported it. And we can't even have an import before "this" here.
-        this(SequenceGraph.readRDDFromParquet(sc, directory + "/Sides"), 
-            SequenceGraph.readRDDFromParquet(sc, directory + "/AlleleGroups"), 
-            SequenceGraph.readRDDFromParquet(sc, directory + "/Adjacencies"), 
-            SequenceGraph.readRDDFromParquet(sc, directory + "/Anchors"))
+        this(SparkUtil.readRDDFromParquet(sc, directory + "/Sides"), 
+            SparkUtil.readRDDFromParquet(sc, directory + "/AlleleGroups"), 
+            SparkUtil.readRDDFromParquet(sc, directory + "/Adjacencies"), 
+            SparkUtil.readRDDFromParquet(sc, directory + "/Anchors"))
     }
     
     /**
@@ -412,10 +206,10 @@ class SequenceGraph(graph: Graph[Side, HasEdge]) {
     def writeToParquet(directory: String) = {
     
         // Write each type of object in turn.
-        writeRDDToParquet(sides, directory + "/Sides")
-        writeRDDToParquet(adjacencies, directory + "/Adjacencies")
-        writeRDDToParquet(alleleGroups, directory + "/AlleleGroups")
-        writeRDDToParquet(anchors, directory + "/Anchors")
+        SparkUtil.writeRDDToParquet(sides, directory + "/Sides")
+        SparkUtil.writeRDDToParquet(adjacencies, directory + "/Adjacencies")
+        SparkUtil.writeRDDToParquet(alleleGroups, directory + "/AlleleGroups")
+        SparkUtil.writeRDDToParquet(anchors, directory + "/Anchors")
     
     }
     

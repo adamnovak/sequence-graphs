@@ -5,6 +5,13 @@ import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
 import org.apache.spark.graphx._
 
+import org.apache.commons.io.FileUtils
+import java.io._
+
+import com.esotericsoftware.kryo._
+import com.esotericsoftware.kryo.io.{Input, Output}
+import com.twitter.chill.ScalaKryoInstantiator
+
 import scala.reflect._
 
 /**
@@ -646,31 +653,144 @@ class SearchState(val depthRemaining: Int, val breadcrumbs: List[Long] = Nil,
  * building each level, and a possibly finished, or possibly null, graph of
  * Sides, Sites, Adjacencies, and Generalizations (with no negative vertex IDs).
  */
-class ReferenceHierarchy(sc: SparkContext, index: FMDIndex,
-    schemes: Seq[MergingScheme], var graph: Graph[Side, HasEdge] = null) {
+class ReferenceHierarchy(sc: SparkContext, var index: FMDIndex) {
     
-    // Find the next available ID: the max in the graph we got, or 0.
-    // Assumes the graph we got doesn't use any negative IDs.
-    var nextAvailableID: Long = graph match {
-        case null => 0
-        case _ => graph.vertices.map(_._1)
-            // Add in all the edge IDs too
-            .union(graph.edges.map(_.attr.edge.id))
-            // Get 1 after the largest, or 0.
-            .fold(-1)((a, b) => if(a > b) a else b) + 1
-    }
-     
-    // Make an IDSource for generating sequentila IDs. 
-    val source = new IDSource(nextAvailableID)
+    // Make an IDSource for generating sequential IDs. TODO: Fix up for
+    // load/save.
+    val source = new IDSource(0)
     
     // Keep a Seq of ReferenceStructure levels, from bottom to top
     var levels: List[ReferenceStructure] = Nil
+    
+    // Keep around a level-labeled version of the graph.
+    var labeledGraph: Graph[(Side, Int), HasEdge] = null
+    
+    // Keep around the graph without level labels
+    var graph: Graph[Side, HasEdge] = null
+    
+    /**
+     * Load a ReferenceHierarchy from the given path, using the given
+     * SparkContext. The saved hierarchy must contain at least one level.
+     */
+    def this(sc: SparkContext, path: String) = {
+        // Set up with a null index.
+        this(sc, null.asInstanceOf[FMDIndex])
+        
+        // Load our graph.
+        
+        // Load the Sides
+        val sides: RDD[Side] = SparkUtil
+            .readRDDFromParquet(sc, path + "/Sides")
+        // And all the edges
+        val siteEdges: RDD[Site] = SparkUtil
+            .readRDDFromParquet(sc, path + "/Sites")
+        val breakpointEdges: RDD[Breakpoint] = SparkUtil
+            .readRDDFromParquet(sc, path + "/Breakpoints")
+        val generalizationEdges: RDD[Generalization] = SparkUtil
+            .readRDDFromParquet(sc, path + "/Generalizations")
+            
+        // Key the Sides by ID
+        val keyedSides = sides.keyBy(_.id)
+            
+        // Make the edges into HasEdges
+        val haveEdges: RDD[HasEdge] = siteEdges.map(Site2HasEdge)
+            .union(breakpointEdges.map(Breakpoint2HasEdge))
+            .union(generalizationEdges.map(Generalization2HasEdge))
+            
+        // And then into Graphx Edges
+        val edges = haveEdges.map { hasEdge =>
+            new org.apache.spark.graphx.Edge(hasEdge.edge.left, 
+                hasEdge.edge.right, hasEdge)
+        }
+        
+        // And make the graph
+        graph = SparkUtil.graph(keyedSides, edges)
+        
+        // Deserialize levels with Kryo. TODO: Ensure registrator stuff has
+        // happened.
+        val kryo = (new ScalaKryoInstantiator).newKryo
+        val input = new Input(new FileInputStream(path + "/levels.dat"))
+        
+        // Load our labeled levels.
+        levels = kryo.readObject(input, classOf[List[ReferenceStructure]])
+        
+        input.close
+        
+        // Grab the index from the first one, which we assume exists.
+        index = levels.head.getIndex
+        
+        // TODO: Try to do this without mutable state, and without needing to do
+        // loads of stuff in an argument to this().
+    }
+    
+    
+    /**
+     * Save this ReferenceHierarchy to the specified directory.
+     */
+    def save(path: String) = {
+        // Make a File 
+        val directory = new File(path)
+        
+        if(directory.exists) {
+            if(directory.isDirectory) {
+                // Delete the directory if it exists.
+                FileUtils.deleteDirectory(directory)
+            } else {
+                // Delete it if it's a file, too.
+                directory.delete
+            }
+        }
+        
+        // Make it again
+        directory.mkdir
+        
+        // Save with Kryo
+        val kryo = (new ScalaKryoInstantiator).newKryo
+        val output = new Output(new FileOutputStream(path + "/levels.dat"))
+        kryo.writeObject(output, levels);
+        output.close
+        
+        // Save the unlabeled graph RDDs. We will unfortunately have to do
+        // without the labels when we reload, since we can only save RDDs of
+        // Avro stuff.
+        
+        // Grab the vertices as Sides
+        val sides: RDD[Side] = labeledGraph.vertices.map(_._2._1)
+        // And the edges
+        val siteEdges: RDD[Site] = labeledGraph.edges
+            .map(_.attr)
+            .flatMap {
+                case edge: SiteEdge => Some(edge.owner)
+                case _ => None
+            }
+        val breakpointEdges: RDD[Breakpoint] = labeledGraph.edges
+            .map(_.attr)
+            .flatMap {
+                case edge: BreakpointEdge => Some(edge.owner)
+                case _ => None
+            }
+        val generalizationEdges: RDD[Generalization] = labeledGraph.edges
+            .map(_.attr)
+            .flatMap {
+                case edge: GeneralizationEdge => Some(edge.owner)
+                case _ => None
+            }
+        
+        // Write everything    
+        SparkUtil.writeRDDToParquet(sides, path + "/Sides")
+        SparkUtil.writeRDDToParquet(siteEdges, path + "/Sites")
+        SparkUtil.writeRDDToParquet(breakpointEdges, path + "/Breakpoints")
+        SparkUtil.writeRDDToParquet(generalizationEdges, path +
+            "/Generalizations")       
+        
+    }
     
     /**
      * Build a completely new graph by merging, starting from our bottom-level
      * contigs. Also build the levels list.
      */
-    def initialize = {
+    def initialize(schemes: Seq[MergingScheme]) = {
+        
         // Make an empty RDD of sides for our graph, paired with the hierarchy
         // levels they live at, starting at 0 on the bottom.
         var sides: RDD[(Side, Int)] = sc.parallelize(Nil)
@@ -704,10 +824,6 @@ class ReferenceHierarchy(sc: SparkContext, index: FMDIndex,
                 (vertexId, vertex) => vertex != null
             })
             
-            // Dump the graph for this particular level to its own dot file.
-            new GraphvizWriter("level%d.dot".format(schemeIndex + 1))
-                .writeGraph(levelGraph)
-            
             // Roll these sides and edges into the collection we are going to
             // use to create the big unioned graph. We can't just union our
             // small graphs. Make sure to tag the sides with their level,
@@ -718,17 +834,17 @@ class ReferenceHierarchy(sc: SparkContext, index: FMDIndex,
         
         // Now we've created levels for all of our schemes. Make our overall
         // graph, with level labels. We need to explain that the Sides to get
-        // the IDs from are the first things in the tuples.
-        val labeledGraph = makeGraph(sides, edges,
-            {(tuple: (Side, Int)) => tuple._1})
+        // the IDs from are the first things in the tuples. We also need to
+        // cache the graph, so we don't re-do all that work.
+        labeledGraph = makeGraph(sides, edges,
+            {(tuple: (Side, Int)) => tuple._1}).cache()
         
         // Make the final graph with the labels stripped
         graph = labeledGraph.mapVertices {
             (id, data) => data._1
         }
         
-        // Dump the final graph
-        new GraphvizWriter("hierarchy.dot").writeSubgraphs(labeledGraph)
+        
         
         // Now we made the graph; we need to look at it and make the actual
         // levels we use for mapping.

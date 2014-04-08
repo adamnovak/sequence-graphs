@@ -3,7 +3,7 @@ package edu.ucsc.genome
 /**
  * Represents a thing that can create long IDs sequentially. Mutable.
  */
-class IDSource(idStart: Long = 0, idCount: Long = -1) {
+class IDSource(idStart: Long = 0, idCount: Long = -1) extends Serializable {
 
     // Compute the actual ID limit, which may or many not be present, but if
     // present should be what the caller passed.

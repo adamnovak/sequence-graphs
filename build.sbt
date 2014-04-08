@@ -67,6 +67,10 @@ libraryDependencies += "fi.tkk.ics.hadoop.bam" % "hadoop-bam" % "6.1"
 // We need FASTA reading capability.
 libraryDependencies += "org.biojava" % "biojava3-core" % "3.0.6"
 
+// We need Kryo and Chill for serialization of things with Avro things in them.
+// Let Spark pull in Kryo and Chill.
+// When I try to pull in Chill I get a broken version and can't sbt stage.
+
 libraryDependencies += "variant" % "variant" % "1.93"
 
 libraryDependencies += "tribble" % "tribble" % "1.93"
