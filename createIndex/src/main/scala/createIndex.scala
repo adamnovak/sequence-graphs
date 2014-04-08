@@ -53,6 +53,9 @@ object CreateIndex {
                 descr = "Print version")
             val help = opt[Boolean](noshort = true, 
                 descr = "Show this message")
+                
+            val dump = opt[String](noshort = true, 
+                descr = "Dump hierarchy to this file in GraphViz format")
 
         } 
         
@@ -133,25 +136,17 @@ object CreateIndex {
         val hierarchy = new ReferenceHierarchy(sc, builder.getIndex)
         
         // Actually compute it. For now hardcode our merging scheme.
-        hierarchy.initialize(Seq(new Unmerged(), new NonSymmetric(2)))
+        hierarchy.initialize(Seq(new NonSymmetric(5), new NonSymmetric(3),
+            new NonSymmetric(2)))
         
         println("Hierarchy created! Saving...")
         
         // Save it to the given path
         hierarchy.save(indexPath + "/hierarchy")
         
-        // Dump it as graphviz
-        hierarchy.dump("hierarchy.dot")
-        
-        // Check mapping
-        val pattern = "AATCTACTGC"
-        for((level, levelIndex) <- hierarchy.levels.zipWithIndex) {
-            // Map to each level.
-            val mappings: Seq[Option[Position]] = level.map(pattern)
-            
-            // Print the mappings
-            println("Level %d:".format(levelIndex))
-            println(mappings.mkString("\n"))
+        opts.dump.get.map { filename =>
+            // Dump it as graphviz
+            hierarchy.dump(filename)
         }
     }
 }
