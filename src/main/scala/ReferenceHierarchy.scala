@@ -922,6 +922,17 @@ class ReferenceHierarchy(sc: SparkContext, var index: FMDIndex) {
                 (triplet.dstAttr._1.position, triplet.srcAttr._1.position)
             }.groupByKey
         
+            // Collect to the master, and sort by destination base
+            val positionsCollected = positionsToMerge.collect.sortBy(_._1.base)
+            for((destination, sources) <- positionsCollected) {
+                println("Creating new position: %s".format(destination))
+                sources.foreach(source => println("From %s".format(source)))
+                
+                // Add a new base with the correct destination Position
+                // subsuming the source Positions of each group.
+                newStructure.addBase(sources, destination)
+            }
+        
             // Put the new structure on top of the stack.
             levels = newStructure :: levels
         }
