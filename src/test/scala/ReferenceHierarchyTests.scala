@@ -59,6 +59,7 @@ class ReferenceHierarchyTests extends RLCSASuite with SparkSuite {
     }
     
     test("can save") {
+        // TODO: Put this in a temp directory.
         hierarchy.save("hierarchy.ref")
     }
     
