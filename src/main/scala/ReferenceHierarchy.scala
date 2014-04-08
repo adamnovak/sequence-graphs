@@ -855,6 +855,9 @@ class ReferenceHierarchy(sc: SparkContext, var index: FMDIndex) {
                 (vertexId, vertex) => vertex != null
             })
             
+            println("Made level with %d sides and %d edges".format(
+                newSides.count, newEdges.count))
+            
             // Roll these sides and edges into the collection we are going to
             // use to create the big unioned graph. We can't just union our
             // small graphs. Make sure to tag the sides with their level,

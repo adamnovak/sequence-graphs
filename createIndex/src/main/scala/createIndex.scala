@@ -131,7 +131,7 @@ object CreateIndex {
         val hierarchy = new ReferenceHierarchy(sc, builder.getIndex)
         
         // Actually compute it. For now hardcode our merging scheme.
-        hierarchy.initialize(Seq(new NonSymmetric(10)))
+        hierarchy.initialize(Seq(new Unmerged(), new NonSymmetric(2)))
         
         println("Hierarchy created! Saving...")
         
