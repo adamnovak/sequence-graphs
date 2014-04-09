@@ -363,6 +363,8 @@ case class NonSymmetric(context: Int) extends MergingScheme {
         // First, run the search to completion, so each node has a list of
         // SearchStates with no breadcrumbs left.
         
+        println("Counting vertices")
+        
         println("Search graph will want about %d bytes of contexts"
             .format(graph.vertices.count * length))
         
@@ -939,8 +941,12 @@ class ReferenceHierarchy(sc: SparkContext, var index: FMDIndex) {
         println("Making full bottom-level graph...")
         var levelGraph = makeGraph(sides.map(_._1), edges)
         
+        // Cache the bottom-level graph
+        levelGraph.cache
+        
         for((scheme, schemeIndex) <- schemes.zipWithIndex) {
             println("Merging level %d...".format(schemeIndex + 1))
+            
             
             // Make new sides and edges from merging on the last graph. TODO:
             // this will eventually need to be able to map things, for some
@@ -954,6 +960,9 @@ class ReferenceHierarchy(sc: SparkContext, var index: FMDIndex) {
             levelGraph = makeGraph(newSides, newEdges).subgraph(vpred = {
                 (vertexId, vertex) => vertex != null
             })
+            
+            // Cache the new graph. TODO: uncache the old one.
+            levelGraph.cache
             
             println("Made level with %d sides and %d edges".format(
                 newSides.count, newEdges.count))
@@ -973,12 +982,13 @@ class ReferenceHierarchy(sc: SparkContext, var index: FMDIndex) {
         labeledGraph = makeGraph(sides, edges,
             {(tuple: (Side, Int)) => tuple._1}).cache()
         
+        // Cache the labeled graph
+        labeledGraph.cache
+        
         // Make the final graph with the labels stripped
         graph = labeledGraph.mapVertices {
             (id, data) => data._1
         }
-        
-        
         
         // Now we made the graph; we need to look at it and make the actual
         // levels we use for mapping.
