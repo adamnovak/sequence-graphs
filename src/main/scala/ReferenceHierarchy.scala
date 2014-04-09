@@ -363,6 +363,9 @@ case class NonSymmetric(context: Int) extends MergingScheme {
         // First, run the search to completion, so each node has a list of
         // SearchStates with no breadcrumbs left.
         
+        println("Search graph will want about %d bytes of contexts"
+            .format(graph.vertices.count * length))
+        
         println("Creating search graph")
         
         // Set up the initial graph.
@@ -826,17 +829,114 @@ class ReferenceHierarchy(sc: SparkContext, var index: FMDIndex) {
         // And another empty RDD of various types of edges
         var edges: RDD[HasEdge] = sc.parallelize(Nil)
         
-        for(contig <- index.contigs) {
-            // Make sides and edges for each contig
-            val (newSides, newEdges) = makeContigGraph(contig)
+        // Reserve IDs for first-level contigs. Also grab all their bases from
+        // the index. Make sure to do that locally and now, then ship the
+        // contigs off to Spark.
+        val contigData = sc.parallelize(index.contigs.map { contig =>
+            println("Reconstructing contig %s from index".format(contig))
             
-            // Add them to our growing collections of graph parts.
-            sides = sides.union(newSides.map((_, 0)))
-            edges = edges.union(newEdges)
+            // How many bases do we need to do?
+            val contigBases = index.contigLength(contig)
+            
+            // How many IDs do we need? Two per base for the Sides, one per base
+            // for the Site, and 1 per inter-base gap (bases - 1) for the
+            // Breakpoints.
+            val neededIds = contigBases * 4 - 1
+            
+            // Reserve that many
+            val idBase = source.ids(neededIds)
+            
+            // Grab all the bases and make a string. TODO: use a different,
+            // full-string Display.
+            val contigString = (1L until contigBases + 1).map { base =>
+                index.display(new Position(contig, base, Face.LEFT))
+            }.mkString
+            
+            // Send the contig name, the string contig data, and the ID start
+            // position.
+            (contig, (contigString, idBase))
+        })
+        
+        // Make an RDD of Sides at the bottom level
+        val bottomSides: RDD[Side] = contigData.flatMap {
+            case (contig, (contigString, idStart)) =>
+                contigString.view.zipWithIndex.flatMap { case (base, offset) =>
+                    // Make a list of Sides for the two Sides we need for every
+                    // base.
+                    
+                    // TODO: we don't use the base.
+                    
+                    // Make positions for the base, accounting for 1-based
+                    // indexing
+                    val leftPosition = new Position(contig, offset + 1,
+                        Face.LEFT)
+                    val rightPosition = new Position(contig, offset + 1,
+                        Face.RIGHT)
+                    
+                    // What are the left and right Side IDs for this base?
+                    val leftSideId = offset * 2 + idStart
+                    val rightSideId = leftSideId + 1
+                    
+                    // Make Sides for the base. Assign Side IDs sequentially
+                    // from the first 2 * size IDs
+                    val leftSide = new Side(leftSideId, leftPosition, false, 
+                        leftPosition)
+                    val rightSide = new Side(rightSideId, rightPosition, false,
+                        rightPosition)
+                        
+                    // Give back a list of the Sides
+                    List(leftSide, rightSide)
+                }
         }
+        
+        // And one of edges (Sites and Breakpoints)
+        val bottomEdges: RDD[HasEdge] = contigData.flatMap {
+            case (contig, (contigString, idStart)) =>
+                // How many bases are on this contig?
+                val length = contigString.size
+                
+                contigString.view.zipWithIndex.flatMap { case (base, offset) =>
+                    // What were the left and right Side IDs for this base?
+                    val leftSideId = offset * 2 + idStart
+                    val rightSideId = leftSideId + 1
+                    
+                    // And the right Side ID of the previous base (if it
+                    // exists)? We know it was 1 before our left Side.
+                    val prevSideId = leftSideId - 1
+                    
+                    // What ID should we give to our Site edge?
+                    val siteId = 2 * length + offset
+                    
+                    // And our previous-Site-to-here Breakpoint? The - 1 is so
+                    // the first Site doesn't use up an ID.
+                    val breakpointId = 3 * length + offset - 1
+                    
+                    // Start a list of edges we're generating by putting the
+                    // actual Site edge.
+                    var edges: List[HasEdge] = List(new Site(new Edge(siteId,
+                        leftSideId, rightSideId), base.toString))
+                    
+                    if(offset > 0) {
+                        // And the Breakpoint edge to the previous Site, since
+                        // it exists.
+                        edges = new Breakpoint(new Edge(breakpointId,
+                            prevSideId, leftSideId), false) :: edges
+                    }
+                    
+                    // Return the edges we made to be flattened into edges for
+                    // this contig, and then RDD'd.
+                    edges
+                }
+                
+        }
+        
+        // Add in the bottom level.
+        sides = sides.union(bottomSides.map((_, 0)))
+        edges = edges.union(bottomEdges)
         
         // Keep a graph of just each level by itself, without level labels,
         // starting from this bottom level.
+        println("Making full bottom-level graph...")
         var levelGraph = makeGraph(sides.map(_._1), edges)
         
         for((scheme, schemeIndex) <- schemes.zipWithIndex) {
@@ -997,42 +1097,77 @@ class ReferenceHierarchy(sc: SparkContext, var index: FMDIndex) {
      * contig.
      */
     def makeContigGraph(contig: String): (RDD[Side], RDD[HasEdge]) = {
-        // Keep a growing list of Sides
-        var sides: List[Side] = Nil
-        // And a growing list of Sites/Breakpoints
-        var edges: List[HasEdge] = Nil
         
-        for(base <- 1L until index.contigLength(contig) + 1) {
-            // Make positions for the base, accounting for 1-based indexing
-            val leftPosition = new Position(contig, base, Face.LEFT)
-            val rightPosition = new Position(contig, base, Face.RIGHT)
+        // Make an RDD to hold all our Sides.
+        var sidesRDD: RDD[Side] = sc.parallelize(Nil)
+        
+        // And our Edges.
+        var edgesRDD: RDD[HasEdge] = sc.parallelize(Nil)
+        
+        // How many bases do we need to do?
+        val totalBases = index.contigLength(contig)
+        
+        // How many can we do in a chunk? TODO: abstract this out
+        val chunkSize = 10000
+        
+        // How many chunbks do we need for this?
+        val chunks: Long = Math.ceil(totalBases.toDouble / chunkSize).toLong
+        
+        println("Creating %d nodes in %d chunks".format(totalBases * 2, chunks))
+        
+        for(chunk <- 0L until chunks) {
+            // Keep a growing list of Sides
+            var sides: List[Side] = Nil
+            // And a growing list of Sites/Breakpoints
+            var edges: List[HasEdge] = Nil
             
-            // Make Sides for the base
-            val leftSide = new Side(source.id, leftPosition, false,
-                leftPosition)
-            val rightSide = new Side(source.id, rightPosition, false,
-                rightPosition)
+            println("Making chunk %d".format(chunk))
             
-            // Make the Site edge with the base for this position that we pull
-            // from the FMDIndex. TODO: it might be much easier to just display
-            // the whole contig and then iterate through that.
-            edges = new Site(new Edge(source.id, leftSide.id, rightSide.id), 
-                index.display(leftPosition).toString) :: edges
+            for(base <- (chunk * chunkSize) + 1 until Math.min(totalBases + 1,
+                (chunk + 1) * chunkSize + 1)) {
                 
-            if(sides != Nil) {
-                // And the Breakpoint edge to the previous Site, if any
-                edges = new Breakpoint(new Edge(source.id, sides.head.id, 
-                    leftSide.id), false) :: edges
+                // Go through each base in the chunk
+                
+                // Make positions for the base, accounting for 1-based indexing
+                val leftPosition = new Position(contig, base, Face.LEFT)
+                val rightPosition = new Position(contig, base, Face.RIGHT)
+                
+                // Make Sides for the base
+                val leftSide = new Side(source.id, leftPosition, false,
+                    leftPosition)
+                val rightSide = new Side(source.id, rightPosition, false,
+                    rightPosition)
+                
+                // Make the Site edge with the base for this position that we
+                // pull from the FMDIndex. TODO: it might be much easier to just
+                // display the whole contig and then iterate through that.
+                edges = new Site(new Edge(source.id, leftSide.id, rightSide.id),
+                    index.display(leftPosition).toString) :: edges
+                    
+                if(sides != Nil) {
+                    // And the Breakpoint edge to the previous Site, if any
+                    edges = new Breakpoint(new Edge(source.id, sides.head.id, 
+                        leftSide.id), false) :: edges
+                }
+                
+                // Put our Sides in the list (right side last so it can be
+                // grabbed on the next iteration).
+                sides = rightSide :: leftSide :: sides
+                
             }
             
-            // Put our Sides in the list (right side last so it can be grabbed
-            // on the next iteration).
-            sides = rightSide :: leftSide :: sides
+            // Now we've built lists for this chunk. Parallelize them so we can
+            // throw them out of our local driver memory.
+            
+            // Add these things to our growing RDDs
+            sidesRDD = sidesRDD.union(sc.parallelize(sides))
+            edgesRDD = edgesRDD.union(sc.parallelize(edges))
             
         }
         
-        // Turn the Lists we built into RDDs and return them.
-        (sc.parallelize(sides), sc.parallelize(edges))
+        // Return our completed RDDs
+        (sidesRDD, edgesRDD)
+            
     }
     
     /**

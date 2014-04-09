@@ -122,8 +122,6 @@ object CreateIndex {
         // Build the FMD-index with the building class
         val builder = new RLCSABuilder(basename)
         
-        builder.checksum
-        
         // Grab the list of FASTAs to load
         val fastas: List[String] = opts.fastas.get.get
         
@@ -131,6 +129,10 @@ object CreateIndex {
             // Add each of the FASTA files to the index.
             builder.add(fasta)
         }
+        
+        builder.checksum
+        
+        println("Creating hierarchy")
         
         // Make the ReferenceHierarchy from the index we built
         val hierarchy = new ReferenceHierarchy(sc, builder.getIndex)
