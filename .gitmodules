@@ -1,0 +1,6 @@
+[submodule "deps/pinchesAndCacti"]
+	path = deps/pinchesAndCacti
+	url = git@github.com:benedictpaten/pinchesAndCacti.git
+[submodule "deps/sonLib"]
+	path = deps/sonLib
+	url = git@github.com:benedictpaten/sonLib.git
