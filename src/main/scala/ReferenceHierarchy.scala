@@ -43,7 +43,10 @@ trait MergingScheme {
                 // And make sure that list of sides is sorted by (contig, base)
                 .sortBy(_.position.contig)
                 .sortBy(_.position.base))
-        }
+        }.cache
+        
+        println("Counting merge sets")        
+        println("Need to merge %d sets".format(setsToMerge.count))
         
         // Get an ID to name the contig after on the new layer. TODO: use level
         // height.
@@ -247,7 +250,7 @@ case class NonSymmetric(context: Int) extends MergingScheme {
             "edge partitions").format(lowerLevel.vertices.partitions.size, 
             lowerLevel.edges.partitions.size))
         
-        println("Annotating")
+        println("Annotating (%d sets max)".format(Math.pow(5, context + 1))
         
         // Go tag each Side with all the contexts of exactly the right length
         // that it appears in.
