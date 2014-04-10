@@ -250,7 +250,7 @@ case class NonSymmetric(context: Int) extends MergingScheme {
             "edge partitions").format(lowerLevel.vertices.partitions.size, 
             lowerLevel.edges.partitions.size))
         
-        println("Annotating (%d sets max)".format(Math.pow(5, context + 1))
+        println("Annotating (%d sets max)".format(Math.pow(5, context + 1)))
         
         // Go tag each Side with all the contexts of exactly the right length
         // that it appears in.
