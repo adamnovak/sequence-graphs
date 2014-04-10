@@ -250,7 +250,7 @@ case class NonSymmetric(context: Int) extends MergingScheme {
             "edge partitions").format(lowerLevel.vertices.partitions.size, 
             lowerLevel.edges.partitions.size))
         
-        println("Annotating (%d sets max)".format(Math.pow(5, context + 1)))
+        println("Annotating (%f sets max)".format(Math.pow(5, context + 1)))
         
         // Go tag each Side with all the contexts of exactly the right length
         // that it appears in.
@@ -262,7 +262,9 @@ case class NonSymmetric(context: Int) extends MergingScheme {
         // reasonable number of Sides share a context string.
         val idsByContext = contextGraph.vertices.flatMap { 
             case (id, (side, contexts)) => contexts.map((_, id))
-        }.groupByKey
+        }.groupByKey.cache
+        
+        println("There are %d actual contexts".format(idsByContext.count))
         
         // Make a new graph where each Side is in a connected component with all
         // other Sides sharing a context with it. The sides are the sides from

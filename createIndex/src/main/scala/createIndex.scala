@@ -54,6 +54,8 @@ object CreateIndex {
             val help = opt[Boolean](noshort = true, 
                 descr = "Show this message")
                 
+            val temp = opt[String](noshort = true, 
+                descr = "Temporary directory root")
             val dump = opt[String](noshort = true, 
                 descr = "Dump hierarchy to this file in GraphViz format")
 
@@ -74,6 +76,12 @@ object CreateIndex {
         // Set the parallelism level to have enough reducers to not run out of
         // memory
         System.setProperty("spark.default.parallelism", "12")
+        
+        opts.temp.get.map { temp =>
+            // Set up our chosen temp directory
+            System.setProperty("spark.local.dir", temp)
+            System.setProperty("java.io.tmpdir", temp)
+        }
         
         // The first thing we need is a Spark context. We would like to be able
         // to make one against any Spark URL: either "local" or soemthing like
