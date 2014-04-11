@@ -4,3 +4,6 @@
 [submodule "deps/sonLib"]
 	path = deps/sonLib
 	url = git@github.com:benedictpaten/sonLib.git
+[submodule "deps/rlcsa"]
+	path = deps/rlcsa
+	url = git@github.com:adamnovak/rlcsa.git
