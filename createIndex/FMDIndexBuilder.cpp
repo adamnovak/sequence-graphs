@@ -3,11 +3,20 @@
 #include <iostream>
 #include <fstream>
 
+#include <sys/types.h>
+#include <sys/wait.h>
+
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
 
-#include "FMDIndexBuilder.hpp"
 #include "kseq.h"
+#include "util.hpp"
+
+#include "FMDIndexBuilder.hpp"
+
+// Tell kseq what files are (handle numbers) and that you read them with read.
+// Don't hook in .gz support. See <http://stackoverflow.com/a/19390915/402891>
+KSEQ_INIT(int, read)
 
 FMDIndexBuilder::FMDIndexBuilder(const std::string& basename):
     basename(basename) {
@@ -18,7 +27,7 @@ void FMDIndexBuilder::add(const std::string& filename) {
 
     // Get a temporary directory
     // Make some memory to be replaced with the actual name
-    char[] tempDirName = "indexXXXXXX";
+    char tempDirName[] = "indexXXXXXX";
     // Make the directory
     mkdtemp(tempDirName);
     std::string tempDirString(tempDirName);
@@ -28,18 +37,18 @@ void FMDIndexBuilder::add(const std::string& filename) {
     
     // Open it up for writing
     std::ofstream haplotypeStream;
-    haplotypeStream.open(haplotypeFilename, std::ofstream::out);
+    haplotypeStream.open(haplotypeFilename.c_str(), std::ofstream::out);
     
     // Open the main index contig size list for appending
     std::ofstream contigStream;
-    contigStream.open(basename + ".chrom.sizes", std::ofstream::out |
+    contigStream.open((basename + ".chrom.sizes").c_str(), std::ofstream::out |
         std::ofstream::app);
         
     // Open the FASTA for reading.
-    FILE* fasta = fopen(filename.c_str);
+    FILE* fasta = fopen(filename.c_str(), "r");
     
-    kseq_t seq = kseq_init(fasta); // Start up the parser
-    while ((kseq_read(seq) >= 0) { // Read sequences until we run out.
+    kseq_t* seq = kseq_init(fileno(fasta)); // Start up the parser
+    while (kseq_read(seq) >= 0) { // Read sequences until we run out.
         // Stringify the sequence name
         std::string name(seq->name.s);
         
@@ -59,7 +68,7 @@ void FMDIndexBuilder::add(const std::string& filename) {
         haplotypeStream << reverse_complement(sequence) << '\0';
         
         // Write the sequence ID and size to the contig list.
-        contigStream << name << '\t' << sequence.size << std::endl;
+        contigStream << name << '\t' << sequence.size() << std::endl;
     }  
     kseq_destroy(seq); // Close down the parser.
     
@@ -72,7 +81,7 @@ void FMDIndexBuilder::add(const std::string& filename) {
     int pid = fork();
     if(pid == 0) {
         // We're the child; execute the process.
-        execlp("build_rlcsa", haplotypeFilename.c_str, "10");
+        execlp("build_rlcsa", haplotypeFilename.c_str(), "10");
     } else {
         // Wait for the child to finish.
         waitpid(pid, NULL, 0);
@@ -92,7 +101,8 @@ void FMDIndexBuilder::merge(const std::string& otherBasename) {
         int pid = fork();
         if(pid == 0) {
             // We're the child; execute the process.
-            execlp("merge_rlcsa", basename.c_str, otherBasename.c_str, "10");
+            execlp("merge_rlcsa", basename.c_str(), otherBasename.c_str(),
+                "10");
         } else {
             // Wait for the child to finish.
             waitpid(pid, NULL, 0);

@@ -16,8 +16,6 @@ class FMDIndexBuilder {
          * Create a new FMDIndexBuilder using the specified basename for its
          * index. If an index with that basename already exists, the builder
          * will merge new things into it.
-         *
-         * KSEQ_INIT must have already been called.
          */
         FMDIndexBuilder(const std::string& basename);
         
@@ -37,6 +35,6 @@ class FMDIndexBuilder {
          */
         std::string basename;
 
-}
+};
 
 #endif

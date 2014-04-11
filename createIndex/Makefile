@@ -2,6 +2,10 @@ CXX=g++
 
 OBJS= createIndex.o FMDIndexBuilder.o util.o
 
+LDLIBS += -lboost_filesystem
+
+all: createIndex
+
 FMDIndexBuilder.o: FMDIndexBuilder.cpp FMDIndexBuilder.hpp util.hpp kseq.h
 
 util.o: util.cpp util.hpp
@@ -9,7 +13,7 @@ util.o: util.cpp util.hpp
 createIndex.o: createIndex.cpp
 
 createIndex: $(OBJS)
-    $(CXX) $(LDFLAGS) -o $@ $(OBJS) $(LDLIBS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(LDLIBS)
     
-all: createIndex
+
 
