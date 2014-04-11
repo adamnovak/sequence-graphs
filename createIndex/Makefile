@@ -4,6 +4,8 @@ OBJS= createIndex.o FMDIndexBuilder.o util.o
 
 LDLIBS += -lboost_filesystem
 
+CXXFLAGS += -g
+
 all: createIndex
 
 FMDIndexBuilder.o: FMDIndexBuilder.cpp FMDIndexBuilder.hpp util.hpp kseq.h
@@ -14,6 +16,9 @@ createIndex.o: createIndex.cpp
 
 createIndex: $(OBJS)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(LDLIBS)
+	
+clean:
+	rm -Rf $(OBJS) createIndex
     
 
 

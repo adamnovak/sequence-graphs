@@ -13,4 +13,10 @@
  */
 std::string reverse_complement(const std::string& sequence);
 
+/**
+ * Make a new temporary directory securely, in the appropriate directory
+ * (obeying $TMPDIR if set), and return its path.
+ */
+std::string make_tempdir();
+
 #endif

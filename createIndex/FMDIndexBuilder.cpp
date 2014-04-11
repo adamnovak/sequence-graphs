@@ -24,16 +24,12 @@ FMDIndexBuilder::FMDIndexBuilder(const std::string& basename):
 }
 
 void FMDIndexBuilder::add(const std::string& filename) {
-
-    // Get a temporary directory
-    // Make some memory to be replaced with the actual name
-    char tempDirName[] = "indexXXXXXX";
-    // Make the directory
-    mkdtemp(tempDirName);
-    std::string tempDirString(tempDirName);
+    
+    // Make a new temporary directory with our utility function.
+    std::string tempDir = make_tempdir();
     
     // Work out the name of the basename file that will store the haplotypes
-    std::string haplotypeFilename = tempDirString + "/haplotypes";
+    std::string haplotypeFilename = tempDir + "/haplotypes";
     
     // Open it up for writing
     std::ofstream haplotypeStream;
@@ -80,8 +76,9 @@ void FMDIndexBuilder::add(const std::string& filename) {
     // of threads.
     int pid = fork();
     if(pid == 0) {
-        // We're the child; execute the process.
-        execlp("build_rlcsa", haplotypeFilename.c_str(), "10");
+        // We're the child; execute the process. Make sure to fill in its
+        // argv[0].
+        execlp("build_rlcsa", "build_rlcsa", haplotypeFilename.c_str(), "10");
     } else {
         // Wait for the child to finish.
         waitpid(pid, NULL, 0);
@@ -91,7 +88,7 @@ void FMDIndexBuilder::add(const std::string& filename) {
     merge(haplotypeFilename);
     
     // Get rid of the temporary index files
-    boost::filesystem::remove_all(tempDirName);
+    boost::filesystem::remove_all(tempDir);
 
 }
 
@@ -100,9 +97,10 @@ void FMDIndexBuilder::merge(const std::string& otherBasename) {
         // We have an index already. Run a merge command.
         int pid = fork();
         if(pid == 0) {
-            // We're the child; execute the process.
-            execlp("merge_rlcsa", basename.c_str(), otherBasename.c_str(),
-                "10");
+            // We're the child; execute the process. Make sure to fill in its
+            // argv[0].
+            execlp("merge_rlcsa", "merge_rlcsa", basename.c_str(),
+                otherBasename.c_str(), "10");
         } else {
             // Wait for the child to finish.
             waitpid(pid, NULL, 0);
