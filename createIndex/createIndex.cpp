@@ -4,6 +4,8 @@
 
 #include <boost/filesystem.hpp>
 
+#include <rlcsa/fmd.h>
+
 #include "FMDIndexBuilder.hpp"
 
 /**
@@ -52,6 +54,7 @@ int main(int argc, char** argv) {
     
     
     // Load it up with RLCSA.
+    
     
     // Pull contig lengths from the index.
     // Make a ThreadSet with one thread per contig.
