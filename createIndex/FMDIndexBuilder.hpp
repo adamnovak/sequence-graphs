@@ -24,6 +24,11 @@ class FMDIndexBuilder {
          * and in reverse complement.
          */
         void add(const std::string& filename);
+        
+        /**
+         * Close all files, sync to disk, and shut down the Builder.
+         */
+        void close();
     protected:
         /**
          * Merge the index pointed to by otherBasename into our index.

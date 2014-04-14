@@ -43,20 +43,50 @@ int main(int argc, char** argv) {
     
     // Build the bottom-level index.
     
+    // Work out its basename
+    std::string basename(indexDirectory + "/index.basename");
+    
     // Make a new builder
-    FMDIndexBuilder builder(indexDirectory + "/index.basename");
+    FMDIndexBuilder builder(basename);
     for(std::vector<std::string>::iterator i = fastas.begin(); i < fastas.end();
         ++i) {
+        
+        std::cout << "Adding FASTA " << *i << std::endl;
         
         // Add each FASTA file to the index.
         builder.add(*i);
     }
     
     
-    // Load it up with RLCSA.
+    // Load the index with RLCSA.
+    CSA::FMD Index(basename);
+    
+    // Open the contig name/length file for reading.
+    std::ifstream contigFile((basename + ".chrom.sizes").c_str());
+    
+    // Read all the contigs. We'll keep them in this map of contig name to
+    // length.
+    std::map<std::string, long long> contigLengths;
+    // Also a string to hold eanc line in turn.
+    std::string line;
+    while(std::getline(contigFile, line)) {
+        // For each <contig>\t<length> pair...
+        
+        // Find the \t
+        size_t separator = line.find('\t');
+        
+        // Split into name and length
+        std::string contigName = line.substr(0, separator - 1);
+        std::string contigLength = line.substr(separator + 1, line.size() - 1);
+        
+        // Parse the length
+        long long lengthNumber = atoll(contigLength.c_str());
+        
+        // Add it to the map
+        contigLengths[contigName] = lengthNumber;
+    }
     
     
-    // Pull contig lengths from the index.
     // Make a ThreadSet with one thread per contig.
     // To construct the non-symmetric merged graph with p context:
         // Traverse the suffix tree down to depth p + 1

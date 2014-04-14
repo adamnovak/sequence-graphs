@@ -1,10 +1,12 @@
 #include <cstdlib>
 #include <cstdio>
+#include <cstring>
 #include <iostream>
 #include <fstream>
 
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <errno.h>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
@@ -39,6 +41,8 @@ void FMDIndexBuilder::add(const std::string& filename) {
     std::ofstream contigStream;
     contigStream.open((basename + ".chrom.sizes").c_str(), std::ofstream::out |
         std::ofstream::app);
+        
+    std::cout << "Writing contig data to " << (basename + ".chrom.sizes").c_str() << std::endl;
         
     // Open the FASTA for reading.
     FILE* fasta = fopen(filename.c_str(), "r");
@@ -76,12 +80,36 @@ void FMDIndexBuilder::add(const std::string& filename) {
     // of threads.
     int pid = fork();
     if(pid == 0) {
-        // We're the child; execute the process. Make sure to fill in its
-        // argv[0].
-        execlp("build_rlcsa", "build_rlcsa", haplotypeFilename.c_str(), "10");
+        // We're the child; execute the process.
+        
+        // What file does it need to index?
+        const char* toIndex = haplotypeFilename.c_str();
+        
+        errno = 0;
+        // Make sure to fill in its argv[0], and end with a NULL.
+        if(execlp("build_rlcsa", "build_rlcsa", toIndex, "10", NULL) == -1) {
+            
+            // Something went wrong. We need to report this error.
+            int errorNumber = errno;
+            char* error = strerror(errno);
+            
+            // Complain about the error
+            std::cerr << "Failed to start build_rlcsa " << 
+                haplotypeFilename.c_str() << " 10: (" << errorNumber << "): " <<
+                error << std::endl;
+            
+            // Don't finish our program.
+            throw std::runtime_error(std::string(
+                "Failed to start build_rlcsa"));
+        }
     } else {
         // Wait for the child to finish.
-        waitpid(pid, NULL, 0);
+        // This will hold its status
+        int status = 0;
+        waitpid(pid, &status, 0);
+        if(status != 0) {
+            throw std::runtime_error("Indexing child failed.");
+        }
     }
     
     // Now merge in the index
@@ -98,9 +126,9 @@ void FMDIndexBuilder::merge(const std::string& otherBasename) {
         int pid = fork();
         if(pid == 0) {
             // We're the child; execute the process. Make sure to fill in its
-            // argv[0].
+            // argv[0], and to terminate with a NULL argument.
             execlp("merge_rlcsa", "merge_rlcsa", basename.c_str(),
-                otherBasename.c_str(), "10");
+                otherBasename.c_str(), "10", NULL);
         } else {
             // Wait for the child to finish.
             waitpid(pid, NULL, 0);
