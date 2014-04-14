@@ -6,6 +6,9 @@
 
 #include <rlcsa/fmd.h>
 
+// Grab pinchesAndCacti dependency.
+#include "stPinchGraphs.h"
+
 #include "FMDIndexBuilder.hpp"
 
 /**
@@ -66,7 +69,9 @@ int main(int argc, char** argv) {
     
     // Read all the contigs. We'll keep them in this map of contig name to
     // length.
-    std::map<std::string, long long> contigLengths;
+    std::map<std::string, long long int> contigLengths;
+    // Also we need a vector of contig names to give them all numbers.
+    std::vector<std::string> contigNames;
     // Also a string to hold eanc line in turn.
     std::string line;
     while(std::getline(contigFile, line)) {
@@ -80,14 +85,28 @@ int main(int argc, char** argv) {
         std::string contigLength = line.substr(separator + 1, line.size() - 1);
         
         // Parse the length
-        long long lengthNumber = atoll(contigLength.c_str());
+        long long int lengthNumber = atoll(contigLength.c_str());
         
         // Add it to the map
         contigLengths[contigName] = lengthNumber;
+        
+        // And to the vector of names in number order.
+        contigNames.push_back(contigName);
     }
-    
+    // Close up the contig file. We read our map.
+    contigFile.close();
     
     // Make a ThreadSet with one thread per contig.
+    // Construct the thread set first.
+    stPinchThreadSet* threadSet = stPinchThreadSet_construct();
+    
+    for(size_t i = 0; i < contigNames.size(); i++) {
+        // Add a thread for this contig number, starting at 1 and having the
+        // appropriate length.
+        stPinchThreadSet_addThread(threadSet, i, 1, 
+            contigLengths[contigNames[i]]);
+    } 
+    
     // To construct the non-symmetric merged graph with p context:
         // Traverse the suffix tree down to depth p + 1
         // At each leaf, you have a range:
@@ -109,6 +128,9 @@ int main(int argc, char** argv) {
                     // Save the IntervalTree
                         // Which can make the RangeVector when needed
                         // And stores the bi-directional range<->Position mappings.
+                        
+    // Throw out the threadset
+    stPinchThreadSet_destruct(threadSet);
     
     return 0;
 }
