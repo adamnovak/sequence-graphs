@@ -12,6 +12,40 @@
 #include "FMDIndexBuilder.hpp"
 
 /**
+ * Get the contig number (not the text number) from a (text, offset) pair.
+ */
+CSA::usint getContigNumber(CSA::pair_type base) {
+    // What contig corresponds to that text? Contigs all have both strands.
+    return base.first / 2;
+}
+
+/**
+ * Get the strand from a (text, offset) pair: either 0 or 1.
+ */
+CSA::usint getStrand(CSA::pair_type base) {
+    // What strand corresponds to that text? Strands are forward, then reverse.
+    return base.first % 2;
+}
+
+/**
+ * Given a pair_type representing a base, and a vector of contig lengths by
+ * number, determine the specified base's offset from the left of its contig,
+ * 1-based.
+ */
+CSA::usint getOffset(CSA::pair_type base,
+    const std::vector<long long int>& contigLengths) {
+    // What base offset, 1-based, from the left, corresponds to this pair_type,
+    // which may be on either strand.
+    if(getStrand(base) == 0) {
+        // We're on the forward strand; just correct for the 1-basedness offset.
+        return base.second + 1;
+    } else {
+        // We're on the reverse strand, so we measured from the end.
+        return contigLengths[getContigNumber(base)] - base.second;
+    }
+}
+
+/**
  * createIndex: command-line tool to create a multi-level reference structure.
  */
 int main(int argc, char** argv) {
@@ -23,6 +57,9 @@ int main(int argc, char** argv) {
             << "exists." << std::endl;
         return 1;
     }
+    
+    // TODO: define context for merging in a more reasonable way (argument?)
+    int contextLength = 3;
     
     // If we get here, we have the right arguments.
     
@@ -62,7 +99,7 @@ int main(int argc, char** argv) {
     
     
     // Load the index with RLCSA.
-    CSA::FMD Index(basename);
+    CSA::FMD index(basename);
     
     // Open the contig name/length file for reading.
     std::ifstream contigFile((basename + ".chrom.sizes").c_str());
@@ -72,7 +109,10 @@ int main(int argc, char** argv) {
     std::map<std::string, long long int> contigLengths;
     // Also we need a vector of contig names to give them all numbers.
     std::vector<std::string> contigNames;
-    // Also a string to hold eanc line in turn.
+    // Also a vector of lengths by contig number.
+    std::vector<long long int> contigLengthVector;
+    
+    // Also a string to hold each line in turn.
     std::string line;
     while(std::getline(contigFile, line)) {
         // For each <contig>\t<length> pair...
@@ -92,9 +132,14 @@ int main(int argc, char** argv) {
         
         // And to the vector of names in number order.
         contigNames.push_back(contigName);
+        
+        // And the vector of sizes in number order
+        contigLengthVector.push_back(lengthNumber);
     }
     // Close up the contig file. We read our map.
     contigFile.close();
+    
+    
     
     // Make a ThreadSet with one thread per contig.
     // Construct the thread set first.
@@ -108,7 +153,105 @@ int main(int argc, char** argv) {
     } 
     
     // To construct the non-symmetric merged graph with p context:
-        // Traverse the suffix tree down to depth p + 1
+    // Traverse the suffix tree down to depth p + 1
+    
+    for(CSA::FMD::iterator i = index.begin(contextLength); 
+        i != index.end(contextLength); ++i) {
+        // For each pair of suffix and position in the suffix tree
+        
+        // Unpack the iterator into pattern and FMDPosition at which it happens.
+        std::string pattern = (*i).first;
+        CSA::FMDPosition range = (*i).second;
+        
+        // Dump the context and range.
+        std::cout << pattern << " at " << range << std::endl;
+        
+        // Convert to SA positions from BWT positions.
+        
+        // Check by counting again
+        CSA::pair_type count = index.count(pattern);
+        std::cout << "Count: (" << count.first << "," << count.second << ")" <<
+            std::endl;
+        
+        if(range.end_offset >= 1) {
+            // We only need to do any pinching if this context appears in two or
+            // more places. And since a range with offset 0 has one thing in it,
+            // we check to see if it's 1 or more.
+            
+            // Grab just the correct-strand range, and construct the actual
+            // endpoint.
+            CSA::pair_type oneStrandRange = std::make_pair(range.forward_start, 
+                range.forward_start + range.end_offset);
+            
+            std::cout << "Locating (" << oneStrandRange.first << "," <<
+                oneStrandRange.second << ")" << std::endl;
+            
+            // Locate the entire range. We'll have to free this eventually.
+            // There are at least two of these.
+            CSA::usint* locations = index.locate(oneStrandRange);
+                
+            if(locations == NULL) {
+                throw std::runtime_error("Coud not locate pair!");
+            }
+            
+            // For each base location, we need to work out the contig and base
+            // and orientation, and pinch with the first.
+            
+            // Work out what text and base the first base is.
+            CSA::pair_type firstBase = index.getRelativePosition(locations[0]);
+            
+            std::cout << "Relative position: (" << firstBase.first << "," << 
+                firstBase.second << ")" << std::endl;
+            
+            // What contig corresponds to that text?
+            CSA::usint firstContigNumber = getContigNumber(firstBase);
+            // And what strand corresponds to that text?
+            CSA::usint firstStrand = getStrand(firstBase);
+            // And what base position is that?
+            CSA::usint firstOffset = getOffset(firstBase, contigLengthVector);
+            
+            // Grab the first pinch thread
+            stPinchThread* firstThread = stPinchThreadSet_getThread(threadSet,
+                firstContigNumber);
+            
+            for(CSA::usint j = 1; j < range.end_offset + 1; j++) {
+                // For each subsequent located base
+                
+                // Find and unpack it just like for the first base.
+                CSA::pair_type otherBase = index.getRelativePosition(
+                    locations[j]);
+                std::cout << "Relative position: (" << otherBase.first << "," << 
+                    otherBase.second << ")" << std::endl;   
+                CSA::usint otherContigNumber = getContigNumber(otherBase);
+                CSA::usint otherStrand = getStrand(otherBase);
+                CSA::usint otherOffset = getOffset(otherBase,
+                    contigLengthVector);
+                
+                // Grab the other pinch thread.
+                stPinchThread* otherThread = stPinchThreadSet_getThread(
+                    threadSet, otherContigNumber);
+            
+                // Pinch firstBase on firstNumber and otherBase on otherNumber
+                // in the correct relative orientation.
+                std::cout << "\tPinching #" << firstContigNumber << ":" << 
+                    firstOffset << " strand " << firstStrand << " and #" << 
+                    otherContigNumber << ":" << otherOffset << " strand " << 
+                    otherStrand << std::endl;
+                
+                stPinchThread_pinch(firstThread, otherThread, firstOffset,
+                    otherOffset, 1, firstStrand != otherStrand);
+                
+            }
+            
+            // Free the location buffer
+            free(locations);
+            
+            // Say we merged some bases.
+            std::cout << "Merged " << range.end_offset + 1 <<  " bases" << std::endl;
+            
+        }
+    }
+    
         // At each leaf, you have a range:
             // Range = all bases that match this character and share a downstream context of length p.
             // Locate each base in the range.
