@@ -1,10 +1,13 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <cstdlib>
+#include <sstream>
 
 #include <boost/filesystem.hpp>
 
 #include <rlcsa/fmd.h>
+#include <rlcsa/bits/rlevector.h>
 
 // Grab pinchesAndCacti dependency.
 #include "stPinchGraphs.h"
@@ -166,8 +169,6 @@ int main(int argc, char** argv) {
         // Dump the context and range.
         std::cout << pattern << " at " << range << std::endl;
         
-        // Convert to SA positions from BWT positions.
-        
         // Check by counting again
         CSA::pair_type count = index.count(pattern);
         std::cout << "Count: (" << count.first << "," << count.second << ")" <<
@@ -178,10 +179,11 @@ int main(int argc, char** argv) {
             // more places. And since a range with offset 0 has one thing in it,
             // we check to see if it's 1 or more.
             
-            // Grab just the correct-strand range, and construct the actual
-            // endpoint.
-            CSA::pair_type oneStrandRange = std::make_pair(range.forward_start, 
-                range.forward_start + range.end_offset);
+            // Grab just the one-strand range, and construct the actual
+            // endpoint. Use the reverse strand so that we handle things in
+            // increasing coordinate order.
+            CSA::pair_type oneStrandRange = std::make_pair(range.reverse_start, 
+                range.reverse_start + range.end_offset);
             
             std::cout << "Locating (" << oneStrandRange.first << "," <<
                 oneStrandRange.second << ")" << std::endl;
@@ -220,8 +222,8 @@ int main(int argc, char** argv) {
                 // Find and unpack it just like for the first base.
                 CSA::pair_type otherBase = index.getRelativePosition(
                     locations[j]);
-                std::cout << "Relative position: (" << otherBase.first << "," << 
-                    otherBase.second << ")" << std::endl;   
+                //std::cout << "Relative position: (" << otherBase.first << "," << 
+                //    otherBase.second << ")" << std::endl;   
                 CSA::usint otherContigNumber = getContigNumber(otherBase);
                 CSA::usint otherStrand = getStrand(otherBase);
                 CSA::usint otherOffset = getOffset(otherBase,
@@ -233,10 +235,10 @@ int main(int argc, char** argv) {
             
                 // Pinch firstBase on firstNumber and otherBase on otherNumber
                 // in the correct relative orientation.
-                std::cout << "\tPinching #" << firstContigNumber << ":" << 
-                    firstOffset << " strand " << firstStrand << " and #" << 
-                    otherContigNumber << ":" << otherOffset << " strand " << 
-                    otherStrand << std::endl;
+                //std::cout << "\tPinching #" << firstContigNumber << ":" << 
+                //    firstOffset << " strand " << firstStrand << " and #" << 
+                //    otherContigNumber << ":" << otherOffset << " strand " << 
+                //    otherStrand << std::endl;
                 
                 stPinchThread_pinch(firstThread, otherThread, firstOffset,
                     otherOffset, 1, firstStrand != otherStrand);
@@ -247,10 +249,139 @@ int main(int argc, char** argv) {
             free(locations);
             
             // Say we merged some bases.
-            std::cout << "Merged " << range.end_offset + 1 <<  " bases" << std::endl;
+            std::cout << "Merged " << range.end_offset + 1 <<  " bases" <<
+                std::endl;
             
         }
+        
+        // Now GC the boundaries in the pinch set
+        std::cout << "Joining trivial boundaries..." << std::endl;
+        stPinchThreadSet_joinTrivialBoundaries(threadSet);
+        
     }
+    
+    // What are we going to save?
+    
+    // A bit vector denoting ranges, which we encode with this encoder, which
+    // has 32 byte blocks.
+    CSA::RLEEncoder encoder(32);
+    
+    // A vector of (contig, base, face) strings. TODO: replace with Avro
+    std::vector<std::string> mappings;
+    
+    
+    // Now go through all the contexts again.
+    for(CSA::FMD::iterator i = index.begin(contextLength); 
+        i != index.end(contextLength); ++i) {
+        // For each pair of suffix and position in the suffix tree, in
+        // increasing SA coordinate order.
+        
+        // Unpack the iterator into pattern and FMDPosition at which it happens.
+        std::string pattern = (*i).first;
+        CSA::FMDPosition range = (*i).second;
+        
+        // Dump the context and range.
+        std::cout << "Reprocessing " << pattern << " at " << range << std::endl;
+        
+        if(range.end_offset == -1) {
+            // Not even a single thing with this context. Skip to the next one.
+            continue;
+        }
+        
+        // Grab just the one-strand range, and construct the actual
+        // endpoint. Use the reverse strand so that we handle things in
+        // increasing coordinate order.
+        CSA::pair_type oneStrandRange = std::make_pair(range.reverse_start, 
+            range.reverse_start + range.end_offset);
+            
+        // Work out what text and base the first base is.
+        CSA::pair_type base = index.getRelativePosition(index.locate(
+            oneStrandRange.first));
+        
+        std::cout << "Relative position: (" << base.first << "," << 
+            base.second << ")" << std::endl;
+        
+        // What contig corresponds to that text?
+        CSA::usint contigNumber = getContigNumber(base);
+        // And what strand corresponds to that text?
+        CSA::usint strand = getStrand(base);
+        // And what base position is that from the front of the contig?
+        CSA::usint offset = getOffset(base, contigLengthVector);
+     
+        // Now we need to look up what the pinch set says is the canonical
+        // position for this base, and what orientation it should be in.
+        
+        // Get the segment
+        stPinchSegment* segment = stPinchThreadSet_getSegment(threadSet, 
+            contigNumber, offset);
+            
+        if(segment == NULL) {
+            throw std::runtime_error("Found position in null segment!");
+        }
+            
+        // How is it oriented?
+        bool segmentOrientation = stPinchSegment_getBlockOrientation(segment);
+        // How far into the segment are we?
+        CSA::usint segmentOffset = offset - stPinchSegment_getStart(segment);
+            
+        // Get the first segment in the segment's block, or just this segment if
+        // it isn't in a block.
+        stPinchSegment* firstSegment = segment;
+        
+        // Get the block that that segment is in
+        stPinchBlock* block = stPinchSegment_getBlock(segment);
+        if(block != NULL) {
+            // Put the first segment in the block as the canonical segment.
+            firstSegment = stPinchBlock_getFirst(block);
+        }
+        
+        // Work out what the official contig number for this block is (the name
+        // of the first segment).
+        size_t canonicalContig = stPinchSegment_getName(firstSegment);
+        // How should it be oriented?
+        bool canonicalOrientation = stPinchSegment_getBlockOrientation(
+            firstSegment);
+        
+        // What's the offset into the canonical segment?
+        CSA::usint canonicalSegmentOffset = segmentOffset;
+        if(segmentOrientation != canonicalOrientation) {
+            // We really want this many bases in from the end of the contig, not
+            // out from the start.
+            // TODO: Is this 0-based or 1-based?
+            canonicalSegmentOffset = stPinchSegment_getLength(
+                firstSegment) - canonicalSegmentOffset;
+        }
+        // What is the offset in the canonical sequence? TODO: needs to be
+        // 1-based.
+        CSA::usint canonicalOffset = canonicalSegmentOffset + 
+            stPinchSegment_getStart(firstSegment);
+        
+        // Record a 1 in the vector at the end of this range, in BWT
+        // coordinates.
+        encoder.addBit(range.reverse_start + range.end_offset + 
+            index.getNumberOfSequences());
+          
+        std::stringstream stream;  
+        
+        stream << canonicalContig << ":" << canonicalOffset << " orientation " << canonicalOrientation;
+            
+        // Add a string describing the mapping
+        mappings.push_back(stream.str());
+        
+        std::cout << "Canonicalized to #" << mappings.back() << std::endl;
+            
+        
+        
+            
+    }
+    
+    
+    // For each context in order by range...
+    // Locate the first base in it
+    // Look it up in the pinch set to get a canonical ID and face for it
+    // Put a range in the range vector, and a copy of the canonical ID and face in the mapping vector.
+    
+    
     
         // At each leaf, you have a range:
             // Range = all bases that match this character and share a downstream context of length p.
