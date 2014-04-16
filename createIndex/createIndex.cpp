@@ -363,7 +363,8 @@ int main(int argc, char** argv) {
           
         std::stringstream stream;  
         
-        stream << canonicalContig << ":" << canonicalOffset << " orientation " << canonicalOrientation;
+        stream << canonicalContig << ":" << canonicalOffset << 
+            " orientation " << canonicalOrientation;
             
         // Add a string describing the mapping
         mappings.push_back(stream.str());
