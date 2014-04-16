@@ -12,6 +12,12 @@
 // Grab pinchesAndCacti dependency.
 #include "stPinchGraphs.h"
 
+// Grab the Avro header for the Face/Coordinate/Side objects we need to dump
+// out. Only use the most dependent one, since they all define their
+// dependencies and are thus incompatible with the headers for their
+// dependencies.
+#include "schemas/Side.hpp"
+
 #include "FMDIndexBuilder.hpp"
 
 /**
@@ -141,8 +147,6 @@ int main(int argc, char** argv) {
     }
     // Close up the contig file. We read our map.
     contigFile.close();
-    
-    
     
     // Make a ThreadSet with one thread per contig.
     // Construct the thread set first.
