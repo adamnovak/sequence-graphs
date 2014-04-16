@@ -1,7 +1,7 @@
 @namespace("edu.ucsc.genome")
 protocol ReferenceGraphTypes {
     
-    // The schemas here describe the reference genome.
+    // The schemas here describe reference structures and reference hierarchies.
     
     enum Face {
         // Keeps track of whether we are talking about the left (5') or right
@@ -10,58 +10,28 @@ protocol ReferenceGraphTypes {
         RIGHT
     }
     
-    record Position {
-        // Identifies a position in the reference genome as a base and a face
-        // (left/5' or right/3') of that base.
+    record Coordinate {
+        // Identifies a Position uniquely.
         
-        // Every unique Position is contained by at most one Site.
-        
-        // What contig is it on? "chr1", "chr2", "chrM", etc. "novel" is used
-        // for novel insertions.
+        // What contig is it on? "chr1", "chr2", "chrM", etc.
         string contig;
         // What base are we talking about?
         long base;
-        
-        // Every base has a UUID, which is currently held to be the (string,
-        // long) tuple of the contig and the base. This magically gives UUIDs to
-        // all hg38 bases and also allows us to add novel things with arbirtrary
-        // UUID strings and base index 0.
-        
-        // What face are we talking about (left or right)? 
-        Face face; 
     }
     
     record Side {
-        // Represents one side of a Site, a node in the graph of Sites and
-        // Breakpoints.
+        // Identifies a side of a unique Position.
         
-        // A unique ID for the Side
-        long id;
+        // What is the coordinate of the position we are talking about?
+        Coordinate coordinate;
         
-        // Where in the genome does it live?
-        Position position;
-        
-        // Is this Side part of the reference haplotype?
-        boolean isReference;
-        
-        // What is a lower bound on the Side's position along the reference
-        // haplotype? This is necessary for efficient range queries in reference
-        // haplotype coordinates.
-        Position lowerBound;
-    }
-    
-    record Allele {
-        // Holds a piece of sequence data.
-        
-        // What string of bases does the allele represent? An empty string is
-        // legal here.
-        string bases;
-        string referenceBases;
+        // What face of that position are we talking about (left or right)? 
+        Face face; 
     }
     
     record Edge {
-        // Represents an edge in the reference graph. Can be part of a Site or
-        // Breakpoint.
+        // Represents an edge in the reference graph. Can be part of a Position
+        // or Block or Adjacency.
         
         // A unique ID for the Edge
         union { null, long } id = null;
@@ -74,41 +44,56 @@ protocol ReferenceGraphTypes {
 
     }
      
-    record Site {
-        // Represents a site in the reference genome, at which any of a set of
-        // Alleles may be present in an individual.
+    record Position {
+        // Represents a single-base position in a reference structure in the
+        // reference hierarchy.
+        
+        // Where is this position?
+        Coordinate coordinate;
 
-        // The Edge in the graph that represents this Site.
+        // The Edge in the graph that represents this Position.
         Edge edge;
         
-        // The base that should be present at this Site.
+        // The base that should be present at this Position.
         string base;         
     }
     
-    record Breakpoint {
-        // Represents a Breakpoint in the reference genome, which may be
-        // realized by an adjacency in an individual.
+    record Block {
+        // Represents several Positions with sequential IDs, connected only to
+        // each other.
+        
+        // Where is the first position in this Block?
+        Coordinate start;
+        // How long does it run
+        long length;
 
-        // The Edge in the graph that represents this Breakpoint.
+
+        // The Edge in the graph that represents this Block.
         Edge edge;
         
-        // A flag indicating whether this adjacency is part of the cannonical
-        // reference genome, or whether it is a variant that has been observed
-        // in the population. Between any two Sides, there can be at most one
-        // path consisting only of reference adjacencies and sites with nonempty
-        // reference alleles.
-        boolean isReference;   
+        // The base that this Block represents.
+        string bases;      
+        
+    }
+    
+    record Adjacency {
+        // Represents an Adjacency between two sides of two Positions or Blocks.
+
+        // The Edge in the graph that represents this Adjacency.
+        Edge edge;
     }
     
     record Generalization {
-        // Represents the idea that the first Side that the Edge connects is an
-        // instance of the second Side that the Edge connects.
+        // Represents homology between ranges of Positions. Not a graph
+        // component.
         
-        // The Edge in the graph that represents this Abstraction relationship.
-        Edge edge;
+        // What coordinate do we start at on the lower level? We always go out
+        // to the right from here.
+        Coordinate lowerStart;
+        // What coordinate do we start at on the upper level? We go out either
+        // left or right from here depending on the face here.
+        Side upperStart;
+        // How many Positions do we run for?
+        long length;
     }
-    
-    // Telomeres are represented by Sides that are not involved in Site edges,
-    // and which correspond to before-the-beginning and after-the-end positions
-    // on chromosomes.
 }
