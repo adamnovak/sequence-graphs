@@ -85,48 +85,22 @@ stPinchThreadSet* makeThreadSet(const FMDIndex& index) {
 }
 
 /**
- * createIndex: command-line tool to create a multi-level reference structure.
+ * Create a new thread set from the given FMDIndex, and merge it down by the
+ * nonsymmetric merging scheme to contexts of the given length (including the
+ * base being matched itself). Returns the pinched thread set.
+ *
+ * Note that due to the nature of this merging scheme, any two nodes that would
+ * merge at a longer context length will also merge at a shorter context length,
+ * so we can just directly calculate each upper level in turn.
  */
-int main(int argc, char** argv) {
-    if(argc < 3) {
-        // They forgot their arguments.
-        std::cout << "Usage: " << argv[0] << " <index directory> <fasta> "
-            << "[<fasta> [<fasta> ...]]" << std::endl;
-        std::cout << "The index directory will be deleted and recreated, if it "
-            << "exists." << std::endl;
-        return 1;
-    }
+stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
+    size_t contextLength) {
     
-    // TODO: define context for merging in a more reasonable way (argument?)
-    int contextLength = 3;
+    // Make a thread set.
+    stPinchThreadSet* threadSet = stPinchThreadSet_construct();
     
-    // If we get here, we have the right arguments. Parse them.
-    
-    // This holds the directory for the reference structure to build.
-    std::string indexDirectory(argv[1]);
-    
-    // This holds a list of FASTA filenames to load and index.
-    std::vector<std::string> fastas;
-    for(int i = 2; i < argc; i++) {
-        // Put each filename in the vector.
-        fastas.push_back(std::string(argv[i]));
-    }
-    
-    // Index the bottom-level FASTAs and get the basename they go into.
-    std::string basename = buildIndex(indexDirectory, fastas);
-    
-    // Load the index and its metadata.
-    FMDIndex index(basename);
-    
-    // Make an IDSource to produce IDs not already claimed by contigs.
-    IDSource<long long int> source(index.getTotalLength());
-    
-    // Make a ThreadSet with one thread per contig.
-    stPinchThreadSet* threadSet = makeThreadSet(index);
-
     // To construct the non-symmetric merged graph with p context:
     // Traverse the suffix tree down to depth p + 1
-    
     for(CSA::FMD::iterator i = index.fmd.begin(contextLength); 
         i != index.fmd.end(contextLength); ++i) {
         // For each pair of suffix and position in the suffix tree
@@ -225,16 +199,31 @@ int main(int argc, char** argv) {
         // Now GC the boundaries in the pinch set
         std::cout << "Joining trivial boundaries..." << std::endl;
         stPinchThreadSet_joinTrivialBoundaries(threadSet);
-        
     }
     
-    // What are we going to save?
+    // Return the finished thread set
+    return threadSet;
+}
+
+/**
+ * Make the range vector and list of matching Sides for the hierarchy level
+ * implied by the given thread set in the given index, assuming it was created
+ * by going through all contexts of the given length and assigning them to
+ * nodes. Gets IDs for created positions from the given source.
+ * 
+ * Don't forget to delete the bit vector when done!
+ */
+std::pair<CSA::RLEVector*, std::vector<Side> > makeLevelIndex(
+    stPinchThreadSet* threadSet, const FMDIndex& index, size_t contextLength,
+    IDSource<long long int>& source) {
     
-    // A bit vector denoting ranges, which we encode with this encoder, which
-    // has 32 byte blocks.
+    // We need to make bit vector denoting ranges, which we encode with this
+    // encoder, which has 32 byte blocks.
     CSA::RLEEncoder encoder(32);
     
-    // A vector of Sides, which are (contig, base, face).
+    // We also need to make a vector of Sides, which are (contig, base, face),
+    // and are the things that get matched to by the corresponding ranges in the
+    // bit vector.
     std::vector<Side> mappings;
     
     // We also need this map of position IDs (long long ints) by canonical
@@ -363,17 +352,33 @@ int main(int argc, char** argv) {
             mapping.face << std::endl;
     }
     
-    
-    // Throw out the threadset
-    stPinchThreadSet_destruct(threadSet);
-    
     // Finish the vector encoder into a vector of the right length.
-    CSA::RLEVector bitVector(encoder, index.fmd.getBWTRange().second);
+    CSA::RLEVector* bitVector = new CSA::RLEVector(encoder,
+        index.fmd.getBWTRange().second);
     
-    // Save it to a file.
-    std::ofstream vectorStream((indexDirectory + "/vector.bin").c_str());
-    bitVector.writeTo(vectorStream);
+    // Return the bit vector and the Side vector
+    return make_pair(bitVector, mappings);
+    
+}
+
+/**
+ * Save both parts of the given level index to files in the given directory,
+ * which must not yet exist. Also deletes the bit vector, so don't use that
+ * level index again.
+ */
+void saveLevelIndex(std::pair<CSA::RLEVector*, std::vector<Side> > levelIndex,
+    std::string directory) {
+    
+    // Make the directory
+    boost::filesystem::create_directory(directory);
+    
+    // Save the bit vector to a file.
+    std::ofstream vectorStream((directory + "/vector.bin").c_str());
+    levelIndex.first->writeTo(vectorStream);
     vectorStream.close();
+    
+    // Delete the bit vector since we're done with it.
+    delete levelIndex.first;
     
     // Now write out all the merged positions to Avro, in an Avro-format file.
     // See <http://avro.apache.org/docs/1.7.6/api/cpp/html/index.html>. This is
@@ -381,8 +386,8 @@ int main(int argc, char** argv) {
     // write such a file, and the generated C++ classes provide no access to
     // that text.
     
-    // We previously hacked the Side schema into Side_schema and Side_schema_len
-    // with the xdd tool. Now we make it into an std::string.
+    // We previously hacked the Side schema into globals Side_schema and
+    // Side_schema_len with the xdd tool. Now we make it into an std::string.
     std::string sideSchema((char*) Side_schema, (size_t) Side_schema_len);
     std::istringstream sideSchemaStream(sideSchema);
     
@@ -393,20 +398,68 @@ int main(int argc, char** argv) {
     avro::compileJsonSchema(sideSchemaStream, validSchema);
     
     // Make a writer to write to the file we want, in the schema we want.
-    avro::DataFileWriter<Side> writer((indexDirectory + 
+    avro::DataFileWriter<Side> writer((directory + 
         "/mappings.avro").c_str(), validSchema);
     
-    for(std::vector<Side>::iterator i = mappings.begin(); i != mappings.end();
-        ++i) {
-        
+    for(std::vector<Side>::iterator i = levelIndex.second.begin(); 
+        i != levelIndex.second.end(); ++i) {
         // Write each mapping to the file.
         writer.write(*i);
         
     }
     writer.close();
+}
+
+/**
+ * createIndex: command-line tool to create a multi-level reference structure.
+ */
+int main(int argc, char** argv) {
+    if(argc < 3) {
+        // They forgot their arguments.
+        std::cout << "Usage: " << argv[0] << " <index directory> <fasta> "
+            << "[<fasta> [<fasta> ...]]" << std::endl;
+        std::cout << "The index directory will be deleted and recreated, if it "
+            << "exists." << std::endl;
+        return 1;
+    }
     
+    // TODO: define context for merging in a more reasonable way (argument?)
+    int contextLength = 3;
+    
+    // If we get here, we have the right arguments. Parse them.
+    
+    // This holds the directory for the reference structure to build.
+    std::string indexDirectory(argv[1]);
+    
+    // This holds a list of FASTA filenames to load and index.
+    std::vector<std::string> fastas;
+    for(int i = 2; i < argc; i++) {
+        // Put each filename in the vector.
+        fastas.push_back(std::string(argv[i]));
+    }
+    
+    // Index the bottom-level FASTAs and get the basename they go into.
+    std::string basename = buildIndex(indexDirectory, fastas);
+    
+    // Load the index and its metadata.
+    FMDIndex index(basename);
+    
+    // Make an IDSource to produce IDs not already claimed by contigs.
+    IDSource<long long int> source(index.getTotalLength());
+    
+    // Make a thread set for the context length we want;
+    stPinchThreadSet* threadSet = mergeNonsymmetric(index, contextLength);
+    
+    // Index it so we have a bit vector and Sides to write out
+    std::pair<CSA::RLEVector*, std::vector<Side> > levelIndex = makeLevelIndex(
+        threadSet, index, contextLength, source);
+        
+    // Write it out, deleting the bit vector in the process
+    saveLevelIndex(levelIndex, indexDirectory + "/level1");
+    
+    // Clean up the thread set
+    stPinchThreadSet_destruct(threadSet);
+
     // Now we're done!
-    
-    
     return 0;
 }
