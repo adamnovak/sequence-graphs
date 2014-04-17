@@ -33,6 +33,11 @@ public:
     CSA::usint getOffset(CSA::pair_type base) const;
     
     /**
+     * Get the total length of all contigs, on both strands.
+     */
+    CSA::usint getTotalLength() const;
+    
+    /**
      * Holds the actual underlying FMD.
      */
     CSA::FMD fmd;

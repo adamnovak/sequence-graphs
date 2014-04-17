@@ -28,39 +28,60 @@
 #include <avro/Compiler.hh>
 
 #include "FMDIndexBuilder.hpp"
+#include "FMDIndex.hpp"
+#include "IDSource.hpp"
 
 /**
- * Get the contig number (not the text number) from a (text, offset) pair.
+ * Start a new index in the given directory (by replacing it), and index the
+ * given FASTAs for the bottom level FMD index. Returns the basename of the FMD
+ * index that gets created.
  */
-CSA::usint getContigNumber(CSA::pair_type base) {
-    // What contig corresponds to that text? Contigs all have both strands.
-    return base.first / 2;
-}
+std::string buildIndex(std::string indexDirectory,
+    std::vector<std::string> fastas) {
 
-/**
- * Get the strand from a (text, offset) pair: either 0 or 1.
- */
-CSA::usint getStrand(CSA::pair_type base) {
-    // What strand corresponds to that text? Strands are forward, then reverse.
-    return base.first % 2;
-}
-
-/**
- * Given a pair_type representing a base, and a vector of contig lengths by
- * number, determine the specified base's offset from the left of its contig,
- * 1-based.
- */
-CSA::usint getOffset(CSA::pair_type base,
-    const std::vector<long long int>& contigLengths) {
-    // What base offset, 1-based, from the left, corresponds to this pair_type,
-    // which may be on either strand.
-    if(getStrand(base) == 0) {
-        // We're on the forward strand; just correct for the 1-basedness offset.
-        return base.second + 1;
-    } else {
-        // We're on the reverse strand, so we measured from the end.
-        return contigLengths[getContigNumber(base)] - base.second;
+    // Make sure an empty indexDirectory exists.
+    if(boost::filesystem::exists(indexDirectory)) {
+        // Get rid of it if it exists already.
+        boost::filesystem::remove_all(indexDirectory);
     }
+    // Create it again.
+    boost::filesystem::create_directory(indexDirectory);
+    
+    // Build the bottom-level index.
+    
+    // Work out its basename
+    std::string basename(indexDirectory + "/index.basename");
+
+    // Make a new builder
+    FMDIndexBuilder builder(basename);
+    for(std::vector<std::string>::iterator i = fastas.begin(); i < fastas.end();
+        ++i) {
+        
+        std::cout << "Adding FASTA " << *i << std::endl;
+        
+        // Add each FASTA file to the index.
+        builder.add(*i);
+    }
+    
+    // Return the basename
+    return basename;
+}
+
+/**
+ * Make a thread set with one thread representing each contig in the index.
+ */
+stPinchThreadSet* makeThreadSet(const FMDIndex& index) {
+    // Make a ThreadSet with one thread per contig.
+    // Construct the thread set first.
+    stPinchThreadSet* threadSet = stPinchThreadSet_construct();
+    
+    for(size_t i = 0; i < index.lengths.size(); i++) {
+        // Add a thread for this contig number. The thread starts at base 1 and
+        // has the appropriate length.
+        stPinchThreadSet_addThread(threadSet, i, 1, index.lengths[i]);
+    }
+    
+    return threadSet;
 }
 
 /**
@@ -79,7 +100,7 @@ int main(int argc, char** argv) {
     // TODO: define context for merging in a more reasonable way (argument?)
     int contextLength = 3;
     
-    // If we get here, we have the right arguments.
+    // If we get here, we have the right arguments. Parse them.
     
     // This holds the directory for the reference structure to build.
     std::string indexDirectory(argv[1]);
@@ -91,95 +112,23 @@ int main(int argc, char** argv) {
         fastas.push_back(std::string(argv[i]));
     }
     
-    // Make sure an empty indexDirectory exists.
-    if(boost::filesystem::exists(indexDirectory)) {
-        // Get rid of it if it exists already.
-        boost::filesystem::remove_all(indexDirectory);
-    }
-    // Create it again.
-    boost::filesystem::create_directory(indexDirectory);
+    // Index the bottom-level FASTAs and get the basename they go into.
+    std::string basename = buildIndex(indexDirectory, fastas);
     
-    // Build the bottom-level index.
+    // Load the index and its metadata.
+    FMDIndex index(basename);
     
-    // Work out its basename
-    std::string basename(indexDirectory + "/index.basename");
-    
-    // Make a new builder
-    FMDIndexBuilder builder(basename);
-    for(std::vector<std::string>::iterator i = fastas.begin(); i < fastas.end();
-        ++i) {
-        
-        std::cout << "Adding FASTA " << *i << std::endl;
-        
-        // Add each FASTA file to the index.
-        builder.add(*i);
-    }
-    
-    
-    // Load the index with RLCSA.
-    CSA::FMD index(basename);
-    
-    // Open the contig name/length file for reading.
-    std::ifstream contigFile((basename + ".chrom.sizes").c_str());
-    
-    // Read all the contigs. We'll keep them in this map of contig name to
-    // length.
-    std::map<std::string, long long int> contigLengths;
-    // Also we need a vector of contig names to give them all numbers.
-    std::vector<std::string> contigNames;
-    // Also a vector of lengths by contig number.
-    std::vector<long long int> contigLengthVector;
-    
-    // Also a variable for the next available ID, which comes after 2 * all the
-    // contigs.
-    long long int nextID = 0;
-    
-    // Also a string to hold each line in turn.
-    std::string line;
-    while(std::getline(contigFile, line)) {
-        // For each <contig>\t<length> pair...
-        
-        // Find the \t
-        size_t separator = line.find('\t');
-        
-        // Split into name and length
-        std::string contigName = line.substr(0, separator - 1);
-        std::string contigLength = line.substr(separator + 1, line.size() - 1);
-        
-        // Parse the length
-        long long int lengthNumber = atoll(contigLength.c_str());
-        
-        // Add it to the map
-        contigLengths[contigName] = lengthNumber;
-        
-        // And to the vector of names in number order.
-        contigNames.push_back(contigName);
-        
-        // And the vector of sizes in number order
-        contigLengthVector.push_back(lengthNumber);
-        
-        // Also keep track of the IDs this contig is held to have used up.
-        nextID += 2 * lengthNumber;
-    }
-    // Close up the contig file. We read our map.
-    contigFile.close();
+    // Make an IDSource to produce IDs not already claimed by contigs.
+    IDSource<long long int> source(index.getTotalLength());
     
     // Make a ThreadSet with one thread per contig.
-    // Construct the thread set first.
-    stPinchThreadSet* threadSet = stPinchThreadSet_construct();
-    
-    for(size_t i = 0; i < contigNames.size(); i++) {
-        // Add a thread for this contig number, starting at 1 and having the
-        // appropriate length.
-        stPinchThreadSet_addThread(threadSet, i, 1, 
-            contigLengths[contigNames[i]]);
-    } 
-    
+    stPinchThreadSet* threadSet = makeThreadSet(index);
+
     // To construct the non-symmetric merged graph with p context:
     // Traverse the suffix tree down to depth p + 1
     
-    for(CSA::FMD::iterator i = index.begin(contextLength); 
-        i != index.end(contextLength); ++i) {
+    for(CSA::FMD::iterator i = index.fmd.begin(contextLength); 
+        i != index.fmd.end(contextLength); ++i) {
         // For each pair of suffix and position in the suffix tree
         
         // Unpack the iterator into pattern and FMDPosition at which it happens.
@@ -190,7 +139,7 @@ int main(int argc, char** argv) {
         std::cout << pattern << " at " << range << std::endl;
         
         // Check by counting again
-        CSA::pair_type count = index.count(pattern);
+        CSA::pair_type count = index.fmd.count(pattern);
         std::cout << "Count: (" << count.first << "," << count.second << ")" <<
             std::endl;
         
@@ -210,7 +159,7 @@ int main(int argc, char** argv) {
             
             // Locate the entire range. We'll have to free this eventually.
             // There are at least two of these.
-            CSA::usint* locations = index.locate(oneStrandRange);
+            CSA::usint* locations = index.fmd.locate(oneStrandRange);
                 
             if(locations == NULL) {
                 throw std::runtime_error("Coud not locate pair!");
@@ -220,17 +169,17 @@ int main(int argc, char** argv) {
             // and orientation, and pinch with the first.
             
             // Work out what text and base the first base is.
-            CSA::pair_type firstBase = index.getRelativePosition(locations[0]);
+            CSA::pair_type firstBase = index.fmd.getRelativePosition(locations[0]);
             
             std::cout << "Relative position: (" << firstBase.first << "," << 
                 firstBase.second << ")" << std::endl;
             
             // What contig corresponds to that text?
-            CSA::usint firstContigNumber = getContigNumber(firstBase);
+            CSA::usint firstContigNumber = index.getContigNumber(firstBase);
             // And what strand corresponds to that text?
-            CSA::usint firstStrand = getStrand(firstBase);
+            CSA::usint firstStrand = index.getStrand(firstBase);
             // And what base position is that?
-            CSA::usint firstOffset = getOffset(firstBase, contigLengthVector);
+            CSA::usint firstOffset = index.getOffset(firstBase);
             
             // Grab the first pinch thread
             stPinchThread* firstThread = stPinchThreadSet_getThread(threadSet,
@@ -240,14 +189,13 @@ int main(int argc, char** argv) {
                 // For each subsequent located base
                 
                 // Find and unpack it just like for the first base.
-                CSA::pair_type otherBase = index.getRelativePosition(
+                CSA::pair_type otherBase = index.fmd.getRelativePosition(
                     locations[j]);
                 //std::cout << "Relative position: (" << otherBase.first << "," << 
                 //    otherBase.second << ")" << std::endl;   
-                CSA::usint otherContigNumber = getContigNumber(otherBase);
-                CSA::usint otherStrand = getStrand(otherBase);
-                CSA::usint otherOffset = getOffset(otherBase,
-                    contigLengthVector);
+                CSA::usint otherContigNumber = index.getContigNumber(otherBase);
+                CSA::usint otherStrand = index.getStrand(otherBase);
+                CSA::usint otherOffset = index.getOffset(otherBase);
                 
                 // Grab the other pinch thread.
                 stPinchThread* otherThread = stPinchThreadSet_getThread(
@@ -295,8 +243,8 @@ int main(int argc, char** argv) {
         idReservations;
     
     // Now go through all the contexts again.
-    for(CSA::FMD::iterator i = index.begin(contextLength); 
-        i != index.end(contextLength); ++i) {
+    for(CSA::FMD::iterator i = index.fmd.begin(contextLength); 
+        i != index.fmd.end(contextLength); ++i) {
         // For each pair of suffix and position in the suffix tree, in
         // increasing SA coordinate order.
         
@@ -319,18 +267,18 @@ int main(int argc, char** argv) {
             range.reverse_start + range.end_offset);
             
         // Work out what text and base the first base is.
-        CSA::pair_type base = index.getRelativePosition(index.locate(
+        CSA::pair_type base = index.fmd.getRelativePosition(index.fmd.locate(
             oneStrandRange.first));
         
         std::cout << "Relative position: (" << base.first << "," << 
             base.second << ")" << std::endl;
         
         // What contig corresponds to that text?
-        CSA::usint contigNumber = getContigNumber(base);
+        CSA::usint contigNumber = index.getContigNumber(base);
         // And what strand corresponds to that text?
-        CSA::usint strand = getStrand(base);
+        CSA::usint strand = index.getStrand(base);
         // And what base position is that from the front of the contig?
-        CSA::usint offset = getOffset(base, contigLengthVector);
+        CSA::usint offset = index.getOffset(base);
      
         // Now we need to look up what the pinch set says is the canonical
         // position for this base, and what orientation it should be in.
@@ -392,13 +340,13 @@ int main(int argc, char** argv) {
             positionID = idReservations[contigAndOffset];
         } else {
             // Allocate and remember a new ID.
-            positionID = idReservations[contigAndOffset] = nextID++;
+            positionID = idReservations[contigAndOffset] = source.next();
         }
         
         // Record a 1 in the vector at the end of this range, in BWT
         // coordinates.
         encoder.addBit(range.reverse_start + range.end_offset + 
-            index.getNumberOfSequences());
+            index.fmd.getNumberOfSequences());
           
         // Say this range is going to belong to the ID we just looked up, on the
         // appropriate face.
@@ -420,7 +368,7 @@ int main(int argc, char** argv) {
     stPinchThreadSet_destruct(threadSet);
     
     // Finish the vector encoder into a vector of the right length.
-    CSA::RLEVector bitVector(encoder, index.getBWTRange().second);
+    CSA::RLEVector bitVector(encoder, index.fmd.getBWTRange().second);
     
     // Save it to a file.
     std::ofstream vectorStream((indexDirectory + "/vector.bin").c_str());
