@@ -33,6 +33,20 @@
 #include "IDSource.hpp"
 
 /**
+ * Look at the text of a base to see what arrow it needs to
+ * have. Can also pass a base "strand" number.
+ */
+std::string getArrow(CSA::usint textNumber) {
+    if(textNumber % 2 == 0) {
+        // It's a left, so it gets a normal arrow
+        return "normal";
+    } else {
+        // It's a right, so it gets that square thing.
+        return "crow";
+    }
+}
+
+/**
  * Start a new index in the given directory (by replacing it), and index the
  * given FASTAs for the bottom level FMD index. Returns the basename of the FMD
  * index that gets created.
@@ -90,12 +104,17 @@ stPinchThreadSet* makeThreadSet(const FMDIndex& index) {
  * nonsymmetric merging scheme to contexts of the given length (including the
  * base being matched itself). Returns the pinched thread set.
  *
+ * If dumpFile is set, dumps debug graph data to that file.
+ *
  * Note that due to the nature of this merging scheme, any two nodes that would
  * merge at a longer context length will also merge at a shorter context length,
  * so we can just directly calculate each upper level in turn.
  */
 stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
-    size_t contextLength) {
+    size_t contextLength, std::ostream* dumpFile = NULL) {
+    
+    // Keep track of nodes we have already dumped.
+    std::map<std::string, bool> dumped;
     
     // Make a thread set from our index.
     stPinchThreadSet* threadSet = makeThreadSet(index);
@@ -118,7 +137,7 @@ stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
         std::cout << "Count: (" << count.first << "," << count.second << ")" <<
             std::endl;
         
-        if(range.end_offset >= 1) {
+        if(range.end_offset >= 1 || dumpFile != NULL) {
             // We only need to do any pinching if this context appears in two or
             // more places. And since a range with offset 0 has one thing in it,
             // we check to see if it's 1 or more.
@@ -147,8 +166,8 @@ stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
             CSA::pair_type firstBase = index.fmd.getRelativePosition(
                 locations[0]);
             
-            std::cout << "Relative position: (" << firstBase.first << "," << 
-                firstBase.second << ")" << std::endl;
+            std::cout << "First relative position: text " << firstBase.first << 
+                " offset " << firstBase.second << std::endl;
             
             // What contig corresponds to that text?
             CSA::usint firstContigNumber = index.getContigNumber(firstBase);
@@ -163,6 +182,29 @@ stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
                 
             if(firstThread == NULL) {
                 throw std::runtime_error("First thread was NULL!");
+            }
+            
+            if(dumpFile != NULL) {
+                // Report the first position as existing.
+                std::string firstName = index.getName(firstBase); 
+                
+                if(!dumped.count(firstName)) {
+                
+                    std::cout << "Making first: " << firstName << std::endl;
+                    
+                    // Write a node for it
+                    *dumpFile << firstName << "[shape=\"record\",label=\"" << 
+                        firstName << "\"];" << std::endl;
+                    if(firstOffset > 1) {
+                        // Link to previous Position
+                        *dumpFile << index.getName(std::make_pair(
+                            // Hack to get the base actually before us on the
+                            // contig.
+                            firstContigNumber * 2, firstOffset - 2)) << " -> " <<
+                            firstName << ";" << std::endl;
+                    }
+                    dumped[firstName] = true;
+                }
             }
             
             for(CSA::usint j = 1; j < range.end_offset + 1; j++) {
@@ -194,6 +236,31 @@ stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
                 
                 stPinchThread_pinch(firstThread, otherThread, firstOffset,
                     otherOffset, 1, firstStrand != otherStrand);
+                    
+                if(dumpFile != NULL) {
+                    // Report the other position as existing.
+                    std::string otherName = index.getName(otherBase); 
+                    
+                    if(!dumped.count(otherName)) {
+                    
+                        std::cout << "Making other: " << otherName << std::endl;
+                        
+                        // Write a node for it
+                        *dumpFile << otherName << 
+                            "[shape=\"record\",label=\"" << otherName << 
+                            "\"];" << std::endl;
+                        
+                        if(otherOffset > 1) {
+                            // Link previous position to us.
+                            *dumpFile << index.getName(std::make_pair(
+                                // Hack to get the base actually before us on the
+                                // contig.
+                                otherContigNumber * 2, otherOffset - 2)) << 
+                                " -> " << otherName << ";" << std::endl;
+                        }
+                        dumped[otherName] = true;
+                    }
+                }
                 
             }
             
@@ -221,11 +288,13 @@ stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
  * by going through all contexts of the given length and assigning them to
  * nodes. Gets IDs for created positions from the given source.
  * 
+ * If dumpFile is set, also writes a graphviz-format debug graph.
+ * 
  * Don't forget to delete the bit vector when done!
  */
 std::pair<CSA::RLEVector*, std::vector<Side> > makeLevelIndex(
     stPinchThreadSet* threadSet, const FMDIndex& index, size_t contextLength,
-    IDSource<long long int>& source) {
+    IDSource<long long int>& source, std::ofstream* dumpFile = NULL) {
     
     // We need to make bit vector denoting ranges, which we encode with this
     // encoder, which has 32 byte blocks.
@@ -269,8 +338,8 @@ std::pair<CSA::RLEVector*, std::vector<Side> > makeLevelIndex(
         CSA::pair_type base = index.fmd.getRelativePosition(index.fmd.locate(
             oneStrandRange.first));
         
-        std::cout << "Relative position: (" << base.first << "," << 
-            base.second << ")" << std::endl;
+        std::cout << "First relative position: text " << base.first << 
+                " offset " << base.second << std::endl;
         
         // What contig corresponds to that text?
         CSA::usint contigNumber = index.getContigNumber(base);
@@ -280,7 +349,9 @@ std::pair<CSA::RLEVector*, std::vector<Side> > makeLevelIndex(
         CSA::usint offset = index.getOffset(base);
      
         // Now we need to look up what the pinch set says is the canonical
-        // position for this base, and what orientation it should be in.
+        // position for this base, and what orientation it should be in. All the
+        // bases in this range have the same context and should thus all be
+        // pointing to the canonical base's replacement.
         
         // Get the segment
         stPinchSegment* segment = stPinchThreadSet_getSegment(threadSet, 
@@ -340,7 +411,45 @@ std::pair<CSA::RLEVector*, std::vector<Side> > makeLevelIndex(
         } else {
             // Allocate and remember a new ID.
             positionID = idReservations[contigAndOffset] = source.next();
+            
+            if(dumpFile != NULL) {
+                // Put in this new position
+                *dumpFile << positionID << "[shape=\"record\",label=\"" << 
+                    positionID << "\"];" << std::endl;
+            }
         }
+        
+        if(dumpFile != NULL) {
+            // Locate every base in oneStrandRange
+            CSA::usint* locations = index.fmd.locate(oneStrandRange);
+            
+            std::cout << "Located bases (" << oneStrandRange.first << "," <<
+                oneStrandRange.second << ")" << std::endl;
+            
+            for(CSA::usint j = 0; j < range.end_offset + 1; j++) {
+                // For each location
+                
+                // Get its text and offset.
+                CSA::pair_type childBase = index.fmd.getRelativePosition(
+                    locations[j]);
+                
+                std::cout << "\tAt text " << childBase.first << " offset " << 
+                    childBase.second << std::endl;
+                    
+                // Link from the child base to the merged base it goes into.
+                *dumpFile << index.getName(childBase) << " -> " << positionID <<
+                    "[color=red,dir=both,arrowtail=" << 
+                    getArrow(childBase.first) << ",arrowhead=" << 
+                    getArrow(canonicalOrientation) << "];" << std::endl;
+                
+            }
+            
+            // Throw out the location data.
+            // TODO: Did they use new?
+            free(locations);
+            
+        }
+        
         
         // Record a 1 in the vector at the end of this range, in BWT
         // coordinates.
@@ -435,8 +544,7 @@ int main(int argc, char** argv) {
     // Add all the options
     description.add_options() 
         ("help", "Print help messages") 
-        ("dump", boost::program_options::value<std::string>(), 
-            "Dump GraphViz graphs")
+        ("dump", "Dump GraphViz graphs")
         ("indexDirectory", boost::program_options::value<std::string>(), 
             "Directory to make the index in; will be deleted and replaced!")
         ("fastas", boost::program_options::value<std::vector<std::string> >()
@@ -515,18 +623,48 @@ int main(int argc, char** argv) {
     // Make an IDSource to produce IDs not already claimed by contigs.
     IDSource<long long int> source(index.getTotalLength());
     
-    // Make a thread set for the context length we want;
-    stPinchThreadSet* threadSet = mergeNonsymmetric(index, contextLength);
+    // This si the file we will dump our graph to, if needed.
+    std::ofstream* dumpFile = NULL;
+    if(options.count("dump")) {
+        // Open it up.
+        dumpFile = new std::ofstream("dump.dot");
+        *dumpFile << "digraph dump {" << std::endl;
+        
+        // Start a cluster
+        *dumpFile << "subgraph cluster_L0 {" << std::endl; 
+        *dumpFile << "style=filled;" << std::endl;
+        *dumpFile << "color=lightgrey;" << std::endl;
+        *dumpFile << "label=\"Level 0\";" << std::endl;
+    }
+    
+    // Make a thread set for the context length we want.
+    stPinchThreadSet* threadSet = mergeNonsymmetric(index, contextLength,
+        dumpFile);
+        
+    if(options.count("dump")) {
+        // End the cluster and start a new one.
+        *dumpFile << "}" << std::endl << "subgraph cluster_L1 {" << std::endl;
+        *dumpFile << "style=filled;" << std::endl;
+        *dumpFile << "color=lightgrey;" << std::endl;
+        *dumpFile << "label=\"Level 1\";" << std::endl;
+    }
     
     // Index it so we have a bit vector and Sides to write out
     std::pair<CSA::RLEVector*, std::vector<Side> > levelIndex = makeLevelIndex(
-        threadSet, index, contextLength, source);
+        threadSet, index, contextLength, source, dumpFile);
         
     // Write it out, deleting the bit vector in the process
     saveLevelIndex(levelIndex, indexDirectory + "/level1");
     
     // Clean up the thread set
     stPinchThreadSet_destruct(threadSet);
+    
+    if(options.count("dump")) {
+        // Finish and clean up the dump file
+        *dumpFile << "}" << std::endl << "}" << std::endl;
+        dumpFile->close();
+        delete dumpFile;
+    }
 
     // Now we're done!
     return 0;

@@ -33,6 +33,11 @@ public:
     CSA::usint getOffset(CSA::pair_type base) const;
     
     /**
+     * Get a unique string name for a position.
+     */
+    std::string getName(CSA::pair_type base) const;
+    
+    /**
      * Get the total length of all contigs, on both strands.
      */
     CSA::usint getTotalLength() const;

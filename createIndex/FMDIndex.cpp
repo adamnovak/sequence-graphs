@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <numeric>
+#include <sstream>
 
 #include "FMDIndex.hpp"
 
@@ -57,6 +58,20 @@ CSA::usint FMDIndex::getOffset(CSA::pair_type base) const {
         // We're on the reverse strand, so we measured from the end.
         return lengths[getContigNumber(base)] - base.second;
     }
+}
+
+std::string FMDIndex::getName(CSA::pair_type base) const {
+
+    // Unpack the coordinate parts.
+    CSA::usint contig = getContigNumber(base);
+    CSA::usint offset = getOffset(base);
+    
+    // Work out what to name the position.
+    std::stringstream nameStream;
+    // Leave off the strand.
+    nameStream << "N" << contig << "B" << offset;
+    return nameStream.str(); 
+    
 }
 
 CSA::usint FMDIndex::getTotalLength() const {
