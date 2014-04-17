@@ -1,6 +1,6 @@
 CXX=g++
 
-OBJS=createIndex.o FMDIndexBuilder.o util.o
+OBJS=createIndex.o FMDIndex.o FMDIndexBuilder.o util.o
 
 # What projects do we depend on? We have rules for each of these.
 DEPS=rlcsa pinchesAndCacti
@@ -61,6 +61,8 @@ schemas/%_schema.hpp: schemas/%.avsc
 	
 
 FMDIndexBuilder.o: FMDIndexBuilder.cpp FMDIndexBuilder.hpp util.hpp kseq.h
+
+FMDIndex.o: FMDIndex.cpp FMDIndex.hpp
 
 util.o: util.cpp util.hpp
 
