@@ -96,8 +96,8 @@ stPinchThreadSet* makeThreadSet(const FMDIndex& index) {
 stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
     size_t contextLength) {
     
-    // Make a thread set.
-    stPinchThreadSet* threadSet = stPinchThreadSet_construct();
+    // Make a thread set from our index.
+    stPinchThreadSet* threadSet = makeThreadSet(index);
     
     // To construct the non-symmetric merged graph with p context:
     // Traverse the suffix tree down to depth p + 1
@@ -143,7 +143,8 @@ stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
             // and orientation, and pinch with the first.
             
             // Work out what text and base the first base is.
-            CSA::pair_type firstBase = index.fmd.getRelativePosition(locations[0]);
+            CSA::pair_type firstBase = index.fmd.getRelativePosition(
+                locations[0]);
             
             std::cout << "Relative position: (" << firstBase.first << "," << 
                 firstBase.second << ")" << std::endl;
@@ -158,6 +159,10 @@ stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
             // Grab the first pinch thread
             stPinchThread* firstThread = stPinchThreadSet_getThread(threadSet,
                 firstContigNumber);
+                
+            if(firstThread == NULL) {
+                throw std::runtime_error("First thread was NULL!");
+            }
             
             for(CSA::usint j = 1; j < range.end_offset + 1; j++) {
                 // For each subsequent located base
@@ -174,6 +179,10 @@ stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
                 // Grab the other pinch thread.
                 stPinchThread* otherThread = stPinchThreadSet_getThread(
                     threadSet, otherContigNumber);
+                    
+                if(firstThread == NULL) {
+                    throw std::runtime_error("Other thread was NULL!");
+                }
             
                 // Pinch firstBase on firstNumber and otherBase on otherNumber
                 // in the correct relative orientation.

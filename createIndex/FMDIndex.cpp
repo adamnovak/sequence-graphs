@@ -62,6 +62,6 @@ CSA::usint FMDIndex::getOffset(CSA::pair_type base) const {
 CSA::usint FMDIndex::getTotalLength() const {
     // Sum all the contig lengths and double (for both strands). See
     // <http://stackoverflow.com/a/3221813/402891>
-    return std::accumulate(lengths.begin(), lengths.end(), 0);
+    return std::accumulate(lengths.begin(), lengths.end(), 0) * 2;
 }
 
