@@ -5,6 +5,7 @@
 #include <sstream>
 
 #include <boost/filesystem.hpp>
+#include "boost/program_options.hpp" 
 
 #include <rlcsa/fmd.h>
 #include <rlcsa/bits/rlevector.h>
@@ -423,6 +424,50 @@ void saveLevelIndex(std::pair<CSA::RLEVector*, std::vector<Side> > levelIndex,
  * createIndex: command-line tool to create a multi-level reference structure.
  */
 int main(int argc, char** argv) {
+    // Parse options with boost::programOptions. See
+    // <http://www.radmangames.com/programming/how-to-use-boost-program_options>
+
+    std::string appDescription = 
+        "Create a reference hierarchy for mapping to FASTAs";
+
+    // Make an options description for our program's options.
+    boost::program_options::options_description description("Options");
+    // Add all the options
+    description.add_options() 
+        ("help", "Print help messages") 
+        ("dump", "Dump GraphViz graphs"); 
+    
+    // Add a variables map to hold option variables.
+    boost::program_options::variables_map options;
+    
+    try {
+        // Parse options into the variable map, or throw an error if there's
+        // something wring with them.
+        boost::program_options::store(
+            boost::program_options::parse_command_line(argc, argv, description),
+            options);
+            
+        if(options.count("help")) {
+            // The help option was given. Print program help.
+            std::cout << appDescription << std::endl;
+            std::cout << description << std::endl;
+            
+            // Don't do the actual program.
+            return 0; 
+        }
+            
+    } catch(boost::program_options::error& error) {
+        // Something is bad about our options. Complain on stderr
+        std::cerr << "Option parsing error: " << error.what() << std::endl;
+        std::cerr << std::endl; 
+        std::cerr << description << std::endl; 
+        
+        // Stop the program.
+        return -1; 
+    }
+    
+    
+    
     if(argc < 3) {
         // They forgot their arguments.
         std::cout << "Usage: " << argv[0] << " <index directory> <fasta> "
