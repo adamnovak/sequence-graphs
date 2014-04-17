@@ -70,8 +70,6 @@ void FMDIndexBuilder::add(const std::string& filename) {
     }
     
     int fileNumber = fileno(fasta);
-    std::cout << "Opening file handle " << fileNumber << " with kseq." << std::endl;
-    
     
     kseq_t* seq = kseq_init(fileNumber); // Start up the parser
     while (kseq_read(seq) >= 0) { // Read sequences until we run out.
