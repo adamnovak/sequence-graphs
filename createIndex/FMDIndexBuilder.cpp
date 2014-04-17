@@ -16,6 +16,24 @@
 
 #include "FMDIndexBuilder.hpp"
 
+/**
+ * Utility function to report last error and kill the program.
+ */
+void report_error(const std::string message) {
+
+    // Something went wrong. We need to report this error.
+    int errorNumber = errno;
+    char* error = strerror(errno);
+    
+    // Complain about the error
+    std::cerr << message << " (" << errorNumber << "): " <<
+        error << std::endl;
+    
+    // Don't finish our program.
+    throw std::runtime_error(message);
+    
+}
+
 // Tell kseq what files are (handle numbers) and that you read them with read.
 // Don't hook in .gz support. See <http://stackoverflow.com/a/19390915/402891>
 KSEQ_INIT(int, read)
@@ -47,7 +65,15 @@ void FMDIndexBuilder::add(const std::string& filename) {
     // Open the FASTA for reading.
     FILE* fasta = fopen(filename.c_str(), "r");
     
-    kseq_t* seq = kseq_init(fileno(fasta)); // Start up the parser
+    if(fasta == NULL) {
+        report_error("Failed to open FASTA " + filename);
+    }
+    
+    int fileNumber = fileno(fasta);
+    std::cout << "Opening file handle " << fileNumber << " with kseq." << std::endl;
+    
+    
+    kseq_t* seq = kseq_init(fileNumber); // Start up the parser
     while (kseq_read(seq) >= 0) { // Read sequences until we run out.
         // Stringify the sequence name
         std::string name(seq->name.s);
@@ -88,19 +114,7 @@ void FMDIndexBuilder::add(const std::string& filename) {
         errno = 0;
         // Make sure to fill in its argv[0], and end with a NULL.
         if(execlp("build_rlcsa", "build_rlcsa", toIndex, "10", NULL) == -1) {
-            
-            // Something went wrong. We need to report this error.
-            int errorNumber = errno;
-            char* error = strerror(errno);
-            
-            // Complain about the error
-            std::cerr << "Failed to start build_rlcsa " << 
-                haplotypeFilename.c_str() << " 10: (" << errorNumber << "): " <<
-                error << std::endl;
-            
-            // Don't finish our program.
-            throw std::runtime_error(std::string(
-                "Failed to start build_rlcsa"));
+            report_error("Failed to build_rlcsa");
         }
     } else {
         // Wait for the child to finish.
@@ -108,7 +122,7 @@ void FMDIndexBuilder::add(const std::string& filename) {
         int status = 0;
         waitpid(pid, &status, 0);
         if(status != 0) {
-            throw std::runtime_error("Indexing child failed.");
+            report_error("The indexing child process failed");
         }
     }
     
