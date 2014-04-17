@@ -121,7 +121,7 @@ void FMDIndexBuilder::add(const std::string& filename) {
 }
 
 void FMDIndexBuilder::merge(const std::string& otherBasename) {
-    if(boost::filesystem::exists(basename)) {
+    if(boost::filesystem::exists(basename + ".rlcsa.array")) {
         // We have an index already. Run a merge command.
         int pid = fork();
         if(pid == 0) {

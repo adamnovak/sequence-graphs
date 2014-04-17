@@ -435,7 +435,20 @@ int main(int argc, char** argv) {
     // Add all the options
     description.add_options() 
         ("help", "Print help messages") 
-        ("dump", "Dump GraphViz graphs"); 
+        ("dump", boost::program_options::value<std::string>(), 
+            "Dump GraphViz graphs")
+        ("indexDirectory", boost::program_options::value<std::string>(), 
+            "Directory to make the index in; will be deleted and replaced!")
+        ("fastas", boost::program_options::value<std::vector<std::string> >()
+            ->multitoken(),
+            "FASTA files to load");
+        
+    // And set up our positional arguments
+    boost::program_options::positional_options_description positionals;
+    // One index directory
+    positionals.add("indexDirectory", 1);
+    // And an unknown number of FASTAs
+    positionals.add("fastas", -1);
     
     // Add a variables map to hold option variables.
     boost::program_options::variables_map options;
@@ -444,8 +457,13 @@ int main(int argc, char** argv) {
         // Parse options into the variable map, or throw an error if there's
         // something wring with them.
         boost::program_options::store(
-            boost::program_options::parse_command_line(argc, argv, description),
+            // Build the command line parser.
+            boost::program_options::command_line_parser(argc, argv)
+                .options(description)
+                .positional(positionals)
+                .run(),
             options);
+        boost::program_options::notify(options);
             
         if(options.count("help")) {
             // The help option was given. Print program help.
@@ -466,30 +484,26 @@ int main(int argc, char** argv) {
         return -1; 
     }
     
-    
-    
-    if(argc < 3) {
-        // They forgot their arguments.
-        std::cout << "Usage: " << argv[0] << " <index directory> <fasta> "
-            << "[<fasta> [<fasta> ...]]" << std::endl;
-        std::cout << "The index directory will be deleted and recreated, if it "
-            << "exists." << std::endl;
-        return 1;
-    }
-    
     // TODO: define context for merging in a more reasonable way (argument?)
     int contextLength = 3;
     
     // If we get here, we have the right arguments. Parse them.
     
     // This holds the directory for the reference structure to build.
-    std::string indexDirectory(argv[1]);
+    std::string indexDirectory(options["indexDirectory"].as<std::string>());
     
     // This holds a list of FASTA filenames to load and index.
-    std::vector<std::string> fastas;
-    for(int i = 2; i < argc; i++) {
-        // Put each filename in the vector.
-        fastas.push_back(std::string(argv[i]));
+    std::vector<std::string> fastas(options["fastas"]
+        .as<std::vector<std::string> >());
+    
+    // Dump options.
+    std::cout << "Options:" << std::endl;
+    std::cout << "Store index in: " << indexDirectory << std::endl;
+    
+    for(std::vector<std::string>::iterator i = fastas.begin();
+        i != fastas.end(); ++i) {
+        
+        std::cout << "Index file: " << *i << std::endl;
     }
     
     // Index the bottom-level FASTAs and get the basename they go into.
