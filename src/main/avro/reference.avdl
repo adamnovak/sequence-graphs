@@ -10,20 +10,13 @@ protocol ReferenceGraphTypes {
         RIGHT
     }
     
-    record Coordinate {
-        // Identifies a Position uniquely.
-        
-        // What contig is it on? "chr1", "chr2", "chrM", etc.
-        string contig;
-        // What base are we talking about?
-        long base;
-    }
+    // Coordinates are longs that identify Positions. They don't need schemas.
     
     record Side {
         // Identifies a side of a unique Position.
         
         // What is the coordinate of the position we are talking about?
-        Coordinate coordinate;
+        long coordinate;
         
         // What face of that position are we talking about (left or right)? 
         Face face; 
@@ -36,35 +29,24 @@ protocol ReferenceGraphTypes {
         // A unique ID for the Edge
         union { null, long } id = null;
         
-        // The ID of the 5' side of the Edge
+        // The ID of the 5' side of the Edge. These vertex IDs are just meeting
+        // points for edges; vertices don't need any particular annotations.
         long left;
 
-        // The ID of the 3' side of the Edge
+        // The ID of the 3' side of the Edge.
         long right;
 
     }
      
-    record Position {
-        // Represents a single-base position in a reference structure in the
-        // reference hierarchy.
-        
-        // Where is this position?
-        Coordinate coordinate;
-
-        // The Edge in the graph that represents this Position.
-        Edge edge;
-        
-        // The base that should be present at this Position.
-        string base;         
-    }
+    // Positions are represented by just single-element Blocks.
     
     record Block {
         // Represents several Positions with sequential IDs, connected only to
         // each other.
         
-        // Where is the first position in this Block?
-        Coordinate start;
-        // How long does it run
+        // What is the ID (coordinate) of the first position in this Block?
+        long start;
+        // How long does it run?
         long length;
 
 
@@ -77,19 +59,19 @@ protocol ReferenceGraphTypes {
     }
     
     record Adjacency {
-        // Represents an Adjacency between two sides of two Positions or Blocks.
+        // Represents an Adjacency between two sides of two Blocks.
 
         // The Edge in the graph that represents this Adjacency.
         Edge edge;
     }
     
     record Generalization {
-        // Represents homology between ranges of Positions. Not a graph
-        // component.
+        // Represents homology between ranges of Positions in Blocks. Not a
+        // graph component.
         
         // What coordinate do we start at on the lower level? We always go out
         // to the right from here.
-        Coordinate lowerStart;
+        long lowerStart;
         // What coordinate do we start at on the upper level? We go out either
         // left or right from here depending on the face here.
         Side upperStart;

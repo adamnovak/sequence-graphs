@@ -12,11 +12,20 @@
 // Grab pinchesAndCacti dependency.
 #include "stPinchGraphs.h"
 
-// Grab the Avro header for the Face/Coordinate/Side objects we need to dump
-// out. Only use the most dependent one, since they all define their
-// dependencies and are thus incompatible with the headers for their
-// dependencies.
+// Grab the Avro header for the Face/Side objects we need to dump out. Only use
+// the most dependent one, since they all define their dependencies and are thus
+// incompatible with the headers for their dependencies.
 #include "schemas/Side.hpp"
+
+// Get the variables Side_schema and Side_schema_len that give us the actual
+// text of that schema, before code generation.
+#include "schemas/Side_schema.hpp"
+
+#include <avro/Encoder.hh>
+#include <avro/DataFile.hh>
+#include <avro/Schema.hh>
+#include <avro/ValidSchema.hh>
+#include <avro/Compiler.hh>
 
 #include "FMDIndexBuilder.hpp"
 
@@ -121,6 +130,10 @@ int main(int argc, char** argv) {
     // Also a vector of lengths by contig number.
     std::vector<long long int> contigLengthVector;
     
+    // Also a variable for the next available ID, which comes after 2 * all the
+    // contigs.
+    long long int nextID = 0;
+    
     // Also a string to hold each line in turn.
     std::string line;
     while(std::getline(contigFile, line)) {
@@ -144,6 +157,9 @@ int main(int argc, char** argv) {
         
         // And the vector of sizes in number order
         contigLengthVector.push_back(lengthNumber);
+        
+        // Also keep track of the IDs this contig is held to have used up.
+        nextID += 2 * lengthNumber;
     }
     // Close up the contig file. We read our map.
     contigFile.close();
@@ -270,9 +286,13 @@ int main(int argc, char** argv) {
     // has 32 byte blocks.
     CSA::RLEEncoder encoder(32);
     
-    // A vector of (contig, base, face) strings. TODO: replace with Avro
-    std::vector<std::string> mappings;
+    // A vector of Sides, which are (contig, base, face).
+    std::vector<Side> mappings;
     
+    // We also need this map of position IDs (long long ints) by canonical
+    // contig name (a size_t) and base index (a CSA::usint)
+    std::map<std::pair<size_t, CSA::usint>, long long int>
+        idReservations;
     
     // Now go through all the contexts again.
     for(CSA::FMD::iterator i = index.begin(contextLength); 
@@ -360,56 +380,85 @@ int main(int argc, char** argv) {
         CSA::usint canonicalOffset = canonicalSegmentOffset + 
             stPinchSegment_getStart(firstSegment);
         
+        // So what's the contig-and-offset pair?
+        std::pair<size_t, CSA::usint> contigAndOffset = std::make_pair(
+            canonicalContig, canonicalOffset); 
+        
+        // What Position ID does this base get?
+        long long int positionID;
+        
+        if(idReservations.count(contigAndOffset) > 0) {
+            // Load the previously chosen ID
+            positionID = idReservations[contigAndOffset];
+        } else {
+            // Allocate and remember a new ID.
+            positionID = idReservations[contigAndOffset] = nextID++;
+        }
+        
         // Record a 1 in the vector at the end of this range, in BWT
         // coordinates.
         encoder.addBit(range.reverse_start + range.end_offset + 
             index.getNumberOfSequences());
           
-        std::stringstream stream;  
-        
-        stream << canonicalContig << ":" << canonicalOffset << 
-            " orientation " << canonicalOrientation;
+        // Say this range is going to belong to the ID we just looked up, on the
+        // appropriate face.
+        Side mapping;
+        mapping.coordinate = positionID;
+        mapping.face = canonicalOrientation ? LEFT : RIGHT;
             
         // Add a string describing the mapping
-        mappings.push_back(stream.str());
+        mappings.push_back(mapping);
         
-        std::cout << "Canonicalized to #" << mappings.back() << std::endl;
-            
+        // Every range belongs to some ID. TODO: test this. Especially with Ns.
         
-        
-            
+        std::cout << "Canonicalized to #" << mapping.coordinate << "." << 
+            mapping.face << std::endl;
     }
     
     
-    // For each context in order by range...
-    // Locate the first base in it
-    // Look it up in the pinch set to get a canonical ID and face for it
-    // Put a range in the range vector, and a copy of the canonical ID and face in the mapping vector.
-    
-    
-    
-        // At each leaf, you have a range:
-            // Range = all bases that match this character and share a downstream context of length p.
-            // Locate each base in the range.
-            // Pinch them all in the correct orientations in the ThreadSet.
-                // This does the union-find that we were doing with the complementary connected components problem
-        // Then for each block in the ThreadSet:
-            // Zip all the segments to get sets of oriented bases.
-                // To make the full graph:
-                    // Produce two Sides and a Site for each base set.
-                    // Connect to upstream/downstream stuff
-                        // Accounting for the ends of blocks where you can go many possible places.
-                // To allow mapping:
-                    // Un-locate everything in the base set.
-                    // Make two Sides for each base.
-                    // Put them in under every 1-element located base interval in an IntervalTree.
-                        // This will re-construct the intervals we pulled out in the suffix-tree traversal.
-                    // Save the IntervalTree
-                        // Which can make the RangeVector when needed
-                        // And stores the bi-directional range<->Position mappings.
-                        
     // Throw out the threadset
     stPinchThreadSet_destruct(threadSet);
+    
+    // Finish the vector encoder into a vector of the right length.
+    CSA::RLEVector bitVector(encoder, index.getBWTRange().second);
+    
+    // Save it to a file.
+    std::ofstream vectorStream((indexDirectory + "/vector.bin").c_str());
+    bitVector.writeTo(vectorStream);
+    vectorStream.close();
+    
+    // Now write out all the merged positions to Avro, in an Avro-format file.
+    // See <http://avro.apache.org/docs/1.7.6/api/cpp/html/index.html>. This is
+    // complicated by the fact that we need to have the Avro schema JSON text to
+    // write such a file, and the generated C++ classes provide no access to
+    // that text.
+    
+    // We previously hacked the Side schema into Side_schema and Side_schema_len
+    // with the xdd tool. Now we make it into an std::string.
+    std::string sideSchema((char*) Side_schema, (size_t) Side_schema_len);
+    std::istringstream sideSchemaStream(sideSchema);
+    
+    // This will hold the actual built schema
+    avro::ValidSchema validSchema;
+    
+    // Now parse the schema. Assume it works.
+    avro::compileJsonSchema(sideSchemaStream, validSchema);
+    
+    // Make a writer to write to the file we want, in the schema we want.
+    avro::DataFileWriter<Side> writer((indexDirectory + 
+        "/mappings.avro").c_str(), validSchema);
+    
+    for(std::vector<Side>::iterator i = mappings.begin(); i != mappings.end();
+        ++i) {
+        
+        // Write each mapping to the file.
+        writer.write(*i);
+        
+    }
+    writer.close();
+    
+    // Now we're done!
+    
     
     return 0;
 }
