@@ -43,7 +43,7 @@ object MapToIndex {
                 descr = "Run against this cluster URL")
             
             val index = trailArg[String](required = true,
-                descr = "index path to save in")
+                descr = "index path to load")
                 
             val pattern = trailArg[String](required = true,
                 descr = "string to map")
@@ -89,7 +89,7 @@ object MapToIndex {
         // environment variable (which must be set!), and the list of jars we
         // have worked out.
         println("Initializing Spark")
-        val sc = new SparkContext(opts.cluster.get.get, "createIndex", 
+        val sc = new SparkContext(opts.cluster.get.get, "mapToIndex", 
             System.getenv("SPARK_HOME"), jarsToSend)
         println("Spark initialized")
         
@@ -100,7 +100,7 @@ object MapToIndex {
         val pattern = opts.pattern.get.get 
 
         // Make the ReferenceHierarchy from the index we built
-        val hierarchy = new ReferenceHierarchy(sc, indexPath + "/hierarchy")
+        val hierarchy = new ReferenceHierarchy(indexPath)
         
         println("Hierarchy loaded! Mapping...")
         
