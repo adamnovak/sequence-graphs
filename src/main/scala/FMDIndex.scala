@@ -2,8 +2,7 @@ package edu.ucsc.genome
 
 import scala.collection.JavaConversions._
 import scala.io.Source
-import fi.helsinki.cs.rlcsa.{RangeVector, RangeVectorEncoder,
-    RangeVectorIterator}
+import fi.helsinki.cs.rlcsa.{RangeVector, RangeEncoder, RangeVectorIterator}
 
 // We use edu.ucsc.genome.Side objects to represent a base on a strand; face is
 // the strand (LEFT for forward strand, RIGHT for reverse strand, under the idea
@@ -72,7 +71,7 @@ class FMDIndex(var basename: String) extends Serializable {
         
         // Keep track of the next ID to use. Assume the contigs take all the
         // first IDs.
-        var nextID = 0
+        var nextID: Long = 0
         
         contigData.foreach { case (_, length) =>
             // For each contig
@@ -113,18 +112,18 @@ class FMDIndex(var basename: String) extends Serializable {
      * position ID is within range of those assigned to contigs (i.e. less than
      * the total single-strand length of all contigs).
      */
-    def positionToContigNumber(position: Long): Long = {
+    def positionToContigNumber(position: Long): Int = {
         // Just look up the rank of that position
-        contigIdentifier.rank(position)
+        contigIdentifier.rank(position).asInstanceOf[Int]
     }
     
     /**
      * Get the first ID used by any position on the contig with the given
      * number. This will be the the first base of the forward strand.
      */
-    def contigNumberToPosition(contig: Long): Long = {
+    def contigNumberToPosition(contig: Int): Long = {
         // Ought to be the reverse of contigNumberForPosition.
-        contigIdentifier.select(position)
+        contigIdentifier.select(contig)
     }
     
     ////////////////////////////////////////////////////////////////////////////

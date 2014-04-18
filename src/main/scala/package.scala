@@ -25,29 +25,12 @@ package edu.ucsc
 package object genome {
     
     /**
-     * Define an ordering for Positions implicitly, rather than trying to edit
-     * the code-generated Avro code to add it.
-     */
-    implicit val positionOrdering = Ordering.by { (position: Position) =>
-        (position.contig, position.base, position.face)
-    }
-    
-    /**
      * Define an ordering for Sides: sort them by position.
      * TODO: Move this to Avro.
      */ 
     implicit val sideOrdering = Ordering.by { (side: Side) =>
-        side.position
+        (side.coordinate, side.face)
     }
-    
-    /**
-     * Allow a Side to be used in place of its Long ID. We do this as a down-
-     * conversion (rather than converting Longs up to Sides) because otherwise
-     * we'd have to make up info for the other Side fields (or at least null
-     * them out), and could get into trouble. API users will just have to figure
-     * out that they can use Sides wherever a Long is called for.
-     */
-    implicit def Side2Long(side: Side) = side.id
     
     /**
      * Auto-Magically make PloidyBounds for fixed ploidies.
@@ -94,35 +77,13 @@ package object genome {
     }
     
     /**
-     * Magically wrap Sites in HasEdge objects.
+     * Magically wrap Blocks in HasEdge objects.
      *
      * TODO: Upgrade to Scala 2.10 Implicit Classes(?) instead of this. But we'd
      * have to get rid of case class-ness.
      */
-    implicit def Site2HasEdge(site: Site): HasEdge = {
-        SiteEdge(site)
-    }
-    
-    /**
-     * Magically wrap Breakpoints in HasEdge objects.
-     *
-     * TODO: Upgrade to Scala 2.10 Implicit Classes(?) instead of this. But we'd
-     * have to get rid of case class-ness.
-     */
-    implicit def Breakpoint2HasEdge(breakpoint: Breakpoint): HasEdge = {
-        BreakpointEdge(breakpoint)
-    }
-    
-    /**
-     * Magically wrap Generalization in HasEdge objects.
-     *
-     * TODO: Upgrade to Scala 2.10 Implicit Classes(?) instead of this. But we'd
-     * have to get rid of case class-ness.
-     */
-    implicit def Generalization2HasEdge(
-        generalization: Generalization): HasEdge = {
-        
-        GeneralizationEdge(generalization)
+    implicit def Block2HasEdge(block: Block): HasEdge = {
+        BlockEdge(block)
     }
     
     /**
@@ -172,21 +133,21 @@ package object genome {
     }
     
     /**
-     * Magically allow us to do nice things with Positions.
+     * Magically allow us to do nice things with Sides.
      */
-    implicit class RichPosition(position: Position) {
+    implicit class RichSide(side: Side) {
         /** 
-         * Flip Position faces with unary !
+         * Flip Side faces with unary !
          */
-        def unary_! : Position = {
+        def unary_! : Side = {
             // Flip the face around
-            val newFace = position.face match {
+            val newFace = side.face match {
                 case Face.LEFT => Face.RIGHT
                 case Face.RIGHT => Face.LEFT
             }
             
-            // Make a new Position
-            new Position(position.contig, position.base, newFace)
+            // Make a new Side
+            new Side(side.coordinate, newFace)
         }
     }
 }

@@ -63,12 +63,12 @@ case class AnchorEdge(owner: Anchor) extends HasEdge {
 }
 
 /**
- * A class to say that Sites are edges.
+ * A class to say that Blocks are edges.
  */
-case class SiteEdge(owner: Site) extends HasEdge {
+case class BlockEdge(owner: Block) extends HasEdge {
     def edge = owner.edge
     override def clone = {
-        new SiteEdge(Site.newBuilder(owner).build)
+        new BlockEdge(Block.newBuilder(owner).build)
     }
 }
 
@@ -79,15 +79,5 @@ case class BreakpointEdge(owner: Breakpoint) extends HasEdge {
     def edge = owner.edge
     override def clone = {
         new BreakpointEdge(Breakpoint.newBuilder(owner).build)
-    }
-}
-
-/**
- * A class to say that Generalizations are edges.
- */
-case class GeneralizationEdge(owner: Generalization) extends HasEdge {
-    def edge = owner.edge
-    override def clone = {
-        new GeneralizationEdge(Generalization.newBuilder(owner).build)
     }
 }
