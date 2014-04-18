@@ -1,5 +1,10 @@
 package edu.ucsc.genome
 import scala.collection.immutable.HashMap
+import fi.helsinki.cs.rlcsa.{FMDUtil, RangeVector}
+import org.apache.avro.specific.{SpecificDatumReader, SpecificRecord}
+import org.apache.avro.file.DataFileReader
+import scala.collection.JavaConversions._
+import java.io.File
 
 /**
  * Represents a Reference Structure: a phased or unphased sequence graph, with a
@@ -113,6 +118,79 @@ class StringReferenceStructure(index: FMDIndex) extends ReferenceStructure {
 
     // Expose our index to the level above us.
     def getIndex = index
+    
+    def getRanges(side: Side): Seq[(Long, Long)] = {
+        // Ranges for sides are just the BWT indices corresponding to them.
+        val bwtSide = index.sideToBWT(side)
+        
+        Seq((bwtSide, bwtSide))
+    }
+}
+
+/**
+ * A ReferenceStructure that has been built by the createIndex program and
+ * loaded form disk. Internally keeps track of its bit vector of ranges and
+ * array of Sides to which ranges map things.
+ */
+class MergedReferenceStructure(index: FMDIndex, directory: String)
+    extends ReferenceStructure {
+    
+    // Load the range vector
+    val rangeVector = {
+        // First open a C FILE* with the minimal API that FMDUtil in RLCSA comes
+        // with.
+        val file = FMDUtil.fopen(directory + "/vector.bin", "r")
+        // Load the RangeVector from it
+        val toReturn = new RangeVector(file)
+        // Close the file. OS should free it.
+        FMDUtil.fclose(file)
+     
+        // Send out the RangeVector   
+        toReturn
+    }
+    
+    // Load the array of Sides that correspond to the ranges
+    val sideArray: Array[Side] = {
+        // We're loading a plain Avro file (no Parquet). See <http://avro.apache
+        // .org/docs/current/gettingstartedjava.html#Deserializing>
+    
+        // Make a DatumReader because Avro thinks we might want to not have one
+        // sometimes.
+        val datumReader = new SpecificDatumReader[Side](classOf[Side])
+        
+        // Make a file reader to read the file with the datum reader.
+        val fileReader = new DataFileReader[Side](
+            new File(directory + "/mappings.avro"), datumReader)
+        
+        // Get an iterator over the file, and turn it into an array.
+        fileReader.iterator.toArray
+    }
+        
+    
+    
+    // We map using the range-based mapping mode on the index.
+    def map(pattern: String, face: Face): Seq[Option[Side]] = {
+        // Map to defined ranges in the range vector
+        getIndex.map(rangeVector, pattern, face).map {
+            // An range number of -1 means it didn't map 
+            case -1 => None
+            // Otherwise go get the Side for the range it mapped to (or None
+            // if there's no side for that range). Make sure to flip it
+            // around, to compensate for range mapping producing right-side
+            // contexts on the forward strand instead of left-side ones.
+            case range => 
+                if(range < sideArray.length) {
+                    // We got a range that a Side is defined for. Flip the Side.
+                    Some(!(sideArray(range.toInt)))
+                } else {
+                    // We probably got the 1-past-the-end range? TODO: Did we
+                    // break something?
+                    None
+                }
+        }
+    }
+    
+    def getIndex: FMDIndex = index
     
     def getRanges(side: Side): Seq[(Long, Long)] = {
         // Ranges for sides are just the BWT indices corresponding to them.

@@ -20,15 +20,25 @@ import scala.reflect._
  * building each level, and a possibly finished, or possibly null, graph of
  * Sides, Sites, Adjacencies, and Generalizations (with no negative vertex IDs).
  */
-class ReferenceHierarchy(sc: SparkContext, var index: FMDIndex) {
+class ReferenceHierarchy(sc: SparkContext, index: FMDIndex) {
+    
+    // We keep an array of levels, starting with our bottom-most string level.
+    var levels: Array[ReferenceStructure] = 
+        Seq(new StringReferenceStructure(index)).toArray
     
     /**
      * Load a ReferenceHierarchy from the given path, using the given
-     * SparkContext. The saved hierarchy must contain at least one level.
+     * SparkContext. The saved hierarchy must have been created by the
+     * createIndex C++ program.
      */
     def this(sc: SparkContext, path: String) = {
-        // Load an FMDIndex for a basename in that directory.
+        // Load an FMDIndex for a basename in that directory, and create the
+        // bottom level.
         this(sc, new FMDIndex(path + "/index.basename"))
+        
+        // Load the merged level 1, on the same index.
+        levels :+= new MergedReferenceStructure(index, path + "/level1")
+        
     }
     
     
