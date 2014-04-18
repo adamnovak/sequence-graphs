@@ -229,8 +229,9 @@ class FMDIndex(var basename: String) extends Serializable {
         } else {
             // We're on the reverse strand, so we need to flip around and count
             // from the "start" of the reverse complement, and adjust to keep it
-            // 0-based.
-            contigLength - (contigStart - side.coordinate) - 1
+            // 0-based. Coordinate varies between contigStart and (contigStart +
+            // contigLength - 1)
+            contigLength - (side.coordinate - contigStart) - 1
         }
         
         // Return the text and offset
@@ -315,10 +316,10 @@ class FMDIndex(var basename: String) extends Serializable {
         // What coordinate/Position ID should we use?
         val coordinate = contigStrand match {
             // On the forward strand, the first position is the first ID.
-            case 0 => offset + contigStart
+            case 0 => contigStart + offset
             // On the reverse strand we start at the end and go back. Correct to
             // stay 0-based.
-            case 1 => contigLength - offset - 1
+            case 1 => contigStart + contigLength - offset - 1
         }
         
         // Make a Side representing wherever we've decided this base really

@@ -17,10 +17,6 @@ class FMDIndexTests extends RLCSASuite {
     }
     
     test("positionToContigNumber works") {
-        for(i <- 0 until 21) {
-            println("Pos %d: %d".format(i, index.positionToContigNumber(i)))
-        }
-        
         // Ends of contig 0
         assert(index.positionToContigNumber(0) === 0)
         assert(index.positionToContigNumber(9) === 0)
@@ -30,10 +26,6 @@ class FMDIndexTests extends RLCSASuite {
     }
     
     test("contigNumberToPosition works") {
-        for(i <- 0 until 2) {
-            println("Contig %d: %d".format(i, index.contigNumberToPosition(i)))
-        }
-    
         // Should return first position in each contig.
         assert(index.contigNumberToPosition(0) === 0)
         assert(index.contigNumberToPosition(1) === 10)
@@ -66,6 +58,19 @@ class FMDIndexTests extends RLCSASuite {
         assert(side.face === Face.RIGHT)
     }
     
+    test("sideToPair inverts pairToSide") {
+        val pairs = Seq((0, 0), (1, 0), (0, 9), (1, 9), (2, 0), (2, 10), (3, 0), 
+            (3, 10))
+        
+        for(pair <- pairs) {
+            // Convert to a pair and back.
+            val side = index.pairToSide(pair._1, pair._2)
+            val newPair = index.sideToPair(side)
+            
+            assert(newPair === pair)
+        }
+    }
+    
     test("sideToBWT inverts bwtToSide") {
         // BWT space is ((# of contigs) + (totoal contig length)) * 2 in size.
         // We know that RLCSASuite has 2 sequences, one of 10 bases and one of
@@ -91,7 +96,7 @@ class FMDIndexTests extends RLCSASuite {
         
         // And the second one ought to be AAT: all of seq1
         val side2 = index.bwtToSide(5)
-        assert(side.coordinate === 0)
+        assert(side2.coordinate === 0)
         assert(side2.face === Face.LEFT)
     }
     
@@ -105,15 +110,16 @@ class FMDIndexTests extends RLCSASuite {
     }
     
     test("bwtToSide inverts sideToBWT") {
-        // Let's try every base on seq1 (length 10), for both strands
-        for(i <- 0 until 10) {
+        // Let's try every base on seq1 and seq2, for both strands
+        for(i <- 0 until 21) {
             // Check the left sides
             // Starting at 0: first ID in seq1
-            val pos = new Side(index.contigNumberToPosition(0) + i, Face.LEFT)
+            val pos = new Side(i, Face.LEFT)
+            
             assert(index.bwtToSide(index.sideToBWT(pos)) === pos)
             
             // And the right sides
-            val pos2 = new Side(index.contigNumberToPosition(0) + i, Face.RIGHT)
+            val pos2 = new Side(i, Face.RIGHT)
             assert(index.bwtToSide(index.sideToBWT(pos2)) === pos2)
         }
     }
@@ -284,8 +290,6 @@ class FMDIndexTests extends RLCSASuite {
         // Now try mapping with the range vector
         val pattern = "AATCTACTGC"
         val mappings: Seq[Long] = index.map(rangeVector, pattern, Face.LEFT)
-        
-        println((pattern, mappings).zipped.mkString("\n"))
         
         // The last 8 characters ought to map
         assert(mappings(0) === -1)
