@@ -16,38 +16,49 @@ class FMDIndexTests extends RLCSASuite {
         index = new FMDIndex(basename)
     }
     
-    test("pairToPosition works at start of forward strand") {
-        val position = index.pairToPosition(0, 0)
+    test("positionToContigNumber works") {
+        // Ends of contig 0
+        assert(index.positionToContigNumber(0) === 0)
+        assert(index.positionToContigNumber(9) === 0)
+        // Ends of contig 1
+        assert(index.positionToContigNumber(10) === 1)
+        assert(index.positionToContigNumber(20) === 1)
+    }
+    
+    test("contigNumberToPosition works") {
+        // Should return first position in each contig.
+        assert(index.contigNumberToPosition(0) === 0)
+        assert(index.contigNumberToPosition(1) === 10)
+    }
+    
+    test("pairToSide works at start of forward strand") {
+        val side = index.pairToSide(0, 0)
         
-        assert(position.contig === "seq1")
-        assert(position.base === 1)
-        assert(position.face === Face.LEFT)
+        assert(side.coordinate === 0)
+        assert(side.face === Face.LEFT)
     }
     
-    test("pairToPosition works at start of a reverse strand") {
-        val position = index.pairToPosition(1, 0)
-        assert(position.contig === "seq1")
-        assert(position.base === 10)
-        assert(position.face === Face.RIGHT)
+    test("pairToSide works at start of a reverse strand") {
+        val side = index.pairToSide(1, 0)
+        assert(side.coordinate === 9)
+        assert(side.face === Face.RIGHT)
     }
     
-    test("pairToPosition works at end of a forward strand") {
-        val position = index.pairToPosition(0, 9)
+    test("pairToSide works at end of a forward strand") {
+        val side = index.pairToSide(0, 9)
         
-        assert(position.contig === "seq1")
-        assert(position.base === 10)
-        assert(position.face === Face.LEFT)
+        assert(side.coordinate === 9)
+        assert(side.face === Face.LEFT)
     }
     
-    test("pairToPosition works at end of a reverse strand") {
-        val position = index.pairToPosition(1, 9)
+    test("pairToSide works at end of a reverse strand") {
+        val side = index.pairToSide(1, 9)
         
-        assert(position.contig === "seq1")
-        assert(position.base === 1)
-        assert(position.face === Face.RIGHT)
+        assert(side.coordinate === 0)
+        assert(side.face === Face.RIGHT)
     }
     
-    test("positionToBWT inverts bwtToPosition") {
+    test("sideToBWT inverts bwtToSide") {
         // BWT space is ((# of contigs) + (totoal contig length)) * 2 in size.
         // We know that RLCSASuite has 2 sequences, one of 10 bases and one of
         // 11.
@@ -57,44 +68,45 @@ class FMDIndexTests extends RLCSASuite {
         val bwtStart = 2 * 2
         
         for(bwt <- bwtStart until bwtSize) {
-            // For a bunch of positions in the BWT
-            assert(index.positionToBWT(index.bwtToPosition(bwt)) === bwt)
+            // For a bunch of sides in the BWT
+            assert(index.sideToBWT(index.bwtToSide(bwt)) === bwt)
         }
     }
     
-    test("bwtToPosition works by index") {
+    test("bwtToSide works by index") {
         // Get the location of the first non-end character in the BWT. 0-3 are
         // $.
-        val position = index.bwtToPosition(4)
+        val side = index.bwtToSide(4)
         // The first suffix is going to be the one that starts AAG: all of seq2.
-        assert(position.contig === "seq2")
-        // Sequence position is 1-based.
-        assert(position.base === 1)
-        assert(position.face === Face.LEFT)
+        assert(side.coordinate === 10)
+        assert(side.face === Face.LEFT)
         
         // And the second one ought to be AAT: all of seq1
-        val position2 = index.bwtToPosition(5)
-        assert(position2.contig === "seq1")
-        assert(position2.base === 1)
-        assert(position2.face === Face.LEFT)
+        val side2 = index.bwtToSide(5)
+        assert(side.coordinate === 0)
+        assert(side2.face === Face.LEFT)
     }
     
-    test("positionToBWT works correctly") {
+    test("sideToBWT works correctly") {
         // Make sure we match the test above
-        assert(index.positionToBWT(new Position("seq2", 1, Face.LEFT)) === 4)
-        assert(index.positionToBWT(new Position("seq1", 1, Face.LEFT)) === 5)
+        
+        // Start of seq 2
+        assert(index.sideToBWT(new Side(10, Face.LEFT)) === 4)
+        // Start of seq 1
+        assert(index.sideToBWT(new Side(0, Face.LEFT)) === 5)
     }
     
-    test("bwtToPosition inverts positionToBWT") {
+    test("bwtToSide inverts sideToBWT") {
         // Let's try every base on seq1 (length 10), for both strands
-        for(i <- 1 until 11) {
+        for(i <- 0 until 10) {
             // Check the left sides
-            val pos = new Position("seq1", i, Face.LEFT)
-            assert(index.bwtToPosition(index.positionToBWT(pos)) === pos)
+            // Starting at 0: first ID in seq1
+            val pos = new Side(index.contigNumberToPosition(0) + i, Face.LEFT)
+            assert(index.bwtToSide(index.sideToBWT(pos)) === pos)
             
             // And the right sides
-            val pos2 = new Position("seq1", i, Face.RIGHT)
-            assert(index.bwtToPosition(index.positionToBWT(pos2)) === pos2)
+            val pos2 = new Side(index.contigNumberToPosition(0) + i, Face.RIGHT)
+            assert(index.bwtToSide(index.sideToBWT(pos2)) === pos2)
         }
     }
     
@@ -105,8 +117,8 @@ class FMDIndexTests extends RLCSASuite {
         
         val got1 = seq1.zipWithIndex.map { case (char, offset) =>
             // Display the appropriate base and see what we get.
-            val displayed = index.display(new Position("seq1", offset + 1,
-                Face.LEFT))
+            val displayed = index.display(new Side(
+                index.contigNumberToPosition(0) + offset, Face.LEFT))
             
             println("\t%s vs. %s".format(char, displayed))
             
@@ -119,8 +131,8 @@ class FMDIndexTests extends RLCSASuite {
         
         val got2 = seq2.zipWithIndex.map { case (char, offset) =>
             // Display the appropriate base and see what we get.
-            val displayed = index.display(new Position("seq2", offset + 1,
-                Face.LEFT))
+            val displayed = index.display(new Side(
+                index.contigNumberToPosition(1) + offset, Face.LEFT))
             
             println("\t%s vs. %s".format(char, displayed))
             
@@ -153,32 +165,29 @@ class FMDIndexTests extends RLCSASuite {
     }
     
     test("right-maps left-ambiguous thing") {
-        val position = index.map("AATCTACTGC", 2, Face.RIGHT).get
+        val side = index.map("AATCTACTGC", 2, Face.RIGHT).get
         
-        assert(position.contig === "seq1")
-        assert(position.base === 2)
-        assert(position.face === Face.RIGHT)
+        assert(side.coordinate === index.contigNumberToPosition(0) + 1)
+        assert(side.face === Face.RIGHT)
     }
     
     test("left-maps last base of contig") {
-        val position = index.map("AATCTACTGC", 10, Face.LEFT).get
+        val side = index.map("AATCTACTGC", 10, Face.LEFT).get
         
-        assert(position.contig === "seq1")
-        assert(position.base === 10)
-        assert(position.face === Face.LEFT)
+        assert(side.coordinate === index.contigNumberToPosition(0) + 9)
+        assert(side.face === Face.LEFT)
     }
     
     test("left-maps last base of reverse complement") {
-        val position = index.map("GCTAGTAGCTT", 11, Face.LEFT).get
+        val side = index.map("GCTAGTAGCTT", 11, Face.LEFT).get
         
-        assert(position.contig === "seq2")
-        assert(position.base === 1)
-        assert(position.face === Face.RIGHT)
+        assert(side.coordinate === index.contigNumberToPosition(1))
+        assert(side.face === Face.RIGHT)
     }
     
     test("left-maps unambiguous bases in contig") {
         val pattern = "AATCTACTGC"
-        val mappings: Seq[Option[Position]] = index.map(pattern, Face.LEFT)
+        val mappings: Seq[Option[Side]] = index.map(pattern, Face.LEFT)
         
         // The last 8 characters ought to map.
         assert(mappings.map {
@@ -189,9 +198,9 @@ class FMDIndexTests extends RLCSASuite {
         mappings.foreach {
             case Some(mapping) => {
                 // Everything mapped should be mapped on the left
-                assert(mapping.face == Face.LEFT)
+                assert(mapping.face === Face.LEFT)
                 // And on this contig
-                assert(mapping.contig == "seq1")
+                assert(index.positionToContigNumber(mapping.position) === 0))
             }
             case None => {}
         }
@@ -201,7 +210,7 @@ class FMDIndexTests extends RLCSASuite {
     
     test("left-maps unambiguous bases in reverse complement") {
         val pattern = "GCAGTAGATT"
-        val mappings: Seq[Option[Position]] = index.map(pattern, Face.LEFT)
+        val mappings: Seq[Option[Side]] = index.map(pattern, Face.LEFT)
         
         // The last 8 characters ought to map this way too.
         assert(mappings.map {
@@ -214,7 +223,7 @@ class FMDIndexTests extends RLCSASuite {
                 // Everything mapped should be mapped on the left
                 assert(mapping.face == Face.RIGHT)
                 // And on this contig
-                assert(mapping.contig == "seq1")
+                assert(index.positionToContigNumber(mapping.position) === 0))
             }
             case None => {}
         }
@@ -224,7 +233,7 @@ class FMDIndexTests extends RLCSASuite {
     
     test("right-maps unambiguous bases in contig") {
         val pattern = "AATCTACTGC"
-        val mappings: Seq[Option[Position]] = index.map(pattern, Face.RIGHT)
+        val mappings: Seq[Option[Side]] = index.map(pattern, Face.RIGHT)
         
         // The first 8 characters ought to map.
         assert(mappings.map {
@@ -237,7 +246,7 @@ class FMDIndexTests extends RLCSASuite {
                 // Everything mapped should be mapped on the right
                 assert(mapping.face == Face.RIGHT)
                 // And on this contig
-                assert(mapping.contig == "seq1")
+                assert(index.positionToContigNumber(mapping.position) === 0))
             }
             case None => {}
         }

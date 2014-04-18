@@ -2,12 +2,13 @@ package edu.ucsc.genome
 
 import scala.collection.JavaConversions._
 import scala.io.Source
-import fi.helsinki.cs.rlcsa.RangeVector
+import fi.helsinki.cs.rlcsa.{RangeVector, RangeVectorEncoder,
+    RangeVectorIterator}
 
-// We use edu.ucsc.genome.Position objects to represent our positions. Contig is
-// the actual haplotype name, base is the index from the start of the forward
-// strand, and face is the strand (LEFT for forward strand, RIGHT for reverse
-// strand, since everything maps by upstream context).
+// We use edu.ucsc.genome.Side objects to represent a base on a strand; face is
+// the strand (LEFT for forward strand, RIGHT for reverse strand, under the idea
+// that everything maps by upstream context). This is sort of backwards for
+// suffix ranges, however.
 
 /**
  * An index that allows efficient substring query and exact-match mapping to a
@@ -59,6 +60,33 @@ class FMDIndex(var basename: String) extends Serializable {
             case ((contig: String, length: Long), index: Int) =>
                 (contig, (index, length))
         }.toMap
+     
+    // Keep a bit vector so we can put in a Position ID and get out the number
+    // of the contig it belongs to. There is a 1 at the start of the range
+    // occupied by every contig, except the first. So the rank of an ID gives
+    // the contig it belongs to. Strand doesn't matter here.
+    @transient
+    lazy val contigIdentifier: RangeVectorIterator = {
+        // Make a new encoder with this arbitrary block size.
+        val encoder = new RangeEncoder(32)
+        
+        // Keep track of the next ID to use. Assume the contigs take all the
+        // first IDs.
+        var nextID = 0
+        
+        contigData.foreach { case (_, length) =>
+            // For each contig
+            // Push the next ID over by the length
+            nextID += length
+            
+            // Put a 1 at the start of the next contig
+            encoder.addBit(nextID)
+        }
+        
+        // Make an iterator we can use to look up contig numbers for the blocks
+        // IDs are in.
+        new RangeVectorIterator(encoder, nextID + 1)
+    }
     
     ////////////////////////////////////////////////////////////////////////////
     // Metadata Operations
@@ -80,6 +108,25 @@ class FMDIndex(var basename: String) extends Serializable {
         contigInverse(contig)._2
     }
     
+    /**
+     * Get the contig number for a given Position number. Assumes that the given
+     * position ID is within range of those assigned to contigs (i.e. less than
+     * the total single-strand length of all contigs).
+     */
+    def positionToContigNumber(position: Long): Long = {
+        // Just look up the rank of that position
+        contigIdentifier.rank(position)
+    }
+    
+    /**
+     * Get the first ID used by any position on the contig with the given
+     * number. This will be the the first base of the forward strand.
+     */
+    def contigNumberToPosition(contig: Long): Long = {
+        // Ought to be the reverse of contigNumberForPosition.
+        contigIdentifier.select(position)
+    }
+    
     ////////////////////////////////////////////////////////////////////////////
     // FM-Index Operations
     ////////////////////////////////////////////////////////////////////////////
@@ -90,10 +137,10 @@ class FMDIndex(var basename: String) extends Serializable {
     def count(pattern: String): Long = RLCSAUtil.length(fmd.count(pattern))
     
     /**
-     * Return the Positions at which occurrences of the given pattern
+     * Return the Sides at which occurrences of the given pattern
      * start.
      */
-    def locate(pattern: String): Iterator[Position] = {
+    def locate(pattern: String): Iterator[Side] = {
         // Look up the range.
         val range = fmd.count(pattern)
         
@@ -101,7 +148,7 @@ class FMDIndex(var basename: String) extends Serializable {
         val locations = fmd.locate(range)
         
         // Make a list in our onw memory to copy to.
-        var items: List[Position] = Nil
+        var items: List[Side] = Nil
         
         for(i <- 0L until RLCSAUtil.length(range)) {
             // Get each result location. TODO: We can only go up to the max int
@@ -111,8 +158,8 @@ class FMDIndex(var basename: String) extends Serializable {
             // Get a text number and an offset
             val textAndOffset = fmd.getRelativePosition(location)
             
-            // Make a Position and cons it onto the list.
-            items = pairToPosition(textAndOffset) :: items
+            // Make a Side and cons it onto the list.
+            items = pairToSide(textAndOffset) :: items
         }
         
         // Free the C array of locations
@@ -120,43 +167,40 @@ class FMDIndex(var basename: String) extends Serializable {
         
         // Give back an iterator for the list.
         // TODO: Do this iteration on demand.
-        return items.iterator
+        items.iterator
     }
     
     ////////////////////////////////////////////////////////////////////////////
-    // Convert between Positions, text-offset pairs and BWT coordinates
+    // Convert between Sides, text-offset pairs and BWT coordinates
     ////////////////////////////////////////////////////////////////////////////
     
     /**
-     * Convert a Position into a text number and offset in that text. If the
-     * Position is a LEFT face, it will be on the forward strand; if it is a
+     * Convert a Side into a text number and offset in that text. If the
+     * Side is a LEFT face, it will be on the forward strand; if it is a
      * RIGHT face, it will be on the reverse strand.
      */
-    def positionToPair(position: Position): (Int, Long) = {
-        // Look up the contig used in the Position
-        val (contigNumber, contigLength) = contigInverse(position.contig)
+    def sideToPair(side: Side): (Int, Long) = {
+        // Look up the contig used in the side
+        val contigNumber = positionToContigNumber(side.coordinate)
+        // Look up its length
+        val contigLength = contigData(contigNumber)._2
+        // Get the base ID for the contig
+        val contigStart = contigNumberToPosition(contigNumber)
         
-        if(position.base < 1) {
-            // Catch and complain about people who forgot that positions are
-            // 1-based.
-            throw new Exception("Base in %s below minimum base index of 1"
-                .format(position))
-        }
-        
-        // What text index corresponds to the strand of the contig this Position
+        // What text index corresponds to the strand of the contig this Side
         // lives on? Forward texts are even, reverse ones are odd.
-        val text = contigNumber * 2 + (if(position.face == Face.LEFT) 0 else 1)
+        val text = contigNumber * 2 + (if(side.face == Face.LEFT) 0 else 1)
         
-        // What's the offset in the text?
-        val offset = if(position.face == Face.LEFT) {
-            // We're on the forward strand, so no change. Just convert from
-            // 1-based Position coordinates to 0-based text coordinates.
-            position.base - 1
+        // What's the offset in the text (0-based)?
+        val offset = if(side.face == Face.LEFT) {
+            // We're on the forward strand, so just count up how far we have to
+            // go out to get to that ID.
+            side.coordinate - contigStart
         } else {
             // We're on the reverse strand, so we need to flip around and count
-            // from the "start" of the reverse complement. This automatically
-            // adjusts for the 1-based to 0-based conversion.
-            contigLength - position.base
+            // from the "start" of the reverse complement, and adjust to keep it
+            // 0-based.
+            contigLength - (contigStart - side.coordinate) - 1
         }
         
         // Return the text and offset
@@ -164,13 +208,13 @@ class FMDIndex(var basename: String) extends Serializable {
     }
     
     /**
-     * Convert a Position to a BWT index in this index. If the Position is a
+     * Convert a Side to a BWT index in this index. If the Side is a
      * LEFT face, it will be on the forward strand; if it is a RIGHT face, it
      * will be on the reverse strand.
      */
-    def positionToBWT(position: Position): Long = {
-        // Turn the position into a text and offset.
-        val (text, offset) = positionToPair(position)
+    def sideToBWT(side: Side): Long = {
+        // Turn the side into a text and offset.
+        val (text, offset) = sideToPair(side)
         
         // Pack the two together in the right type to send down to C++
         val textAndOffset: pair_type = new pair_type(text, offset)
@@ -190,46 +234,46 @@ class FMDIndex(var basename: String) extends Serializable {
     }
     
     /**
-     * Convert a BWT index in this index to a Position. If the BWT index is on
-     * the forward strand, it will be a Position with a LEFT face; if it is on
-     * the reverse strand, it will be a position with a RIGHT face.
+     * Convert a BWT index in this index to a Side. If the BWT index is on
+     * the forward strand, it will be a Side with a LEFT face; if it is on
+     * the reverse strand, it will be a Side with a RIGHT face.
      *
      * TODO: Consistent capitalization with function above?
      */
-    def bwtToPosition(bwt: Long): Position = {
+    def bwtToSide(bwt: Long): Side = {
         // Convert from BWT coordinates to SA coordinates, locate it, and then
         // report position as a (text, offset) pair.
         val textAndOffset = fmd.getRelativePosition(fmd.locate(bwt - 
             fmd.getNumberOfSequences));
         
-        // Convert that pair to a Position
-        pairToPosition(textAndOffset)
+        // Convert that pair to a Side
+        pairToSide(textAndOffset)
     }
     
     /**
      * Convert a text and offset pair (which some C++-level mapping functions
-     * use) to a Position. If the text is a forward- strand text, the position's
-     * face will be LEFT; otherwise it will be RIGHT.
+     * use) to a Side. If the text is a forward- strand text, the Side's face
+     * will be LEFT; otherwise it will be RIGHT.
      */
-    def pairToPosition(textAndOffset: pair_type): Position = {
+    def pairToSide(textAndOffset: pair_type): Side = {
         // Pull out the text and offset
-        pairToPosition(textAndOffset.getFirst.toInt, textAndOffset.getSecond)
+        pairToSide(textAndOffset.getFirst.toInt, textAndOffset.getSecond)
     }
     
     /**
-     * Convert a text number and offset length to a Position. If the text is a
-     * forward- strand text, the position's face will be LEFT; otherwise it will
+     * Convert a text number and offset length to a Side. If the text is a
+     * forward- strand text, the Side's face will be LEFT; otherwise it will
      * be RIGHT.
      */
-    def pairToPosition(text: Int, offset: Long): Position = {
+    def pairToSide(text: Int, offset: Long): Side = {
         // Work out how far we are into what strand of what contig.
         val contigNumber: Int = text / 2
         val contigStrand: Int = text % 2
         
-        // What contig name is that contig number?
-        val contigName = contigData(contigNumber)._1
-        // How long is that contig?
+        // Look up its length
         val contigLength = contigData(contigNumber)._2
+        // Get the base ID for the contig
+        val contigStart = contigNumberToPosition(contigNumber)
         
         // What face should we use for that strand?
         val face = contigStrand match {
@@ -237,18 +281,19 @@ class FMDIndex(var basename: String) extends Serializable {
             case 1 => Face.RIGHT
         }
         
-        // What base number should we use on that strand?
-        val base = contigStrand match {
-            // On the forward strand, the first position is base 1
-            case 0 => offset + 1
-            // On the reverse strand we start at the end and go back.
-            // Automatically corrects for 0/1-based-ness.
-            case 1 => contigLength - offset
+        
+        // What coordinate/Position ID should we use?
+        val coordinate = contigStrand match {
+            // On the forward strand, the first position is the first ID.
+            case 0 => offset + contigStart
+            // On the reverse strand we start at the end and go back. Correct to
+            // stay 0-based.
+            case 1 => contigLength - offset - 1
         }
         
-        // Make a Position representing wherever we've decided this base really
+        // Make a Side representing wherever we've decided this base really
         // goes.
-        new Position(contigName, base, face)
+        new Side(coordinate, face)
     }
     
     ////////////////////////////////////////////////////////////////////////////
@@ -256,11 +301,11 @@ class FMDIndex(var basename: String) extends Serializable {
     ////////////////////////////////////////////////////////////////////////////
     
     /**
-     * Return the base letter corresponding to the given Position.
+     * Return the base letter corresponding to the given Side.
      */
-    def display(position: Position): Char = {
-        // Find the text and offset for this position.
-        val (text, offset) = positionToPair(position)
+    def display(side: Side): Char = {
+        // Find the text and offset for this side.
+        val (text, offset) = sideToPair(side)
         
         // Make a single-item range.
         val rangeToGrab = new pair_type(offset, offset)
@@ -280,21 +325,21 @@ class FMDIndex(var basename: String) extends Serializable {
     
     
     ////////////////////////////////////////////////////////////////////////////
-    // Left- and right-mapping single bases to Positions
+    // Left- and right-mapping single bases to Sides
     ////////////////////////////////////////////////////////////////////////////
     
     /**
-     * Return the position to which the given base in the given string uniquely
+     * Return the side to which the given base in the given string uniquely
      * maps, or None if it does not uniquely map. Maps by context on the
      * specified face.
      *
-     * If the position's face is `Face.LEFT`, then the base mapped corresponds
+     * Base is a 1-based index into the passed string.
+     *
+     * If the side's face is `Face.LEFT`, then the base mapped corresponds
      * to the base it was mapped to. If it is `Face.RIGHT`, it corresponds to
      * the reverse complement of the base it was mapped to.
-     *
-     * Uses 1-based indexing for position and for base index.
      */
-    def map(context: String, base: Int, face: Face): Option[Position] = {
+    def map(context: String, base: Int, face: Face): Option[Side] = {
         // Map a single base
         
         face match {
@@ -312,27 +357,27 @@ class FMDIndex(var basename: String) extends Serializable {
                     // Get the single actual mapped BWT position
                     val bwt = mapping.getPosition.getForward_start
                     
-                    // Convert to a Position (for the very first character in
+                    // Convert to a Side (for the very first character in
                     // the pattern)
-                    val position = bwtToPosition(bwt)
+                    val side = bwtToSide(bwt)
                     
                     // On the forward strand, we have to offset right by
-                    // (mapping.getCharacters - 1), since we've gotten the
-                    // position of the leftmost character in the pattern and we
-                    // really want that of this specific character.
-                    // Unfortunately, on the reverse strand, we have to offset
-                    // left by the same amount, since the pattern in that case
-                    // is running backwards in genome coordinates.
-                    val offset = position.face match {
+                    // (mapping.getCharacters - 1), since we've gotten the Side
+                    // of the leftmost character in the pattern and we really
+                    // want that of this specific character. Unfortunately, on
+                    // the reverse strand, we have to offset left by the same
+                    // amount, since the pattern in that case is running
+                    // backwards in genome coordinates.
+                    val offset = side.face match {
                         case Face.LEFT => mapping.getCharacters - 1
                         case Face.RIGHT => -(mapping.getCharacters - 1)
                     }
                     
-                    // Make a new Position, accounting for the offset from the
+                    // Make a new Side, accounting for the offset from the
                     // left end of the pattern due to pattern length, and report
                     // that.
-                    Some(new Position(position.contig, position.base + offset,
-                        position.face))
+                    Some(new Side(side.coordinate + offset,
+                        side.face))
                     
                 } else {
                     None
@@ -341,19 +386,19 @@ class FMDIndex(var basename: String) extends Serializable {
     }
     
     ////////////////////////////////////////////////////////////////////////////
-    // Left- and right-mapping entire strings to Positions per base.
+    // Left- and right-mapping entire strings to Sides per base.
     ////////////////////////////////////////////////////////////////////////////
     
     /**
-     * Map each position in the given string by context on the given face,
-     * returning a sequence of corresponding Positions, or None for bases that
+     * Map each Side in the given string by context on the given face,
+     * returning a sequence of corresponding Sides, or None for bases that
      * don't map.
      *
-     * If the position's face is `Face.LEFT`, then the base mapped corresponds
+     * If the Side's face is `Face.LEFT`, then the base mapped corresponds
      * to the base it was mapped to. If it is `Face.RIGHT`, it corresponds to
      * the reverse complement of the base it was mapped to.
      */
-    def map(context: String, face: Face): Seq[Option[Position]] = {
+    def map(context: String, face: Face): Seq[Option[Side]] = {
         // Map a whole string
         
         face match {
@@ -370,9 +415,9 @@ class FMDIndex(var basename: String) extends Serializable {
                 } yield {
                     if(mapping.getIs_mapped) {
                         // Turn the (text, index) pair for this mapping into a
-                        // Position. It's already been corrected for pattern
+                        // Side. It's already been corrected for pattern
                         // length.
-                        Some(pairToPosition(mapping.getLocation))
+                        Some(pairToSide(mapping.getLocation))
                     } else {
                         // This didn't map, so the corresponding entry should be
                         // None
@@ -387,7 +432,7 @@ class FMDIndex(var basename: String) extends Serializable {
     ////////////////////////////////////////////////////////////////////////////
 
     /**
-     * Map each position in the given string to a range starting with a 1 in the
+     * Map each side in the given string to a range starting with a 1 in the
      * given RangeVector, or to -1 if the FM-index search interval for the base
      * doesn't get contained in exactly 1 range. Uses the context on the given
      * face.
