@@ -81,26 +81,26 @@ protocol SequenceGraphStore {
     array<long> getTelomeres(string contig, Face end);   
     
     // Get all AlleleGroups for the Site covering the given Position.
-    array<AlleleGroup> getAlleleGroupsAt(Position position);
+    array<AlleleGroup> getAlleleGroupsAt(long position);
     
     // Get all non-reference AlleleGroups between the left position and the
     // right position.
     //
     // Note: this will attempt to return a lot of data on large intervals.
-    array<AlleleGroup> getVariantAlleleGroupsBetween(Position left,
-        Position right);
+    array<AlleleGroup> getVariantAlleleGroupsBetween(long left,
+        long right);
     
     // Get all inserted AlleleGroups between the left position and the right
     // position.
     //
     // Note: this will attempt to return a lot of data on large intervals.
-    array<AlleleGroup> getInsertionsBetween(Position left, Position right);
+    array<AlleleGroup> getInsertionsBetween(long left, long right);
     
     // Get all Adjacencies involved in deletions between the left position and
     // the right position.
     //
     // Note: this will attempt to return a lot of data on large intervals.
-    array<Adjacency> getDeletionsBetween(Position left, Position right);
+    array<Adjacency> getDeletionsBetween(long left, long right);
     
     // TODO: What other operations do we want to support?
 }

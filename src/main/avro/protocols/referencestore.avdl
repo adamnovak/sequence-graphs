@@ -36,10 +36,10 @@ protocol ReferenceStore {
     
     // Get the Site attached to the Side with the given ID. There will only ever
     // be one such Site.
-    Site getAttachedSite(long sideId) throws NotFoundError;
+    Block getAttachedSite(long sideId) throws NotFoundError;
     
     // Get all of the Breakpoints attached to a certain Side.
-    array<Breakpoint> getAttachedBreakpoints(long sideId) throws NotFoundError;
+    array<Adjacency> getAttachedBreakpoints(long sideId) throws NotFoundError;
     
     /////////////////////////////////
     // More advanced query functions
@@ -51,26 +51,26 @@ protocol ReferenceStore {
     
     // Get the Site (and its contained Alleles) covering the given Position, or
     // null if no Site exists there.
-    union { Site, null } getSiteAt(Position position);
+    union { Block, null } getSiteAt(long position);
     
     // Get all multi-Allele Sites (and the Alleles they hold) along the
     // reference haplotype's path between the given pair of positions.
     //
     // Note: this will attempt to return a lot of data on large intervals.
-    array<Site> getPolymorphicSitesBetween(Position left, Position right);
+    array<Block> getPolymorphicSitesBetween(long left, long right);
     
     // Get all inserted (reference allele == "") Sites overlapping the region
     // from the left position to the right position.
     //
     // Note: this will attempt to return a lot of data on large intervals.
-    array<Site> getInsertionsBetween(Position left, Position right);
+    array<Block> getInsertionsBetween(long left, long right);
     
     // Get all non-reference-haplotype Breakpoints that represent deletions
     // relative to the reference haplotype overlapping the region between the
     // left position and the right position.
     //
     // Note: this will attempt to return a lot of data on large intervals.
-    array<Breakpoint> getDeletionsBetween(Position left, Position right);
+    array<Adjacency> getDeletionsBetween(long left, long right);
     
     // TODO: What other operations do we want to support?
 }
