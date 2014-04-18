@@ -200,7 +200,7 @@ class FMDIndexTests extends RLCSASuite {
         assert(mappings.map {
             case Some(_) => 1
             case None => 0
-        }.sum == 8)
+        }.sum === 8)
         
         mappings.foreach {
             case Some(mapping) => {
@@ -223,7 +223,7 @@ class FMDIndexTests extends RLCSASuite {
         assert(mappings.map {
             case Some(_) => 1
             case None => 0
-        }.sum == 8)
+        }.sum === 8)
         
         mappings.foreach {
             case Some(mapping) => {

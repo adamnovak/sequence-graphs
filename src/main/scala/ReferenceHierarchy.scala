@@ -27,6 +27,12 @@ class ReferenceHierarchy(index: FMDIndex) {
         
     }
     
+    /**
+     * Map the given string on the given level.
+     */
+    def map(level: Int, context: String): Seq[Option[Side]] = {
+        levels(level).map(context)
+    }
     
     /**
      * Save this ReferenceHierarchy to the specified directory.
