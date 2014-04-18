@@ -537,7 +537,8 @@ int main(int argc, char** argv) {
     // <http://www.radmangames.com/programming/how-to-use-boost-program_options>
 
     std::string appDescription = 
-        "Create a reference hierarchy for mapping to FASTAs";
+        std::string("Create a reference hierarchy for mapping to FASTAs.\n") + 
+        "Usage: createIndex <index directory> <fasta> [<fasta> [<fasta> ...]]";
 
     // Make an options description for our program's options.
     boost::program_options::options_description description("Options");
@@ -545,6 +546,9 @@ int main(int argc, char** argv) {
     description.add_options() 
         ("help", "Print help messages") 
         ("dump", "Dump GraphViz graphs")
+        // These next two options should be ->required(), but that's not in the
+        // Boost version I can convince our cluster admins to install. From now
+        // on I shall work exclusively in Docker containers or something.
         ("indexDirectory", boost::program_options::value<std::string>(), 
             "Directory to make the index in; will be deleted and replaced!")
         ("fastas", boost::program_options::value<std::vector<std::string> >()
@@ -581,11 +585,18 @@ int main(int argc, char** argv) {
             // Don't do the actual program.
             return 0; 
         }
+        
+        if(!options.count("indexDirectory") || !options.count("fastas")) {
+            throw boost::program_options::error("Missing important arguments!");
+        }
             
     } catch(boost::program_options::error& error) {
         // Something is bad about our options. Complain on stderr
         std::cerr << "Option parsing error: " << error.what() << std::endl;
         std::cerr << std::endl; 
+        // Talk about our app.
+        std::cerr << appDescription << std::endl;
+        // Show all the actually available options.
         std::cerr << description << std::endl; 
         
         // Stop the program.
