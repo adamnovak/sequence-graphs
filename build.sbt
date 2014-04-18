@@ -18,7 +18,7 @@ seq( sbtavro.SbtAvro.avroSettings : _*)
 net.virtualvoid.sbt.graph.Plugin.graphSettings
 
 // Set up test stack traces
-testOptions in Test += Tests.Argument("-oF")
+//testOptions in Test += Tests.Argument("-oF")
 
 // This is a library, not an application, so no native packager setup is needed.
 

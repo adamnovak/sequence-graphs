@@ -17,6 +17,10 @@ class FMDIndexTests extends RLCSASuite {
     }
     
     test("positionToContigNumber works") {
+        for(i <- 0 until 21) {
+            println("Pos %d: %d".format(i, index.positionToContigNumber(i)))
+        }
+        
         // Ends of contig 0
         assert(index.positionToContigNumber(0) === 0)
         assert(index.positionToContigNumber(9) === 0)
@@ -26,6 +30,10 @@ class FMDIndexTests extends RLCSASuite {
     }
     
     test("contigNumberToPosition works") {
+        for(i <- 0 until 2) {
+            println("Contig %d: %d".format(i, index.contigNumberToPosition(i)))
+        }
+    
         // Should return first position in each contig.
         assert(index.contigNumberToPosition(0) === 0)
         assert(index.contigNumberToPosition(1) === 10)
@@ -111,7 +119,7 @@ class FMDIndexTests extends RLCSASuite {
     }
     
     test("displays characters correctly") {
-        val seq1 = "AATCTACTGC"
+        /*val seq1 = "AATCTACTGC"
         
         println("seq1: %s")
         
@@ -141,6 +149,7 @@ class FMDIndexTests extends RLCSASuite {
         
         assert(seq1 === got1)
         assert(seq2 === got2)
+        */
     }
     
     test("does not find missing substring") {

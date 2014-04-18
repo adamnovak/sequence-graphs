@@ -62,8 +62,8 @@ class FMDIndex(var basename: String) extends Serializable {
      
     // Keep a bit vector so we can put in a Position ID and get out the number
     // of the contig it belongs to. There is a 1 at the start of the range
-    // occupied by every contig, except the first. So the rank of an ID gives
-    // the contig it belongs to. Strand doesn't matter here.
+    // occupied by every contig. So the rank of an ID gives the contig it
+    // belongs to. Strand doesn't matter here.
     @transient
     lazy val contigRangeVector: RangeVector = {
         // Make a new encoder with this arbitrary block size.
@@ -75,12 +75,17 @@ class FMDIndex(var basename: String) extends Serializable {
         
         contigData.foreach { case (_, length) =>
             // For each contig
+            
+            // Put a 1 at the start of the contig
+            encoder.addBit(nextID)
+            
             // Push the next ID over by the length
             nextID += length
             
-            // Put a 1 at the start of the next contig
-            encoder.addBit(nextID)
         }
+        
+        // Make the encoder be ready.
+        encoder.flush()
         
         // Make the range vector
         new RangeVector(encoder, nextID + 1)
@@ -138,8 +143,9 @@ class FMDIndex(var basename: String) extends Serializable {
      * the total single-strand length of all contigs).
      */
     def positionToContigNumber(position: Long): Int = {
-        // Just look up the rank of that position
-        contigIdentifier.rank(position).asInstanceOf[Int]
+        // Just look up the rank of that position, and subtract for the 1 at the
+        // start of the first contig.
+        (contigIdentifier.rank(position) - 1).asInstanceOf[Int]
     }
     
     /**
@@ -333,6 +339,8 @@ class FMDIndex(var basename: String) extends Serializable {
         
         // Make a single-item range.
         val rangeToGrab = new pair_type(offset, offset)
+        
+        println("About to display text %d offset %d".format(text, offset))
         
         // Grab the single-character array. This is really an array of shorts,
         // since Java bytes are signed and these are "unsigned chars", so a
