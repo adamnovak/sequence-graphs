@@ -200,7 +200,7 @@ class FMDIndexTests extends RLCSASuite {
                 // Everything mapped should be mapped on the left
                 assert(mapping.face === Face.LEFT)
                 // And on this contig
-                assert(index.positionToContigNumber(mapping.position) === 0))
+                assert(index.positionToContigNumber(mapping.coordinate) === 0)
             }
             case None => {}
         }
@@ -223,7 +223,7 @@ class FMDIndexTests extends RLCSASuite {
                 // Everything mapped should be mapped on the left
                 assert(mapping.face == Face.RIGHT)
                 // And on this contig
-                assert(index.positionToContigNumber(mapping.position) === 0))
+                assert(index.positionToContigNumber(mapping.coordinate) === 0)
             }
             case None => {}
         }
@@ -246,7 +246,7 @@ class FMDIndexTests extends RLCSASuite {
                 // Everything mapped should be mapped on the right
                 assert(mapping.face == Face.RIGHT)
                 // And on this contig
-                assert(index.positionToContigNumber(mapping.position) === 0))
+                assert(index.positionToContigNumber(mapping.coordinate) === 0)
             }
             case None => {}
         }

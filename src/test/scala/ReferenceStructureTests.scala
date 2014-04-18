@@ -80,7 +80,8 @@ class ReferenceStructureTests extends RLCSASuite {
                 // left-mapping semantics for its output.
                 assert(mapping.face === Face.LEFT)
                 // And on this contig
-                assert(mapping.contig === "seq1")
+                assert(stringReference.getIndex.positionToContigNumber(
+                    mapping.coordinate) === 0)
             }
             case None => {}
         }
@@ -90,7 +91,7 @@ class ReferenceStructureTests extends RLCSASuite {
     test("maps all bases in reverse complement") {
     
         val pattern = "GCTAGTAGCTT"
-        val mappings: Seq[Option[Position]] = stringReference.map(pattern)
+        val mappings: Seq[Option[Side]] = stringReference.map(pattern)
         
         // The first 8 characters ought to map.
         assert(mappings.map {
@@ -105,7 +106,8 @@ class ReferenceStructureTests extends RLCSASuite {
                 // to a reverse strand.
                 assert(mapping.face === Face.RIGHT)
                 // And on this contig
-                assert(mapping.contig === "seq2")
+                assert(stringReference.getIndex.positionToContigNumber(
+                    mapping.coordinate) === 1)
             }
             case None => {}
         }
@@ -121,8 +123,7 @@ class ReferenceStructureTests extends RLCSASuite {
     }
     
     test("CollapsedReferenceStructure can be created on top") {
-        collapsedReference = new CollapsedReferenceStructure(stringReference,
-            "merged")
+        collapsedReference = new CollapsedReferenceStructure(stringReference)
     }
     
     test("CollapsedReferenceStructure can have positions merged") {
@@ -146,39 +147,13 @@ class ReferenceStructureTests extends RLCSASuite {
         collapsedReference.merge("seq1", 10, "seq2", 11)
     }
     
-    test("CollapsedReferenceStructure maps to merged positions") {
-        val mappings = collapsedReference.map("AATCTACTGC")
-        
-        println(mappings.mkString("\n"))
-        
-        mappings.foreach {
-            case Some(position) => assert(position.contig === "merged")
-            case None => Unit
-        }
-    }
-    
     test("CollapsedReferenceStructure maps previously ambiguous things") {
         // This would be ambiguous if it weren't for the merging.
         val mappings = collapsedReference.map("AA")
         
         println(mappings.mkString("\n"))
         
-        val position = mappings(0).get
-        
-        assert(position.contig === "merged")
-        assert(position.base === 1)
-        assert(position.face === Face.LEFT)
+        assert(mappings(0) != None)
     }
-    
-    test("CollapsedReferenceStructure maps to passed positions") {
-        // Seq1 has the T, so it gets base number 3.
-        val position = collapsedReference.map("AATCT")(2).get
-        
-        assert(position.contig === "merged")
-        assert(position.base === 3)
-        assert(position.face === Face.LEFT)
-    }
-    
-    
     
 }

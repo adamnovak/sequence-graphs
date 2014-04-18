@@ -71,13 +71,3 @@ case class BlockEdge(owner: Block) extends HasEdge {
         new BlockEdge(Block.newBuilder(owner).build)
     }
 }
-
-/**
- * A class to say that Breakpoints are edges.
- */
-case class BreakpointEdge(owner: Breakpoint) extends HasEdge {
-    def edge = owner.edge
-    override def clone = {
-        new BreakpointEdge(Breakpoint.newBuilder(owner).build)
-    }
-}

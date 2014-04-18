@@ -9,15 +9,14 @@ import org.apache.spark.serializer.KryoRegistrator
  */
 class SequenceGraphKryoRegistrator extends KryoRegistrator {
   override def registerClasses(kryo: Kryo) {
-    // Register all the Sequence Graph parts
+    // Register all the Sequence Graph parts, and other Avro things we need to
+    // ship around.
     kryo.register(classOf[Adjacency], new AvroSerializer[Adjacency]())
     kryo.register(classOf[Anchor], new AvroSerializer[Anchor]())
     kryo.register(classOf[AlleleGroup], new AvroSerializer[AlleleGroup]())
     kryo.register(classOf[Side], new AvroSerializer[Side]())
-    kryo.register(classOf[Position], new AvroSerializer[Position]())
     kryo.register(classOf[Edge], new AvroSerializer[Edge]())
-    kryo.register(classOf[Site], new AvroSerializer[Site]())
-    kryo.register(classOf[Breakpoint], new AvroSerializer[Breakpoint]())
+    kryo.register(classOf[Block], new AvroSerializer[Block]())
     kryo.register(classOf[Generalization], new AvroSerializer[Generalization]())
   }
 }

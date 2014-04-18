@@ -104,14 +104,6 @@ object MapToIndex {
         
         println("Hierarchy loaded! Mapping...")
         
-        for((level, levelIndex) <- hierarchy.levels.zipWithIndex) {
-            // Map to each level.
-            val mappings: Seq[Option[Position]] = level.map(pattern)
-            
-            // Print the mappings
-            println("Level %d:".format(levelIndex))
-            println(mappings.mkString("\n"))
-        }
     }
 }
 

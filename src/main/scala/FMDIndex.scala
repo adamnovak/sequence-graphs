@@ -65,7 +65,7 @@ class FMDIndex(var basename: String) extends Serializable {
     // occupied by every contig, except the first. So the rank of an ID gives
     // the contig it belongs to. Strand doesn't matter here.
     @transient
-    lazy val contigIdentifier: RangeVectorIterator = {
+    lazy val contigRangeVector: RangeVector = {
         // Make a new encoder with this arbitrary block size.
         val encoder = new RangeEncoder(32)
         
@@ -82,9 +82,15 @@ class FMDIndex(var basename: String) extends Serializable {
             encoder.addBit(nextID)
         }
         
-        // Make an iterator we can use to look up contig numbers for the blocks
-        // IDs are in.
-        new RangeVectorIterator(encoder, nextID + 1)
+        // Make the range vector
+        new RangeVector(encoder, nextID + 1)
+    }
+    
+    // Keep a persistent iterator for actual lookups. We keep the vector too
+    // because it might manage to get GC'd if we don't, probably.
+    @transient
+    lazy val contigIdentifier: RangeVectorIterator = {
+        new RangeVectorIterator(contigRangeVector)
     }
     
     ////////////////////////////////////////////////////////////////////////////
@@ -105,6 +111,25 @@ class FMDIndex(var basename: String) extends Serializable {
     def contigLength(contig: String): Long = {
         // We store (index, length) tuples by name.
         contigInverse(contig)._2
+    }
+    
+    /**
+     * Return the total length of all contigs.
+     */
+    def totalLength: Long = {
+        // Sum up all the lengths
+        contigData.map(_._2).sum
+    }
+    
+    /**
+     * Turn a 1-based contig name and base into a position ID.
+     */
+    def contigNameBaseToPosition(contig: String, base: Long): Long = {
+        // What contig number is this?
+        val contigNumber = contigInverse(contig)._1
+        
+        // What position ID beloings this far 1-based into it?
+        contigNumberToPosition(contigNumber) + base - 1
     }
     
     /**
