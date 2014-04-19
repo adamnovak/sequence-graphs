@@ -47,6 +47,8 @@ class ReferenceHierarchyTests extends HierarchySuite {
         val pattern = "AATCTACTGC"
         val mappings: Seq[Option[Side]] = hierarchy.map(1, pattern)
         
+        mappings.foreach(println _)
+        
         // All characters ought to map.
         assert(mappings.map {
             case Some(_) => 1
