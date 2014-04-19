@@ -1,6 +1,6 @@
 package edu.ucsc.genome
 import scala.collection.immutable.HashMap
-import fi.helsinki.cs.rlcsa.{FMDUtil, RangeVector}
+import fi.helsinki.cs.rlcsa.{FMDUtil, RangeVector, RangeVectorIterator}
 import org.apache.avro.specific.{SpecificDatumReader, SpecificRecord}
 import org.apache.avro.file.DataFileReader
 import scala.collection.JavaConversions._
@@ -166,8 +166,6 @@ class MergedReferenceStructure(index: FMDIndex, directory: String)
         fileReader.iterator.toArray
     }
         
-    
-    
     // We map using the range-based mapping mode on the index.
     def map(pattern: String, face: Face): Seq[Option[Side]] = {
         // Map to defined ranges in the range vector
@@ -192,11 +190,41 @@ class MergedReferenceStructure(index: FMDIndex, directory: String)
     
     def getIndex: FMDIndex = index
     
+    /**
+     * Dump the whole BitVector.
+     */
+    def bits: Seq[Boolean] = {
+        val iterator = new RangeVectorIterator(rangeVector)
+        // Look up the index and get the bit for every BWT position.
+        for(i <- 0L until index.bwtRange._2) yield {
+            iterator.isSet(i)
+        }
+    }
+    
+    /**
+     * Get all the ranges in order, with their Sides.
+     */
+    def getRanges: Seq[((Long, Long), Side)] = {
+        // Get an iterator
+        val iterator = new RangeVectorIterator(rangeVector)
+    
+        for((side, i) <- sideArray.zipWithIndex)  yield {
+            ((iterator.select(i), iterator.select(i + 1) - 1), side)
+        }
+    }
+    
     def getRanges(side: Side): Seq[(Long, Long)] = {
-        // Ranges for sides are just the BWT indices corresponding to them.
-        val bwtSide = index.sideToBWT(side)
         
-        Seq((bwtSide, bwtSide))
+        // Get an iterator
+        val iterator = new RangeVectorIterator(rangeVector)
+        
+        for(
+            (candidate, index) <- sideArray.zipWithIndex;
+            if side == candidate
+        ) yield {
+            // This index is one of the ranges we want. Get its bounds.
+            (iterator.select(index), iterator.select(index + 1) - 1)
+        }
     }
 }
 

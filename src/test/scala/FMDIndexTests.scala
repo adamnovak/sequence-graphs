@@ -369,4 +369,38 @@ class FMDIndexTests extends RLCSASuite {
         assert(mappings.distinct.size === 9)
     }
     
+    test("left-maps somewhat sanely to multiple-item ranges") {
+        import fi.helsinki.cs.rlcsa.{RangeEncoder, RangeVector}
+        
+        // BWT space is ((# of contigs) + (totoal contig length)) * 2 in size.
+        // We know that RLCSASuite has 2 sequences, one of 10 bases and one of
+        // 11.
+        val bwtSize = (2 + (10 + 11)) * 2
+        
+        // Make a RangeVector. Use a block size of 32.
+        val rangeEncoder = new RangeEncoder(32)
+        // Set it to 1 at some point.
+        rangeEncoder.addBit(10)
+        rangeEncoder.flush()
+        
+        // Make a RangeVector from it
+        val rangeVector = new RangeVector(rangeEncoder, bwtSize)
+        
+        // Now try mapping with the range vector
+        val pattern = "AATCTACTGC"
+        val mappings: Seq[Long] = index.map(rangeVector, pattern, Face.LEFT)
+        
+        mappings.foreach(println _)
+        
+        // All characters probably ought to map
+        assert(mappings.map {
+            case -1 => 0
+            case _ => 1
+        }.sum === 10)
+        
+        // There should be 2 distint values: range before the 1 and range after
+        assert(mappings.distinct.size === 2)
+        
+    }
+    
 }

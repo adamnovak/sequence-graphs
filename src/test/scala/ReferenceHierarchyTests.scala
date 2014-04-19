@@ -27,6 +27,21 @@ class ReferenceHierarchyTests extends HierarchySuite {
         }.sum === 10)
     }
     
+    test("maps merged bases to the same places") {
+        // Have our two sequences.
+        val seq1 = "AATCTACTGC"
+        val seq2 = "AAGCTACTAGC"
+        
+        // The "C" at the start of "CTAC" ought to map to the same place in
+        // both.
+        val mapping1 = hierarchy.map(1, seq1)(3)
+        val mapping2 = hierarchy.map(1, seq2)(3)
+        
+        assert(mapping1 != None)
+        assert(mapping1 === mapping2)
+        
+    }
+    
     test("can map on level 1") {
         // This is just seq1
         val pattern = "AATCTACTGC"

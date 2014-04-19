@@ -127,6 +127,14 @@ class FMDIndex(var basename: String) extends Serializable {
     }
     
     /**
+     * Return the bounds of non-start characters in the first column of the BWT.
+     * Second value is 1-past-the-end.
+     */
+    def bwtRange: (Long, Long) = {
+        (fmd.getBWTRange.getFirst, fmd.getBWTRange.getSecond + 1)
+    }
+    
+    /**
      * Turn a 1-based contig name and base into a position ID.
      */
     def contigNameBaseToPosition(contig: String, base: Long): Long = {
@@ -341,8 +349,6 @@ class FMDIndex(var basename: String) extends Serializable {
         // Make a single-item range.
         val rangeToGrab = new pair_type(offset, offset)
         
-        println("About to display text %d offset %d".format(text, offset))
-        
         // Grab the single-character array. This is really an array of shorts,
         // since Java bytes are signed and these are "unsigned chars", so a
         // short is needed to store the numerically-correct value.
@@ -356,6 +362,118 @@ class FMDIndex(var basename: String) extends Serializable {
         // TODO: Free the array?
     }
     
+    /**
+     * Dump the whole BWT first column.
+     */
+    def firstColumn: Seq[Char] = {
+        for(i <- 0L until bwtRange._2) yield {
+            // Go through all of BWT space
+            if(i < contigs.size * 2) {
+                // Not yet up to the actual letters.
+                '$'
+            } else {
+                display(bwtToSide(i))
+            }
+        }
+    }
+    
+    /**
+     * Dump the whole BWT last column.
+     */
+    def lastColumn: Seq[Char] = {
+        for(i <- 0L until bwtRange._2) yield {
+            if(i < contigs.size * 2) {
+                // Before the end of text character is the last letter of each
+                // text. The end of text characters are held to come in text
+                // order, so these are just in text order.
+                display(pairToSide(i.asInstanceOf[Int], 
+                    contigData(i.asInstanceOf[Int]/2)._2 - 1))
+            } else {
+                // Work out the Side.
+                val firstSide = bwtToSide(i)
+                
+                if(firstSide.coordinate > 0) {
+                    // Find the Side right before it
+                    val prevSide = new Side(firstSide.coordinate - 1,
+                        firstSide.face)
+                    // Display that.
+                    display(prevSide)
+                } else {
+                    // This is the first letter, so before it is the end of text
+                    // character.
+                    '$'
+                }
+                
+                
+            }
+        }
+    }
+    
+    /**
+     * Get the suffixes from all BWT positions in order.
+     */
+    def suffixes: Seq[String] = {
+         for(i <- 0L until bwtRange._2) yield {
+            if(i < contigs.size * 2) {
+                // No Sides here.
+                ""
+            } else {
+                // Work out the Side and report its prefix.
+                suffix(bwtToSide(i))
+            }
+        }
+    }
+    
+    /**
+     * Get the whole suffix starting at the given Side.
+     */
+    def suffix(side: Side): String = {
+        // Find the text and offset for this side.
+        val (text, offset) = sideToPair(side)
+        
+        val chars = for(i <- offset until contigData(text / 2)._2)  yield {
+            // For everything after here...
+            
+            // Accumulate all the characters
+            display(pairToSide(text, i))
+        }
+        
+        // Stick all the characters together.
+        chars.mkString
+    }
+    
+    /**
+     * Get all of a sies's text that isn't in the suffix for a given side.
+     */
+    def prefix(side: Side): String = {
+        // Find the text and offset for this side.
+        val (text, offset) = sideToPair(side)
+        
+        val chars = for(i <- 0L until offset)  yield {
+            // For everything after here...
+            
+            // Accumulate all the characters
+            display(pairToSide(text, i.asInstanceOf[Int]))
+        }
+        
+        // Stick all the characters together.
+        chars.mkString
+    }
+    
+    /**
+     * Extract the whole BWT table.
+     */
+    def bwtTable: Seq[String] = {
+        for(i <- 0L until bwtRange._2) yield {
+            if(i < contigs.size * 2) {
+                // No Sides here. Just start with $ and the whole string.
+                "$" + suffix(pairToSide(i.asInstanceOf[Int], 0))
+            } else {
+                // Work out the Side and report its suffix, $, and prefix.
+                suffix(bwtToSide(i)) + "$" + prefix(bwtToSide(i))
+            }
+        }
+    }
     
     ////////////////////////////////////////////////////////////////////////////
     // Left- and right-mapping single bases to Sides
@@ -471,7 +589,8 @@ class FMDIndex(var basename: String) extends Serializable {
      * face.
      *
      * The RangeVector specifies bi-ranges, where each range has a corresponding
-     * reverse-complement range present. A range describes a right context.
+     * reverse-complement range present. A range describes a right context, or a
+     * subtree of the suffix tree.
      */
     def map(ranges: RangeVector, context: String, face: Face): Seq[Long] = {
         face match {
