@@ -133,9 +133,9 @@ stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
         std::cout << pattern << " at " << range << std::endl;
         
         // Check by counting again
-        CSA::pair_type count = index.fmd.count(pattern);
-        std::cout << "Count: (" << count.first << "," << count.second << ")" <<
-            std::endl;
+        //CSA::pair_type count = index.fmd.count(pattern);
+        //std::cout << "Count: (" << count.first << "," << count.second << ")" <<
+        //    std::endl;
         
         if(range.end_offset >= 1 || dumpFile != NULL) {
             // We only need to do any pinching if this context appears in two or
@@ -274,7 +274,7 @@ stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
         }
         
         // Now GC the boundaries in the pinch set
-        std::cout << "Joining trivial boundaries..." << std::endl;
+        //std::cout << "Joining trivial boundaries..." << std::endl;
         stPinchThreadSet_joinTrivialBoundaries(threadSet);
     }
     
@@ -310,6 +310,9 @@ std::pair<CSA::RLEVector*, std::vector<Side> > makeLevelIndex(
     std::map<std::pair<size_t, CSA::usint>, long long int>
         idReservations;
     
+    // We need this out here so we know where the last range ends.
+    CSA::pair_type bwtRange;
+    
     // Now go through all the contexts again.
     for(CSA::FMD::iterator i = index.fmd.begin(contextLength); 
         i != index.fmd.end(contextLength); ++i) {
@@ -320,34 +323,39 @@ std::pair<CSA::RLEVector*, std::vector<Side> > makeLevelIndex(
         std::string pattern = (*i).first;
         CSA::FMDPosition range = (*i).second;
         
-        // Dump the context and range.
-        std::cout << "Reprocessing " << pattern << " at " << range << std::endl;
-        
         if(range.end_offset == -1) {
             // Not even a single thing with this context. Skip to the next one.
             continue;
         }
         
-        // Grab just the one-strand range, and construct the actual
-        // endpoint. Use the reverse strand so that we handle things in
-        // increasing coordinate order.
-        CSA::pair_type oneStrandRange = std::make_pair(range.reverse_start, 
-            range.reverse_start + range.end_offset);
+        // Grab just the one-strand range, and construct the actual endpoint.
+        // Use the forward strand so that we handle things in increasing
+        // coordinate order. This is in SA coordinates. We'll cover the other
+        // range when we run the RC context.
+        CSA::pair_type oneStrandRange = std::make_pair(range.forward_start, 
+            range.forward_start + range.end_offset);
             
-        // Work out what text and base the first base is.
+        // Convert that range to a BWT range.
+        bwtRange = oneStrandRange;
+        index.fmd.convertToBWTRange(bwtRange);
+            
+        // Dump the context and range.
+        std::cout << "Reprocessing " << pattern << " at range " << range << 
+            " BWT " << bwtRange.first << "-" << bwtRange.second << std::endl;
+            
+        // Work out what text and base the first base with this context is. All
+        // bases with this context should be pinched into it.
         CSA::pair_type base = index.fmd.getRelativePosition(index.fmd.locate(
             oneStrandRange.first));
         
-        std::cout << "First relative position: text " << base.first << 
-                " offset " << base.second << std::endl;
-        
         // What contig corresponds to that text?
         CSA::usint contigNumber = index.getContigNumber(base);
-        // And what strand corresponds to that text?
-        CSA::usint strand = index.getStrand(base);
+        // And what strand corresponds to that text? This tells us what
+        // orientation we're actually looking at the base in.
+        bool strand = (bool) index.getStrand(base);
         // And what base position is that from the front of the contig?
         CSA::usint offset = index.getOffset(base);
-     
+        
         // Now we need to look up what the pinch set says is the canonical
         // position for this base, and what orientation it should be in. All the
         // bases in this range have the same context and should thus all be
@@ -361,7 +369,7 @@ std::pair<CSA::RLEVector*, std::vector<Side> > makeLevelIndex(
             throw std::runtime_error("Found position in null segment!");
         }
             
-        // How is it oriented?
+        // How is it oriented in its block?
         bool segmentOrientation = stPinchSegment_getBlockOrientation(segment);
         // How far into the segment are we?
         CSA::usint segmentOffset = offset - stPinchSegment_getStart(segment);
@@ -373,8 +381,11 @@ std::pair<CSA::RLEVector*, std::vector<Side> > makeLevelIndex(
         // Get the block that that segment is in
         stPinchBlock* block = stPinchSegment_getBlock(segment);
         if(block != NULL) {
+            std::cout << "In block" << std::endl;
             // Put the first segment in the block as the canonical segment.
             firstSegment = stPinchBlock_getFirst(block);
+        } else {
+            std::cout << "Not in block" << std::endl;
         }
         
         // Work out what the official contig number for this block is (the name
@@ -398,6 +409,10 @@ std::pair<CSA::RLEVector*, std::vector<Side> > makeLevelIndex(
         CSA::usint canonicalOffset = canonicalSegmentOffset + 
             stPinchSegment_getStart(firstSegment);
         
+        
+        std::cout << "Orientation: " << segmentOrientation << " vs. " << 
+            canonicalOrientation << " vs. " << strand << std::endl;
+        
         // So what's the contig-and-offset pair?
         std::pair<size_t, CSA::usint> contigAndOffset = std::make_pair(
             canonicalContig, canonicalOffset); 
@@ -420,7 +435,7 @@ std::pair<CSA::RLEVector*, std::vector<Side> > makeLevelIndex(
         }
         
         if(dumpFile != NULL) {
-            // Locate every base in oneStrandRange
+            // Locate every base in oneStrandRange, the SA range
             CSA::usint* locations = index.fmd.locate(oneStrandRange);
             
             std::cout << "Located bases (" << oneStrandRange.first << "," <<
@@ -450,20 +465,25 @@ std::pair<CSA::RLEVector*, std::vector<Side> > makeLevelIndex(
             
         }
         
-        
-        // Record a 1 in the vector at the end of this range, in BWT
-        // coordinates.
-        encoder.addBit(range.reverse_start + range.end_offset + 
-            index.fmd.getNumberOfSequences());
-          
         // Say this range is going to belong to the ID we just looked up, on the
         // appropriate face.
         Side mapping;
         mapping.coordinate = positionID;
-        mapping.face = canonicalOrientation ? LEFT : RIGHT;
+        // What face? Well, we have the canonical position's orientation within
+        // the block, our position's orientation within the block, and the
+        // orientation that this context attaches to the position in. Flipping
+        // any of those will flip the orientation in which we need to map, so we
+        // need to xor them all together, which for bools is done with !=.
+        mapping.face = (canonicalOrientation != segmentOrientation != strand) ?
+            LEFT : RIGHT;
             
         // Add a string describing the mapping
         mappings.push_back(mapping);
+        
+        // Record a 1 in the vector at the start of this range, in BWT
+        // coordinates.
+        encoder.addBit(bwtRange.first);
+        std::cout << "Set bit " << bwtRange.first << std::endl;
         
         // Every range belongs to some ID. TODO: test this. Especially with Ns.
         
@@ -471,9 +491,17 @@ std::pair<CSA::RLEVector*, std::vector<Side> > makeLevelIndex(
             mapping.face << std::endl;
     }
     
+    // Set a bit after the end of the last range.
+    encoder.addBit(bwtRange.second + 1);
+    
+    
     // Finish the vector encoder into a vector of the right length.
+    // This should always end in a 1! Make sure to flush first.
+    encoder.flush();
     CSA::RLEVector* bitVector = new CSA::RLEVector(encoder,
-        index.fmd.getBWTRange().second);
+        index.fmd.getBWTRange().second + 1);
+    
+    std::cout << "Total expected 1s: " << mappings.size() + 1 << std::endl;
     
     // Return the bit vector and the Side vector
     return make_pair(bitVector, mappings);
