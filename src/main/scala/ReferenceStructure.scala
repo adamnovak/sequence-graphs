@@ -168,21 +168,8 @@ class MergedReferenceStructure(index: FMDIndex, directory: String)
         
     // We map using the range-based mapping mode on the index.
     def map(pattern: String, face: Face): Seq[Option[Side]] = {
-        println("Mapping %s on face %s".format(pattern, face))
-        
-        // Print out all the BWT entries each Side gets.
-        val bwt = index.bwtTable
-        println(getRanges.map {
-            case ((first, last), side) => (side, (first until last + 1).map {
-                (bwtIndex: Long) => bwt(bwtIndex.toInt)
-            })
-        }.mkString("\n"))
-        
         // Map to range numbers, or -1 for no mapping.
         val rangeNumbers = getIndex.map(rangeVector, pattern, face)
-        
-        println("Original:")
-        println(rangeNumbers)
         
         // Convert to Sides and return.
         rangeNumbers.map {
@@ -222,11 +209,19 @@ class MergedReferenceStructure(index: FMDIndex, directory: String)
      * Get all the ranges in order, with their Sides.
      */
     def getRanges: Seq[((Long, Long), Side)] = {
-        // Get an iterator
+        // Get an iterator for looking in the range vector.
         val iterator = new RangeVectorIterator(rangeVector)
     
         for((side, i) <- sideArray.zipWithIndex)  yield {
-            ((iterator.select(i), iterator.select(i + 1) - 1), side)
+            if(i == 0) {
+                // We don't have a 1 at the very start of the very first range.
+                // Decide where it is based on the number of start caharcters.
+                ((index.bwtRange._1, iterator.select(i) - 1), side)
+            } else {
+                // The range for this side runs from one number i to before one
+                // number i+1, but select takes things 0-based.
+                ((iterator.select(i-1), iterator.select(i) - 1), side)
+            }
         }
     }
     
@@ -236,11 +231,20 @@ class MergedReferenceStructure(index: FMDIndex, directory: String)
         val iterator = new RangeVectorIterator(rangeVector)
         
         for(
-            (candidate, index) <- sideArray.zipWithIndex;
+            (candidate, i) <- sideArray.zipWithIndex;
             if side == candidate
         ) yield {
-            // This index is one of the ranges we want. Get its bounds.
-            (iterator.select(index), iterator.select(index + 1) - 1)
+            // Get the bounds of every range belonging to this Side. TODO: unify
+            // with the other getRanges case.
+            if(i == 0) {
+                // We don't have a 1 at the very start of the very first range.
+                // Decide where it is based on the number of start caharcters.
+                (index.bwtRange._1, iterator.select(i) - 1)
+            } else {
+                // The range for this side runs from one number i to before one
+                // number i+1, but select takes things 0-based.
+                (iterator.select(i-1), iterator.select(i) - 1)
+            }
         }
     }
 }

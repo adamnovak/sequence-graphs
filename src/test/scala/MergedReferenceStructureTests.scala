@@ -16,19 +16,19 @@ class MergedReferenceStructureTests extends HierarchySuite {
     }
     
     test("has sane ranges") {
-        // Dump all the bits and the BWT rows they go with.
-        (reference.getIndex.bwtTable zip reference.bits).zipWithIndex.map(println _)
+        // Get all the BWT rows.
+        val bwt = reference.getIndex.bwtTable
+        // Organize into tuples of a Side and all its BWT rows.
+        val sideContexts = reference.getRanges.map {
+            case ((first, last), side) => 
+            (side, (first until last + 1).map {
+                (bwtIndex: Long) => bwt(bwtIndex.toInt)
+            })
+        }
         
-        // Dump all the letters
-        (reference.getIndex.firstColumn zip reference.getIndex.lastColumn zip reference.getIndex.suffixes).zipWithIndex.map(println _)
-        
-        // Dump all the ranges in order
-        reference.getRanges.map(println _)
-        
-        // And collected by Side
-        reference.sideArray.distinct.map { side =>
-            println("%s: %s".format(side, reference.getRanges(side)
-                .mkString(", ")))
+        sideContexts.foreach { case (side, contexts) =>
+            // Make sure they all start with the same letter.
+            assert(contexts.map(_(0)).distinct.size === 1)
         }
     }
     

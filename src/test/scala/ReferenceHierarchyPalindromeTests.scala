@@ -33,8 +33,6 @@ class ReferenceHierarchyPalindromeTests extends HierarchySuite {
         val pattern = sequences(0)
         val mappings: Seq[Option[Side]] = hierarchy.map(1, pattern)
         
-        mappings.foreach(println _)
-        
         // All characters ought to map.
         assert(mappings.map {
             case Some(_) => 1
@@ -47,9 +45,6 @@ class ReferenceHierarchyPalindromeTests extends HierarchySuite {
         val mappings: Seq[Option[Side]] = hierarchy.map(1, pattern, Face.LEFT)
         
         val mappings2: Seq[Option[Side]] = hierarchy.map(1, pattern, Face.RIGHT)
-        
-        println(mappings.mkString("\n"))
-        println(mappings2.mkString("\n"))
         
         assert(mappings === mappings2.reverse)
         

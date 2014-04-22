@@ -18,8 +18,6 @@ class ReferenceStructureTests extends RLCSASuite {
     
     test("maps all bases in contig") {
     
-        println("====Starting Problematic Test====")
-    
         val pattern = "AATCTACTGC"
         
         val leftMappings = stringReference.getIndex.map(pattern, Face.LEFT)
@@ -37,41 +35,6 @@ class ReferenceStructureTests extends RLCSASuite {
             case Some(_) => 1
             case None => 0
         }.sum
-        
-        if(mapped != 10) {
-            // Here is where we have problems.
-            println("!!! Problem detected")
-            
-            // Wait for the user to acknowledge this
-            System.in.read
-            
-            println("!!! Problem detected")
-            
-            println("Incorrect mappings:")
-            println(mappings.mkString("\n"))
-            
-            println("Left was:")
-            println(leftMappings.mkString("\n"))
-            
-            println("Right was:")
-            println(rightMappings.mkString("\n"))
-            
-            // Try again
-            val mappings2 = stringReference.map(pattern)
-            
-            val mapped2 = mappings2.map {
-                case Some(_) => 1
-                case None => 0
-            }.sum
-            
-            println("On second attempt: %d/10 map:".format(mapped2))
-            
-            println(mappings2.mkString("\n"))
-            
-            // Wait for the user to acknowledge this
-            System.in.read
-        }
-        
         assert(mapped === 10)
         
         mappings.foreach {
@@ -150,8 +113,6 @@ class ReferenceStructureTests extends RLCSASuite {
     test("CollapsedReferenceStructure maps previously ambiguous things") {
         // This would be ambiguous if it weren't for the merging.
         val mappings = collapsedReference.map("AA")
-        
-        println(mappings.mkString("\n"))
         
         assert(mappings(0) != None)
     }
