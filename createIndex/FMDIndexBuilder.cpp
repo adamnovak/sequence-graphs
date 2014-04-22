@@ -97,7 +97,9 @@ void FMDIndexBuilder::add(const std::string& filename) {
     kseq_destroy(seq); // Close down the parser.
     
     // Close up streams
+    haplotypeStream.flush();
     haplotypeStream.close();
+    contigStream.flush();
     contigStream.close();
 
     // Index the haplotypes file with build_rlcsa. Use some hardcoded number
@@ -108,11 +110,10 @@ void FMDIndexBuilder::add(const std::string& filename) {
         
         // What file does it need to index?
         const char* toIndex = haplotypeFilename.c_str();
-        
         errno = 0;
         // Make sure to fill in its argv[0], and end with a NULL.
         if(execlp("build_rlcsa", "build_rlcsa", toIndex, "10", NULL) == -1) {
-            report_error("Failed to build_rlcsa");
+            report_error("Failed to exec build_rlcsa");
         }
     } else {
         // Wait for the child to finish.
@@ -120,7 +121,12 @@ void FMDIndexBuilder::add(const std::string& filename) {
         int status = 0;
         waitpid(pid, &status, 0);
         if(status != 0) {
-            report_error("The indexing child process failed");
+            // Complain about the error
+            std::cout << "The indexing child process failed with code " << 
+                status << std::endl << std::endl;
+            std::cout << "Arguments were: " << "build_rlcsa" << " " <<
+                haplotypeFilename << " " << "10" << std::endl;
+            throw std::runtime_error("The indexing child process failed.");
         }
     }
     

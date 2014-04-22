@@ -49,7 +49,14 @@ abstract class HierarchySuite extends FunSuite with BeforeAndAfterAll {
         }
         
         // Invoke the createIndex tool on all the FASTAs.
-        (Seq("./createIndex.sh", indexName) ++ files)!
+        val returnCode = (Seq("./createIndex.sh", indexName) ++ files)!
+
+        if(returnCode != 0) {
+            // Don't continue on with the test if we can't construct the
+            // fixture.
+            throw new Exception("Invoking createIndex produced return code %d"
+                .format(createIndex))
+        }
         
     }
     

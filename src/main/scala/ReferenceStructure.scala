@@ -137,6 +137,14 @@ class MergedReferenceStructure(index: FMDIndex, directory: String)
     
     // Load the range vector
     val rangeVector = {
+        // We're about to use an API that doesn't really have error checking. So
+        // first we make sure we can actually see this file.
+        // TODO: check access rights and so forth.
+        if(!(new File(directory + "/vector.bin").exists)) {
+            throw new Exception("vector.bin file not found in %s"
+                .format(directory))
+        }
+    
         // First open a C FILE* with the minimal API that FMDUtil in RLCSA comes
         // with.
         val file = FMDUtil.fopen(directory + "/vector.bin", "r")
