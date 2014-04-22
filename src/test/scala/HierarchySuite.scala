@@ -31,9 +31,9 @@ abstract class HierarchySuite extends FunSuite with BeforeAndAfterAll {
         // Write a FASTA
         val fastaWriter = new FileWriter(fasta)
         
-        // Write a sequence (Benedict's example)
-        fastaWriter.write(">seq1\n")
-        fastaWriter.write("AATCTACTGC\n")
+        // Write a sequence (easy palindrome)
+        fastaWriter.write(">seq3\n")
+        fastaWriter.write("ACTAGT\n")
         
         fastaWriter.close
         
@@ -44,13 +44,13 @@ abstract class HierarchySuite extends FunSuite with BeforeAndAfterAll {
         val fastaWriter2 = new FileWriter(fasta2)
         
         // Write a sequence (Benedict's example)
-        fastaWriter2.write(">seq2\n")
-        fastaWriter2.write("AAGCTACTAGC\n")
+        //fastaWriter2.write(">seq4\n")
+        //fastaWriter2.write("AACCTACTGCC\n")
         
         fastaWriter2.close
         
         // Invoke the createIndex tool on the two FASTAs.
-        Seq("./createIndex.sh", indexName, fasta, fasta2)!
+        Seq("./createIndex.sh", indexName, fasta)!
         
     }
     

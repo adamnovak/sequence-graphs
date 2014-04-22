@@ -168,6 +168,19 @@ class MergedReferenceStructure(index: FMDIndex, directory: String)
         
     // We map using the range-based mapping mode on the index.
     def map(pattern: String, face: Face): Seq[Option[Side]] = {
+        println("Mapping %s on face %s".format(pattern, face))
+        
+        // Print out all the BWT entries each Side gets.
+        val bwt = index.bwtTable
+        println(getRanges.map {
+            case ((first, last), side) => (side, (first until last + 1).map {
+                (bwtIndex: Long) => bwt(bwtIndex.toInt)
+            })
+        }.mkString("\n"))
+        
+        println("Original:")
+        println(getIndex.map(rangeVector, pattern, face))
+        
         // Map to defined ranges in the range vector
         getIndex.map(rangeVector, pattern, face).map {
             // An range number of -1 means it didn't map 

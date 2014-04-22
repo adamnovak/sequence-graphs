@@ -16,35 +16,18 @@ class ReferenceHierarchyTests extends HierarchySuite {
     }
     
     test("can map on level 0") {
-        // This is just seq1
-        val pattern = "AATCTACTGC"
+        val pattern = "ACTAGT"
         val mappings: Seq[Option[Side]] = hierarchy.map(0, pattern)
         
-        // All characters ought to map.
+        // Nothing should map because it's an ambiguous palindrome.
         assert(mappings.map {
             case Some(_) => 1
             case None => 0
-        }.sum === 10)
-    }
-    
-    test("maps merged bases to the same places") {
-        // Have our two sequences.
-        val seq1 = "AATCTACTGC"
-        val seq2 = "AAGCTACTAGC"
-        
-        // The "C" at the start of "CTAC" ought to map to the same place in
-        // both.
-        val mapping1 = hierarchy.map(1, seq1)(3)
-        val mapping2 = hierarchy.map(1, seq2)(3)
-        
-        assert(mapping1 != None)
-        assert(mapping1 === mapping2)
-        
+        }.sum === 0)
     }
     
     test("can map on level 1") {
-        // This is just seq1
-        val pattern = "AATCTACTGC"
+        val pattern = "ACTAGT"
         val mappings: Seq[Option[Side]] = hierarchy.map(1, pattern)
         
         mappings.foreach(println _)
@@ -53,7 +36,25 @@ class ReferenceHierarchyTests extends HierarchySuite {
         assert(mappings.map {
             case Some(_) => 1
             case None => 0
-        }.sum === 10)
+        }.sum === 6)
+    }
+    
+    test("left-mapping answers are correct") {
+        val pattern = "ACTAGT"
+        val mappings: Seq[Option[Side]] = hierarchy.map(1, pattern, Face.LEFT)
+        
+        println("Left mappings:")
+        mappings.foreach(println _)
+        
+    }
+    
+    test("right-mapping answers are correct") {
+        val pattern = "AATCTACTCC"
+        val mappings: Seq[Option[Side]] = hierarchy.map(1, pattern, Face.RIGHT)
+        
+        println("Right mappings:")
+        mappings.foreach(println _)
+        
     }
     
 }

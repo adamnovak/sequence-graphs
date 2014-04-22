@@ -593,6 +593,7 @@ class FMDIndex(var basename: String) extends Serializable {
      * subtree of the suffix tree.
      */
     def map(ranges: RangeVector, context: String, face: Face): Seq[Long] = {
+        println("Index mapping %s face %s".format(context, face))
         face match {
             case Face.LEFT =>
                 // Map the reverse complement on the other strand and flip
@@ -604,6 +605,9 @@ class FMDIndex(var basename: String) extends Serializable {
                 
                 // FMD does all the work.
                 val mappings = fmd.map(ranges, context)
+                
+                println("Got %d mappings".format(mappings.size))
+                
                 
                 for {
                     i <- (0L until mappings.size)

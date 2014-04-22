@@ -310,8 +310,13 @@ std::pair<CSA::RLEVector*, std::vector<Side> > makeLevelIndex(
     std::map<std::pair<size_t, CSA::usint>, long long int>
         idReservations;
     
-    // We need this out here so we know where the last range ends.
+    // We need this out here so we know where the final range ends, so we can
+    // put a 1 after it.
     CSA::pair_type bwtRange;
+    
+    // And we need this to keep track of where the previous range ended, so we
+    // can see if we skipped a block in the BWT and need to put a dummy Side.
+    CSA::pair_type prevBwtRange = std::make_pair(0, 0);
     
     // Now go through all the contexts again.
     for(CSA::FMD::iterator i = index.fmd.begin(contextLength); 
@@ -342,6 +347,35 @@ std::pair<CSA::RLEVector*, std::vector<Side> > makeLevelIndex(
         // Dump the context and range.
         std::cout << "Reprocessing " << pattern << " at range " << range << 
             " BWT " << bwtRange.first << "-" << bwtRange.second << std::endl;
+        
+        if(bwtRange.first != prevBwtRange.second + 1 && 
+            prevBwtRange.second != 0) {
+            
+            // We aren't the very first BWT range, and we've skipped a bit of
+            // BWT space since the last BWT range. This is probably space taken
+            // up by suffixes that are too short for our iteration.
+            
+            std::cout << "Skipped " << 
+                bwtRange.first - prevBwtRange.second - 1 << " BWT positions." <<
+                std::endl;
+            
+            // Set the bit after the end of the previous BWT range, to break it
+            // off from the skipped region.
+            encoder.addBit(prevBwtRange.second + 1);
+            std::cout << "Set bit " << prevBwtRange.second + 1 << std::endl;
+            
+            // Stick in a dummy Side to take up that range. TODO: make sure
+            // mapping logic knows to ignore such Sides with negative
+            // coordinates.
+            Side mapping;
+            mapping.coordinate = -1;
+            mapping.face = LEFT;
+                
+            mappings.push_back(mapping);
+        }
+        
+        // Remember this bwt range next time
+        prevBwtRange = bwtRange;
             
         // Work out what text and base the first base with this context is. All
         // bases with this context should be pinched into it.
