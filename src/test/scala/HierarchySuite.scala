@@ -55,7 +55,7 @@ abstract class HierarchySuite extends FunSuite with BeforeAndAfterAll {
             // Don't continue on with the test if we can't construct the
             // fixture.
             throw new Exception("Invoking createIndex produced return code %d"
-                .format(createIndex))
+                .format(returnCode))
         }
         
     }
