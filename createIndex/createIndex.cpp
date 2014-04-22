@@ -283,11 +283,97 @@ stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
 }
 
 /**
+ * Turn the given (text, offset) pair into a canonical (contig number, offset
+ * from contig start, orientation), using the given FMDIndex and the given
+ * thread set. The orientation is which face of the canonical base this (text,
+ * offset) pair means.
+ */
+std::pair<std::pair<size_t, CSA::usint>, bool> canonicalize(
+    const FMDIndex& index, stPinchThreadSet* threadSet, CSA::pair_type base) {
+    
+    // What contig corresponds to that text?
+    CSA::usint contigNumber = index.getContigNumber(base);
+    // And what strand corresponds to that text? This tells us what
+    // orientation we're actually looking at the base in.
+    bool strand = (bool) index.getStrand(base);
+    // And what base position is that from the front of the contig?
+    CSA::usint offset = index.getOffset(base);
+    
+    // Now we need to look up what the pinch set says is the canonical
+    // position for this base, and what orientation it should be in. All the
+    // bases in this range have the same context and should thus all be
+    // pointing to the canonical base's replacement.
+    
+    // Get the segment
+    stPinchSegment* segment = stPinchThreadSet_getSegment(threadSet, 
+        contigNumber, offset);
+        
+    if(segment == NULL) {
+        throw std::runtime_error("Found position in null segment!");
+    }
+        
+    // How is it oriented in its block?
+    bool segmentOrientation = stPinchSegment_getBlockOrientation(segment);
+    // How far into the segment are we?
+    CSA::usint segmentOffset = offset - stPinchSegment_getStart(segment);
+        
+    // Get the first segment in the segment's block, or just this segment if
+    // it isn't in a block.
+    stPinchSegment* firstSegment = segment;
+    
+    // Get the block that that segment is in
+    stPinchBlock* block = stPinchSegment_getBlock(segment);
+    if(block != NULL) {
+        std::cout << "In block" << std::endl;
+        // Put the first segment in the block as the canonical segment.
+        firstSegment = stPinchBlock_getFirst(block);
+    } else {
+        std::cout << "Not in block" << std::endl;
+    }
+    
+    // Work out what the official contig number for this block is (the name
+    // of the first segment).
+    size_t canonicalContig = stPinchSegment_getName(firstSegment);
+    // How should it be oriented?
+    bool canonicalOrientation = stPinchSegment_getBlockOrientation(
+        firstSegment);
+    
+    // What's the offset into the canonical segment?
+    CSA::usint canonicalSegmentOffset = segmentOffset;
+    if(segmentOrientation != canonicalOrientation) {
+        // We really want this many bases in from the end of the contig, not
+        // out from the start.
+        // TODO: Is this 0-based or 1-based?
+        canonicalSegmentOffset = stPinchSegment_getLength(
+            firstSegment) - canonicalSegmentOffset;
+    }
+    // What is the offset in the canonical sequence? TODO: needs to be
+    // 1-based.
+    CSA::usint canonicalOffset = canonicalSegmentOffset + 
+        stPinchSegment_getStart(firstSegment);
+    
+    // Return all three values, and be sad about not having real tuples. What
+    // orientation should we use?  Well, we have the canonical position's
+    // orientation within the block, our position's orientation within the
+    // block, and the orientation that this context attaches to the position in.
+    // Flipping any of those will flip the orientation in which we need to map,
+    // so we need to xor them all together, which for bools is done with !=.
+    std::cout << "Canonical orientation: " << canonicalOrientation << std::endl;
+    std::cout << "Segment orientation: " << segmentOrientation << std::endl;
+    std::cout << "Strand: " << strand << std::endl;
+    return std::make_pair(std::make_pair(canonicalContig, canonicalOffset),
+        canonicalOrientation != segmentOrientation);
+}
+
+/**
  * Make the range vector and list of matching Sides for the hierarchy level
- * implied by the given thread set in the given index, assuming it was created
- * by going through all contexts of the given length and assigning them to
- * nodes. Gets IDs for created positions from the given source.
+ * implied by the given thread set in the given index. Gets IDs for created
+ * positions from the given source.
  * 
+ * Manages this by scanning the BWT from left to right, seeing what cannonical
+ * position and orientation each base belongs to, and putting 1s in the range
+ * vector every time a new one starts.
+ *
  * If dumpFile is set, also writes a graphviz-format debug graph.
  * 
  * Don't forget to delete the bit vector when done!
@@ -309,237 +395,101 @@ std::pair<CSA::RLEVector*, std::vector<Side> > makeLevelIndex(
     // contig name (a size_t) and base index (a CSA::usint)
     std::map<std::pair<size_t, CSA::usint>, long long int>
         idReservations;
+        
+    // Keep track of the last canonical base
+    std::pair<size_t, CSA::usint> lastCanonical;
+    // And the last orientation relative to that base
+    bool lastOrientation;
     
-    // We need this out here so we know where the final range ends, so we can
-    // put a 1 after it.
-    CSA::pair_type bwtRange;
-    
-    // And we need this to keep track of where the previous range ended, so we
-    // can see if we skipped a block in the BWT and need to put a dummy Side.
-    CSA::pair_type prevBwtRange = std::make_pair(0, 0);
-    
-    // Now go through all the contexts again.
-    for(CSA::FMD::iterator i = index.fmd.begin(contextLength); 
-        i != index.fmd.end(contextLength); ++i) {
-        // For each pair of suffix and position in the suffix tree, in
-        // increasing SA coordinate order.
+    // What range should we scan?
+    CSA::pair_type bwtBounds = index.fmd.getBWTRange();
+    for(CSA::usint bwtIndex = bwtBounds.first; bwtIndex < bwtBounds.second + 1;
+        bwtIndex++) {
         
-        // Unpack the iterator into pattern and FMDPosition at which it happens.
-        std::string pattern = (*i).first;
-        CSA::FMDPosition range = (*i).second;
+        // For each position in the BWT.
         
-        if(range.end_offset == -1) {
-            // Not even a single thing with this context. Skip to the next one.
-            continue;
-        }
+        // Find its text and offset by converting to SA, locating, and
+        // converting to a relative position.
+        CSA::pair_type base =  index.fmd.getRelativePosition(index.fmd.locate(
+            bwtIndex - index.fmd.getNumberOfSequences()));
         
-        // Grab just the one-strand range, and construct the actual endpoint.
-        // Use the forward strand so that we handle things in increasing
-        // coordinate order. This is in SA coordinates. We'll cover the other
-        // range when we run the RC context.
-        CSA::pair_type oneStrandRange = std::make_pair(range.forward_start, 
-            range.forward_start + range.end_offset);
-            
-        // Convert that range to a BWT range.
-        bwtRange = oneStrandRange;
-        index.fmd.convertToBWTRange(bwtRange);
-            
-        // Dump the context and range.
-        std::cout << "Reprocessing " << pattern << " at range " << range << 
-            " BWT " << bwtRange.first << "-" << bwtRange.second << std::endl;
         
-        if(bwtRange.first != prevBwtRange.second + 1 && 
-            prevBwtRange.second != 0) {
+        // Look up the canonical base and relative orientation for that
+        // text and offset.
+        std::pair<std::pair<size_t, CSA::usint>, bool> canonicalized = 
+            canonicalize(index, threadSet, base);
             
-            // We aren't the very first BWT range, and we've skipped a bit of
-            // BWT space since the last BWT range. This is probably space taken
-            // up by suffixes that are too short for our iteration.
+        std::cout << "BWT position " << bwtIndex << " is text " << base.first <<
+            " offset " << base.second << std::endl;
             
-            std::cout << "Skipped " << 
-                bwtRange.first - prevBwtRange.second - 1 << " BWT positions." <<
+        if(bwtIndex == bwtBounds.first || 
+            canonicalized.first != lastCanonical || 
+            canonicalized.second != lastOrientation) {
+            
+            std::cout << "Starting new range for " << 
+                canonicalized.first.first << ":" << 
+                canonicalized.first.second << "." << canonicalized.second <<
                 std::endl;
             
-            // Set the bit after the end of the previous BWT range, to break it
-            // off from the skipped region.
-            encoder.addBit(prevBwtRange.second + 1);
-            std::cout << "Set bit " << prevBwtRange.second + 1 << std::endl;
+            // We're the very first BWT entry, or we're a BWT entry that belongs
+            // to a different base than the last one. We'll need to start a new
+            // range.
             
-            // Stick in a dummy Side to take up that range. TODO: make sure
-            // mapping logic knows to ignore such Sides with negative
-            // coordinates.
+            // What ID should we use?
+            long long int positionCoordinate;
+            
+            if(idReservations.count(canonicalized.first) > 0) {
+                // Load the previously chosen ID
+                positionCoordinate = idReservations[canonicalized.first];
+            } else {
+                // Allocate and remember a new ID.
+                positionCoordinate = idReservations[canonicalized.first] = 
+                    source.next();
+                
+            }
+            
+            // Say this range is going to belong to the ID we just looked up, on
+            // the appropriate face.
             Side mapping;
-            mapping.coordinate = -1;
-            mapping.face = LEFT;
-                
+            mapping.coordinate = positionCoordinate;
+            // What face?
+            mapping.face = canonicalized.second ? LEFT : RIGHT;
+            // Add the mapping
             mappings.push_back(mapping);
-        }
-        
-        // Remember this bwt range next time
-        prevBwtRange = bwtRange;
             
-        // Work out what text and base the first base with this context is. All
-        // bases with this context should be pinched into it.
-        CSA::pair_type base = index.fmd.getRelativePosition(index.fmd.locate(
-            oneStrandRange.first));
-        
-        // What contig corresponds to that text?
-        CSA::usint contigNumber = index.getContigNumber(base);
-        // And what strand corresponds to that text? This tells us what
-        // orientation we're actually looking at the base in.
-        bool strand = (bool) index.getStrand(base);
-        // And what base position is that from the front of the contig?
-        CSA::usint offset = index.getOffset(base);
-        
-        // Now we need to look up what the pinch set says is the canonical
-        // position for this base, and what orientation it should be in. All the
-        // bases in this range have the same context and should thus all be
-        // pointing to the canonical base's replacement.
-        
-        // Get the segment
-        stPinchSegment* segment = stPinchThreadSet_getSegment(threadSet, 
-            contigNumber, offset);
+            // Record a 1 in the vector at the start of this range, in BWT
+            // coordinates.
+            encoder.addBit(bwtIndex);
+            std::cout << "Set bit " << bwtIndex << std::endl;
             
-        if(segment == NULL) {
-            throw std::runtime_error("Found position in null segment!");
-        }
+            // Every range belongs to some ID. TODO: test this. Especially with Ns.
             
-        // How is it oriented in its block?
-        bool segmentOrientation = stPinchSegment_getBlockOrientation(segment);
-        // How far into the segment are we?
-        CSA::usint segmentOffset = offset - stPinchSegment_getStart(segment);
-            
-        // Get the first segment in the segment's block, or just this segment if
-        // it isn't in a block.
-        stPinchSegment* firstSegment = segment;
-        
-        // Get the block that that segment is in
-        stPinchBlock* block = stPinchSegment_getBlock(segment);
-        if(block != NULL) {
-            std::cout << "In block" << std::endl;
-            // Put the first segment in the block as the canonical segment.
-            firstSegment = stPinchBlock_getFirst(block);
-        } else {
-            std::cout << "Not in block" << std::endl;
-        }
-        
-        // Work out what the official contig number for this block is (the name
-        // of the first segment).
-        size_t canonicalContig = stPinchSegment_getName(firstSegment);
-        // How should it be oriented?
-        bool canonicalOrientation = stPinchSegment_getBlockOrientation(
-            firstSegment);
-        
-        // What's the offset into the canonical segment?
-        CSA::usint canonicalSegmentOffset = segmentOffset;
-        if(segmentOrientation != canonicalOrientation) {
-            // We really want this many bases in from the end of the contig, not
-            // out from the start.
-            // TODO: Is this 0-based or 1-based?
-            canonicalSegmentOffset = stPinchSegment_getLength(
-                firstSegment) - canonicalSegmentOffset;
-        }
-        // What is the offset in the canonical sequence? TODO: needs to be
-        // 1-based.
-        CSA::usint canonicalOffset = canonicalSegmentOffset + 
-            stPinchSegment_getStart(firstSegment);
-        
-        
-        std::cout << "Orientation: " << segmentOrientation << " vs. " << 
-            canonicalOrientation << " vs. " << strand << std::endl;
-        
-        // So what's the contig-and-offset pair?
-        std::pair<size_t, CSA::usint> contigAndOffset = std::make_pair(
-            canonicalContig, canonicalOffset); 
-        
-        // What Position ID does this base get?
-        long long int positionID;
-        
-        if(idReservations.count(contigAndOffset) > 0) {
-            // Load the previously chosen ID
-            positionID = idReservations[contigAndOffset];
-        } else {
-            // Allocate and remember a new ID.
-            positionID = idReservations[contigAndOffset] = source.next();
-            
-            if(dumpFile != NULL) {
-                // Put in this new position
-                *dumpFile << positionID << "[shape=\"record\",label=\"" << 
-                    positionID << "\"];" << std::endl;
-            }
-        }
-        
-        if(dumpFile != NULL) {
-            // Locate every base in oneStrandRange, the SA range
-            CSA::usint* locations = index.fmd.locate(oneStrandRange);
-            
-            std::cout << "Located bases (" << oneStrandRange.first << "," <<
-                oneStrandRange.second << ")" << std::endl;
-            
-            for(CSA::usint j = 0; j < range.end_offset + 1; j++) {
-                // For each location
+            std::cout << "Canonicalized to #" << mapping.coordinate << "." << 
+                mapping.face << std::endl;
                 
-                // Get its text and offset.
-                CSA::pair_type childBase = index.fmd.getRelativePosition(
-                    locations[j]);
-                
-                std::cout << "\tAt text " << childBase.first << " offset " << 
-                    childBase.second << std::endl;
-                    
-                // Link from the child base to the merged base it goes into.
-                *dumpFile << index.getName(childBase) << " -> " << positionID <<
-                    "[color=red,dir=both,arrowtail=" << 
-                    getArrow(childBase.first) << ",arrowhead=" << 
-                    getArrow(canonicalOrientation) << "];" << std::endl;
-                
-            }
+            // Remember that this is now the most recently used canonical face.
+            // TODO: Consolidate into a triple or nested pairs?
+            lastCanonical = canonicalized.first;
+            lastOrientation = canonicalized.second;
             
-            // Throw out the location data.
-            // TODO: Did they use new?
-            free(locations);
             
         }
         
-        // Say this range is going to belong to the ID we just looked up, on the
-        // appropriate face.
-        Side mapping;
-        mapping.coordinate = positionID;
-        // What face? Well, we have the canonical position's orientation within
-        // the block, our position's orientation within the block, and the
-        // orientation that this context attaches to the position in. Flipping
-        // any of those will flip the orientation in which we need to map, so we
-        // need to xor them all together, which for bools is done with !=.
-        mapping.face = (canonicalOrientation != segmentOrientation != strand) ?
-            LEFT : RIGHT;
-            
-        // Add a string describing the mapping
-        mappings.push_back(mapping);
-        
-        // Record a 1 in the vector at the start of this range, in BWT
-        // coordinates.
-        encoder.addBit(bwtRange.first);
-        std::cout << "Set bit " << bwtRange.first << std::endl;
-        
-        // Every range belongs to some ID. TODO: test this. Especially with Ns.
-        
-        std::cout << "Canonicalized to #" << mapping.coordinate << "." << 
-            mapping.face << std::endl;
+    
     }
     
     // Set a bit after the end of the last range.
-    encoder.addBit(bwtRange.second + 1);
+    encoder.addBit(bwtBounds.second + 1);
     
     
     // Finish the vector encoder into a vector of the right length.
     // This should always end in a 1! Make sure to flush first.
     encoder.flush();
-    CSA::RLEVector* bitVector = new CSA::RLEVector(encoder,
-        index.fmd.getBWTRange().second + 1);
-    
-    std::cout << "Total expected 1s: " << mappings.size() + 1 << std::endl;
+    CSA::RLEVector* bitVector = new CSA::RLEVector(encoder, 
+        bwtBounds.second + 1);
     
     // Return the bit vector and the Side vector
     return make_pair(bitVector, mappings);
-    
 }
 
 /**
