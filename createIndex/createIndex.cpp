@@ -33,6 +33,14 @@
 #include "IDSource.hpp"
 
 /**
+ * Define a macro for easily compiling in/out detailed debugging information.
+ * Replaces the one we got from the fmd header.
+ */
+//#define DEBUG(op) op
+#define DEBUG(op)
+
+
+/**
  * Look at the text of a base to see what arrow it needs to
  * have. Can also pass a base "strand" number.
  */
@@ -148,8 +156,8 @@ stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
             CSA::pair_type oneStrandRange = std::make_pair(range.reverse_start, 
                 range.reverse_start + range.end_offset);
             
-            std::cout << "Locating (" << oneStrandRange.first << "," <<
-                oneStrandRange.second << ")" << std::endl;
+            DEBUG(std::cout << "Locating (" << oneStrandRange.first << "," <<
+                oneStrandRange.second << ")" << std::endl;)
             
             // Locate the entire range. We'll have to free this eventually.
             // There are at least two of these.
@@ -166,8 +174,8 @@ stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
             CSA::pair_type firstBase = index.fmd.getRelativePosition(
                 locations[0]);
             
-            std::cout << "First relative position: text " << firstBase.first << 
-                " offset " << firstBase.second << std::endl;
+            DEBUG(std::cout << "First relative position: text " << 
+                firstBase.first << " offset " << firstBase.second << std::endl;)
             
             // What contig corresponds to that text?
             CSA::usint firstContigNumber = index.getContigNumber(firstBase);
@@ -190,8 +198,6 @@ stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
                 
                 if(!dumped.count(firstName)) {
                 
-                    std::cout << "Making first: " << firstName << std::endl;
-                    
                     // Write a node for it
                     *dumpFile << firstName << "[shape=\"record\",label=\"" << 
                         firstName << "\"];" << std::endl;
@@ -234,11 +240,11 @@ stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
             
                 // Pinch firstBase on firstNumber and otherBase on otherNumber
                 // in the correct relative orientation.
-                std::cout << "\tPinching #" << firstContigNumber << ":" << 
+                DEBUG(std::cout << "\tPinching #" << firstContigNumber << ":" <<
                     firstOffset << " strand " << firstStrand << " and #" << 
                     otherContigNumber << ":" << otherOffset << " strand " << 
                     otherStrand << " (orientation: " << orientation << ")" <<
-                    std::endl;
+                    std::endl;)
                 
                 stPinchThread_pinch(firstThread, otherThread, firstOffset,
                     otherOffset, 1, orientation);
@@ -249,8 +255,6 @@ stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
                     
                     if(!dumped.count(otherName)) {
                     
-                        std::cout << "Making other: " << otherName << std::endl;
-                        
                         // Write a node for it
                         *dumpFile << otherName << 
                             "[shape=\"record\",label=\"" << otherName << 
@@ -330,11 +334,8 @@ std::pair<std::pair<size_t, CSA::usint>, bool> canonicalize(
     // Get the block that that segment is in
     stPinchBlock* block = stPinchSegment_getBlock(segment);
     if(block != NULL) {
-        std::cout << "In block" << std::endl;
         // Put the first segment in the block as the canonical segment.
         firstSegment = stPinchBlock_getFirst(block);
-    } else {
-        std::cout << "Not in block" << std::endl;
     }
     
     // Work out what the official contig number for this block is (the name
@@ -364,9 +365,13 @@ std::pair<std::pair<size_t, CSA::usint>, bool> canonicalize(
     // block, and the orientation that this context attaches to the position in.
     // Flipping any of those will flip the orientation in which we need to map,
     // so we need to xor them all together, which for bools is done with !=.
-    std::cout << "Canonical orientation: " << canonicalOrientation << std::endl;
-    std::cout << "Segment orientation: " << segmentOrientation << std::endl;
-    std::cout << "Strand: " << strand << std::endl;
+    DEBUG(
+        std::cout << "Canonical orientation: " << canonicalOrientation << 
+            std::endl;
+        std::cout << "Segment orientation: " << segmentOrientation << 
+            std::endl;
+        std::cout << "Strand: " << strand << std::endl;
+    )
     return std::make_pair(std::make_pair(canonicalContig, canonicalOffset),
         canonicalOrientation != segmentOrientation != strand);
 }
@@ -407,6 +412,8 @@ std::pair<CSA::RLEVector*, std::vector<Side> > makeLevelIndex(
     // And the last orientation relative to that base
     bool lastOrientation;
     
+    std::cout << "Scanning through BWT..." << std::endl;
+    
     // What range should we scan?
     CSA::pair_type bwtBounds = index.fmd.getBWTRange();
     for(CSA::usint bwtIndex = bwtBounds.first; bwtIndex < bwtBounds.second + 1;
@@ -425,17 +432,17 @@ std::pair<CSA::RLEVector*, std::vector<Side> > makeLevelIndex(
         std::pair<std::pair<size_t, CSA::usint>, bool> canonicalized = 
             canonicalize(index, threadSet, base);
             
-        std::cout << "BWT position " << bwtIndex << " is text " << base.first <<
-            " offset " << base.second << std::endl;
+        DEBUG(std::cout << "BWT position " << bwtIndex << " is text " << 
+            base.first << " offset " << base.second << std::endl;)
             
         if(bwtIndex == bwtBounds.first || 
             canonicalized.first != lastCanonical || 
             canonicalized.second != lastOrientation) {
             
-            std::cout << "Starting new range for " << 
+            DEBUG(std::cout << "Starting new range for " << 
                 canonicalized.first.first << ":" << 
                 canonicalized.first.second << "." << canonicalized.second <<
-                std::endl;
+                std::endl;)
             
             // We're the very first BWT entry, or we're a BWT entry that belongs
             // to a different base than the last one. We'll need to start a new
@@ -470,11 +477,11 @@ std::pair<CSA::RLEVector*, std::vector<Side> > makeLevelIndex(
                 // OK not to split it off from the stop characters since they
                 // can't ever be searched.
                 encoder.addBit(bwtIndex);
-                std::cout << "Set bit " << bwtIndex << std::endl;
+                DEBUG(std::cout << "Set bit " << bwtIndex << std::endl;)
             }
             
-            std::cout << "Canonicalized to #" << mapping.coordinate << "." << 
-                mapping.face << std::endl;
+            DEBUG(std::cout << "Canonicalized to #" << mapping.coordinate << 
+                "." << mapping.face << std::endl;)
                 
             // Remember that this is now the most recently used canonical face.
             // TODO: Consolidate into a triple or nested pairs?
@@ -508,6 +515,8 @@ std::pair<CSA::RLEVector*, std::vector<Side> > makeLevelIndex(
  */
 void saveLevelIndex(std::pair<CSA::RLEVector*, std::vector<Side> > levelIndex,
     std::string directory) {
+    
+    std::cout << "Saving index to disk..." << std::endl;
     
     // Make the directory
     boost::filesystem::create_directory(directory);
