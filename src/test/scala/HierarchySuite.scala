@@ -18,6 +18,11 @@ abstract class HierarchySuite extends FunSuite with BeforeAndAfterAll {
     // Holds the directory of the index
     var indexName: String = null
     
+    /**
+     * This can be overridden to specify the sequences to index.
+     */
+    def sequences = Seq("ACTAGT")
+    
     override def beforeAll = {
         // Make a new temp directory
         scratch = Files.createTempDirectory("test")
@@ -25,32 +30,26 @@ abstract class HierarchySuite extends FunSuite with BeforeAndAfterAll {
         // Decide on the index directory
         indexName = scratch.resolve("index").toString
     
-        // Pick a name
-        val fasta = scratch.resolve("fasta1").toString
+        val files = for((sequence, index) <- sequences.zipWithIndex) yield {
+    
+            // Pick a name
+            val fasta = scratch.resolve("fasta%d".format(index)).toString
+            
+            // Write a FASTA
+            val fastaWriter = new FileWriter(fasta)
+            
+            // Write the sequence
+            fastaWriter.write(">seq%d\n".format(index))
+            fastaWriter.write("%s\n".format(sequence))
+            
+            fastaWriter.close
+            
+            // Return the file name to be indexed.
+            fasta
+        }
         
-        // Write a FASTA
-        val fastaWriter = new FileWriter(fasta)
-        
-        // Write a sequence (easy palindrome)
-        fastaWriter.write(">seq3\n")
-        fastaWriter.write("ACTAGT\n")
-        
-        fastaWriter.close
-        
-        // Pick a name
-        val fasta2 = scratch.resolve("fasta2").toString
-        
-        // Write a FASTA
-        val fastaWriter2 = new FileWriter(fasta2)
-        
-        // Write a sequence (Benedict's example)
-        //fastaWriter2.write(">seq4\n")
-        //fastaWriter2.write("AACCTACTGCC\n")
-        
-        fastaWriter2.close
-        
-        // Invoke the createIndex tool on the two FASTAs.
-        Seq("./createIndex.sh", indexName, fasta)!
+        // Invoke the createIndex tool on all the FASTAs.
+        (Seq("./createIndex.sh", indexName) ++ files)!
         
     }
     

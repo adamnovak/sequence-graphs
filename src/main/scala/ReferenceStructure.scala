@@ -178,11 +178,14 @@ class MergedReferenceStructure(index: FMDIndex, directory: String)
             })
         }.mkString("\n"))
         
-        println("Original:")
-        println(getIndex.map(rangeVector, pattern, face))
+        // Map to range numbers, or -1 for no mapping.
+        val rangeNumbers = getIndex.map(rangeVector, pattern, face)
         
-        // Map to defined ranges in the range vector
-        getIndex.map(rangeVector, pattern, face).map {
+        println("Original:")
+        println(rangeNumbers)
+        
+        // Convert to Sides and return.
+        rangeNumbers.map {
             // An range number of -1 means it didn't map 
             case -1 => None
             // Otherwise go get the Side for the range it mapped to (or None
@@ -194,9 +197,10 @@ class MergedReferenceStructure(index: FMDIndex, directory: String)
                     // We got a range that a Side is defined for. Flip the Side.
                     Some(!(sideArray(range.toInt)))
                 } else {
-                    // We probably got the 1-past-the-end range? TODO: Did we
-                    // break something?
-                    None
+                    // Complain we're supposed to be mapping to a range that
+                    // doesn't exist.
+                    throw new Exception("Mapped to out-of-bounds range %d"
+                        .format(range))
                 }
         }
     }

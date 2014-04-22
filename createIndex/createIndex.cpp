@@ -463,12 +463,15 @@ std::pair<CSA::RLEVector*, std::vector<Side> > makeLevelIndex(
             // Add the mapping
             mappings.push_back(mapping);
             
-            // Record a 1 in the vector at the start of this range, in BWT
-            // coordinates.
-            encoder.addBit(bwtIndex);
-            std::cout << "Set bit " << bwtIndex << std::endl;
-            
-            // Every range belongs to some ID. TODO: test this. Especially with Ns.
+            if(bwtIndex != bwtBounds.first) {
+                // Record a 1 in the vector at the start of every range except
+                // the first, in BWT coordinates. The first needs no 1 before it
+                // so it will be rank 0 (and match up with mapping 0), and it's
+                // OK not to split it off from the stop characters since they
+                // can't ever be searched.
+                encoder.addBit(bwtIndex);
+                std::cout << "Set bit " << bwtIndex << std::endl;
+            }
             
             std::cout << "Canonicalized to #" << mapping.coordinate << "." << 
                 mapping.face << std::endl;

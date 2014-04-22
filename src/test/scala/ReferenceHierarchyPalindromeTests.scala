@@ -3,20 +3,23 @@ package edu.ucsc.genome
 import org.scalatest._
 
 /**
- * Tests for making and using ReferenceHierarchy objects.
+ * Tests for making and using ReferenceHierarchy objects on a plaindrome.
  */
-class ReferenceHierarchyTests extends HierarchySuite {
+class ReferenceHierarchyPalindromeTests extends HierarchySuite {
     
     // We will keep a ReferenceHierarchy around
     var hierarchy: ReferenceHierarchy = null
+
+    // Demand a palindrome.
+    override def sequences = Seq("ACTAGT")
 
     test("can be created") {
         // Load the hierarchy from the filename HierarchySuite feeds us.
         hierarchy = new ReferenceHierarchy(indexName)
     }
     
-    test("can map on level 0") {
-        val pattern = "ACTAGT"
+    test("can't map on level 0 due to palindrome") {
+        val pattern = sequences(0)
         val mappings: Seq[Option[Side]] = hierarchy.map(0, pattern)
         
         // Nothing should map because it's an ambiguous palindrome.
@@ -27,7 +30,7 @@ class ReferenceHierarchyTests extends HierarchySuite {
     }
     
     test("can map on level 1") {
-        val pattern = "ACTAGT"
+        val pattern = sequences(0)
         val mappings: Seq[Option[Side]] = hierarchy.map(1, pattern)
         
         mappings.foreach(println _)
@@ -36,25 +39,19 @@ class ReferenceHierarchyTests extends HierarchySuite {
         assert(mappings.map {
             case Some(_) => 1
             case None => 0
-        }.sum === 6)
+        }.sum === sequences(0).size)
     }
     
-    test("left-mapping answers are correct") {
-        val pattern = "ACTAGT"
+    test("left-mapping is reverse of right-mapping") {
+        val pattern = sequences(0)
         val mappings: Seq[Option[Side]] = hierarchy.map(1, pattern, Face.LEFT)
         
-        println("Left mappings:")
-        mappings.foreach(println _)
+        val mappings2: Seq[Option[Side]] = hierarchy.map(1, pattern, Face.RIGHT)
+        
+        println(mappings.mkString("\n"))
+        println(mappings2.mkString("\n"))
+        
+        assert(mappings === mappings2.reverse)
         
     }
-    
-    test("right-mapping answers are correct") {
-        val pattern = "AATCTACTCC"
-        val mappings: Seq[Option[Side]] = hierarchy.map(1, pattern, Face.RIGHT)
-        
-        println("Right mappings:")
-        mappings.foreach(println _)
-        
-    }
-    
 }
