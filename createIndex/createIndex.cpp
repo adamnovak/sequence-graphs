@@ -227,15 +227,21 @@ stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
                     throw std::runtime_error("Other thread was NULL!");
                 }
             
+                // What orientation should we use for the second strand, given
+                // that we are pinching against the first strand in orientation
+                // 1 (reverse)?
+                bool orientation = firstStrand == otherStrand;
+            
                 // Pinch firstBase on firstNumber and otherBase on otherNumber
                 // in the correct relative orientation.
-                //std::cout << "\tPinching #" << firstContigNumber << ":" << 
-                //    firstOffset << " strand " << firstStrand << " and #" << 
-                //    otherContigNumber << ":" << otherOffset << " strand " << 
-                //    otherStrand << std::endl;
+                std::cout << "\tPinching #" << firstContigNumber << ":" << 
+                    firstOffset << " strand " << firstStrand << " and #" << 
+                    otherContigNumber << ":" << otherOffset << " strand " << 
+                    otherStrand << " (orientation: " << orientation << ")" <<
+                    std::endl;
                 
                 stPinchThread_pinch(firstThread, otherThread, firstOffset,
-                    otherOffset, 1, firstStrand != otherStrand);
+                    otherOffset, 1, orientation);
                     
                 if(dumpFile != NULL) {
                     // Report the other position as existing.
@@ -343,9 +349,9 @@ std::pair<std::pair<size_t, CSA::usint>, bool> canonicalize(
     if(segmentOrientation != canonicalOrientation) {
         // We really want this many bases in from the end of the contig, not
         // out from the start.
-        // TODO: Is this 0-based or 1-based?
+        // Keep it 0-based.
         canonicalSegmentOffset = stPinchSegment_getLength(
-            firstSegment) - canonicalSegmentOffset;
+            firstSegment) - canonicalSegmentOffset - 1;
     }
     // What is the offset in the canonical sequence? TODO: needs to be
     // 1-based.
@@ -362,7 +368,7 @@ std::pair<std::pair<size_t, CSA::usint>, bool> canonicalize(
     std::cout << "Segment orientation: " << segmentOrientation << std::endl;
     std::cout << "Strand: " << strand << std::endl;
     return std::make_pair(std::make_pair(canonicalContig, canonicalOffset),
-        canonicalOrientation != segmentOrientation);
+        canonicalOrientation != segmentOrientation != strand);
 }
 
 /**
