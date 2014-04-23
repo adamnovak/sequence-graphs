@@ -43,19 +43,20 @@ CSA::usint FMDIndex::getContigNumber(CSA::pair_type base) const {
     return base.first / 2;
 }
 
-CSA::usint FMDIndex::getStrand(CSA::pair_type base) const {
+bool FMDIndex::getStrand(CSA::pair_type base) const {
     // What strand corresponds to that text? Strands are forward, then reverse.
-    return base.first % 2;
+    return base.first % 2 == 1;
 }
 
 CSA::usint FMDIndex::getOffset(CSA::pair_type base) const {
     // What base offset, 1-based, from the left, corresponds to this pair_type,
     // which may be on either strand.
     if(getStrand(base) == 0) {
-        // We're on the forward strand; just correct for the 1-basedness offset.
+        // We're on the forward strand. Make offset 1-based.
         return base.second + 1;
     } else {
-        // We're on the reverse strand, so we measured from the end.
+        // We're on the reverse strand, so we measured from the end. Make it
+        // 1-based.
         return lengths[getContigNumber(base)] - base.second;
     }
 }
@@ -78,5 +79,47 @@ CSA::usint FMDIndex::getTotalLength() const {
     // Sum all the contig lengths and double (to make it be for both strands).
     // See <http://stackoverflow.com/a/3221813/402891>
     return std::accumulate(lengths.begin(), lengths.end(), 0) * 2;
+}
+
+char FMDIndex::display(CSA::usint contig, CSA::usint offset,
+    bool strand) const {
+
+    std::cout << "Displaying " << contig << ":" << offset << "." << strand << std::endl;
+
+    // What offset into the text do we use?
+    CSA::usint textOffset;
+    
+    if(!strand) {
+        // On the forward strand. Keep the original offset, but convert to
+        // 0-based.
+        textOffset = offset - 1;
+    } else {
+        // On the reverse strand. Use the offset from the other end. Convert to
+        // 0-based.
+        textOffset = lengths[contig] - offset;
+    }
+    
+    // After converting to a base in (text, offset) form, call the other
+    // display.
+    return display(std::make_pair(contig * 2 + strand, textOffset));
+    
+    
+}
+
+char FMDIndex::display(CSA::pair_type base) const {
+    std::cout << "Displaying " << base.first << "," << base.second << std::endl;
+    
+    // Display 1 character off the appropriate strand.
+    CSA::uchar* displayData = fmd.display(base.first, 
+        std::make_pair(base.second, base.second));
+        
+    // Get the character value
+    char toReturn = displayData[0];
+    
+    // Free the buffer that got allocated.
+    free(displayData);
+    
+    // Send back the character.
+    return toReturn;
 }
 

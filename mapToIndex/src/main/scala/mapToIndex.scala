@@ -104,6 +104,19 @@ object MapToIndex {
         
         println("Hierarchy loaded! Mapping...")
         
+        // Map to all levels
+        val mappings: Seq[Seq[Option[Side]]] = hierarchy.map(pattern)
+        
+        for((mapping, index) <- mappings.zipWithIndex) {
+            println("Mappings to level %d:".format(index))
+            mapping.map {
+                // Print out the mappings in a reasonable way.
+                // TODO: ADAM-format output.
+                case Some(side) => println("\t%s".format(side))
+                case None => println("\t.")
+            }
+        }
+        
     }
 }
 

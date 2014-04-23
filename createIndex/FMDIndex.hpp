@@ -23,12 +23,12 @@ public:
     /**
      * Get the strand from a (text, offset) pair: either 0 or 1.
      */
-    CSA::usint getStrand(CSA::pair_type base) const;
+    bool getStrand(CSA::pair_type base) const;
     
     /**
      * Given a pair_type representing a base, and a vector of contig lengths by
-     * number, determine the specified base's offset from the left of its contig,
-     * 1-based.
+     * number, determine the specified base's offset from the left of its
+     * contig, 1-based.
      */
     CSA::usint getOffset(CSA::pair_type base) const;
     
@@ -41,6 +41,17 @@ public:
      * Get the total length of all contigs, on both strands.
      */
     CSA::usint getTotalLength() const;
+    
+    /**
+     * Get the character for a base at the given offset on the given contig,
+     * oriented as on the given strand. Offset is 1-based from contig start.
+     */
+    char display(CSA::usint contig, CSA::usint offset, bool strand) const;
+    
+    /**
+     * Get the character for a base.
+     */
+    char display(CSA::pair_type base) const; 
     
     /**
      * Holds the actual underlying FMD.

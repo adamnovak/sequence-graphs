@@ -3,6 +3,7 @@
 #include <vector>
 #include <cstdlib>
 #include <sstream>
+#include <set>
 
 #include <boost/filesystem.hpp>
 #include "boost/program_options.hpp" 
@@ -36,8 +37,8 @@
  * Define a macro for easily compiling in/out detailed debugging information.
  * Replaces the one we got from the fmd header.
  */
-//#define DEBUG(op) op
-#define DEBUG(op)
+#define DEBUG(op) op
+//#define DEBUG(op)
 
 
 /**
@@ -199,15 +200,16 @@ stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
                 if(!dumped.count(firstName)) {
                 
                     // Write a node for it
-                    *dumpFile << firstName << "[shape=\"record\",label=\"" << 
-                        firstName << "\"];" << std::endl;
+                    *dumpFile << firstName << "[shape=\"record\",label=\"{" << 
+                        firstName << "|" << index.display(firstBase) <<
+                        "}\"];" << std::endl;
                     if(firstOffset > 1) {
                         // Link to previous Position
                         *dumpFile << index.getName(std::make_pair(
                             // Hack to get the base actually before us on the
                             // contig.
-                            firstContigNumber * 2, firstOffset - 2)) << " -> " <<
-                            firstName << ";" << std::endl;
+                            firstContigNumber * 2, firstOffset - 2)) << 
+                            " -> " << firstName << ";" << std::endl;
                     }
                     dumped[firstName] = true;
                 }
@@ -257,8 +259,8 @@ stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
                     
                         // Write a node for it
                         *dumpFile << otherName << 
-                            "[shape=\"record\",label=\"" << otherName << 
-                            "\"];" << std::endl;
+                            "[shape=\"record\",label=\"{" << otherName << "|" <<
+                            index.display(otherBase) << "}\"];" << std::endl;
                         
                         if(otherOffset > 1) {
                             // Link previous position to us.
@@ -350,12 +352,11 @@ std::pair<std::pair<size_t, CSA::usint>, bool> canonicalize(
     if(segmentOrientation != canonicalOrientation) {
         // We really want this many bases in from the end of the contig, not
         // out from the start.
-        // Keep it 0-based.
+        // Keep it 1-based.
         canonicalSegmentOffset = stPinchSegment_getLength(
-            firstSegment) - canonicalSegmentOffset - 1;
+            firstSegment) - canonicalSegmentOffset;
     }
-    // What is the offset in the canonical sequence? TODO: needs to be
-    // 1-based.
+    // What is the offset in the canonical sequence? 1-based.
     CSA::usint canonicalOffset = canonicalSegmentOffset + 
         stPinchSegment_getStart(firstSegment);
     
@@ -406,6 +407,12 @@ std::pair<CSA::RLEVector*, std::vector<Side> > makeLevelIndex(
     // contig name (a size_t) and base index (a CSA::usint)
     std::map<std::pair<size_t, CSA::usint>, long long int>
         idReservations;
+        
+    // Keep track of a set of edges from (contig, offset) to higher-level merged
+    // nodes that we have already dumped, so we don't dump the same edge
+    // multiple times.
+    std::set<std::pair<std::pair<size_t, CSA::usint>, long long int> >
+        edgesDumped;
         
     // Keep track of the last canonical base
     std::pair<size_t, CSA::usint> lastCanonical;
@@ -458,7 +465,43 @@ std::pair<CSA::RLEVector*, std::vector<Side> > makeLevelIndex(
                 // Allocate and remember a new ID.
                 positionCoordinate = idReservations[canonicalized.first] = 
                     source.next();
+                    
+                if(dumpFile != NULL) {
+                    // Since we're creating a new upper-level node, add it to
+                    // the graph we're dumping.
+                    
+                    // Work out what character it is
+                    char baseChar = index.display(canonicalized.first.first, 
+                        canonicalized.first.second, canonicalized.second);
+                    
+                    // Write a node for it
+                    *dumpFile << "M" << positionCoordinate << 
+                        "[shape=\"record\",label=\"{" << "M" << 
+                        positionCoordinate << "|" << baseChar << "}\"];" <<
+                        std::endl;
+                    
+                }
                 
+                
+            }
+            
+            if(dumpFile != NULL) {
+                // What edge would we want to dump? One from the lower (contig,
+                // offset) to the higher coordinate.
+                std::pair<CSA::pair_type, long long int> edge = 
+                    std::make_pair(std::make_pair(index.getContigNumber(base), 
+                    index.getOffset(base)), positionCoordinate);
+                    
+                if(edgesDumped.count(edge) == 0) {
+                    // Edge is not yet dumped
+            
+                    // Add a generalization edge up to this node.
+                    *dumpFile << index.getName(base) << 
+                        " -> " << "M" << positionCoordinate << ";" << std::endl;
+                    // Say we dumped this edge, so the next range we come to
+                    // (like the other side) won't dump another copy.
+                    edgesDumped.insert(edge);
+                }
             }
             
             // Say this range is going to belong to the ID we just looked up, on

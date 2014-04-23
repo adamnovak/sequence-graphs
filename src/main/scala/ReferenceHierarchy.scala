@@ -28,7 +28,7 @@ class ReferenceHierarchy(index: FMDIndex) {
     }
     
     /**
-     * Map the given string on the given level.
+     * Map the given string on the given level. Discards ambiguous mappings.
      */
     def map(level: Int, context: String): Seq[Option[Side]] = {
         levels(level).map(context)
@@ -39,6 +39,15 @@ class ReferenceHierarchy(index: FMDIndex) {
      */
     def map(level: Int, context: String, face: Face): Seq[Option[Side]] = {
         levels(level).map(context, face)
+    }
+    
+    /**
+     * Map the given string to all levels. Discards ambiguous mappings. Returns
+     * a sequence of sequences of mappings (Side or None).
+     */
+    def map(context: String): Seq[Seq[Option[Side]]] = {
+        // Run the normal map for every level.
+        (0 until levels.size).map(this.map(_, context))
     }
     
     /**
