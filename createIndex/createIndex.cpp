@@ -114,13 +114,14 @@ stPinchThreadSet* makeThreadSet(const FMDIndex& index) {
  * base being matched itself). Returns the pinched thread set.
  *
  * If dumpFile is set, dumps debug graph data to that file.
+ * If quiet is true, don't announce contexts.
  *
  * Note that due to the nature of this merging scheme, any two nodes that would
  * merge at a longer context length will also merge at a shorter context length,
  * so we can just directly calculate each upper level in turn.
  */
 stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
-    size_t contextLength, std::ostream* dumpFile = NULL) {
+    size_t contextLength, std::ostream* dumpFile = NULL, bool quiet = false) {
     
     // Keep track of nodes we have already dumped.
     std::map<std::string, bool> dumped;
@@ -138,8 +139,11 @@ stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
         std::string pattern = (*i).first;
         CSA::FMDPosition range = (*i).second;
         
-        // Dump the context and range.
-        std::cout << pattern << " at " << range << std::endl;
+        
+        if(!quiet) {
+            // Dump the context and range.
+            std::cout << pattern << " at " << range << std::endl;
+        }
         
         // Check by counting again
         //CSA::pair_type count = index.fmd.count(pattern);
@@ -291,9 +295,11 @@ stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
             // Free the location buffer
             free(locations);
             
-            // Say we merged some bases.
-            std::cout << "Merged " << range.end_offset + 1 <<  " bases" <<
-                std::endl;
+            if(!quiet) {
+                // Say we merged some bases.
+                std::cout << "Merged " << range.end_offset + 1 <<  " bases" <<
+                    std::endl;
+            }
             
         }
         
@@ -662,6 +668,7 @@ int main(int argc, char** argv) {
     description.add_options() 
         ("help", "Print help messages") 
         ("dump", "Dump GraphViz graphs")
+        ("quiet", "Don't print every context")
         ("context", boost::program_options::value<unsigned int>()
             ->default_value(3), 
             "Set the context length to merge on")
@@ -771,7 +778,7 @@ int main(int argc, char** argv) {
     
     // Make a thread set for the context length we want.
     stPinchThreadSet* threadSet = mergeNonsymmetric(index, contextLength,
-        dumpFile);
+        dumpFile, options.count("quiet"));
         
     if(options.count("dump")) {
         // End the cluster and start a new one.
