@@ -512,11 +512,14 @@ std::pair<CSA::RLEVector*, std::vector<Side> > makeLevelIndex(
             }
             
             // Make sure our merge is sane.
-            char sourceChar = index.display(base);
-            char destChar = index.display(canonicalized.first.first, 
-                        canonicalized.first.second, canonicalized.second);
-            DEBUG(std::cout << "Merged a " << sourceChar << " into a " << destChar <<
-                std::endl;)
+            
+            DEBUG(
+                char sourceChar = index.display(base);
+                char destChar = index.display(canonicalized.first.first, 
+                            canonicalized.first.second, canonicalized.second);
+                std::cout << "Merged a " << sourceChar << " into a " << destChar <<
+                    std::endl;
+            )
             
             if(dumpFile != NULL) {
                 // What edge would we want to dump? One from the lower (contig,
@@ -659,6 +662,9 @@ int main(int argc, char** argv) {
     description.add_options() 
         ("help", "Print help messages") 
         ("dump", "Dump GraphViz graphs")
+        ("context", boost::program_options::value<unsigned int>()
+            ->default_value(3), 
+            "Set the context length to merge on")
         // These next two options should be ->required(), but that's not in the
         // Boost version I can convince our cluster admins to install. From now
         // on I shall work exclusively in Docker containers or something.
@@ -716,9 +722,6 @@ int main(int argc, char** argv) {
         return -1; 
     }
     
-    // TODO: define context for merging in a more reasonable way (argument?)
-    int contextLength = 3;
-    
     // If we get here, we have the right arguments. Parse them.
     
     // This holds the directory for the reference structure to build.
@@ -727,6 +730,9 @@ int main(int argc, char** argv) {
     // This holds a list of FASTA filenames to load and index.
     std::vector<std::string> fastas(options["fastas"]
         .as<std::vector<std::string> >());
+        
+    // This holds the length of context to use
+    unsigned int contextLength = options["context"].as<unsigned int>();
     
     // Dump options.
     std::cout << "Options:" << std::endl;
@@ -737,6 +743,8 @@ int main(int argc, char** argv) {
         
         std::cout << "Index file: " << *i << std::endl;
     }
+    
+    std::cout << "Use " << contextLength << " bases of context." << std::endl;
     
     // Index the bottom-level FASTAs and get the basename they go into.
     std::string basename = buildIndex(indexDirectory, fastas);
