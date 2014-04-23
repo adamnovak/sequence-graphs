@@ -37,8 +37,8 @@
  * Define a macro for easily compiling in/out detailed debugging information.
  * Replaces the one we got from the fmd header.
  */
-#define DEBUG(op) op
-//#define DEBUG(op)
+//#define DEBUG(op) op
+#define DEBUG(op)
 
 
 /**
@@ -198,10 +198,16 @@ stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
                 std::string firstName = index.getName(firstBase); 
                 
                 if(!dumped.count(firstName)) {
+                    // Get its base
+                    char baseChar = index.display(firstBase);
+                    if(firstStrand) {
+                        // Flip it around so we always see forward strand bases.
+                        baseChar = CSA::reverse_complement(baseChar);
+                    }
                 
                     // Write a node for it
                     *dumpFile << firstName << "[shape=\"record\",label=\"{" << 
-                        firstName << "|" << index.display(firstBase) <<
+                        firstName << "|" << baseChar <<
                         "}\"];" << std::endl;
                     if(firstOffset > 1) {
                         // Link to previous Position
@@ -256,11 +262,17 @@ stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
                     std::string otherName = index.getName(otherBase); 
                     
                     if(!dumped.count(otherName)) {
+                        // Get its base
+                        char baseChar = index.display(otherBase);
+                        if(otherStrand) {
+                            // Flip it around so we always see forward strand bases.
+                            baseChar = CSA::reverse_complement(baseChar);
+                        }
                     
                         // Write a node for it
                         *dumpFile << otherName << 
                             "[shape=\"record\",label=\"{" << otherName << "|" <<
-                            index.display(otherBase) << "}\"];" << std::endl;
+                            baseChar << "}\"];" << std::endl;
                         
                         if(otherOffset > 1) {
                             // Link previous position to us.
@@ -308,7 +320,8 @@ std::pair<std::pair<size_t, CSA::usint>, bool> canonicalize(
     // And what strand corresponds to that text? This tells us what
     // orientation we're actually looking at the base in.
     bool strand = (bool) index.getStrand(base);
-    // And what base position is that from the front of the contig?
+    // And what base position is that from the front of the contig? This is
+    // 1-based.
     CSA::usint offset = index.getOffset(base);
     
     // Now we need to look up what the pinch set says is the canonical
@@ -316,7 +329,7 @@ std::pair<std::pair<size_t, CSA::usint>, bool> canonicalize(
     // bases in this range have the same context and should thus all be
     // pointing to the canonical base's replacement.
     
-    // Get the segment
+    // Get the segment (using the 1-based position).
     stPinchSegment* segment = stPinchThreadSet_getSegment(threadSet, 
         contigNumber, offset);
         
@@ -326,7 +339,8 @@ std::pair<std::pair<size_t, CSA::usint>, bool> canonicalize(
         
     // How is it oriented in its block?
     bool segmentOrientation = stPinchSegment_getBlockOrientation(segment);
-    // How far into the segment are we?
+    // How far into the segment are we? 0-based, from subtracting 1-based
+    // positions.
     CSA::usint segmentOffset = offset - stPinchSegment_getStart(segment);
         
     // Get the first segment in the segment's block, or just this segment if
@@ -347,18 +361,29 @@ std::pair<std::pair<size_t, CSA::usint>, bool> canonicalize(
     bool canonicalOrientation = stPinchSegment_getBlockOrientation(
         firstSegment);
     
-    // What's the offset into the canonical segment?
+    // We need to calculate an offset into the canonical segment. If the
+    // segments are pinched together backwards, this will count in opposite
+    // directions on the two segments, so we'll need to flip the within-sement
+    // offset around.
     CSA::usint canonicalSegmentOffset = segmentOffset;
     if(segmentOrientation != canonicalOrientation) {
-        // We really want this many bases in from the end of the contig, not
-        // out from the start.
-        // Keep it 1-based.
-        canonicalSegmentOffset = stPinchSegment_getLength(
-            firstSegment) - canonicalSegmentOffset;
+        // We really want this many bases in from the end of the segment, not
+        // out from the start of the segment. Keep it 0-based.
+        canonicalSegmentOffset = stPinchSegment_getLength(firstSegment) - 
+            canonicalSegmentOffset - 1;
     }
-    // What is the offset in the canonical sequence? 1-based.
-    CSA::usint canonicalOffset = canonicalSegmentOffset + 
-        stPinchSegment_getStart(firstSegment);
+    
+    DEBUG(std::cout << "Canonicalized segment offset " << segmentOffset << 
+        " to " << canonicalSegmentOffset << std::endl;)
+    
+    // What's the offset into the canonical contig? 1-based because we add a
+    // 0-based offset to a 1-based position.
+    CSA::usint canonicalOffset = stPinchSegment_getStart(firstSegment) + 
+        canonicalSegmentOffset;
+    
+    DEBUG(std::cout << "Canonicalized contig " << contigNumber << " offset " <<
+        offset << " to contig " << canonicalContig << " offset " << 
+        canonicalOffset << std::endl;)
     
     // Return all three values, and be sad about not having real tuples. What
     // orientation should we use?  Well, we have the canonical position's
@@ -470,9 +495,10 @@ std::pair<CSA::RLEVector*, std::vector<Side> > makeLevelIndex(
                     // Since we're creating a new upper-level node, add it to
                     // the graph we're dumping.
                     
-                    // Work out what character it is
+                    // Work out what character it is (in its local forward
+                    // orientation).
                     char baseChar = index.display(canonicalized.first.first, 
-                        canonicalized.first.second, canonicalized.second);
+                        canonicalized.first.second, false);
                     
                     // Write a node for it
                     *dumpFile << "M" << positionCoordinate << 
@@ -484,6 +510,13 @@ std::pair<CSA::RLEVector*, std::vector<Side> > makeLevelIndex(
                 
                 
             }
+            
+            // Make sure our merge is sane.
+            char sourceChar = index.display(base);
+            char destChar = index.display(canonicalized.first.first, 
+                        canonicalized.first.second, canonicalized.second);
+            DEBUG(std::cout << "Merged a " << sourceChar << " into a " << destChar <<
+                std::endl;)
             
             if(dumpFile != NULL) {
                 // What edge would we want to dump? One from the lower (contig,
@@ -497,7 +530,14 @@ std::pair<CSA::RLEVector*, std::vector<Side> > makeLevelIndex(
             
                     // Add a generalization edge up to this node.
                     *dumpFile << index.getName(base) << 
-                        " -> " << "M" << positionCoordinate << ";" << std::endl;
+                        " -> " << "M" << positionCoordinate << 
+                        // Give an arrow tail according to the relative 
+                        // orientation, and an arrow head that is always
+                        // forward.
+                        "[dir=both,arrowtail=" << 
+                        getArrow(index.getStrand(base)) << ",arrowhead=" << 
+                        getArrow(!canonicalized.second) << 
+                        ",color=green];" << std::endl;
                     // Say we dumped this edge, so the next range we come to
                     // (like the other side) won't dump another copy.
                     edgesDumped.insert(edge);

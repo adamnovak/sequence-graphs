@@ -84,8 +84,6 @@ CSA::usint FMDIndex::getTotalLength() const {
 char FMDIndex::display(CSA::usint contig, CSA::usint offset,
     bool strand) const {
 
-    std::cout << "Displaying " << contig << ":" << offset << "." << strand << std::endl;
-
     // What offset into the text do we use?
     CSA::usint textOffset;
     
@@ -107,8 +105,7 @@ char FMDIndex::display(CSA::usint contig, CSA::usint offset,
 }
 
 char FMDIndex::display(CSA::pair_type base) const {
-    std::cout << "Displaying " << base.first << "," << base.second << std::endl;
-    
+
     // Display 1 character off the appropriate strand.
     CSA::uchar* displayData = fmd.display(base.first, 
         std::make_pair(base.second, base.second));
