@@ -302,11 +302,11 @@ stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
             }
             
         }
-        
-        // Now GC the boundaries in the pinch set
-        //std::cout << "Joining trivial boundaries..." << std::endl;
-        stPinchThreadSet_joinTrivialBoundaries(threadSet);
     }
+    
+    // Now GC the boundaries in the pinch set
+    std::cout << "Joining trivial boundaries..." << std::endl;
+    stPinchThreadSet_joinTrivialBoundaries(threadSet);
     
     // Return the finished thread set
     return threadSet;
