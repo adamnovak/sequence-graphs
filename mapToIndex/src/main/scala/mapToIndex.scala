@@ -64,7 +64,7 @@ object MapToIndex {
         // our Avro records.
         SequenceGraphKryoProperties.setupContextProperties()
         
-        // Set the executors to use a more reasonable amount of memory.
+        /*// Set the executors to use a more reasonable amount of memory.
         System.setProperty("spark.executor.memory", "25G")
         
         // Set the parallelism level to have enough reducers to not run out of
@@ -91,7 +91,7 @@ object MapToIndex {
         println("Initializing Spark")
         val sc = new SparkContext(opts.cluster.get.get, "mapToIndex", 
             System.getenv("SPARK_HOME"), jarsToSend)
-        println("Spark initialized")
+        println("Spark initialized")*/
         
         // Get the hierarchy path
         val indexPath = opts.index.get.get
@@ -107,14 +107,47 @@ object MapToIndex {
         // Map to all levels
         val mappings: Seq[Seq[Option[Side]]] = hierarchy.map(pattern)
         
+        // Get the left and right mappings
+        println("===Starting left mapping===")
+        val leftMappings = hierarchy.map(pattern, Face.LEFT)
         
-        for((mapping, index) <- mappings.zipWithIndex) {
+        println("===Starting right mapping===")
+        val rightMappings = hierarchy.map(pattern, Face.RIGHT)
+        
+        // Have a little function to format the sides
+        def mappingToString(m: Option[Side]): String = {
+            m match {
+                case Some(side) => 
+                    "%d%s".format(side.coordinate, side.face match {
+                        case Face.LEFT => "L"
+                        case Face.RIGHT => "R"
+                    })
+                case None => "          "
+            }
+        }
+        
+        // Bind up all the mappings together
+        val allMappings = (leftMappings, mappings, rightMappings).zipped
+        
+        for((mappingTuple, index) <- allMappings.toSeq.zipWithIndex) {
             println("Mappings to level %d:".format(index))
-            (pattern, mapping).zipped.map {
-                // Print out the mappings in a reasonable way.
-                // TODO: ADAM-format output.
-                case (base, Some(side)) => println("\t%s\t%s".format(base, side))
-                case (base, None) => println("\t%s\t.".format(base))
+            
+            println(Seq("Base", "Left", "Both", "Right").map(_.padTo(10, ' '))
+                .mkString("\t"))
+            
+            // Get the individual mapping lists
+            val (left, center, right) = mappingTuple
+            
+            // Zip up with the pattern. Not really a zip; we use "transpose" to
+            // flip which direction is the outer list.
+            val rows = List(pattern.toSeq.map(_.toString),
+                left.map(mappingToString _), center.map(mappingToString _), 
+                right.map(mappingToString _))
+                .transpose
+            
+            rows.map { row =>
+                // Print each roe
+                println(row.map(_.padTo(10, ' ')).mkString("\t"))
             }
         }
         

@@ -35,7 +35,7 @@ class ReferenceHierarchy(index: FMDIndex) {
     }
     
     /**
-     * Map the given string on the given level, on the given side of each base.
+     * Map the given string on the given level, on the given face of each base.
      */
     def map(level: Int, context: String, face: Face): Seq[Option[Side]] = {
         levels(level).map(context, face)
@@ -48,6 +48,15 @@ class ReferenceHierarchy(index: FMDIndex) {
     def map(context: String): Seq[Seq[Option[Side]]] = {
         // Run the normal map for every level.
         (0 until levels.size).map(this.map(_, context))
+    }
+    
+    /**
+     * Map the given string to all levels, on the given face of each base.
+     * Returns a sequence of sequences of mappings (Side or None).
+     */
+    def map(context: String, face: Face): Seq[Seq[Option[Side]]] = {
+        // Run the normal map for every level.
+        (0 until levels.size).map(this.map(_, context, face))
     }
     
     /**
