@@ -916,6 +916,18 @@ main(
         *dumpFile << "style=filled;" << std::endl;
         *dumpFile << "color=lightgrey;" << std::endl;
         *dumpFile << "label=\"Level 0\";" << std::endl;
+        
+        // Add per-contig rank constraints.
+        for(size_t i = 0; i < index.lengths.size(); i++) {
+            // For every contig, add rank edges.
+            for(size_t j = 0; j < index.lengths[i] - 1; j++) {
+                // For every base except the last...
+                // Add an edge from this one to the next one, to enforce order.
+                *dumpFile << "N" << i << "B" << j + 1 << 
+                "->N" << i << "B" << j + 2 << "[style=invis];" << std::endl;
+            }
+        }
+        
     }
     
     // Make a thread set for the context length we want.
@@ -923,19 +935,6 @@ main(
         dumpFile, options.count("quiet"));
         
     if(options.count("dump")) {
-        // Add per-contig rank constraints.
-        
-        for(size_t i = 0; i < index.lengths.size(); i++) {
-            // For every contig, add a rank constraint.
-            *dumpFile << "{ rank=same" << std::endl;
-            for(size_t j = 0; j < index.lengths[i]; j++) {
-                // For every base in it, say it's at this rank.
-                *dumpFile << "\tN" << i << "B" << j + 1 << std::endl;
-            }
-            *dumpFile << "}";
-        }
-        
-    
         // End the cluster and start a new one.
         *dumpFile << "}" << std::endl << "subgraph cluster_L1 {" << std::endl;
         *dumpFile << "style=filled;" << std::endl;
