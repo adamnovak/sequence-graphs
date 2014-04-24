@@ -140,7 +140,7 @@ mergeNonsymmetric(
 ) {
     
     // Keep track of nodes we have already dumped.
-    std::map<std::string, bool> dumped;
+    std::set<std::string> dumped;
     
     // Make a thread set from our index.
     stPinchThreadSet* threadSet = makeThreadSet(index);
@@ -232,7 +232,7 @@ mergeNonsymmetric(
                             firstContigNumber * 2, firstOffset - 2)) << 
                             " -> " << firstName << ";" << std::endl;
                     }
-                    dumped[firstName] = true;
+                    dumped.insert(firstName);
                 }
             }
             
@@ -300,7 +300,7 @@ mergeNonsymmetric(
                                 otherContigNumber * 2, otherOffset - 2)) << 
                                 " -> " << otherName << ";" << std::endl;
                         }
-                        dumped[otherName] = true;
+                        dumped.insert(otherName);
                     }
                 }
                 
@@ -652,13 +652,13 @@ makeLevelIndex(
                 char sourceChar = index.display(base);
                 char destChar = index.display(canonicalized.first.first, 
                             canonicalized.first.second, canonicalized.second);
-                std::cout << "Merged a " << sourceChar << " into a " << destChar <<
-                    std::endl;
+                std::cout << "Merged a " << sourceChar << " into a " << 
+                    destChar << std::endl;
             )
             
             if(dumpFile != NULL) {
-                // What edge would we want to dump? One from the lower (contig,
-                // offset) to the higher coordinate.
+                // What edge would we want to dump? One from the lower-level
+                // (contig, offset) to the higher-level coordinate.
                 std::pair<CSA::pair_type, long long int> edge = 
                     std::make_pair(std::make_pair(index.getContigNumber(base), 
                     index.getOffset(base)), positionCoordinate);
@@ -923,6 +923,19 @@ main(
         dumpFile, options.count("quiet"));
         
     if(options.count("dump")) {
+        // Add per-contig rank constraints.
+        
+        for(size_t i = 0; i < index.lengths.size(); i++) {
+            // For every contig, add a rank constraint.
+            *dumpFile << "{ rank=same" << std::endl;
+            for(size_t j = 0; j < index.lengths[i]; j++) {
+                // For every base in it, say it's at this rank.
+                *dumpFile << "\tN" << i << "B" << j + 1 << std::endl;
+            }
+            *dumpFile << "}";
+        }
+        
+    
         // End the cluster and start a new one.
         *dumpFile << "}" << std::endl << "subgraph cluster_L1 {" << std::endl;
         *dumpFile << "style=filled;" << std::endl;
