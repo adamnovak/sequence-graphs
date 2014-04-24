@@ -4,6 +4,8 @@
 #include <cstdlib>
 #include <sstream>
 #include <set>
+#include <algorithm>
+#include <utility>
 
 #include <boost/filesystem.hpp>
 #include "boost/program_options.hpp" 
@@ -37,15 +39,18 @@
  * Define a macro for easily compiling in/out detailed debugging information.
  * Replaces the one we got from the fmd header.
  */
-//#define DEBUG(op) op
-#define DEBUG(op)
+#define DEBUG(op) op
+//#define DEBUG(op)
 
 
 /**
  * Look at the text of a base to see what arrow it needs to
  * have. Can also pass a base "strand" number.
  */
-std::string getArrow(CSA::usint textNumber) {
+std::string 
+getArrow(
+    CSA::usint textNumber
+) {
     if(textNumber % 2 == 0) {
         // It's a left, so it gets a normal arrow
         return "normal";
@@ -60,8 +65,11 @@ std::string getArrow(CSA::usint textNumber) {
  * given FASTAs for the bottom level FMD index. Returns the basename of the FMD
  * index that gets created.
  */
-std::string buildIndex(std::string indexDirectory,
-    std::vector<std::string> fastas) {
+std::string
+buildIndex(
+    std::string indexDirectory,
+    std::vector<std::string> fastas
+) {
 
     // Make sure an empty indexDirectory exists.
     if(boost::filesystem::exists(indexDirectory)) {
@@ -94,7 +102,10 @@ std::string buildIndex(std::string indexDirectory,
 /**
  * Make a thread set with one thread representing each contig in the index.
  */
-stPinchThreadSet* makeThreadSet(const FMDIndex& index) {
+stPinchThreadSet* 
+makeThreadSet(
+    const FMDIndex& index
+) {
     // Make a ThreadSet with one thread per contig.
     // Construct the thread set first.
     stPinchThreadSet* threadSet = stPinchThreadSet_construct();
@@ -120,8 +131,13 @@ stPinchThreadSet* makeThreadSet(const FMDIndex& index) {
  * merge at a longer context length will also merge at a shorter context length,
  * so we can just directly calculate each upper level in turn.
  */
-stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
-    size_t contextLength, std::ostream* dumpFile = NULL, bool quiet = false) {
+stPinchThreadSet*
+mergeNonsymmetric(
+    const FMDIndex& index,
+    size_t contextLength,
+    std::ostream* dumpFile = NULL,
+    bool quiet = false
+) {
     
     // Keep track of nodes we have already dumped.
     std::map<std::string, bool> dumped;
@@ -144,11 +160,6 @@ stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
             // Dump the context and range.
             std::cout << pattern << " at " << range << std::endl;
         }
-        
-        // Check by counting again
-        //CSA::pair_type count = index.fmd.count(pattern);
-        //std::cout << "Count: (" << count.first << "," << count.second << ")" <<
-        //    std::endl;
         
         if(range.end_offset >= 1 || dumpFile != NULL) {
             // We only need to do any pinching if this context appears in two or
@@ -231,8 +242,10 @@ stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
                 // Find and unpack it just like for the first base.
                 CSA::pair_type otherBase = index.fmd.getRelativePosition(
                     locations[j]);
-                //std::cout << "Relative position: (" << otherBase.first << "," << 
-                //    otherBase.second << ")" << std::endl;   
+                DEBUG(
+                    std::cout << "Relative position: (" << otherBase.first << 
+                    "," << otherBase.second << ")" << std::endl;   
+                )
                 CSA::usint otherContigNumber = index.getContigNumber(otherBase);
                 CSA::usint otherStrand = index.getStrand(otherBase);
                 CSA::usint otherOffset = index.getOffset(otherBase);
@@ -269,7 +282,8 @@ stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
                         // Get its base
                         char baseChar = index.display(otherBase);
                         if(otherStrand) {
-                            // Flip it around so we always see forward strand bases.
+                            // Flip it around so we always see forward strand
+                            // bases.
                             baseChar = CSA::reverse_complement(baseChar);
                         }
                     
@@ -281,8 +295,8 @@ stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
                         if(otherOffset > 1) {
                             // Link previous position to us.
                             *dumpFile << index.getName(std::make_pair(
-                                // Hack to get the base actually before us on the
-                                // contig.
+                                // Hack to get the base actually before us on
+                                // the contig.
                                 otherContigNumber * 2, otherOffset - 2)) << 
                                 " -> " << otherName << ";" << std::endl;
                         }
@@ -313,22 +327,17 @@ stPinchThreadSet* mergeNonsymmetric(const FMDIndex& index,
 }
 
 /**
- * Turn the given (text, offset) pair into a canonical (contig number, offset
- * from contig start, orientation), using the given FMDIndex and the given
- * thread set. The orientation is which face of the canonical base this (text,
- * offset) pair means.
+ * Turn the given (contig number, 1-based offset from start, orientation)
+ * position into the same sort of structure for the canonical base that
+ * represents all the bases it has been pinched with.
  */
-std::pair<std::pair<size_t, CSA::usint>, bool> canonicalize(
-    const FMDIndex& index, stPinchThreadSet* threadSet, CSA::pair_type base) {
-    
-    // What contig corresponds to that text?
-    CSA::usint contigNumber = index.getContigNumber(base);
-    // And what strand corresponds to that text? This tells us what
-    // orientation we're actually looking at the base in.
-    bool strand = (bool) index.getStrand(base);
-    // And what base position is that from the front of the contig? This is
-    // 1-based.
-    CSA::usint offset = index.getOffset(base);
+std::pair<std::pair<size_t, CSA::usint>, bool>
+canonicalize(
+    stPinchThreadSet* threadSet, 
+    size_t contigNumber,
+    CSA::usint offset,
+    bool strand
+) {
     
     // Now we need to look up what the pinch set says is the canonical
     // position for this base, and what orientation it should be in. All the
@@ -409,6 +418,121 @@ std::pair<std::pair<size_t, CSA::usint>, bool> canonicalize(
 }
 
 /**
+ * Turn the given (text, offset) pair into a canonical (contig number, 1-based
+ * offset from contig start, orientation), using the given FMDIndex and the
+ * given thread set. The orientation is which face of the canonical base this
+ * (text, offset) pair means.
+ */
+std::pair<std::pair<size_t, CSA::usint>, bool>
+canonicalize(
+    const FMDIndex& index, 
+    stPinchThreadSet* threadSet, 
+    CSA::pair_type base
+) {
+    
+    // What contig corresponds to that text?
+    CSA::usint contigNumber = index.getContigNumber(base);
+    // And what strand corresponds to that text? This tells us what
+    // orientation we're actually looking at the base in.
+    bool strand = (bool) index.getStrand(base);
+    // And what base position is that from the front of the contig? This is
+    // 1-based.
+    CSA::usint offset = index.getOffset(base);
+    
+    // Canonicalize that pinch thread set position.
+    return canonicalize(threadSet, contigNumber, offset, strand);
+    
+}
+
+/**
+ * Write GraphViz edges for adjacencies between merged nodes, which are derived
+ * by canonicalizing and looking up the IDs for successive positions, and
+ * linking them together.
+ *
+ * Takes a pinch thread set that knows what all the contigs are and how they got
+ * pinched, a map from canonical pinch thread bases to merged position IDs, and
+ * the stream to send the GraphViz data to.
+ */
+void makeMergedAdjacencies(
+    stPinchThreadSet* threadSet, 
+    std::map<std::pair<size_t, CSA::usint>, long long int> idReservations, 
+    std::ofstream* dumpFile
+) {
+
+    // We need a way to keep track of what edges we have already made between
+    // sides. So keep a set of merged base IDs and orientation flags. Make sure
+    // the key pairs are sorted!
+    typedef std::pair<long long int, bool> mergedSide;
+    std::set<std::pair<mergedSide, mergedSide> > addedEdges;
+    
+    // Iterate through the pinch threads. We need to do a bit of an odd loop
+    // since this is a bit of an odd iterator.
+    stPinchThread* thread;
+    for(stPinchThreadSetIt i = stPinchThreadSet_getIt(threadSet); 
+        (thread = stPinchThreadSetIt_getNext(&i)) != NULL; ) {
+        // For each thread...
+        
+        // Get its name
+        size_t name = stPinchThread_getName(thread);
+        for(size_t j = stPinchThread_getStart(thread); 
+            j < stPinchThread_getStart(thread) + 
+            stPinchThread_getLength(thread) - 1; j++) {
+            
+            // For each base in the thread that isn't the last...
+            
+            DEBUG(std::cout << "Linking merged base " << j << " on thread " <<
+                name << std::endl;)
+            
+            
+            
+            // Canonicalize its right side (strand 0 or false), which is the one
+            // linked by this adjacency to the next base.
+            std::pair<std::pair<size_t, CSA::usint>, bool> canonicalBase =
+                canonicalize(threadSet, name, j, false);
+            
+            // Also canonicalize the left side of the next base.
+            std::pair<std::pair<size_t, CSA::usint>, bool> canonicalNextBase =
+                canonicalize(threadSet, name, j + 1, true);
+                
+            // What IDs and sides do these go to? Hold pairs of coordinate and
+            // side.
+            mergedSide side = 
+                std::make_pair(idReservations[canonicalBase.first],
+                canonicalBase.second);
+            mergedSide nextSide = 
+                std::make_pair(idReservations[canonicalNextBase.first],
+                canonicalNextBase.second);
+            
+            
+            if(nextSide < side) {
+                // These are in the wrong order. All our edges need to go from
+                // smallest to largest, so we don't repeat them.
+                std::swap(side, nextSide);
+            }
+            
+            // What edge would we make? Pair up the sides in order.
+            std::pair<mergedSide, mergedSide> edge = std::make_pair(side,
+                nextSide);
+                
+            if(addedEdges.count(edge) == 0) {
+                // This is a new edge between merged sides. Print it out.
+                *dumpFile << "M" << side.first << " -> " << "M" << 
+                    nextSide.first << "[dir=both,arrowtail=" << 
+                    getArrow(!side.second) << ",arrowhead=" << 
+                    getArrow(!nextSide.second) << ",color=red];" << std::endl;
+                    
+                // Add the edge.
+                addedEdges.insert(edge);
+            }
+        
+        }  
+        
+    }
+
+    
+}
+
+/**
  * Make the range vector and list of matching Sides for the hierarchy level
  * implied by the given thread set in the given index. Gets IDs for created
  * positions from the given source.
@@ -421,9 +545,14 @@ std::pair<std::pair<size_t, CSA::usint>, bool> canonicalize(
  * 
  * Don't forget to delete the bit vector when done!
  */
-std::pair<CSA::RLEVector*, std::vector<Side> > makeLevelIndex(
-    stPinchThreadSet* threadSet, const FMDIndex& index, size_t contextLength,
-    IDSource<long long int>& source, std::ofstream* dumpFile = NULL) {
+std::pair<CSA::RLEVector*, std::vector<Side> > 
+makeLevelIndex(
+    stPinchThreadSet* threadSet, 
+    const FMDIndex& index, 
+    size_t contextLength,
+    IDSource<long long int>& source, 
+    std::ofstream* dumpFile = NULL
+) {
     
     // We need to make bit vector denoting ranges, which we encode with this
     // encoder, which has 32 byte blocks.
@@ -596,6 +725,13 @@ std::pair<CSA::RLEVector*, std::vector<Side> > makeLevelIndex(
     CSA::RLEVector* bitVector = new CSA::RLEVector(encoder, 
         bwtBounds.second + 1);
     
+    if(dumpFile != NULL) {
+        // We need to add in the edges that connect merged positions together.
+        // This requires walking all the contigs again, so we put it in its own
+        // function.
+        makeMergedAdjacencies(threadSet, idReservations, dumpFile);
+    }
+    
     // Return the bit vector and the Side vector
     return make_pair(bitVector, mappings);
 }
@@ -605,8 +741,10 @@ std::pair<CSA::RLEVector*, std::vector<Side> > makeLevelIndex(
  * which must not yet exist. Also deletes the bit vector, so don't use that
  * level index again.
  */
-void saveLevelIndex(std::pair<CSA::RLEVector*, std::vector<Side> > levelIndex,
-    std::string directory) {
+void saveLevelIndex(
+    std::pair<CSA::RLEVector*, std::vector<Side> > levelIndex,
+    std::string directory
+) {
     
     std::cout << "Saving index to disk..." << std::endl;
     
@@ -654,7 +792,11 @@ void saveLevelIndex(std::pair<CSA::RLEVector*, std::vector<Side> > levelIndex,
 /**
  * createIndex: command-line tool to create a multi-level reference structure.
  */
-int main(int argc, char** argv) {
+int 
+main(
+    int argc, 
+    char** argv
+) {
     // Parse options with boost::programOptions. See
     // <http://www.radmangames.com/programming/how-to-use-boost-program_options>
 

@@ -23,6 +23,12 @@ abstract class HierarchySuite extends FunSuite with BeforeAndAfterAll {
      */
     def sequences = Seq("ACTAGT")
     
+    /**
+     * This can be overridden to specify the context length to use for merging
+     * positions.
+     */
+    def contextLength = 3
+    
     override def beforeAll = {
         // Make a new temp directory
         scratch = Files.createTempDirectory("test")
@@ -48,8 +54,10 @@ abstract class HierarchySuite extends FunSuite with BeforeAndAfterAll {
             fasta
         }
         
-        // Invoke the createIndex tool on all the FASTAs.
-        val returnCode = (Seq("./createIndex.sh", indexName) ++ files)!
+        // Invoke the createIndex tool on all the FASTAs, with the given context
+        // length.
+        val returnCode = (Seq("./createIndex.sh", "--context", 
+            contextLength.toString, indexName) ++ files)!
 
         if(returnCode != 0) {
             // Don't continue on with the test if we can't construct the
