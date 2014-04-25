@@ -39,8 +39,8 @@
  * Define a macro for easily compiling in/out detailed debugging information.
  * Replaces the one we got from the fmd header.
  */
-#define DEBUG(op) op
-//#define DEBUG(op)
+//#define DEBUG(op) op
+#define DEBUG(op)
 
 
 /**
@@ -167,10 +167,9 @@ mergeNonsymmetric(
             // we check to see if it's 1 or more.
             
             // Grab just the one-strand range, and construct the actual
-            // endpoint. Use the reverse strand so that we handle things in
-            // increasing coordinate order.
-            CSA::pair_type oneStrandRange = std::make_pair(range.reverse_start, 
-                range.reverse_start + range.end_offset);
+            // endpoint.
+            CSA::pair_type oneStrandRange = std::make_pair(range.forward_start, 
+                range.forward_start + range.end_offset);
             
             DEBUG(std::cout << "Locating (" << oneStrandRange.first << "," <<
                 oneStrandRange.second << ")" << std::endl;)
@@ -578,6 +577,17 @@ makeLevelIndex(
     std::pair<size_t, CSA::usint> lastCanonical;
     // And the last orientation relative to that base
     bool lastOrientation;
+    
+    
+    for(CSA::FMD::iterator i = index.fmd.begin(contextLength, true); 
+        i != index.fmd.end(contextLength, true); ++i) {
+        
+        // Go through all the contexts, including shortened ones before end of
+        // text.
+        
+        std::cout << "Context: " << *i << std::endl;
+        
+    }
     
     std::cout << "Scanning through BWT..." << std::endl;
     
