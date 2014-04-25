@@ -39,8 +39,8 @@
  * Define a macro for easily compiling in/out detailed debugging information.
  * Replaces the one we got from the fmd header.
  */
-//#define DEBUG(op) op
-#define DEBUG(op)
+#define DEBUG(op) op
+//#define DEBUG(op)
 
 
 /**
@@ -153,6 +153,7 @@ mergeNonsymmetric(
         
         // Unpack the iterator into pattern and FMDPosition at which it happens.
         std::string pattern = (*i).first;
+        // This is in SA coordinates.
         CSA::FMDPosition range = (*i).second;
         
         
@@ -337,6 +338,9 @@ canonicalize(
     CSA::usint offset,
     bool strand
 ) {
+    
+    DEBUG(std::cout << "Canonicalizing " << contigNumber << ":" << offset << 
+        "." << strand << std::endl;)
     
     // Now we need to look up what the pinch set says is the canonical
     // position for this base, and what orientation it should be in. All the
@@ -567,17 +571,10 @@ makeLevelIndex(
     std::map<std::pair<size_t, CSA::usint>, long long int>
         idReservations;
         
-    // Keep track of a set of edges from (contig, offset) to higher-level merged
-    // nodes that we have already dumped, so we don't dump the same edge
-    // multiple times.
-    std::set<std::pair<std::pair<size_t, CSA::usint>, long long int> >
-        edgesDumped;
-        
-    // Keep track of the last canonical base
-    std::pair<size_t, CSA::usint> lastCanonical;
-    // And the last orientation relative to that base
-    bool lastOrientation;
-    
+    // Work out where the valid positions in the BWT are.
+    CSA::pair_type bwtBounds = index.fmd.getBWTRange();
+
+    std::cout << "Building mapping data structure..." << std::endl;
     
     for(CSA::FMD::iterator i = index.fmd.begin(contextLength, true); 
         i != index.fmd.end(contextLength, true); ++i) {
@@ -585,49 +582,37 @@ makeLevelIndex(
         // Go through all the contexts, including shortened ones before end of
         // text.
         
-        std::cout << "Context: " << *i << std::endl;
+        // Unpack the iterator into pattern and FMDPosition at which it happens.
+        std::string context = (*i).first;
+        // Keep in mind that this is in SA coordinates!
+        CSA::FMDPosition range = (*i).second;
         
-    }
-    
-    std::cout << "Scanning through BWT..." << std::endl;
-    
-    // What range should we scan?
-    CSA::pair_type bwtBounds = index.fmd.getBWTRange();
-    for(CSA::usint bwtIndex = bwtBounds.first; bwtIndex < bwtBounds.second + 1;
-        bwtIndex++) {
+        // Work out where the forward range starts in BWT coordinates (again)
+        CSA::usint bwtStart = range.forward_start;
+        index.fmd.convertToBWTIndex(bwtStart);
         
-        // For each position in the BWT.
+        std::cout << "===Context: " << context << " at range " << range << 
+            "===" << std::endl;
         
-        // Find its text and offset by converting to SA, locating, and
-        // converting to a relative position.
-        CSA::pair_type base =  index.fmd.getRelativePosition(index.fmd.locate(
-            bwtIndex - index.fmd.getNumberOfSequences()));
+        if(context.size() == contextLength) {
         
-        
-        // Look up the canonical base and relative orientation for that
-        // text and offset.
-        std::pair<std::pair<size_t, CSA::usint>, bool> canonicalized = 
-            canonicalize(index, threadSet, base);
+            // If it's a full-requested-length context (and therefore all the
+            // bases in it have been pinched)...
             
-        DEBUG(std::cout << "BWT position " << bwtIndex << " is text " << 
-            base.first << " offset " << base.second << std::endl;)
+            // Locate the first base in the context. It's already in SA
+            // coordinates.
+            CSA::pair_type base = index.fmd.getRelativePosition(
+                index.fmd.locate(range.forward_start));
+            DEBUG(std::cout << "Text/Offset: (" << base.first << ", " << 
+                base.second << ")" << std::endl;)
             
-        if(bwtIndex == bwtBounds.first || 
-            canonicalized.first != lastCanonical || 
-            canonicalized.second != lastOrientation) {
+            // Canonicalize it. The second field here will be the relative
+            // orientation and determine the Side.
+            std::pair<std::pair<size_t, CSA::usint>, bool> canonicalized = 
+                canonicalize(index, threadSet, base);
             
-            DEBUG(std::cout << "Starting new range for " << 
-                canonicalized.first.first << ":" << 
-                canonicalized.first.second << "." << canonicalized.second <<
-                std::endl;)
-            
-            // We're the very first BWT entry, or we're a BWT entry that belongs
-            // to a different base than the last one. We'll need to start a new
-            // range.
-            
-            // What ID should we use?
+            // Figure out what the ID of the canonical base is.
             long long int positionCoordinate;
-            
             if(idReservations.count(canonicalized.first) > 0) {
                 // Load the previously chosen ID
                 positionCoordinate = idReservations[canonicalized.first];
@@ -635,28 +620,7 @@ makeLevelIndex(
                 // Allocate and remember a new ID.
                 positionCoordinate = idReservations[canonicalized.first] = 
                     source.next();
-                    
-                if(dumpFile != NULL) {
-                    // Since we're creating a new upper-level node, add it to
-                    // the graph we're dumping.
-                    
-                    // Work out what character it is (in its local forward
-                    // orientation).
-                    char baseChar = index.display(canonicalized.first.first, 
-                        canonicalized.first.second, false);
-                    
-                    // Write a node for it
-                    *dumpFile << "M" << positionCoordinate << 
-                        "[shape=\"record\",label=\"{" << "M" << 
-                        positionCoordinate << "|" << baseChar << "}\"];" <<
-                        std::endl;
-                    
-                }
-                
-                
             }
-            
-            // Make sure our merge is sane.
             
             DEBUG(
                 char sourceChar = index.display(base);
@@ -665,32 +629,6 @@ makeLevelIndex(
                 std::cout << "Merged a " << sourceChar << " into a " << 
                     destChar << std::endl;
             )
-            
-            if(dumpFile != NULL) {
-                // What edge would we want to dump? One from the lower-level
-                // (contig, offset) to the higher-level coordinate.
-                std::pair<CSA::pair_type, long long int> edge = 
-                    std::make_pair(std::make_pair(index.getContigNumber(base), 
-                    index.getOffset(base)), positionCoordinate);
-                    
-                if(edgesDumped.count(edge) == 0) {
-                    // Edge is not yet dumped
-            
-                    // Add a generalization edge up to this node.
-                    *dumpFile << index.getName(base) << 
-                        " -> " << "M" << positionCoordinate << 
-                        // Give an arrow tail according to the relative 
-                        // orientation, and an arrow head that is always
-                        // forward.
-                        "[dir=both,arrowtail=" << 
-                        getArrow(index.getStrand(base)) << ",arrowhead=" << 
-                        getArrow(!canonicalized.second) << 
-                        ",color=green];" << std::endl;
-                    // Say we dumped this edge, so the next range we come to
-                    // (like the other side) won't dump another copy.
-                    edgesDumped.insert(edge);
-                }
-            }
             
             // Say this range is going to belong to the ID we just looked up, on
             // the appropriate face.
@@ -701,33 +639,128 @@ makeLevelIndex(
             // Add the mapping
             mappings.push_back(mapping);
             
-            if(bwtIndex != bwtBounds.first) {
+            if(bwtStart != bwtBounds.first) {
                 // Record a 1 in the vector at the start of every range except
                 // the first, in BWT coordinates. The first needs no 1 before it
                 // so it will be rank 0 (and match up with mapping 0), and it's
                 // OK not to split it off from the stop characters since they
                 // can't ever be searched.
-                encoder.addBit(bwtIndex);
-                DEBUG(std::cout << "Set bit " << bwtIndex << std::endl;)
+                encoder.addBit(bwtStart);
+                DEBUG(std::cout << "Set bit " << bwtStart <<
+                    std::endl;)
             }
             
-            DEBUG(std::cout << "Canonicalized to #" << mapping.coordinate << 
+            DEBUG(std::cout << "Mapping to #" << mapping.coordinate << 
                 "." << mapping.face << std::endl;)
+            
+            // Put a 1 at the start of its interval, and add a mapping to the
+            // given ID and Side.
+            
+            // TODO: Make edges by traversing the pinch graph.
                 
-            // Remember that this is now the most recently used canonical face.
-            // TODO: Consolidate into a triple or nested pairs?
-            lastCanonical = canonicalized.first;
-            lastOrientation = canonicalized.second;
+        } else if(context.size() < contextLength) {
+            // Otherwise if it's a shorter than requested context, it's
+            // possible not everything has been merged. So do the old thing
+            // where we locate each base and, when the canonical position
+            // changes, add a 1 to start a new range and add a mapping.
+
+            // Grab just the one-strand range, and construct the actual
+            // endpoint.
+            CSA::pair_type oneStrandRange = std::make_pair(range.forward_start, 
+                range.forward_start + range.end_offset);
             
+            // Locate the entire range. We'll have to free this eventually.
+            // There are at least two of these.
+            CSA::usint* locations = index.fmd.locate(oneStrandRange);
+                
+            if(locations == NULL) {
+                throw std::runtime_error("Coud not locate short suffix!");
+            }
             
+            // Keep track of the ID and relative orientation for the last
+            // position we canonicalized.
+            std::pair<std::pair<size_t, CSA::usint>, bool> lastCanonicalized;
+            
+            for(CSA::usint j = 0; j < range.end_offset + 1; j++) {
+                // For each base in the range...
+                
+                // Where was it located?
+                CSA::pair_type base = index.fmd.getRelativePosition(
+                    locations[j]);
+                
+                // Canonicalize it. The second field here will be the relative
+                // orientation and determine the Side.
+                std::pair<std::pair<size_t, CSA::usint>, bool> canonicalized = 
+                    canonicalize(index, threadSet, base);
+                    
+                if(j == 0 || canonicalized != lastCanonicalized) {
+                    // We need to start a new range here, because this BWT base
+                    // maps to a different position than the last one.
+                    
+                    // What position is that? TODO: Unify with ID assignment
+                    // above.
+                    long long int positionCoordinate;
+                    if(idReservations.count(canonicalized.first) > 0) {
+                        // Load the previously chosen ID
+                        positionCoordinate = 
+                            idReservations[canonicalized.first];
+                    } else {
+                        // Allocate and remember a new ID.
+                        positionCoordinate = 
+                            idReservations[canonicalized.first] = 
+                            source.next();
+                    }
+                    
+                    DEBUG(
+                        char sourceChar = index.display(base);
+                        char destChar = index.display(canonicalized.first.first, 
+                                    canonicalized.first.second,
+                                    canonicalized.second);
+                        std::cout << "Merged a " << sourceChar << " into a " << 
+                            destChar << std::endl;
+                    )
+                    
+                    // Say this range is going to belong to the ID we just
+                    // looked up, on the appropriate face.
+                    Side mapping;
+                    mapping.coordinate = positionCoordinate;
+                    // What face?
+                    mapping.face = canonicalized.second ? LEFT : RIGHT;
+                    // Add the mapping
+                    mappings.push_back(mapping);
+                    
+                    // Add in the bit the same as above, only here we add the
+                    // offset of i.
+                    if(bwtStart + j != bwtBounds.first) {
+                        // Record a 1 in the vector at the start of every range
+                        // except the first, in BWT coordinates. The first needs
+                        // no 1 before it so it will be rank 0 (and match up
+                        // with mapping 0), and it's OK not to split it off from
+                        // the stop characters since they can't ever be
+                        // searched.
+                        encoder.addBit(bwtStart + j);
+                        DEBUG(std::cout << "Set bit " << bwtStart + j <<
+                            std::endl;)
+                    }
+                    
+                    DEBUG(std::cout << "Mapping to #" << 
+                        mapping.coordinate << "." << mapping.face << std::endl;)
+                    
+                    // Remember what canonical base and face we're doing for
+                    // this range.
+                    lastCanonicalized = canonicalized;
+                }
+                // Otherwise we had the same canonical base, so we want this in
+                // the same range we already started.
+            }
+        } else {
+            // We got a context that's longer than we asked for?
+            throw std::runtime_error("Iterated context longer than requested!");
         }
-        
-    
     }
     
     // Set a bit after the end of the last range.
     encoder.addBit(bwtBounds.second + 1);
-    
     
     // Finish the vector encoder into a vector of the right length.
     // This should always end in a 1! Make sure to flush first.
