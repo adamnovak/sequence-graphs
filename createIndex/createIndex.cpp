@@ -591,8 +591,8 @@ makeLevelIndex(
         CSA::usint bwtStart = range.forward_start;
         index.fmd.convertToBWTIndex(bwtStart);
         
-        std::cout << "===Context: " << context << " at range " << range << 
-            "===" << std::endl;
+        DEBUG(std::cout << "===Context: " << context << " at range " << range <<
+            "===" << std::endl;)
         
         if(context.size() == contextLength) {
         
