@@ -6,6 +6,7 @@
 #include <set>
 #include <algorithm>
 #include <utility>
+#include <ctime>
 
 #include <boost/filesystem.hpp>
 #include "boost/program_options.hpp" 
@@ -41,6 +42,15 @@
  */
 //#define DEBUG(op) op
 #define DEBUG(op)
+
+// Define a read to use for testing. 200 bp.
+const std::string TEST_READ(std::string("GACGGGACTCGCCGCCGCCCAGCCGGGGTTCCCGC") +
+    "TGGCGCAATTGAAAACTTTCGTCGATCAGGAATTTGCCCAAATAAAACATGTCCTGCATGGCATTAGTTTGT" +
+    "TGGGGCAGTGCCCGGATAGCATCAACGCTGCGCTGATTTGCCGTGGCGAGAAAATGTCGATCGCCATTATGG" +
+    "CCGGCGTATTAGAAGCGCG");
+    
+// How many times to try mapping this read?
+const int TEST_ITERATIONS = 1000;
 
 
 /**
@@ -781,8 +791,8 @@ makeLevelIndex(
 
 /**
  * Save both parts of the given level index to files in the given directory,
- * which must not yet exist. Also deletes the bit vector, so don't use that
- * level index again.
+ * which must not yet exist. Does not delete the bit vector from the level
+ * index, so it can be reused.
  */
 void saveLevelIndex(
     std::pair<CSA::RLEVector*, std::vector<Side> > levelIndex,
@@ -798,9 +808,6 @@ void saveLevelIndex(
     std::ofstream vectorStream((directory + "/vector.bin").c_str());
     levelIndex.first->writeTo(vectorStream);
     vectorStream.close();
-    
-    // Delete the bit vector since we're done with it.
-    delete levelIndex.first;
     
     // Now write out all the merged positions to Avro, in an Avro-format file.
     // See <http://avro.apache.org/docs/1.7.6/api/cpp/html/index.html>. This is
@@ -833,6 +840,54 @@ void saveLevelIndex(
 }
 
 /**
+ * Map a read repeatedly to the bottom level.
+ */
+void
+testBottomMapping(
+    const FMDIndex& index
+) {
+    // Start the timer
+    clock_t start = clock();
+    for(int i = 0; i < TEST_ITERATIONS; i++) {
+        // Map repeatedly
+        index.fmd.map(TEST_READ);
+    }
+    // Stop the timer
+    clock_t end = clock();
+    
+    // Work out how many milliseconds each call took
+    double msPerCall = ((double)(end - start)) / 
+        (CLOCKS_PER_SEC / 1000.0) / TEST_ITERATIONS;
+        
+    std::cout << "Mapping to bottom level: " << msPerCall << " ms per call" <<
+        std::endl;
+}
+
+/**
+ * Map a read repeatedly to the merged level.
+ */
+void
+testMergedMapping(
+    const FMDIndex& index, const CSA::RLEVector* ranges
+) {
+    // Start the timer
+    clock_t start = clock();
+    for(int i = 0; i < TEST_ITERATIONS; i++) {
+        // Map repeatedly
+        index.fmd.map(*ranges, TEST_READ);
+    }
+    // Stop the timer
+    clock_t end = clock();
+    
+    // Work out how many milliseconds each call took
+    double msPerCall = ((double)(end - start)) / 
+        (CLOCKS_PER_SEC / 1000.0) / TEST_ITERATIONS;
+        
+    std::cout << "Mapping to merged level: " << msPerCall << " ms per call" <<
+        std::endl;
+}
+
+/**
  * createIndex: command-line tool to create a multi-level reference structure.
  */
 int 
@@ -853,6 +908,7 @@ main(
     description.add_options() 
         ("help", "Print help messages") 
         ("dump", "Dump GraphViz graphs")
+        ("test", "Run a mapping speed test")
         ("quiet", "Don't print every context")
         ("context", boost::program_options::value<unsigned int>()
             ->default_value(3), 
@@ -1001,6 +1057,16 @@ main(
         dumpFile->close();
         delete dumpFile;
     }
+    
+    // Run the speed tests if we want to
+    if(options.count("test")) {
+        std::cout << "Running performance tests..." << std::endl;
+        testBottomMapping(index);
+        testMergedMapping(index, levelIndex.first);
+    }
+    
+    // Get rid of the range vector
+    delete levelIndex.first;
 
     // Now we're done!
     return 0;
