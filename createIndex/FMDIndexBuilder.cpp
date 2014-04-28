@@ -104,7 +104,7 @@ void FMDIndexBuilder::add(const std::string& filename) {
 
     // Configure build_rlcsa by writing a configuration file.
     std::ofstream configStream;
-    contigStream.open((basename + ".rlcsa.parameters").c_str(),
+    contigStream.open((tempDir + "/haplotypes.rlcsa.parameters").c_str(),
         std::ofstream::out);
         
     configStream << "RLCSA_BLOCK_SIZE = 32" << std::endl;

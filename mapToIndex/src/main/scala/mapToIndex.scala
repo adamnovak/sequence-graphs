@@ -40,13 +40,16 @@ object MapToIndex {
                 |""".stripMargin)
             
             val cluster = opt[String](default = Some("local"),
-                descr = "Run against this cluster URL")
+                descr = "cluster URL to run against")
             
             val index = trailArg[String](required = true,
                 descr = "index path to load")
                 
-            val pattern = trailArg[String](required = true,
+            val pattern = trailArg[String](required = true, 
                 descr = "string to map")
+            
+            val repeat = opt[Int](noshort = true, default=Some(1),
+                descr = "number of times to repeat the mapping")
             
             val version = opt[Boolean](noshort = true, 
                 descr = "Print version")
@@ -102,16 +105,20 @@ object MapToIndex {
         // Make the ReferenceHierarchy from the index we built
         val hierarchy = new ReferenceHierarchy(indexPath)
         
-        println("Hierarchy loaded! Mapping...")
+        println("Hierarchy loaded! Mapping %s times..."
+            .format(opts.repeat.get.get))
         
         // Map to all levels
-        val mappings: Seq[Seq[Option[Side]]] = hierarchy.map(pattern)
+        var mappings: Seq[Seq[Option[Side]]] = null
+        
+        for(i <- 0 until opts.repeat.get.get) {
+            // Repeat the mapping several times for benchmarking purposes.
+            mappings = hierarchy.map(pattern)
+        }
         
         // Get the left and right mappings
-        println("===Starting left mapping===")
         val leftMappings = hierarchy.map(pattern, Face.LEFT)
         
-        println("===Starting right mapping===")
         val rightMappings = hierarchy.map(pattern, Face.RIGHT)
         
         // Have a little function to format the sides
