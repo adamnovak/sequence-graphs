@@ -108,6 +108,10 @@ object MapToIndex {
         println("Hierarchy loaded! Mapping %s times..."
             .format(opts.repeat.get.get))
         
+        // We want to track time per mapping. See
+        // <http://rosettacode.org/wiki/Time_a_function#Scala>
+        val startTime = System.currentTimeMillis
+        
         // Map to all levels
         var mappings: Seq[Seq[Option[Side]]] = null
         
@@ -115,6 +119,9 @@ object MapToIndex {
             // Repeat the mapping several times for benchmarking purposes.
             mappings = hierarchy.map(pattern)
         }
+        
+        // Stop the timer
+        val endTime = System.currentTimeMillis
         
         // Get the left and right mappings
         val leftMappings = hierarchy.map(pattern, Face.LEFT)
@@ -157,6 +164,11 @@ object MapToIndex {
                 println(row.map(_.padTo(10, ' ')).mkString("\t"))
             }
         }
+        
+        
+        // Report time per mapping.
+        println("map() took %f ms/call".format((endTime - startTime).toDouble / 
+            opts.repeat.get.get))
         
     }
 }
