@@ -104,7 +104,7 @@ void FMDIndexBuilder::add(const std::string& filename) {
 
     // Configure build_rlcsa by writing a configuration file.
     std::ofstream configStream;
-    contigStream.open((tempDir + "/haplotypes.rlcsa.parameters").c_str(),
+    configStream.open((tempDir + "/haplotypes.rlcsa.parameters").c_str(),
         std::ofstream::out);
         
     configStream << "RLCSA_BLOCK_SIZE = 32" << std::endl;
@@ -116,7 +116,6 @@ void FMDIndexBuilder::add(const std::string& filename) {
     configStream.flush();
     configStream.close();
 
-    
     // Index the haplotypes file with build_rlcsa. Use some hardcoded number
     // of threads.
     int pid = fork();
