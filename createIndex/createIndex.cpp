@@ -44,7 +44,7 @@
 #define DEBUG(op)
 
 // Define a read to use for testing. 200 bp perfect match.
-const std::string TEST_READ1(std::string("GACGGGACTCGCCGCCGCCCAGCCGGGGTTCCCGC") +
+const std::string TEST_READ(std::string("GACGGGACTCGCCGCCGCCCAGCCGGGGTTCCCGC") +
     "TGGCGCAATTGAAAACTTTCGTCGATCAGGAATTTGCCCAAATAAAACATGTCCTGCATGGCATTAGTTTGT" +
     "TGGGGCAGTGCCCGGATAGCATCAACGCTGCGCTGATTTGCCGTGGCGAGAAAATGTCGATCGCCATTATGG" +
     "CCGGCGTATTAGAAGCGCG");
@@ -63,7 +63,7 @@ const std::string TEST_READ3(std::string("GACGGGAATCGCCGACGCCCAGCCGGGTTTCCGC") +
     
 // 200bp unrelated
 // >hg19_dna range=chr21:33031597-33031797 5'pad=0 3'pad=0 strand=+ repeatMasking=none
-const std::string TEST_READ(std::string("GCATCCATCTTGGGGCGTCCCAATTGCTGAGTAACAAATGAGACGCTGTG") +
+const std::string TEST_READ4(std::string("GCATCCATCTTGGGGCGTCCCAATTGCTGAGTAACAAATGAGACGCTGTG") +
     "GCCAAACTCAGTCATAACTAATGACATTTCTAGACAAAGTGACTTCAGAT" +
     "TTTCAAAGCGTACCCTGTTTACATCATTTTGCCAATTTCGCGTACTGCAA" +
     "CCGGCGGGCCACGCCCCCGTGAAAAGAAGGTTGTTTTCTCCACATTTCGG" +
@@ -71,7 +71,7 @@ const std::string TEST_READ(std::string("GCATCCATCTTGGGGCGTCCCAATTGCTGAGTAACAAAT
 
     
 // How many times to try mapping this read?
-const int TEST_ITERATIONS = 1000;
+const int TEST_ITERATIONS = 1;
 
 
 /**
@@ -961,6 +961,44 @@ testMergedMapping(
     CSA::pair_type stats = CSA::FMD::getStats();
     std::cout << "Extends/restarts: " << stats.first << " / " << stats.second <<
         std::endl;
+        
+    // Now try with FM-index mapping
+    
+    // Start the timer
+    start = clock();
+    for(int i = 0; i < TEST_ITERATIONS; i++) {
+        // Map repeatedly
+        index.fmd.mapFM(*ranges, TEST_READ);
+    }
+    // Stop the timer
+    end = clock();
+    
+    // Work out how many milliseconds each call took
+    msPerCall = ((double)(end - start)) / 
+        (CLOCKS_PER_SEC / 1000.0) / TEST_ITERATIONS;
+        
+    std::cout << "FM-Mapping to merged level: " << msPerCall <<
+        " ms per call" << std::endl;
+        
+    // Compare results
+    std::vector<CSA::sint> fmd = index.fmd.map(*ranges, TEST_READ);
+    std::vector<CSA::sint> fm = index.fmd.mapFM(*ranges, TEST_READ);
+    
+    if(fmd.size() != fm.size() || !std::equal(fmd.begin(), fmd.end(), 
+        fm.begin())) {
+        
+        // Complain if I see two different results.
+        
+        std::cout << "WARNING! Mapping mismatch!" << std::endl;
+        
+        std::cout << "Got " << fmd.size() << " vs. " << fm.size() <<
+            " mappings." << std::endl;
+        
+        for(int i = 0; i < fmd.size() && i < fm.size(); i++) {
+            std::cout << fmd[i] << "\t" << fm[i] << std::endl;
+        }
+        
+    }
 }
 
 /**
