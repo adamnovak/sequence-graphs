@@ -846,6 +846,9 @@ void
 testBottomMapping(
     const FMDIndex& index
 ) {
+    // Clear FMD stats.
+    CSA::FMD::getStats();
+
     // Start the timer
     clock_t start = clock();
     for(int i = 0; i < TEST_ITERATIONS; i++) {
@@ -861,6 +864,11 @@ testBottomMapping(
         
     std::cout << "Mapping to bottom level: " << msPerCall << " ms per call" <<
         std::endl;
+        
+    // Print out the stats for extends and restarts
+    CSA::pair_type stats = CSA::FMD::getStats();
+    std::cout << "Extends/restarts: " << stats.first << " / " << stats.second <<
+        std::endl;
 }
 
 /**
@@ -870,6 +878,9 @@ void
 testMergedMapping(
     const FMDIndex& index, const CSA::RLEVector* ranges
 ) {
+    // Clear FMD stats.
+    CSA::FMD::getStats();
+
     // Start the timer
     clock_t start = clock();
     for(int i = 0; i < TEST_ITERATIONS; i++) {
@@ -884,6 +895,11 @@ testMergedMapping(
         (CLOCKS_PER_SEC / 1000.0) / TEST_ITERATIONS;
         
     std::cout << "Mapping to merged level: " << msPerCall << " ms per call" <<
+        std::endl;
+        
+    // Print out the stats for extends and restarts
+    CSA::pair_type stats = CSA::FMD::getStats();
+    std::cout << "Extends/restarts: " << stats.first << " / " << stats.second <<
         std::endl;
 }
 

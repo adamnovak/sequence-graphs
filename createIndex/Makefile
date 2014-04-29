@@ -15,7 +15,7 @@ LDFLAGS += -L../deps/rlcsa -fopenmp -L../deps/sonLib/lib
 # We need to make sure all our dependency header files are where our other
 # dependency includes want them to be. pinchesAndCacti just includes "sonLib.h",
 # so we need to explicitly point at its include directory.
-CXXFLAGS += -g -pg -O3 -I../deps -I../deps/pinchesAndCacti/inc \
+CXXFLAGS += -g -fno-inline -O3 -I../deps -I../deps/pinchesAndCacti/inc \
 -I../deps/sonLib/C/inc -DMASSIVE_DATA_RLCSA
 
 # What do we use to explode Avro IDLs into Avro schemas? You need to edit this
