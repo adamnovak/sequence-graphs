@@ -869,6 +869,45 @@ testBottomMapping(
     CSA::pair_type stats = CSA::FMD::getStats();
     std::cout << "Extends/restarts: " << stats.first << " / " << stats.second <<
         std::endl;
+        
+    // Now try with FM-index mapping
+    
+    // Start the timer
+    start = clock();
+    for(int i = 0; i < TEST_ITERATIONS; i++) {
+        // Map repeatedly
+        index.fmd.mapFM(TEST_READ);
+    }
+    // Stop the timer
+    end = clock();
+    
+    // Work out how many milliseconds each call took
+    msPerCall = ((double)(end - start)) / 
+        (CLOCKS_PER_SEC / 1000.0) / TEST_ITERATIONS;
+        
+    std::cout << "FM-Mapping to bottom level: " << msPerCall <<
+        " ms per call" << std::endl;
+        
+    // Compare results
+    std::vector<CSA::Mapping> fmd = index.fmd.map(TEST_READ);
+    std::vector<CSA::Mapping> fm = index.fmd.mapFM(TEST_READ);
+    
+    if(fmd.size() != fm.size() || !std::equal(fmd.begin(), fmd.end(), 
+        fm.begin())) {
+        
+        // Complain if I see two different results.
+        
+        std::cout << "WARNING! Mapping mismatch!" << std::endl;
+        
+        std::cout << "Got " << fmd.size() << " vs. " << fm.size() <<
+            " mappings." << std::endl;
+        
+        for(int i = 0; i < fmd.size() && i < fm.size(); i++) {
+            std::cout << fmd[i] << "\t" << fm[i] << std::endl;
+        }
+        
+    }
+    
 }
 
 /**
