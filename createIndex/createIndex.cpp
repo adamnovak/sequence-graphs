@@ -127,6 +127,9 @@ buildIndex(
         builder.add(*i);
     }
     
+    // Save to disk.
+    builder.close();
+    
     // Return the basename
     return basename;
 }
