@@ -18,11 +18,8 @@ LDFLAGS += -L../deps/rlcsa -fopenmp -L../deps/sonLib/lib
 CXXFLAGS += -g -fno-inline -O3 -I../deps -I../deps/pinchesAndCacti/inc \
 -I../deps/sonLib/C/inc -DMASSIVE_DATA_RLCSA
 
-# What do we use to explode Avro IDLs into Avro schemas? You need to edit this
-# for your system if you want to change the Avro schemas.
-IDL2SCHEMATA=java -jar \
-$(HOME)/build/avro-src-1.7.6/lang/java/tools/target/avro-tools-1.7.6.jar \
-idl2schemata
+# What do we use to explode Avro IDLs into Avro schemas?
+IDL2SCHEMATA=java -jar avro-tools-1.7.6.jar idl2schemata
 
 # Stop deleting intermediate files I might need to use in the final program!
 .SECONDARY:
