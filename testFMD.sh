@@ -61,7 +61,7 @@ do
     
         echo "Sample rate: ${SAMPLE_RATE} Genomes: ${NUM_GENOMES}"
     
-        ./createIndex --noMerge --sampleRate ${SAMPLE_RATE} index ${SELECTED_FASTAS}
+        time ../createIndex.sh --noMerge --sampleRate ${SAMPLE_RATE} index ${SELECTED_FASTAS}
         
         # Check the sizes of the bit vectors and the suffix array samples.
         BITVECTOR_SIZE=$(stat -c%s index/index.basename.rlcsa.array)
