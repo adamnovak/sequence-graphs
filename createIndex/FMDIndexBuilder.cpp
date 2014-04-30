@@ -38,9 +38,9 @@ void report_error(const std::string message) {
 // Don't hook in .gz support. See <http://stackoverflow.com/a/19390915/402891>
 KSEQ_INIT(int, read)
 
-FMDIndexBuilder::FMDIndexBuilder(const std::string& basename):
-    basename(basename) {
-    // Nothing to do. Already initialized our basename.    
+FMDIndexBuilder::FMDIndexBuilder(const std::string& basename, int sampleRate):
+    basename(basename), sampleRate(sampleRate) {
+    // Nothing to do. Already initialized our basename and sample rate.    
 }
 
 void FMDIndexBuilder::add(const std::string& filename) {
@@ -108,7 +108,8 @@ void FMDIndexBuilder::add(const std::string& filename) {
         std::ofstream::out);
         
     configStream << "RLCSA_BLOCK_SIZE = 32" << std::endl;
-    configStream << "SAMPLE_RATE = 1" << std::endl;
+    // We only change the sample rate from the default.
+    configStream << "SAMPLE_RATE = " << sampleRate << std::endl;
     configStream << "SUPPORT_DISPLAY = 1" << std::endl;
     configStream << "SUPPORT_LOCATE = 1" << std::endl;
     configStream << "WEIGHTED_SAMPLES = 0" << std::endl;

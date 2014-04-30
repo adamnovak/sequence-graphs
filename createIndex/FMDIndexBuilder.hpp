@@ -14,10 +14,11 @@ class FMDIndexBuilder {
     public:
         /**
          * Create a new FMDIndexBuilder using the specified basename for its
-         * index. If an index with that basename already exists, the builder
-         * will merge new things into it.
+         * index. Optionally takes a suffix array sample rate. If an index with
+         * that basename already exists, the builder will merge new things into
+         * it.
          */
-        FMDIndexBuilder(const std::string& basename);
+        FMDIndexBuilder(const std::string& basename, int sampleRate = 128);
         
         /**
          * Add the contents of the given FASTA file to the index, both forwards
@@ -39,6 +40,11 @@ class FMDIndexBuilder {
          * Keep track of our index basename.
          */
         std::string basename;
+        
+        /**
+         * Keep track of the suffix array sample rate we're using.
+         */
+        int sampleRate;
 
 };
 

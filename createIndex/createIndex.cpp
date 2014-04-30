@@ -71,7 +71,7 @@ const std::string TEST_READ4(std::string("GCATCCATCTTGGGGCGTCCCAATTGCTGAGTAACAAA
 
     
 // How many times to try mapping this read?
-const int TEST_ITERATIONS = 1;
+const int TEST_ITERATIONS = 1000;
 
 
 /**
@@ -93,13 +93,14 @@ getArrow(
 
 /**
  * Start a new index in the given directory (by replacing it), and index the
- * given FASTAs for the bottom level FMD index. Returns the basename of the FMD
- * index that gets created.
+ * given FASTAs for the bottom level FMD index. Optionally takes a suffix array
+ * sample rate to use. Returns the basename of the FMD index that gets created.
  */
 std::string
 buildIndex(
     std::string indexDirectory,
-    std::vector<std::string> fastas
+    std::vector<std::string> fastas,
+    int sampleRate = 128
 ) {
 
     // Make sure an empty indexDirectory exists.
@@ -116,7 +117,7 @@ buildIndex(
     std::string basename(indexDirectory + "/index.basename");
 
     // Make a new builder
-    FMDIndexBuilder builder(basename);
+    FMDIndexBuilder builder(basename, sampleRate);
     for(std::vector<std::string>::iterator i = fastas.begin(); i < fastas.end();
         ++i) {
         
@@ -961,44 +962,6 @@ testMergedMapping(
     CSA::pair_type stats = CSA::FMD::getStats();
     std::cout << "Extends/restarts: " << stats.first << " / " << stats.second <<
         std::endl;
-        
-    // Now try with FM-index mapping
-    
-    // Start the timer
-    start = clock();
-    for(int i = 0; i < TEST_ITERATIONS; i++) {
-        // Map repeatedly
-        index.fmd.mapFM(*ranges, TEST_READ);
-    }
-    // Stop the timer
-    end = clock();
-    
-    // Work out how many milliseconds each call took
-    msPerCall = ((double)(end - start)) / 
-        (CLOCKS_PER_SEC / 1000.0) / TEST_ITERATIONS;
-        
-    std::cout << "FM-Mapping to merged level: " << msPerCall <<
-        " ms per call" << std::endl;
-        
-    // Compare results
-    std::vector<CSA::sint> fmd = index.fmd.map(*ranges, TEST_READ);
-    std::vector<CSA::sint> fm = index.fmd.mapFM(*ranges, TEST_READ);
-    
-    if(fmd.size() != fm.size() || !std::equal(fmd.begin(), fmd.end(), 
-        fm.begin())) {
-        
-        // Complain if I see two different results.
-        
-        std::cout << "WARNING! Mapping mismatch!" << std::endl;
-        
-        std::cout << "Got " << fmd.size() << " vs. " << fm.size() <<
-            " mappings." << std::endl;
-        
-        for(int i = 0; i < fmd.size() && i < fm.size(); i++) {
-            std::cout << fmd[i] << "\t" << fm[i] << std::endl;
-        }
-        
-    }
 }
 
 /**
@@ -1024,9 +987,13 @@ main(
         ("dump", "Dump GraphViz graphs")
         ("test", "Run a mapping speed test")
         ("quiet", "Don't print every context")
+        ("noMerge", "Don't compute merged level, only make lowest-level index")
         ("context", boost::program_options::value<unsigned int>()
             ->default_value(3), 
             "Set the context length to merge on")
+        ("sampleRate", boost::program_options::value<unsigned int>()
+            ->default_value(128), 
+            "Set the suffix array sample rate to use")
         // These next two options should be ->required(), but that's not in the
         // Boost version I can convince our cluster admins to install. From now
         // on I shall work exclusively in Docker containers or something.
@@ -1106,10 +1073,17 @@ main(
         std::cout << "Index file: " << *i << std::endl;
     }
     
-    std::cout << "Use " << contextLength << " bases of context." << std::endl;
+    // Index the bottom-level FASTAs and get the basename they go into. Use the
+    // sample rate the user specified.
+    std::string basename = buildIndex(indexDirectory, fastas,
+        options["sampleRate"].as<unsigned int>());
     
-    // Index the bottom-level FASTAs and get the basename they go into.
-    std::string basename = buildIndex(indexDirectory, fastas);
+    if(options.count("noMerge")) {
+        // Skip merging any of the higher levels.
+        return 0;
+    }
+    
+    std::cout << "Use " << contextLength << " bases of context." << std::endl;
     
     // Load the index and its metadata.
     FMDIndex index(basename);
