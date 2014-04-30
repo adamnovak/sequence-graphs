@@ -52,9 +52,6 @@ void FMDIndexBuilder::add(const std::string& filename) {
     contigStream.open((basename + ".chrom.sizes").c_str(), std::ofstream::out |
         std::ofstream::app);
         
-    std::cout << "Writing contig data to " << 
-        (basename + ".chrom.sizes").c_str() << std::endl;
-        
     // Open the FASTA for reading.
     FILE* fasta = fopen(filename.c_str(), "r");
     
@@ -68,6 +65,8 @@ void FMDIndexBuilder::add(const std::string& filename) {
     while (kseq_read(seq) >= 0) { // Read sequences until we run out.
         // Stringify the sequence name
         std::string name(seq->name.s);
+        
+        std::cout << "Adding contig " << name << std::endl;
         
         // And the sequence sequence
         std::string sequence(seq->seq.s);
