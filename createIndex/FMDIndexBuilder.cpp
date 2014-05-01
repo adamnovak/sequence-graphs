@@ -39,8 +39,9 @@ void report_error(const std::string message) {
 KSEQ_INIT(int, read)
 
 FMDIndexBuilder::FMDIndexBuilder(const std::string& basename, int sampleRate):
-    basename(basename), sampleRate(sampleRate), input() {
-    // Nothing to do. Already initialized everything.
+    basename(basename), builder(CSA::RLCSA_BLOCK_SIZE.second, sampleRate, 
+    BUFFER_SIZE, THREADS) {
+    // Nothing to do. Already initialized our basename and our RLCSABuilder.
     
 }
 
@@ -50,6 +51,9 @@ void FMDIndexBuilder::add(const std::string& filename) {
     std::ofstream contigStream;
     contigStream.open((basename + ".chrom.sizes").c_str(), std::ofstream::out |
         std::ofstream::app);
+        
+    std::cout << "Writing contig data to " << 
+        (basename + ".chrom.sizes").c_str() << std::endl;
         
     // Open the FASTA for reading.
     FILE* fasta = fopen(filename.c_str(), "r");
@@ -65,8 +69,6 @@ void FMDIndexBuilder::add(const std::string& filename) {
         // Stringify the sequence name
         std::string name(seq->name.s);
         
-        std::cout << "Adding contig " << name << std::endl;
-        
         // And the sequence sequence
         std::string sequence(seq->seq.s);
         
@@ -74,18 +76,15 @@ void FMDIndexBuilder::add(const std::string& filename) {
         // characters are in the string.
         boost::to_upper(sequence);
         
-        // Add the forward strand to the concatenated input. See
-        // <http://stackoverflow.com/a/2551785/402891>
-        input.insert(input.end(), sequence.begin(), sequence.end());
-        
-        // Null-terminate it.
-        input.push_back(0);
+        // Add the forward strand to the RLCSA index. We need to de-const the
+        // string because RLCSA demands it.
+        builder.insertSequence(const_cast<char*>(sequence.c_str()),
+            sequence.size(), false);
         
         // Take the reverse complement and do the same
         std::string reverseComplement = reverse_complement(sequence);
-        input.insert(input.end(), reverseComplement.begin(),
-            reverseComplement.end());
-        input.push_back(0);
+        builder.insertSequence(const_cast<char*>(reverseComplement.c_str()),
+            reverseComplement.size(), false);
         
         // Write the sequence ID and size to the contig list.
         contigStream << name << '\t' << sequence.size() << std::endl;
@@ -101,32 +100,23 @@ void FMDIndexBuilder::add(const std::string& filename) {
 }
 
 void FMDIndexBuilder::close() {
-    
-    std::cout << "Creating final index of " << input.size() << 
-        " byte input..." << std::endl;
-    
-    // Make an RLCSA from out whole concatenated input. Don't try and delete the
-    // data.
-    CSA::RLCSA rlcsa((CSA::uchar*)&input[0], input.size(),
-        CSA::RLCSA_BLOCK_SIZE.second, sampleRate, THREADS, false);
-        
-    // Throw out our input data. It made a copy.
-    input.clear();
-    
     // Pull out the RLCSA and save it.
-    
-    if(!(rlcsa.isOk())) {
+    std::cout << "Creating final index..." << std::endl;
+    CSA::RLCSA* rlcsa = builder.getRLCSA();
+    if(!(rlcsa->isOk())) {
         // Complain if it's broken.
         throw std::runtime_error("RLCSA integrity check failed!");
     }
     std::cout << "Saving RLCSA to " << basename << std::endl;
     
     // Dump its info.
-    rlcsa.printInfo();
-    rlcsa.reportSize(true);
+    rlcsa->printInfo();
+    rlcsa->reportSize(true);
     
-    // Save it
-    rlcsa.writeTo(basename);
+    rlcsa->writeTo(basename);
+    
+    // We're responsible for cleaning it up.
+    delete rlcsa;
 }
 
 
