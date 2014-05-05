@@ -47,30 +47,31 @@ fi
 # Get an array of all the lists of genome files, one entry per genome.
 FASTAS=("hg38/*.fa" "huRef/*.fa" "koRef/*.fa")
 
-for SAMPLE_RATE in 128 64 32 16 8
+for NUM_GENOMES in 2 3
 do
-    # Try every sample rate
+
     
-    for NUM_GENOMES in 1 2 3
-    do
-        # Pull out that many of the genomes.
-        SELECTED_FASTAS=${FASTAS[@]:0:${NUM_GENOMES}}
+    # Pull out that many of the genomes.
+    SELECTED_FASTAS=${FASTAS[@]:0:${NUM_GENOMES}}
+    
+    echo "Genomes: ${NUM_GENOMES}"
+
+    GENOME_FASTA="${NUM_GENOMES}genomes.fa"
+
+    if [ ! -e ${GENOME_FASTA} ]
+    then
+        cat ${SELECTED_FASTAS} > ${GENOME_FASTA}
+    fi
+
+    echo "Indexing ${GENOME_FASTA}"
+
+    time ropebwt2 -bo ${GENOME_FASTA}.fmr ${GENOME_FASTA}
         
-        # Kill the old index
-        rm -Rf index
+    # Check the sizes of the index.
+    INDEX_SIZE=$(stat -c%s ${GENOME_FASTA}.fmr)
     
-        echo "Sample rate: ${SAMPLE_RATE} Genomes: ${NUM_GENOMES}"
-    
-        time ../createIndex.sh --noMerge --sampleRate ${SAMPLE_RATE} index ${SELECTED_FASTAS}
-        
-        # Check the sizes of the bit vectors and the suffix array samples.
-        BITVECTOR_SIZE=$(stat -c%s index/index.basename.rlcsa.array)
-        SA_SIZE=$(stat -c%s index/index.basename.rlcsa.sa_samples)
-        
-        # Dump a grepable TSV line
-        echo "RESULTS\t${SAMPLE_RATE}\t${NUM_GENOMES}\t${BITVECTOR_SIZE}\t${SA_SIZE}"
-    
-    done
+    # Dump a grepable TSV line
+    echo "RESULTS\t${NUM_GENOMES}\t${INDEX_SIZE}"
 
 done
 
