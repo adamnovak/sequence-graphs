@@ -1,27 +1,27 @@
-// Test fixture definition.
+// Test the SampledSuffixArray's ability to build a Sampled Suffix Array.
 
 #include "Util/ReadTable.h"
 #include "SuffixArray.cpp"
 
-#include "bwtTest.h"
+#include "sampledSuffixArrayTests.h"
 
 // Register the fixture to be run.
-CPPUNIT_TEST_SUITE_REGISTRATION( BWTTest );
+CPPUNIT_TEST_SUITE_REGISTRATION( SampledSuffixArrayTests );
 
 // Define constants
-const std::string BWTTest::filename = "Test/haplotypes.fa";
+const std::string SampledSuffixArrayTests::filename = "Test/haplotypes.fa";
 
-void BWTTest::setUp() {
+void SampledSuffixArrayTests::setUp() {
 }
 
 
-void BWTTest::tearDown() {
+void SampledSuffixArrayTests::tearDown() {
 }
 
 /**
- * Test building a BWT.
+ * Test building a BWT. TODO: Replace!
  */
-void BWTTest::testConstruction() {
+void SampledSuffixArrayTests::testConstruction() {
     
     // Make a read table from the headers in the file
 	ReadTable* readTable = new ReadTable(filename);

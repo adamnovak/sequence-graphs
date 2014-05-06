@@ -1,14 +1,14 @@
-#ifndef BWTTEST_HPP
-#define BWTTEST_HPP
+#ifndef SAMPLEDSUFFIXARRAYTESTS_HPP
+#define SAMPLEDSUFFIXARRAYTESTS_HPP
 
 #include <cppunit/extensions/HelperMacros.h>
 
 /**
- * Tests for BWT generation.
+ * Tests for Sampled Suffix Array generartion.
  */
-class BWTTest : public CppUnit::TestFixture {
-    CPPUNIT_TEST_SUITE( BWTTest );
-    CPPUNIT_TEST( testConstruction );
+class SampledSuffixArrayTests : public CppUnit::TestFixture {
+    CPPUNIT_TEST_SUITE(SampledSuffixArrayTests);
+    CPPUNIT_TEST(testConstruction);
     CPPUNIT_TEST_SUITE_END();
     
     // Keep a string saying where to get the haplotypes to test with.

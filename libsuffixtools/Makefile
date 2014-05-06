@@ -82,7 +82,9 @@ OBJS = BWTAlgorithms.o \
     Thirdparty/gzstream.o
     
 # What do we need for our test runner binary?
-TEST_OBJS = Test/testRunner.o Test/bwtTest.o
+TEST_OBJS = Test/testRunner.o \
+	Test/suffixArrayTests.o \
+	Test/sampledSuffixArrayTests.o
 
 default: libsuffixtools.a libsuffixtools.so
 
