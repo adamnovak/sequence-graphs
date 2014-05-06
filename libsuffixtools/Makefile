@@ -9,39 +9,67 @@ PARALLEL_FLAGS = -DHAVE_OPENMP -fopenmp
 
 HASHMAP_FLAGS = -DHAVE_EXT_HASH_MAP -DHAVE_GOOGLE_SPARSE_HASH_MAP
 
-CXXFLAGS = -Wall -Wextra -O3 -fPIC $(DEBUG_FLAGS) $(PARALLEL_FLAGS) \
+CXXFLAGS = -Wall -Wextra -O3 -fPIC -pthread $(DEBUG_FLAGS) $(PARALLEL_FLAGS) \
     $(HASHMAP_FLAGS) -IUtil -IThirdparty -IConcurrency
 
 # What object files need to be built and put in the library?
 OBJS = BWTAlgorithms.o \
-	BWTCABauerCoxRosone.o \
-	BWTCARopebwt.o \
-	BWTDiskConstruction.o \
-	BWTIntervalCache.o \
-	BWTReaderAscii.o \
-	BWTReaderBinary.o \
-	BWTReader.o \
-	BWTWriterAscii.o \
-	BWTWriterBinary.o \
-	BWTWriter.o \
-	GapArray.o \
-	InverseSuffixArray.o \
-	Occurrence.o \
-	PopulationIndex.o \
-	QuickBWT.o \
-	RankProcess.o \
-	RLBWT.o \
-	SACAInducedCopying.o \
-	SampledSuffixArray.o \
-	SAReader.o \
-	SAWriter.o \
-	SBWT.o \
-	STCommon.o \
-	SuffixArray.o \
-	SuffixCompare.o
-
-# What dependency libraries do we need to include?
-DEPS = Thirdparty/thirdparty.a Util/util.a
+    BWTCABauerCoxRosone.o \
+    BWTCARopebwt.o \
+    BWTDiskConstruction.o \
+    BWTIntervalCache.o \
+    BWTReaderAscii.o \
+    BWTReaderBinary.o \
+    BWTReader.o \
+    BWTWriterAscii.o \
+    BWTWriterBinary.o \
+    BWTWriter.o \
+    GapArray.o \
+    InverseSuffixArray.o \
+    Occurrence.o \
+    PopulationIndex.o \
+    QuickBWT.o \
+    RankProcess.o \
+    RLBWT.o \
+    SACAInducedCopying.o \
+    SampledSuffixArray.o \
+    SAReader.o \
+    SAWriter.o \
+    SBWT.o \
+    STCommon.o \
+    SuffixArray.o \
+    SuffixCompare.o \
+    Util/Alphabet.o \
+    Util/BitChar.o \
+    Util/BitVector.o \
+    Util/BloomFilter.o \
+    Util/ClusterReader.o \
+    Util/Contig.o \
+    Util/CorrectionThresholds.o \
+    Util/DNAString.o \
+    Util/Interval.o \
+    Util/KmerDistribution.o \
+    Util/Match.o \
+    Util/MultiAlignment.o \
+    Util/MultiOverlap.o \
+    Util/Pileup.o \
+    Util/PrimerScreen.o \
+    Util/Quality.o \
+    Util/QualityTable.o \
+    Util/QualityVector.o \
+    Util/ReadInfoTable.o \
+    Util/ReadTable.o \
+    Util/SGAStats.o \
+    Util/SeqCoord.o \
+    Util/SeqReader.o \
+    Util/StdAlnTools.o \
+    Util/Util.o \
+    Util/VCFUtil.o \
+    Util/bucketSort.o \
+    Thirdparty/MurmurHash3.o \
+    Thirdparty/bcr.o \
+    Thirdparty/stdaln.o \
+    Thirdparty/gzstream.o
 
 # We want those all to be packed up into libraries.
 
@@ -49,7 +77,7 @@ libsuffixtools.a: $(OBJS)
 	ar rcs $@ $(OBJS)
 	
 libsuffixtools.so: $(OBJS)
-	$(CXX) $(LDFLAGS) -shared -o $@  $(OBJS)
+	$(CXX) $(LDFLAGS) -shared -o $@ $(OBJS)
 	
 clean:
-	rm -f *.a *.so *.o
+	rm -f *.a *.so *.o */*.o

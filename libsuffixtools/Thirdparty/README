@@ -12,3 +12,5 @@ which is allowed by section 3 of the LGPL. The source files have been modified t
 stdaln.h/.c - banded dynamic programming functions developed by Heng Li. Uses the MIT license.
 
 bcr.h/.c - Bauer-Cox-Rosone BWT algorithm implementation by Heng Li. Uses the MIT license.
+
+MurmurHash3.h/.cpp: Public-domain hash functions.
