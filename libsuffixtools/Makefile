@@ -7,8 +7,10 @@ DEBUG_FLAGS = -g
 
 PARALLEL_FLAGS = -DHAVE_OPENMP -fopenmp
 
-CXXFLAGS = -Wall -Wextra -O3 -fPIC $(DEBUG_FLAGS) $(PARALLEL_FLAGS) -IUtil \
-	-IThirdparty -IConcurrency
+HASHMAP_FLAGS = -DHAVE_EXT_HASH_MAP -DHAVE_GOOGLE_SPARSE_HASH_MAP
+
+CXXFLAGS = -Wall -Wextra -O3 -fPIC $(DEBUG_FLAGS) $(PARALLEL_FLAGS) \
+    $(HASHMAP_FLAGS) -IUtil -IThirdparty -IConcurrency
 
 # What object files need to be built and put in the library?
 OBJS = BWTAlgorithms.o \
