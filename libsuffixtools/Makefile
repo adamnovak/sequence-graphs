@@ -9,8 +9,16 @@ PARALLEL_FLAGS = -DHAVE_OPENMP -fopenmp
 
 HASHMAP_FLAGS = -DHAVE_EXT_HASH_MAP -DHAVE_GOOGLE_SPARSE_HASH_MAP
 
-CXXFLAGS = -Wall -Wextra -O3 -fPIC -pthread $(DEBUG_FLAGS) $(PARALLEL_FLAGS) \
+# We need to define CFLAGS since some of our thirdparty code is in C and needs
+# -fPIC
+CFLAGS = -Wall -Wextra -O3 -fPIC -pthread $(DEBUG_FLAGS) $(PARALLEL_FLAGS) \
     $(HASHMAP_FLAGS) -IUtil -IThirdparty -IConcurrency
+    
+CXXFLAGS = $(CFLAGS)
+    
+# We need to link against cppunit when we run our tests.
+TEST_LIBS = -lcppunit
+   
 
 # What object files need to be built and put in the library?
 OBJS = BWTAlgorithms.o \
@@ -70,6 +78,16 @@ OBJS = BWTAlgorithms.o \
     Thirdparty/bcr.o \
     Thirdparty/stdaln.o \
     Thirdparty/gzstream.o
+    
+# What do we need for our test runner binary?
+TEST_OBJS = Test/testRunner.o
+
+default: libsuffixtools.a libsuffixtools.so
+
+test: check
+
+check: testRunner
+	./testRunner
 
 # We want those all to be packed up into libraries.
 
@@ -79,5 +97,9 @@ libsuffixtools.a: $(OBJS)
 libsuffixtools.so: $(OBJS)
 	$(CXX) $(LDFLAGS) -shared -o $@ $(OBJS)
 	
+testRunner: $(TEST_OBJS) libsuffixtools.a
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ libsuffixtools.a \
+	$(TEST_LIBS)
+	
 clean:
-	rm -f *.a *.so *.o */*.o
+	rm -f *.a *.so *.o */*.o testRunner
