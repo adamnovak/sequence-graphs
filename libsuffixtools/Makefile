@@ -16,6 +16,8 @@ CFLAGS = -Wall -Wextra -O3 -fPIC -pthread $(DEBUG_FLAGS) $(PARALLEL_FLAGS) \
     
 CXXFLAGS = $(CFLAGS)
     
+LDFLAGS = -lz
+    
 # We need to link against cppunit when we run our tests.
 TEST_LIBS = -lcppunit
    
@@ -98,7 +100,7 @@ libsuffixtools.so: $(OBJS)
 	$(CXX) $(LDFLAGS) -shared -o $@ $(OBJS)
 	
 testRunner: $(TEST_OBJS) libsuffixtools.a
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ libsuffixtools.a \
+	$(CXX) $(CXXFLAGS) -o $@ $^ libsuffixtools.a $(LDFLAGS) \
 	$(TEST_LIBS)
 	
 clean:

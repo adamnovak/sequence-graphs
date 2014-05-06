@@ -6,12 +6,19 @@
 #include <cppunit/ui/text/TestRunner.h>
 
 #include <iostream>
+#include <string>
 
 /**
  * Main function: run all registered tests.
  */
-int main(int argc, char* argv[]) {
-    std::cout << "Starting" << std::endl;
+int main(int argc, char** argv) {
+    // Dump our arguments to avoid unused warnings, and so we can see them.
+    std::cout << "Command line: ";
+    for(int i = 0; i < argc; i++) {
+        std::cout << argv[i] << " ";
+    }
+    std::cout << std::endl;
+    std::cout << "Running unit tests..." << std::endl;
 
     // Get the top level suite from the registry
     CppUnit::Test *suite = 
@@ -35,37 +42,43 @@ int main(int argc, char* argv[]) {
  */
 class BWTTest : public CppUnit::TestFixture {
     CPPUNIT_TEST_SUITE( BWTTest );
-    CPPUNIT_TEST( testConstructor );
+    CPPUNIT_TEST( testConstruction );
     CPPUNIT_TEST_SUITE_END();
+    
+    // Keep a string saying where to get the haplotypes to test with.
+    static const std::string filename;
 
 public:
     void setUp();
     void tearDown();
 
-    void testConstructor();
+    void testConstruction();
 };
 
 // Test fixture definition.
 
+#include "ReadTable.h"
+
 // Register the fixture to be run.
 CPPUNIT_TEST_SUITE_REGISTRATION( BWTTest );
 
+// Define constants
+const std::string BWTTest::filename = "Test/haplotypes.fa";
 
-void 
-BWTTest::setUp()
-{
+void BWTTest::setUp() {
 }
 
 
-void 
-BWTTest::tearDown()
-{
+void BWTTest::tearDown() {
 }
 
-
-void 
-BWTTest::testConstructor()
-{
-  CPPUNIT_FAIL( "not implemented" );
+/**
+ * Test building a BWT.
+ */
+void BWTTest::testConstruction() {
+    
+    // Make a read table from the headers in the file
+	ReadTable* readTable = new ReadTable(filename);
+    CPPUNIT_ASSERT(readTable != NULL);
 }
 
