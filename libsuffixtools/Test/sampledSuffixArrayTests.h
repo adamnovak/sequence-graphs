@@ -14,6 +14,12 @@ class SampledSuffixArrayTests : public CppUnit::TestFixture {
     // Keep a string saying where to get the haplotypes to test with.
     static const std::string filename;
 
+private:
+    // Test fixtures
+    ReadTable* readTable;
+    ReadInfoTable* infoTable;
+    SuffixArray* suffixArray;
+
 public:
     void setUp();
     void tearDown();

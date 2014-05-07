@@ -1,7 +1,8 @@
 // Test the SampledSuffixArray's ability to build a Sampled Suffix Array.
 
 #include "Util/ReadTable.h"
-#include "SuffixArray.cpp"
+#include "SuffixArray.h"
+#include "SampledSuffixArray.h"
 
 #include "sampledSuffixArrayTests.h"
 
@@ -12,35 +13,49 @@ CPPUNIT_TEST_SUITE_REGISTRATION( SampledSuffixArrayTests );
 const std::string SampledSuffixArrayTests::filename = "Test/haplotypes.fa";
 
 void SampledSuffixArrayTests::setUp() {
+    // Set up the basic suffix array
+    readTable = new ReadTable(filename);
+    infoTable = new ReadInfoTable(filename);
+    suffixArray = new SuffixArray(readTable, 1);
 }
 
 
 void SampledSuffixArrayTests::tearDown() {
+    // Clean up
+    delete suffixArray;
+    delete infoTable;
+    delete readTable;
 }
 
 /**
- * Test building a BWT. TODO: Replace!
+ * Test building a sampled suffix array.
  */
 void SampledSuffixArrayTests::testConstruction() {
     
-    // Make a read table from the headers in the file
-	ReadTable* readTable = new ReadTable(filename);
-    CPPUNIT_ASSERT(readTable != NULL);
+    // Make a BWT object from the normal suffix array
+    BWT* bwt = new BWT(suffixArray, readTable);
+    CPPUNIT_ASSERT(bwt != NULL);
     
-    // Make a suffix array in 1 thread.
-    SuffixArray* suffixArray = new SuffixArray(readTable, 1);
-    CPPUNIT_ASSERT(suffixArray != NULL);
+    // Make a sampled suffix array
+    SampledSuffixArray* sampled = new SampledSuffixArray();
+    CPPUNIT_ASSERT(sampled != NULL);
+    
+    // Build it out from the BWT and the sequence info
+    sampled->build(bwt, infoTable, 5);
     
     // Validate it
-    suffixArray->validate(readTable);
+    sampled->validate(filename, bwt);
     
-    // Try writing it out to nowhere.
+    // Practice saving it to files
     std::string devnull("/dev/null");
-    suffixArray->writeBWT(devnull, readTable);
-    suffixArray->writeIndex(devnull);
+    sampled->writeSSA(devnull);
+    sampled->writeLexicoIndex(devnull);
     
-    // Clean up
-    delete readTable;
-    delete suffixArray;
+    delete sampled;
+    delete bwt;
+    
+    
+    
+    
 
 }
