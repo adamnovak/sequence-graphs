@@ -11,6 +11,12 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
 
+#include <SampledSuffixArray.h>
+#include <SuffixArray.h>
+#include <ReadInfoTable.h>
+#include <ReadTable.h>
+#include <BWT.h>
+
 #include "kseq.h"
 #include "util.hpp"
 
@@ -38,22 +44,17 @@ void report_error(const std::string message) {
 // Don't hook in .gz support. See <http://stackoverflow.com/a/19390915/402891>
 KSEQ_INIT(int, read)
 
-FMDIndexBuilder::FMDIndexBuilder(const std::string& basename, int sampleRate):
-    basename(basename), builder(CSA::RLCSA_BLOCK_SIZE.second, sampleRate, 
-    BUFFER_SIZE, THREADS) {
-    // Nothing to do. Already initialized our basename and our RLCSABuilder.
+FMDIndexBuilder::FMDIndexBuilder(const std::string& basename):
+    basename(basename), tempDir(make_tempdir()), 
+    tempFastaName(tempDir + "/temp.fa"), tempFasta(tempFastaName.c_str()) {
+
+    // Nothing to do, already made everything.
     
 }
 
 void FMDIndexBuilder::add(const std::string& filename) {
     
-    // Open the main index contig size list for appending
-    std::ofstream contigStream;
-    contigStream.open((basename + ".chrom.sizes").c_str(), std::ofstream::out |
-        std::ofstream::app);
-        
-    std::cout << "Writing contig data to " << 
-        (basename + ".chrom.sizes").c_str() << std::endl;
+    std::cout << "Extracting contiguous runs from " << filename << std::endl;
         
     // Open the FASTA for reading.
     FILE* fasta = fopen(filename.c_str(), "r");
@@ -75,48 +76,101 @@ void FMDIndexBuilder::add(const std::string& filename) {
         // Upper-case all the letters. TODO: complain now if any not-base
         // characters are in the string.
         boost::to_upper(sequence);
-        
-        // Add the forward strand to the RLCSA index. We need to de-const the
-        // string because RLCSA demands it.
-        builder.insertSequence(const_cast<char*>(sequence.c_str()),
-            sequence.size(), false);
-        
-        // Take the reverse complement and do the same
-        std::string reverseComplement = reverse_complement(sequence);
-        builder.insertSequence(const_cast<char*>(reverseComplement.c_str()),
-            reverseComplement.size(), false);
-        
-        // Write the sequence ID and size to the contig list.
-        contigStream << name << '\t' << sequence.size() << std::endl;
+
+        // Where does the next run of not-N characters start?        
+        size_t runStart = 0;
+        // Iterate over contiguous runs of not-N
+        for(size_t i = 0; i <= sequence.size(); i++) {
+            if(i == sequence.size() || sequence[i] == 'N') {
+                // This position is after the end of a run of not-N characters.
+                
+                if(i > runStart) {
+                    // That run is nonempty. Process it.
+                    
+                    std::cout << "Run of " << (i - runStart) <<
+                        " characters on " << name << std::endl;
+                    
+                    // Pull it out
+                    std::string run = sequence.substr(runStart, i - runStart);
+                    
+                    // Add the forward strand to the contig FASTA
+                    tempFasta << ">" << name << "-" << runStart << "F" <<
+                        std::endl;
+                    tempFasta << run << std::endl;
+                    
+                    // And the reverse strand    
+                    tempFasta << ">" << name << "-" << runStart << "R" <<
+                        std::endl;
+                    std::string reverseComplement = reverse_complement(run);
+                    tempFasta << reverseComplement << std::endl;
+                    
+                }
+                
+                // The next run must start after here (or later).
+                runStart = i + 1;
+            }
+        }
     }  
     kseq_destroy(seq); // Close down the parser.
-    
-    // Close up streams
-    contigStream.flush();
-    contigStream.close();
-
-    
-
 }
 
 void FMDIndexBuilder::close() {
-    // Pull out the RLCSA and save it.
-    std::cout << "Creating final index..." << std::endl;
-    CSA::RLCSA* rlcsa = builder.getRLCSA();
-    if(!(rlcsa->isOk())) {
-        // Complain if it's broken.
-        throw std::runtime_error("RLCSA integrity check failed!");
-    }
-    std::cout << "Saving RLCSA to " << basename << std::endl;
+    // Close up the temp file
+    tempFasta.close();
     
-    // Dump its info.
-    rlcsa->printInfo();
-    rlcsa->reportSize(true);
+    // Compute what we want to save: BWT and sampled suffix array
+    std::string bwtFile = basename + ".bwt";
+    std::string ssaFile = basename + ".ssa";    
+
+    std::cout << "Loading reads..." << std::endl;
     
-    rlcsa->writeTo(basename);
+    // Produce the index of the temp file
+    // Load all the sequences into memory (again).
+    // TODO: Just keep them there
+    ReadTable* readTable = new ReadTable(tempFastaName);
     
-    // We're responsible for cleaning it up.
-    delete rlcsa;
+    std::cout << "Computing index..." << std::endl;
+    
+    // Compute the suffix array (which computes the BWT)
+    SuffixArray* suffixArray = new SuffixArray(readTable, NUM_THREADS);
+    
+    std::cout << "Saving BWT to " << bwtFile << std::endl;
+    
+    // Write the BWT to disk
+    suffixArray->writeBWT(bwtFile, readTable);
+    
+    // Delete everything we no longer need.
+    delete suffixArray;
+    delete readTable;
+    
+    std::cout << "Loading BWT..." << std::endl;
+    
+    // Load the BWT back in (instead of re-calculating it).
+    // TODO: Add ability to save a calculated BWT object with a BWTWriter.
+    BWT bwt(bwtFile);
+    
+    std::cout << "Scanning reads..." << std::endl;
+    
+    // Load all the sequence lengths from the original file.
+    // TODO: just store these as we write the file.
+    ReadInfoTable infoTable(tempFastaName);
+    
+    std::cout << "Sampling suffix array..." << std::endl;
+    
+    // Make a sampled suffix array
+    SampledSuffixArray sampled;
+    
+    // Build it from the BWT and read info
+    sampled.build(&bwt, &infoTable);
+    
+    std::cout << "Saving sampled suffix array to " << ssaFile << std::endl;
+
+    // Save it to disk    
+    sampled.writeSSA(ssaFile);
+    
+    // Get rid of the temporary FASTA directory
+    boost::filesystem::remove_all(tempDir);
+    
 }
 
 

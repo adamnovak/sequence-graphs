@@ -7,16 +7,19 @@ DEPS=rlcsa pinchesAndCacti sonLib
 
 
 LDLIBS += ../deps/sonLib/lib/stPinchesAndCacti.a ../deps/sonLib/lib/sonLib.a \
--lboost_filesystem -lrlcsa -lavrocpp
+-lboost_filesystem -lrlcsa -lavrocpp -lsuffixtools
 
 # We need -fopenmp to link against rlcsa.
-LDFLAGS += -L../deps/rlcsa -fopenmp -L../deps/sonLib/lib
+LDFLAGS += -L../deps/rlcsa -fopenmp -L../deps/sonLib/lib -L../libsuffixtools
 
 # We need to make sure all our dependency header files are where our other
 # dependency includes want them to be. pinchesAndCacti just includes "sonLib.h",
-# so we need to explicitly point at its include directory.
+# so we need to explicitly point at its include directory. And similarly we need
+# to grab all the internal include directories from libsuffixtools.
 CXXFLAGS += -g -O3 -I../deps -I../deps/pinchesAndCacti/inc \
--I../deps/sonLib/C/inc -DMASSIVE_DATA_RLCSA
+-I../deps/sonLib/C/inc -DMASSIVE_DATA_RLCSA -I../libsuffixtools \
+-I../libsuffixtools/Concurrency -I../libsuffixtools/Thirdparty \
+-I../libsuffixtools/Util
 
 # What do we use to explode Avro IDLs into Avro schemas?
 IDL2SCHEMATA=java -jar avro-tools-1.7.6.jar idl2schemata

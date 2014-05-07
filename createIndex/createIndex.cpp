@@ -117,7 +117,7 @@ buildIndex(
     std::string basename(indexDirectory + "/index.basename");
 
     // Make a new builder
-    FMDIndexBuilder builder(basename, sampleRate);
+    FMDIndexBuilder builder(basename);
     for(std::vector<std::string>::iterator i = fastas.begin(); i < fastas.end();
         ++i) {
         

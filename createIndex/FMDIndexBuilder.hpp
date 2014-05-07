@@ -2,25 +2,22 @@
 #define CREATEINDEX_FMDINDEXBUILDER_HPP
 
 #include <string>
-
-#include <rlcsa/rlcsa_builder.h>
+#include <iostream>
 
 /**
- * A class for building an FMD Index with RLCSA. Every index has a "basename",
- * which is a filename prefix to which extensions are appended for actual files.
- *
- * Depends on the RLCSA binaries being available in the 
+ * A class for building an FMD Index with libsuffixtools. Every index has a
+ * "basename", which is a filename prefix to which extensions are appended for
+ * actual files.
  */
 class FMDIndexBuilder {
 
     public:
         /**
          * Create a new FMDIndexBuilder using the specified basename for its
-         * index. Optionally takes a suffix array sample rate. If an index with
-         * that basename already exists, the builder will merge new things into
-         * it.
+         * index. If an index with that basename already exists, it will be
+         * replaced.
          */
-        FMDIndexBuilder(const std::string& basename, int sampleRate = 128);
+        FMDIndexBuilder(const std::string& basename);
         
         /**
          * Add the contents of the given FASTA file to the index, both forwards
@@ -29,9 +26,10 @@ class FMDIndexBuilder {
         void add(const std::string& filename);
         
         /**
-         * Close all files, sync to disk, and shut down the Builder. Must be
-         * called before the index can be read. After this is called, no other
-         * method on the same object may be called.
+         * Build the final index, close all files, sync to disk, and shut down
+         * the FMDIndexBuilder. Must be called before the index can be read.
+         * After this is called, no other method on the same object may be
+         * called.
          */
         void close();
     protected:
@@ -41,26 +39,24 @@ class FMDIndexBuilder {
         std::string basename;
         
         /**
-         * Keep around an RLCSA builder to build the RLCSA index.
+         * Keep a temporary directory for intermediate files.
          */
-        CSA::RLCSABuilder builder;
-        
-        /** 
-         * How big of a buffer do we reserve in our RLCSA for indexing new
-         * sequences? Probably ought to be bigger than the largest single
-         * sequence. chr1 is 247,249,719 bp in hg18, so let's put 300,000,000 =
-         * 300 mb.
-         *
-         * Should be about the amount we want to index in a single step, but we
-         * can't break sequences, so any sequences that don't fit get their own
-         * steps anyway.
-         */
-        static const size_t BUFFER_SIZE = 300000000;
+        std::string tempDir;
         
         /**
-         * How many threads should we use when building RLCSAs?
+         * Keep the name of the file we're saving the contigs in.
          */
-        static const size_t THREADS = 10;
+        std::string tempFastaName;
+        
+        /**
+         * Keep around a file to save the contigs in.
+         */
+        std::ofstream tempFasta;
+        
+        /**
+         * How many threads should we use when building the index?
+         */
+        static const size_t NUM_THREADS = 10;
 };
 
 #endif
