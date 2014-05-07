@@ -46,7 +46,8 @@ KSEQ_INIT(int, read)
 
 FMDIndexBuilder::FMDIndexBuilder(const std::string& basename):
     basename(basename), tempDir(make_tempdir()), 
-    tempFastaName(tempDir + "/temp.fa"), tempFasta(tempFastaName.c_str()) {
+    tempFastaName(tempDir + "/temp.fa"), tempFasta(tempFastaName.c_str()), 
+    contigFile((basename + ".chrom.sizes").c_str()) {
 
     // Nothing to do, already made everything.
     
@@ -98,6 +99,10 @@ void FMDIndexBuilder::add(const std::string& filename) {
                         std::endl;
                     tempFasta << run << std::endl;
                     
+                    // And the contig file
+                    contigFile << name << "-" << runStart << "\t" <<
+                        (i - runStart) << std::endl;
+                    
                     // And the reverse strand    
                     tempFasta << ">" << name << "-" << runStart << "R" <<
                         std::endl;
@@ -117,6 +122,9 @@ void FMDIndexBuilder::add(const std::string& filename) {
 void FMDIndexBuilder::close() {
     // Close up the temp file
     tempFasta.close();
+    
+    // And the contig sizes file
+    contigFile.close();
     
     // Compute what we want to save: BWT and sampled suffix array
     std::string bwtFile = basename + ".bwt";

@@ -54,6 +54,11 @@ class FMDIndexBuilder {
         std::ofstream tempFasta;
         
         /**
+         * Keep around a file to save the contig names and lengths in.
+         */
+        std::ofstream contigFile;
+        
+        /**
          * How many threads should we use when building the index?
          */
         static const size_t NUM_THREADS = 10;
