@@ -36,12 +36,8 @@
 #include "FMDIndex.hpp"
 #include "IDSource.hpp"
 
-/**
- * Define a macro for easily compiling in/out detailed debugging information.
- * Replaces the one we got from the fmd header.
- */
-//#define DEBUG(op) op
-#define DEBUG(op)
+#include "debug.hpp"
+
 
 // TODO: replace with cppunit!
 

@@ -96,19 +96,22 @@ public:
     FMDPosition extend(FMDPosition range, char c, bool backward) const;
     
     /***************************************************************************
+     * Location/Sampled Suffix Array Functions
+     **************************************************************************/
+ 
+    /**
+     * Find the (text, offset) position for an index in the BWT.
+     */
+    TextPosition locate(int64_t index) const;
+    
+    /***************************************************************************
      * Retrieval Functions
      **************************************************************************/
     
     /**
-     * Get the character for a base at the given offset on the given contig,
-     * oriented as on the given strand. Offset is 1-based from contig start.
+     * Get the character at the given index in the BWT.
      */
-    char display(size_t contig, size_t offset, bool strand) const;
-    
-    /**
-     * Get the character for a base.
-     */
-    char display(TextPosition base) const;
+    char display(int64_t index) const;
     
     /***************************************************************************
      * Mapping Functions
@@ -190,7 +193,12 @@ protected:
     /**
      * Holds the actual underlying index.
      */
-    BWT fmd;
+    BWT bwt;
+    
+    /**
+     * Holds the sampled suffix array we use for locate queries.
+     */
+    SampledSuffixArray suffixArray;
     
     /**
      * How many bases are there? Only 4 in SGA world; N isn't allowed.
