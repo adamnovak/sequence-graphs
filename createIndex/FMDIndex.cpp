@@ -38,17 +38,17 @@ FMDIndex::FMDIndex(std::string basename): fmd(basename), names(), lengths() {
     
 }
 
-CSA::usint FMDIndex::getContigNumber(CSA::pair_type base) const {
+size_t FMDIndex::getContigNumber(TextPosition base) const {
     // What contig corresponds to that text? Contigs all have both strands.
     return base.first / 2;
 }
 
-bool FMDIndex::getStrand(CSA::pair_type base) const {
+bool FMDIndex::getStrand(TextPosition base) const {
     // What strand corresponds to that text? Strands are forward, then reverse.
     return base.first % 2 == 1;
 }
 
-CSA::usint FMDIndex::getOffset(CSA::pair_type base) const {
+size_t FMDIndex::getOffset(TextPosition base) const {
     // What base offset, 1-based, from the left, corresponds to this pair_type,
     // which may be on either strand.
     if(getStrand(base) == 0) {
@@ -61,11 +61,11 @@ CSA::usint FMDIndex::getOffset(CSA::pair_type base) const {
     }
 }
 
-std::string FMDIndex::getName(CSA::pair_type base) const {
+std::string FMDIndex::getName(TextPosition base) const {
 
     // Unpack the coordinate parts.
-    CSA::usint contig = getContigNumber(base);
-    CSA::usint offset = getOffset(base);
+    size_t contig = getContigNumber(base);
+    size_t offset = getOffset(base);
     
     // Work out what to name the position.
     std::stringstream nameStream;
@@ -75,11 +75,37 @@ std::string FMDIndex::getName(CSA::pair_type base) const {
     
 }
 
+size_t FMDIndex::getContigs() const {
+    // How many contigs do we know about?
+    return names.size();
+}
+    
+const std::string& FMDIndex::getContigName(size_t index) const {
+    // Get the name of that contig.
+    return names[index];
+}
+
+size_t FMDIndex::getContigLength(size_t index) const {\
+    // Get the length of that contig.
+    return lengths[index];
+}
+
 CSA::usint FMDIndex::getTotalLength() const {
     // Sum all the contig lengths and double (to make it be for both strands).
     // See <http://stackoverflow.com/a/3221813/402891>
     return std::accumulate(lengths.begin(), lengths.end(), 0) * 2;
 }
+
+FMDPosition FMDIndex::getSAPosition() const {
+    // We want an FMDPosition that covers the entire BWT.
+    
+}
+    
+   
+FMDPosition FMDIndex::getCharPosition(char c) const;
+     
+   
+FMDPosition FMDIndex::extend(FMDPosition range, char c, bool backward) const;
 
 char FMDIndex::display(CSA::usint contig, CSA::usint offset,
     bool strand) const {
@@ -104,7 +130,7 @@ char FMDIndex::display(CSA::usint contig, CSA::usint offset,
     
 }
 
-char FMDIndex::display(CSA::pair_type base) const {
+char FMDIndex::display(TextPosition base) const {
 
     // Display 1 character off the appropriate strand.
     CSA::uchar* displayData = fmd.display(base.first, 

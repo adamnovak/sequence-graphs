@@ -1,12 +1,25 @@
 #include <string>
 #include <vector>
-#include <rlcsa/fmd.h>
+
+#include "BWT.h";
+
+#include "TextPosition.hpp"
+#include "FMDIndexIterator.hpp"
+#include "RangeVector.hpp"
+#include "Mapping.hpp"
+#include "MapAttemptResult.hpp"
+
 
 
 /**
  * A class that encapsulates access to an FMDIndex, consisting of the underlying
- * FMD and some auxilliary structures (cointig names and lengths) that we store
- * along with it.
+ * indexing-library-specific index structure and some auxilliary structures
+ * (cointig names and lengths) that we store along with it.
+ *
+ * Wraps underlying indexing library operations and provides an interface with
+ * bi-directional search and suffix tree iteration.
+ *
+ *
  */
 class FMDIndex {
 public:
@@ -15,48 +28,154 @@ public:
      */
     FMDIndex(std::string basename);
     
+    /***************************************************************************
+     * Metadata Access Functions
+     **************************************************************************/
+    
     /**
      * Get the contig number (not the text number) from a (text, offset) pair.
      */
-    CSA::usint getContigNumber(CSA::pair_type base) const;
+    size_t getContigNumber(TextPosition base) const;
     
     /**
      * Get the strand from a (text, offset) pair: either 0 or 1.
      */
-    bool getStrand(CSA::pair_type base) const;
+    bool getStrand(TextPosition base) const;
     
     /**
      * Given a pair_type representing a base, and a vector of contig lengths by
      * number, determine the specified base's offset from the left of its
      * contig, 1-based.
      */
-    CSA::usint getOffset(CSA::pair_type base) const;
+    size_t getOffset(TextPosition base) const;
     
     /**
      * Get a unique string name for a position.
      */
-    std::string getName(CSA::pair_type base) const;
+    std::string getName(TextPosition base) const;
     
     /**
      * Get the total length of all contigs, on both strands.
      */
-    CSA::usint getTotalLength() const;
+    int64_t getTotalLength() const;
+    
+    /** 
+     * Get the total number of contigs in the index.
+     */
+    size_t getContigs() const;
+    
+    /**
+     * Get the name of the contig at the given index.
+     */
+    const std::string& getContigName(size_t index) const;
+    
+    /**
+     * Get the length of the contig at the given index.
+     */
+    size_t getContigLength(size_t index) const;
+    
+    /***************************************************************************
+     * Search Functions
+     **************************************************************************/
+     
+    /**
+     * Get an FMDPosition covering the whole SA.
+     */
+    FMDPosition getSAPosition() const;
+    
+    /**
+     * Get an FMDPosition for the part of the BWT for things starting with the
+     * given character.
+     */
+    FMDPosition getCharPosition(char c) const;
+     
+    /**
+     * Extend a search by a character, either backward or forward. Ranges are in
+     * BWT coordinates.
+     */
+    FMDPosition extend(FMDPosition range, char c, bool backward) const;
+    
+    /***************************************************************************
+     * Retrieval Functions
+     **************************************************************************/
     
     /**
      * Get the character for a base at the given offset on the given contig,
      * oriented as on the given strand. Offset is 1-based from contig start.
      */
-    char display(CSA::usint contig, CSA::usint offset, bool strand) const;
+    char display(size_t contig, size_t offset, bool strand) const;
     
     /**
      * Get the character for a base.
      */
-    char display(CSA::pair_type base) const; 
+    char display(TextPosition base) const;
+    
+    /***************************************************************************
+     * Mapping Functions
+     **************************************************************************/
+      
+    /**
+     * Attempt to map each base in the query string to a (text, position) pair.
+     * The vector returned will have one entry for each character in the
+     * selected range.
+     * 
+     * Optionally a start and length for the region to map can be specified. The
+     * whole string will be used as context, but only that region will actually
+     * be mapped. A length of -1 means to use the entire string after the start,
+     * and is the default.
+     */
+    std::vector<Mapping> map(const std::string& query, size_t start = 0,
+        size_t length = -1) const;
+      
+    /**
+     * Try RIGHT-mapping each base in the query to one of the ranges represented
+     * by the range vector. The range vector is in BWT space, and has a 1 in the
+     * first position in each range, and is 0 everywhere else. So rank(k) on it
+     * gives the number of the range containing position k, and we can easily
+     * check if both the start and end of our (backwards) search interval are in
+     * the same range.
+     *
+     * TODO: Unify semantics!
+     *
+     * The range starting points must be such that the ranges described are "bi-
+     * ranges": each range has its reverse-complement range also present.
+     *
+     * Returns a vector of range numbers for left-mapping each base, or -1 if
+     * the base did not map to a range.
+     */
+    std::vector<int64_t> map(const RangeVector& ranges,
+        const std::string& query, size_t start = 0, size_t length = -1) const;
+        
+    /***************************************************************************
+     * Iteration Functions
+     **************************************************************************/
+     
+    /**
+     * We have an iterator typedef, so we can get an iterator over the suffix
+     * tree easily.
+     */
+    typedef FMDIndexIterator iterator;
+    /**
+     * const_iterator is the same as the normal iterator, since it would be
+     * silly to try and modify the suffix tree we're iterating over.
+     */
+    typedef FMDIndexIterator const_iterator;
     
     /**
-     * Holds the actual underlying FMD.
+     * Get an iterator pointing to the first range in the suffix tree, iterating
+     * down to the given depth. If reportDeadEnds is set, will yield shorter-
+     * than-depth contexts that happen before end of texts.
      */
-    CSA::FMD fmd;
+    iterator begin(size_t depth, bool reportDeadEnds = false) const;
+     
+    /**
+     * Get a 1-past-the-end sentinel iterator for the given depth.
+     * reportDeadEnds should match whatever was specified on the corresponding
+     * begin.
+     */
+    iterator end(size_t depth, bool reportDeadEnds = false) const;
+    
+protected:
     
     /**
      * Holds the names of all the contigs.
@@ -66,6 +185,71 @@ public:
     /**
      * Holds the lengths of all the contigs, in the same order.
      */
-    std::vector<long long int> lengths;
+    std::vector<size_t> lengths;
+    
+    /**
+     * Holds the actual underlying index.
+     */
+    BWT fmd;
+    
+    /**
+     * How many bases are there? Only 4 in SGA world; N isn't allowed.
+     */
+    static const usint NUM_BASES = 4;
+
+    /**
+     * This holds the bases in alphabetcal order by reverse complement. This
+     * order is needed when doing the iterative scoping out of the reverse
+     * complement intervals in the extension procedure, and there we need to go
+     * through them in this order. See
+     * <http://stackoverflow.com/q/2312860/402891>
+     */
+    static const std::string BASES;
+
+    /**
+     * This holds the bases in alphabetical order, which is the same as their
+     * sort order in the BWT, and is the order that FMDIterator needs to go
+     * through them in.
+     */
+    static const std::string ALPHABETICAL_BASES;
+    
+    /**
+     * Try left-mapping the given index in the given string, starting from
+     * scratch. Start a backwards search at that index in the string and extend
+     * left until we map to exactly one or zero places. Returns true or false
+     * depending on whether we map, an FMDPosition (in BWT coordinates) that, if
+     * nonempty, can be extended right to try and map the next base to the
+     * right, and the number of characters in the pattern used to make that
+     * FMDPosition.
+     *
+     * If the mapping succeeded, the FMDPosition returned has one thing in it,
+     * which is the mapping upstream context.
+     *
+     * Index must be a valid character position in the string.
+     */
+    MapAttemptResult mapPosition(const std::string& pattern,
+        usint index) const;
+      
+    /**
+     * Try RIGHT-mapping the given index in the given string to a unique forward-
+     * strand range according to the bit vector of range start points, starting
+     * from scratch. Start a backwards search at that index in the string and
+     * extend left until we map to exactly one or zero ranges. Returns true or
+     * false depending on whether we map, an FMDPosition (in BWT coordinates)
+     * that, if nonempty, can be extended right to try and map the next base to
+     * the right, and the number of characters in the pattern used to make that
+     * FMDPosition.
+     *
+     * The range starting points must be such that the ranges described are "bi-
+     * ranges": each range has its reverse-complement range also present.
+     *
+     * If the mapping succeeded, the FMDPosition returned is completely
+     * contained within one range, which is the range to which the base has been
+     * mapped.
+     *
+     * Index must be a valid character position in the string.
+     */
+    MapAttemptResult mapPosition(const RangeVector& ranges, 
+      const std::string& pattern, usint index) const;
 
 };

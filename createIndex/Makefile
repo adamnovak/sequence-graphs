@@ -5,9 +5,9 @@ OBJS=createIndex.o FMDIndex.o FMDIndexBuilder.o util.o
 # What projects do we depend on? We have rules for each of these.
 DEPS=rlcsa pinchesAndCacti sonLib libsuffixtools
 
-
+# Specify all the libs to link with.
 LDLIBS += ../deps/sonLib/lib/stPinchesAndCacti.a ../deps/sonLib/lib/sonLib.a \
--lboost_filesystem -lrlcsa -lavrocpp -lsuffixtools
+../libsuffixtools/libsuffixtools.a -lboost_filesystem -lrlcsa -lavrocpp
 
 # We need -fopenmp to link against rlcsa.
 LDFLAGS += -L../deps/rlcsa -fopenmp -L../deps/sonLib/lib -L../libsuffixtools
