@@ -11,9 +11,6 @@
 #include <boost/filesystem.hpp>
 #include "boost/program_options.hpp" 
 
-#include <rlcsa/fmd.h>
-#include <rlcsa/bits/rlevector.h>
-
 // Grab pinchesAndCacti dependency.
 #include "stPinchGraphs.h"
 
@@ -34,6 +31,11 @@
 
 #include "FMDIndexBuilder.hpp"
 #include "FMDIndex.hpp"
+#include "FMDIndexIterator.hpp"
+#include "RangeVector.hpp"
+#include "TextPosition.hpp"
+#include "util.hpp"
+#include "Mapping.hpp"
 #include "IDSource.hpp"
 
 #include "debug.hpp"
@@ -78,7 +80,7 @@ const int TEST_ITERATIONS = 1000;
  */
 std::string 
 getArrow(
-    CSA::usint textNumber
+    size_t textNumber
 ) {
     if(textNumber % 2 == 0) {
         // It's a left, so it gets a normal arrow
@@ -134,8 +136,6 @@ buildIndex(
     return basename;
 }
 
-#ifdef NOPE
-
 /**
  * Make a thread set with one thread representing each contig in the index.
  */
@@ -184,14 +184,14 @@ mergeNonsymmetric(
     
     // To construct the non-symmetric merged graph with p context:
     // Traverse the suffix tree down to depth p + 1
-    for(CSA::FMD::iterator i = index.fmd.begin(contextLength); 
-        i != index.fmd.end(contextLength); ++i) {
+    for(FMDIndex::iterator i = index.begin(contextLength); 
+        i != index.end(contextLength); ++i) {
         // For each pair of suffix and position in the suffix tree
         
         // Unpack the iterator into pattern and FMDPosition at which it happens.
         std::string pattern = (*i).first;
         // This is in SA coordinates.
-        CSA::FMDPosition range = (*i).second;
+        FMDPosition range = (*i).second;
         
         
         if(!quiet) {
@@ -204,38 +204,24 @@ mergeNonsymmetric(
             // more places. And since a range with offset 0 has one thing in it,
             // we check to see if it's 1 or more.
             
-            // Grab just the one-strand range, and construct the actual
-            // endpoint.
-            CSA::pair_type oneStrandRange = std::make_pair(range.forward_start, 
-                range.forward_start + range.end_offset);
-            
-            DEBUG(std::cout << "Locating (" << oneStrandRange.first << "," <<
-                oneStrandRange.second << ")" << std::endl;)
-            
-            // Locate the entire range. We'll have to free this eventually.
-            // There are at least two of these.
-            CSA::usint* locations = index.fmd.locate(oneStrandRange);
-                
-            if(locations == NULL) {
-                throw std::runtime_error("Coud not locate pair!");
-            }
+            DEBUG(std::cout << "Locating " << range << std::endl;)
             
             // For each base location, we need to work out the contig and base
             // and orientation, and pinch with the first.
             
             // Work out what text and base the first base is.
-            CSA::pair_type firstBase = index.fmd.getRelativePosition(
-                locations[0]);
+            TextPosition firstBase = index.locate(range.getForwardStart());
             
             DEBUG(std::cout << "First relative position: text " << 
-                firstBase.first << " offset " << firstBase.second << std::endl;)
+                firstBase.getText() << " offset " << firstBase.getOffset() <<
+                std::endl;)
             
             // What contig corresponds to that text?
-            CSA::usint firstContigNumber = index.getContigNumber(firstBase);
+            size_t firstContigNumber = index.getContigNumber(firstBase);
             // And what strand corresponds to that text?
-            CSA::usint firstStrand = index.getStrand(firstBase);
+            size_t firstStrand = index.getStrand(firstBase);
             // And what base position is that?
-            CSA::usint firstOffset = index.getOffset(firstBase);
+            size_t firstOffset = index.getOffset(firstBase);
             
             // Grab the first pinch thread
             stPinchThread* firstThread = stPinchThreadSet_getThread(threadSet,
@@ -251,10 +237,10 @@ mergeNonsymmetric(
                 
                 if(!dumped.count(firstName)) {
                     // Get its base
-                    char baseChar = index.display(firstBase);
+                    char baseChar = index.display(range.getForwardStart());
                     if(firstStrand) {
                         // Flip it around so we always see forward strand bases.
-                        baseChar = CSA::reverse_complement(baseChar);
+                        baseChar = complement(baseChar);
                     }
                 
                     // Write a node for it
@@ -273,19 +259,22 @@ mergeNonsymmetric(
                 }
             }
             
-            for(CSA::usint j = 1; j < range.end_offset + 1; j++) {
-                // For each subsequent located base
+            for(int64_t j = 1; j < range.getEndOffset() + 1; j++) {
+                // For each subsequent base
                 
-                // Find and unpack it just like for the first base.
-                CSA::pair_type otherBase = index.fmd.getRelativePosition(
-                    locations[j]);
+                // Locate the base
+                TextPosition otherBase = index.locate(range.getForwardStart() +
+                    j);
+                
                 DEBUG(
-                    std::cout << "Relative position: (" << otherBase.first << 
-                    "," << otherBase.second << ")" << std::endl;   
+                    std::cout << "Relative position: (" << 
+                    otherBase.getText() << "," << otherBase.getOffset() << 
+                    ")" << std::endl;   
                 )
-                CSA::usint otherContigNumber = index.getContigNumber(otherBase);
-                CSA::usint otherStrand = index.getStrand(otherBase);
-                CSA::usint otherOffset = index.getOffset(otherBase);
+                
+                size_t otherContigNumber = index.getContigNumber(otherBase);
+                size_t otherStrand = index.getStrand(otherBase);
+                size_t otherOffset = index.getOffset(otherBase);
                 
                 // Grab the other pinch thread.
                 stPinchThread* otherThread = stPinchThreadSet_getThread(
@@ -316,12 +305,14 @@ mergeNonsymmetric(
                     std::string otherName = index.getName(otherBase); 
                     
                     if(!dumped.count(otherName)) {
-                        // Get its base
-                        char baseChar = index.display(otherBase);
+                        // Get its base character
+                        char baseChar = index.display(range.getForwardStart() +
+                            j);
+                            
                         if(otherStrand) {
                             // Flip it around so we always see forward strand
                             // bases.
-                            baseChar = CSA::reverse_complement(baseChar);
+                            baseChar = complement(baseChar);
                         }
                     
                         // Write a node for it
@@ -368,11 +359,11 @@ mergeNonsymmetric(
  * position into the same sort of structure for the canonical base that
  * represents all the bases it has been pinched with.
  */
-std::pair<std::pair<size_t, CSA::usint>, bool>
+std::pair<std::pair<size_t, size_t>, bool>
 canonicalize(
     stPinchThreadSet* threadSet, 
     size_t contigNumber,
-    CSA::usint offset,
+    size_t offset,
     bool strand
 ) {
     
@@ -396,7 +387,7 @@ canonicalize(
     bool segmentOrientation = stPinchSegment_getBlockOrientation(segment);
     // How far into the segment are we? 0-based, from subtracting 1-based
     // positions.
-    CSA::usint segmentOffset = offset - stPinchSegment_getStart(segment);
+    size_t segmentOffset = offset - stPinchSegment_getStart(segment);
         
     // Get the first segment in the segment's block, or just this segment if
     // it isn't in a block.
@@ -420,7 +411,7 @@ canonicalize(
     // segments are pinched together backwards, this will count in opposite
     // directions on the two segments, so we'll need to flip the within-sement
     // offset around.
-    CSA::usint canonicalSegmentOffset = segmentOffset;
+    size_t canonicalSegmentOffset = segmentOffset;
     if(segmentOrientation != canonicalOrientation) {
         // We really want this many bases in from the end of the segment, not
         // out from the start of the segment. Keep it 0-based.
@@ -433,7 +424,7 @@ canonicalize(
     
     // What's the offset into the canonical contig? 1-based because we add a
     // 0-based offset to a 1-based position.
-    CSA::usint canonicalOffset = stPinchSegment_getStart(firstSegment) + 
+    size_t canonicalOffset = stPinchSegment_getStart(firstSegment) + 
         canonicalSegmentOffset;
     
     DEBUG(std::cout << "Canonicalized contig " << contigNumber << " offset " <<
@@ -463,21 +454,21 @@ canonicalize(
  * given thread set. The orientation is which face of the canonical base this
  * (text, offset) pair means.
  */
-std::pair<std::pair<size_t, CSA::usint>, bool>
+std::pair<std::pair<size_t, size_t>, bool>
 canonicalize(
     const FMDIndex& index, 
     stPinchThreadSet* threadSet, 
-    CSA::pair_type base
+    TextPosition base
 ) {
     
     // What contig corresponds to that text?
-    CSA::usint contigNumber = index.getContigNumber(base);
+    size_t contigNumber = index.getContigNumber(base);
     // And what strand corresponds to that text? This tells us what
     // orientation we're actually looking at the base in.
     bool strand = (bool) index.getStrand(base);
     // And what base position is that from the front of the contig? This is
     // 1-based.
-    CSA::usint offset = index.getOffset(base);
+    size_t offset = index.getOffset(base);
     
     // Canonicalize that pinch thread set position.
     return canonicalize(threadSet, contigNumber, offset, strand);
@@ -495,7 +486,7 @@ canonicalize(
  */
 void makeMergedAdjacencies(
     stPinchThreadSet* threadSet, 
-    std::map<std::pair<size_t, CSA::usint>, long long int> idReservations, 
+    std::map<std::pair<size_t, size_t>, long long int> idReservations, 
     std::ofstream* dumpFile
 ) {
 
@@ -527,11 +518,11 @@ void makeMergedAdjacencies(
             
             // Canonicalize its right side (strand 0 or false), which is the one
             // linked by this adjacency to the next base.
-            std::pair<std::pair<size_t, CSA::usint>, bool> canonicalBase =
+            std::pair<std::pair<size_t, size_t>, bool> canonicalBase =
                 canonicalize(threadSet, name, j, false);
             
             // Also canonicalize the left side of the next base.
-            std::pair<std::pair<size_t, CSA::usint>, bool> canonicalNextBase =
+            std::pair<std::pair<size_t, size_t>, bool> canonicalNextBase =
                 canonicalize(threadSet, name, j + 1, true);
                 
             // What IDs and sides do these go to? Hold pairs of coordinate and
@@ -585,7 +576,7 @@ void makeMergedAdjacencies(
  * 
  * Don't forget to delete the bit vector when done!
  */
-std::pair<CSA::RLEVector*, std::vector<Side> > 
+std::pair<RangeVector*, std::vector<Side> > 
 makeLevelIndex(
     stPinchThreadSet* threadSet, 
     const FMDIndex& index, 
@@ -596,7 +587,7 @@ makeLevelIndex(
     
     // We need to make bit vector denoting ranges, which we encode with this
     // encoder, which has 32 byte blocks.
-    CSA::RLEEncoder encoder(32);
+    RangeEncoder encoder(32);
     
     // We also need to make a vector of Sides, which are (contig, base, face),
     // and are the things that get matched to by the corresponding ranges in the
@@ -604,29 +595,22 @@ makeLevelIndex(
     std::vector<Side> mappings;
     
     // We also need this map of position IDs (long long ints) by canonical
-    // contig name (a size_t) and base index (a CSA::usint)
-    std::map<std::pair<size_t, CSA::usint>, long long int>
+    // contig name (a size_t) and base index (also a size_t)
+    std::map<std::pair<size_t, size_t>, long long int>
         idReservations;
-        
-    // Work out where the valid positions in the BWT are.
-    CSA::pair_type bwtBounds = index.fmd.getBWTRange();
 
     std::cout << "Building mapping data structure..." << std::endl;
     
-    for(CSA::FMD::iterator i = index.fmd.begin(contextLength, true); 
-        i != index.fmd.end(contextLength, true); ++i) {
+    for(FMDIndex::iterator i = index.begin(contextLength, true); 
+        i != index.end(contextLength, true); ++i) {
         
         // Go through all the contexts, including shortened ones before end of
         // text.
         
-        // Unpack the iterator into pattern and FMDPosition at which it happens.
+        // Unpack the iterator into pattern and FMDPosition at which it happens,
+        // which is in BWT coordinates.
         std::string context = (*i).first;
-        // Keep in mind that this is in SA coordinates!
-        CSA::FMDPosition range = (*i).second;
-        
-        // Work out where the forward range starts in BWT coordinates (again)
-        CSA::usint bwtStart = range.forward_start;
-        index.fmd.convertToBWTIndex(bwtStart);
+        FMDPosition range = (*i).second;
         
         DEBUG(std::cout << "===Context: " << context << " at range " << range <<
             "===" << std::endl;)
@@ -638,14 +622,13 @@ makeLevelIndex(
             
             // Locate the first base in the context. It's already in SA
             // coordinates.
-            CSA::pair_type base = index.fmd.getRelativePosition(
-                index.fmd.locate(range.forward_start));
-            DEBUG(std::cout << "Text/Offset: (" << base.first << ", " << 
-                base.second << ")" << std::endl;)
+            TextPosition base = index.locate(range.getForwardStart());
+            DEBUG(std::cout << "Text/Offset: (" << base.getText() << ", " << 
+                base.getOffset() << ")" << std::endl;)
             
             // Canonicalize it. The second field here will be the relative
             // orientation and determine the Side.
-            std::pair<std::pair<size_t, CSA::usint>, bool> canonicalized = 
+            std::pair<std::pair<size_t, size_t>, bool> canonicalized = 
                 canonicalize(index, threadSet, base);
             
             // Figure out what the ID of the canonical base is.
@@ -659,14 +642,6 @@ makeLevelIndex(
                     source.next();
             }
             
-            DEBUG(
-                char sourceChar = index.display(base);
-                char destChar = index.display(canonicalized.first.first, 
-                            canonicalized.first.second, canonicalized.second);
-                std::cout << "Merged a " << sourceChar << " into a " << 
-                    destChar << std::endl;
-            )
-            
             // Say this range is going to belong to the ID we just looked up, on
             // the appropriate face.
             Side mapping;
@@ -676,14 +651,14 @@ makeLevelIndex(
             // Add the mapping
             mappings.push_back(mapping);
             
-            if(bwtStart != bwtBounds.first) {
+            if(range.getForwardStart() != 0) {
                 // Record a 1 in the vector at the start of every range except
                 // the first, in BWT coordinates. The first needs no 1 before it
                 // so it will be rank 0 (and match up with mapping 0), and it's
                 // OK not to split it off from the stop characters since they
                 // can't ever be searched.
-                encoder.addBit(bwtStart);
-                DEBUG(std::cout << "Set bit " << bwtStart <<
+                encoder.addBit(range.getForwardStart());
+                DEBUG(std::cout << "Set bit " << range.getForwardStart() <<
                     std::endl;)
             }
             
@@ -701,33 +676,19 @@ makeLevelIndex(
             // where we locate each base and, when the canonical position
             // changes, add a 1 to start a new range and add a mapping.
 
-            // Grab just the one-strand range, and construct the actual
-            // endpoint.
-            CSA::pair_type oneStrandRange = std::make_pair(range.forward_start, 
-                range.forward_start + range.end_offset);
-            
-            // Locate the entire range. We'll have to free this eventually.
-            // There are at least two of these.
-            CSA::usint* locations = index.fmd.locate(oneStrandRange);
-                
-            if(locations == NULL) {
-                throw std::runtime_error("Coud not locate short suffix!");
-            }
-            
             // Keep track of the ID and relative orientation for the last
             // position we canonicalized.
-            std::pair<std::pair<size_t, CSA::usint>, bool> lastCanonicalized;
+            std::pair<std::pair<size_t, size_t>, bool> lastCanonicalized;
             
-            for(CSA::usint j = 0; j < range.end_offset + 1; j++) {
+            for(int64_t j = 0; j < range.getEndOffset() + 1; j++) {
                 // For each base in the range...
                 
-                // Where was it located?
-                CSA::pair_type base = index.fmd.getRelativePosition(
-                    locations[j]);
+                // Where is it located?
+                TextPosition base = index.locate(range.getForwardStart() + j);
                 
                 // Canonicalize it. The second field here will be the relative
                 // orientation and determine the Side.
-                std::pair<std::pair<size_t, CSA::usint>, bool> canonicalized = 
+                std::pair<std::pair<size_t, size_t>, bool> canonicalized = 
                     canonicalize(index, threadSet, base);
                     
                 if(j == 0 || canonicalized != lastCanonicalized) {
@@ -748,15 +709,6 @@ makeLevelIndex(
                             source.next();
                     }
                     
-                    DEBUG(
-                        char sourceChar = index.display(base);
-                        char destChar = index.display(canonicalized.first.first, 
-                                    canonicalized.first.second,
-                                    canonicalized.second);
-                        std::cout << "Merged a " << sourceChar << " into a " << 
-                            destChar << std::endl;
-                    )
-                    
                     // Say this range is going to belong to the ID we just
                     // looked up, on the appropriate face.
                     Side mapping;
@@ -768,16 +720,16 @@ makeLevelIndex(
                     
                     // Add in the bit the same as above, only here we add the
                     // offset of i.
-                    if(bwtStart + j != bwtBounds.first) {
+                    if(range.getForwardStart() + j != 0) {
                         // Record a 1 in the vector at the start of every range
                         // except the first, in BWT coordinates. The first needs
                         // no 1 before it so it will be rank 0 (and match up
                         // with mapping 0), and it's OK not to split it off from
                         // the stop characters since they can't ever be
                         // searched.
-                        encoder.addBit(bwtStart + j);
-                        DEBUG(std::cout << "Set bit " << bwtStart + j <<
-                            std::endl;)
+                        encoder.addBit(range.getForwardStart() + j);
+                        DEBUG(std::cout << "Set bit " << 
+                            range.getForwardStart() + j << std::endl;)
                     }
                     
                     DEBUG(std::cout << "Mapping to #" << 
@@ -797,13 +749,14 @@ makeLevelIndex(
     }
     
     // Set a bit after the end of the last range.
-    encoder.addBit(bwtBounds.second + 1);
+    encoder.addBit(index.getTotalLength());
     
     // Finish the vector encoder into a vector of the right length.
-    // This should always end in a 1! Make sure to flush first.
+    // This should always end in a 1!
+    // Make sure to flush first.
     encoder.flush();
-    CSA::RLEVector* bitVector = new CSA::RLEVector(encoder, 
-        bwtBounds.second + 1);
+    RangeVector* bitVector = new RangeVector(encoder,
+        index.getTotalLength() + 1);
     
     if(dumpFile != NULL) {
         // We need to add in the edges that connect merged positions together.
@@ -822,7 +775,7 @@ makeLevelIndex(
  * index, so it can be reused.
  */
 void saveLevelIndex(
-    std::pair<CSA::RLEVector*, std::vector<Side> > levelIndex,
+    std::pair<RangeVector*, std::vector<Side> > levelIndex,
     std::string directory
 ) {
     
@@ -873,14 +826,11 @@ void
 testBottomMapping(
     const FMDIndex& index
 ) {
-    // Clear FMD stats.
-    CSA::FMD::getStats();
-
     // Start the timer
     clock_t start = clock();
     for(int i = 0; i < TEST_ITERATIONS; i++) {
         // Map repeatedly
-        index.fmd.map(TEST_READ);
+        index.map(TEST_READ);
     }
     // Stop the timer
     clock_t end = clock();
@@ -891,50 +841,6 @@ testBottomMapping(
         
     std::cout << "Mapping to bottom level: " << msPerCall << " ms per call" <<
         std::endl;
-        
-    // Print out the stats for extends and restarts
-    CSA::pair_type stats = CSA::FMD::getStats();
-    std::cout << "Extends/restarts: " << stats.first << " / " << stats.second <<
-        std::endl;
-        
-    // Now try with FM-index mapping
-    
-    // Start the timer
-    start = clock();
-    for(int i = 0; i < TEST_ITERATIONS; i++) {
-        // Map repeatedly
-        index.fmd.mapFM(TEST_READ);
-    }
-    // Stop the timer
-    end = clock();
-    
-    // Work out how many milliseconds each call took
-    msPerCall = ((double)(end - start)) / 
-        (CLOCKS_PER_SEC / 1000.0) / TEST_ITERATIONS;
-        
-    std::cout << "FM-Mapping to bottom level: " << msPerCall <<
-        " ms per call" << std::endl;
-        
-    // Compare results
-    std::vector<CSA::Mapping> fmd = index.fmd.map(TEST_READ);
-    std::vector<CSA::Mapping> fm = index.fmd.mapFM(TEST_READ);
-    
-    if(fmd.size() != fm.size() || !std::equal(fmd.begin(), fmd.end(), 
-        fm.begin())) {
-        
-        // Complain if I see two different results.
-        
-        std::cout << "WARNING! Mapping mismatch!" << std::endl;
-        
-        std::cout << "Got " << fmd.size() << " vs. " << fm.size() <<
-            " mappings." << std::endl;
-        
-        for(int i = 0; i < fmd.size() && i < fm.size(); i++) {
-            std::cout << fmd[i] << "\t" << fm[i] << std::endl;
-        }
-        
-    }
-    
 }
 
 /**
@@ -944,14 +850,11 @@ void
 testMergedMapping(
     const FMDIndex& index, const CSA::RLEVector* ranges
 ) {
-    // Clear FMD stats.
-    CSA::FMD::getStats();
-
     // Start the timer
     clock_t start = clock();
     for(int i = 0; i < TEST_ITERATIONS; i++) {
         // Map repeatedly
-        index.fmd.map(*ranges, TEST_READ);
+        index.map(*ranges, TEST_READ);
     }
     // Stop the timer
     clock_t end = clock();
@@ -962,14 +865,7 @@ testMergedMapping(
         
     std::cout << "Mapping to merged level: " << msPerCall << " ms per call" <<
         std::endl;
-        
-    // Print out the stats for extends and restarts
-    CSA::pair_type stats = CSA::FMD::getStats();
-    std::cout << "Extends/restarts: " << stats.first << " / " << stats.second <<
-        std::endl;
 }
-
-#endif
 
 /**
  * createIndex: command-line tool to create a multi-level reference structure.
@@ -1085,8 +981,6 @@ main(
     std::string basename = buildIndex(indexDirectory, fastas,
         options["sampleRate"].as<unsigned int>());
     
-    #ifdef NOPE
-    
     if(options.count("noMerge")) {
         // Skip merging any of the higher levels.
         return 0;
@@ -1139,7 +1033,7 @@ main(
     }
     
     // Index it so we have a bit vector and Sides to write out
-    std::pair<CSA::RLEVector*, std::vector<Side> > levelIndex = makeLevelIndex(
+    std::pair<RangeVector*, std::vector<Side> > levelIndex = makeLevelIndex(
         threadSet, index, contextLength, source, dumpFile);
         
     // Write it out, deleting the bit vector in the process
@@ -1164,8 +1058,6 @@ main(
     
     // Get rid of the range vector
     delete levelIndex.first;
-
-    #endif
 
     // Now we're done!
     return 0;
