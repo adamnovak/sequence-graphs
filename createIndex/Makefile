@@ -1,6 +1,7 @@
 CXX=g++
 
-OBJS=createIndex.o FMDIndex.o FMDIndexBuilder.o util.o
+OBJS=createIndex.o FMDIndex.o FMDIndexBuilder.o util.o FMDIndexIterator.o \
+    Mapping.o FMDPosition.o
 
 # What projects do we depend on? We have rules for each of these.
 DEPS=rlcsa pinchesAndCacti sonLib libsuffixtools

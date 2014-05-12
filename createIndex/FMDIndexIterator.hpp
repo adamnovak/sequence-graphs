@@ -33,7 +33,7 @@ public:
      *
      * Depth may not be 0.
      */
-    FMDIndexIterator(const FMDIndex& parent, usint depth, bool beEnd=false,
+    FMDIndexIterator(const FMDIndex& parent, size_t depth, bool beEnd=false,
         bool reportDeadEnds=false);
     
     /**
@@ -95,7 +95,7 @@ private:
      * frame we can recurse on the next character). It isn't a real stack
      * because we do need to traverse it to do things like iterator equality.
      */
-    std::deque<std::pair<FMDPosition, int64_t> > stack;
+    std::deque<std::pair<FMDPosition, size_t> > stack;
     
     /**
      * Holds the string corresponding to the current FMDPosition on top of the
@@ -123,14 +123,14 @@ private:
      * Recurse on the base with the given number. Returns true if that was
      * actually done, or false if that would have resulted in an empty range.
      */
-    bool recurse(usint baseNumber);
+    bool recurse(size_t baseNumber);
     
     /**
      * Try recursing with all base numbers, starting from the given one. Take
      * the first one that succeeds and return true, or if none succeed return
      * false.
      */
-    bool tryRecurse(usint baseNumber);
+    bool tryRecurse(size_t baseNumber);
     
     /**
      * Try recursing to a non-empty interval at the iterator's specified depth,
@@ -138,13 +138,13 @@ private:
      * with base numbers increasing from there. Returns true if a max-depth non-
      * empty interval was found, and false otherwise.
      */
-    bool tryRecurseToDepth(usint baseNumber);
+    bool tryRecurseToDepth(size_t baseNumber);
     
     
     /**
      * Pop the top stack frame.
      */
-    std::pair<FMDPosition, int64_t> pop();
+    std::pair<FMDPosition, size_t> pop();
     
     
     
