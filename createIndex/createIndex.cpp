@@ -43,6 +43,8 @@
 //#define DEBUG(op) op
 #define DEBUG(op)
 
+// TODO: replace with cppunit!
+
 // Define a read to use for testing. 200 bp perfect match.
 const std::string TEST_READ(std::string("GACGGGACTCGCCGCCGCCCAGCCGGGGTTCCCGC") +
     "TGGCGCAATTGAAAACTTTCGTCGATCAGGAATTTGCCCAAATAAAACATGTCCTGCATGGCATTAGTTTGT" +
@@ -117,7 +119,7 @@ buildIndex(
     std::string basename(indexDirectory + "/index.basename");
 
     // Make a new builder
-    FMDIndexBuilder builder(basename);
+    FMDIndexBuilder builder(basename, sampleRate);
     for(std::vector<std::string>::iterator i = fastas.begin(); i < fastas.end();
         ++i) {
         
@@ -127,12 +129,16 @@ buildIndex(
         builder.add(*i);
     }
     
+    std::cout << "Finishing index..." << std::endl;    
+    
     // Save to disk.
     builder.close();
     
     // Return the basename
     return basename;
 }
+
+#ifdef NOPE
 
 /**
  * Make a thread set with one thread representing each contig in the index.
@@ -967,6 +973,8 @@ testMergedMapping(
         std::endl;
 }
 
+#endif
+
 /**
  * createIndex: command-line tool to create a multi-level reference structure.
  */
@@ -995,7 +1003,7 @@ main(
             ->default_value(3), 
             "Set the context length to merge on")
         ("sampleRate", boost::program_options::value<unsigned int>()
-            ->default_value(128), 
+            ->default_value(64), 
             "Set the suffix array sample rate to use")
         // These next two options should be ->required(), but that's not in the
         // Boost version I can convince our cluster admins to install. From now
@@ -1081,6 +1089,8 @@ main(
     std::string basename = buildIndex(indexDirectory, fastas,
         options["sampleRate"].as<unsigned int>());
     
+    #ifdef NOPE
+    
     if(options.count("noMerge")) {
         // Skip merging any of the higher levels.
         return 0;
@@ -1158,6 +1168,8 @@ main(
     
     // Get rid of the range vector
     delete levelIndex.first;
+
+    #endif
 
     // Now we're done!
     return 0;

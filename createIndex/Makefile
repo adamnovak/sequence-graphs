@@ -3,7 +3,7 @@ CXX=g++
 OBJS=createIndex.o FMDIndex.o FMDIndexBuilder.o util.o
 
 # What projects do we depend on? We have rules for each of these.
-DEPS=rlcsa pinchesAndCacti sonLib
+DEPS=rlcsa pinchesAndCacti sonLib libsuffixtools
 
 
 LDLIBS += ../deps/sonLib/lib/stPinchesAndCacti.a ../deps/sonLib/lib/sonLib.a \
@@ -37,8 +37,13 @@ rlcsa:
 pinchesAndCacti: sonLib
 	$(MAKE) -C ../deps/pinchesAndCacti
 
+# transitive sonLib dependency
 sonLib:
 	$(MAKE) -C ../deps/sonLib
+	
+# libsuffixtools dependency
+libsuffixtools:
+	$(MAKE) -C ../libsuffixtools
 
 # Build Avro schema JSON files. IDL2SCHEMATA must be correct.
 schemas/%.avsc: ../src/main/avro/reference.avdl

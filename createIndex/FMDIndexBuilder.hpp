@@ -15,9 +15,9 @@ class FMDIndexBuilder {
         /**
          * Create a new FMDIndexBuilder using the specified basename for its
          * index. If an index with that basename already exists, it will be
-         * replaced.
+         * replaced. Optionally, you can specify a suffix array sample rate.
          */
-        FMDIndexBuilder(const std::string& basename);
+        FMDIndexBuilder(const std::string& basename, int sampleRate = 64);
         
         /**
          * Add the contents of the given FASTA file to the index, both forwards
@@ -57,6 +57,12 @@ class FMDIndexBuilder {
          * Keep around a file to save the contig names and lengths in.
          */
         std::ofstream contigFile;
+        
+        /**
+         * Keep track of the sample rate to use when we produce the sampled
+         * suffix array (when close() is called).
+         */
+        int sampleRate;
         
         /**
          * How many threads should we use when building the index?

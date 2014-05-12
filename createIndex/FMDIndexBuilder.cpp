@@ -44,10 +44,10 @@ void report_error(const std::string message) {
 // Don't hook in .gz support. See <http://stackoverflow.com/a/19390915/402891>
 KSEQ_INIT(int, read)
 
-FMDIndexBuilder::FMDIndexBuilder(const std::string& basename):
+FMDIndexBuilder::FMDIndexBuilder(const std::string& basename, int sampleRate):
     basename(basename), tempDir(make_tempdir()), 
     tempFastaName(tempDir + "/temp.fa"), tempFasta(tempFastaName.c_str()), 
-    contigFile((basename + ".chrom.sizes").c_str()) {
+    contigFile((basename + ".chrom.sizes").c_str()), sampleRate(sampleRate) {
 
     // Nothing to do, already made everything.
     
@@ -168,8 +168,8 @@ void FMDIndexBuilder::close() {
     // Make a sampled suffix array
     SampledSuffixArray sampled;
     
-    // Build it from the BWT and read info
-    sampled.build(&bwt, &infoTable);
+    // Build it from the BWT and read info, with the specified sample rate
+    sampled.build(&bwt, &infoTable, sampleRate);
     
     std::cout << "Saving sampled suffix array to " << ssaFile << std::endl;
 
