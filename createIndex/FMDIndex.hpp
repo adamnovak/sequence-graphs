@@ -63,6 +63,13 @@ public:
      */
     int64_t getTotalLength() const;
     
+    /**
+     * Get the total length of the BWT, which ought to be the number of texts
+     * (i.e. twice the number of contigs), plus the number of characters of
+     * actual sequence.
+     */
+    int64_t getBWTLength() const;
+    
     /** 
      * Get the total number of contigs in the index.
      */
@@ -116,6 +123,11 @@ public:
      * Get the character at the given index in the BWT.
      */
     char display(int64_t index) const;
+    
+    /**
+     * Get the character in the first column of the given row in the BWT matrix.
+     */
+    char displayFirst(int64_t index) const;
     
     /***************************************************************************
      * Mapping Functions

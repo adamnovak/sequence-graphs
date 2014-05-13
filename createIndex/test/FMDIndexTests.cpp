@@ -1,6 +1,7 @@
 // Test the BWT generation.
 
 #include <boost/filesystem.hpp>
+#include <iostream>
 
 #include "Util/ReadTable.h"
 #include "SuffixArray.h"
@@ -49,5 +50,16 @@ void FMDIndexTests::testDump() {
     
     // Load the index up
     FMDIndex index(tempDir + "/index.basename");
+    
+    // Make sure it has the right number of characters.
+    CPPUNIT_ASSERT(index.getTotalLength() == 35 * 2 * 2);
+    
+    // Make sure it has the right number of BWT positions (characters + texts).
+    CPPUNIT_ASSERT(index.getBWTLength() == index.getTotalLength() + 4);
+    
+    // Dump it
+    for(int i = 0; i < index.getBWTLength(); i++) {
+        std::cout << i << ": " << index.displayFirst(i) << " ... " << index.display(i) << std::endl;
+    }
     
 }

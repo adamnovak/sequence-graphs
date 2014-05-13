@@ -101,6 +101,10 @@ int64_t FMDIndex::getTotalLength() const {
     return std::accumulate(lengths.begin(), lengths.end(), 0) * 2;
 }
 
+int64_t FMDIndex::getBWTLength() const {
+    return bwt.getBWLen();
+}
+
 FMDPosition FMDIndex::getSAPosition() const {
     // We want an FMDPosition that covers the entire BWT.
     
@@ -271,6 +275,11 @@ TextPosition FMDIndex::locate(int64_t index) const {
 char FMDIndex::display(int64_t index) const {
     // Just pull straight from the BWT string.
     return bwt.getChar(index);
+}
+
+char FMDIndex::displayFirst(int64_t index) const {
+    // Our BWT supports this natively.
+    return bwt.getF(index);
 }
 
 std::vector<Mapping> FMDIndex::map(const std::string& query, int start,
