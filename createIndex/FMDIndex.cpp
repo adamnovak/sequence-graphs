@@ -95,7 +95,7 @@ size_t FMDIndex::getContigLength(size_t index) const {
     return lengths[index];
 }
 
-CSA::usint FMDIndex::getTotalLength() const {
+int64_t FMDIndex::getTotalLength() const {
     // Sum all the contig lengths and double (to make it be for both strands).
     // See <http://stackoverflow.com/a/3221813/402891>
     return std::accumulate(lengths.begin(), lengths.end(), 0) * 2;
@@ -177,7 +177,7 @@ FMDPosition FMDIndex::extend(FMDPosition range, char c, bool backward) const {
         
         // Get the same rank for the last instance. TODO: Is the -1 right here?
         int64_t forwardEndRank = bwt.getOcc(BASES[base], 
-            range.getForwardStart() + range.getEndOffset()) - 1
+            range.getForwardStart() + range.getEndOffset()) - 1;
 
         // Fill in the forward-strand start position and range end offset for
         // this base's answer.
@@ -197,7 +197,7 @@ FMDPosition FMDIndex::extend(FMDPosition range, char c, bool backward) const {
     // thing have the .end_offset set to 0.
     int64_t endOfTextLength = range.getLength();
 
-    for(usint base = 0; base < NUM_BASES; base++)
+    for(size_t base = 0; base < NUM_BASES; base++)
     {
         // Go through the bases in order and account for their lengths.
         endOfTextLength -= answers[base].getLength();
@@ -218,12 +218,12 @@ FMDPosition FMDIndex::extend(FMDPosition range, char c, bool backward) const {
     DEBUG(std::cout << "\t" << BASES[0] << " reverse_start is " << 
     answers[0].getReverseStart() << std::endl;)
 
-    for(usint base = 1; base < NUM_BASES; base++)
+    for(size_t base = 1; base < NUM_BASES; base++)
     {
         // For each subsequent base in alphabetical order by reverse complement
         // (as stored in BASES), allocate it the next part of the reverse range.
 
-        answers[base].setRebverseStart(answers[base - 1].getReverseStart() + 
+        answers[base].setReverseStart(answers[base - 1].getReverseStart() + 
             answers[base - 1].getLength());
         DEBUG(std::cout << "\t" << BASES[base] << " reverse_start is " << 
         answers[base].getReverseStart() << std::endl;)
@@ -231,7 +231,7 @@ FMDPosition FMDIndex::extend(FMDPosition range, char c, bool backward) const {
 
     // Now all the per-base answers are filled in.
 
-    for(usint base = 0; base < NUM_BASES; base++)
+    for(size_t base = 0; base < NUM_BASES; base++)
     {
         // For each base in arbitrary order
         if(BASES[base] == c)
@@ -267,8 +267,8 @@ char FMDIndex::display(int64_t index) const {
     return bwt.getChar(index);
 }
 
-std::vector<Mapping> FMDIndex::map(const std::string& query, size_t start = 0,
-    size_t length = -1) const {
+std::vector<Mapping> FMDIndex::map(const std::string& query, size_t start,
+    size_t length) const {
 
     if(length == -1) {
         // Fix up the length parameter if it is -1: that means the whole rest of
@@ -288,7 +288,7 @@ std::vector<Mapping> FMDIndex::map(const std::string& query, size_t start = 0,
     // Other fields get overwritten.
     location.position = EMPTY_FMD_POSITION;
 
-    for(sint i = start; i < (sint)(start + length); i++)
+    for(size_t i = start; i < start + length; i++)
     {
         if(location.position.isEmpty())
         {
@@ -312,28 +312,27 @@ std::vector<Mapping> FMDIndex::map(const std::string& query, size_t start = 0,
             // one thing in our interval.
 
             // Take the first (only) thing in the bi-interval's forward strand
-            // side, and convert to SA coordinates.
-            usint converted_start = location.position.forward_start;
-            convertToSAIndex(converted_start);
+            // side.
+            int64_t start = location.position.getForwardStart();
 
             // Locate it, and then report position as a (text, offset) pair.
             // This will give us the position of the first base in the pattern,
             // which lets us infer the position of the last base in the pattern.
-            pair_type text_location = getRelativePosition(locate(
-                converted_start));
+            TextPosition textPosition = locate(start);
 
             INFO(std::cout << "Mapped " << location.characters << 
-            " context to text " << text_location.getText() << " position " << 
-            text_location.getOffset() << std::endl;)
+            " context to text " << textPosition.getText() << " position " << 
+            textPosition.getOffset() << std::endl;)
 
             // Correct to the position of the last base in the pattern, by
             // offsetting by the length of the pattern that was used. A
             // 2-character pattern means we need to go 1 further right in the
             // string it maps to to find where its rightmost character maps.
-            text_location.second += (location.characters - 1);
+            textPosition.setOffset(textPosition.getOffset() + 
+                (location.characters - 1));
 
             // Add a Mapping for this mapped base.
-            mappings.push_back(Mapping(text_location));
+            mappings.push_back(Mapping(textPosition));
 
             // We definitely have a non-empty FMDPosition to continue from
 
@@ -385,7 +384,7 @@ std::vector<Mapping> FMDIndex::map(const std::string& query, size_t start = 0,
 }
 
 std::vector<int64_t> FMDIndex::map(const RangeVector& ranges,
-    const std::string& query, size_t start = 0, size_t length = -1) const {
+    const std::string& query, size_t start, size_t length) const {
     
     // RIGHT-map to a range.
 
@@ -396,7 +395,7 @@ std::vector<int64_t> FMDIndex::map(const RangeVector& ranges,
     }
 
     // We need a vector to return.
-    std::vector<sint> mappings;
+    std::vector<int64_t> mappings;
 
     // Keep around the result that we get from the single-character mapping
     // function. We use it as our working state to trackour FMDPosition and how
@@ -406,7 +405,7 @@ std::vector<int64_t> FMDIndex::map(const RangeVector& ranges,
     // Make sure the scratch position is empty so we re-start on the first base
     location.position = EMPTY_FMD_POSITION;
 
-    for(sint i = start + length - 1; i >= (sint) start; i--) {
+    for(size_t i = start + length - 1; i >= start; i--) {
         // Go from the end of our selected region to the beginning.
 
         if(location.position.isEmpty()) {
@@ -426,7 +425,7 @@ std::vector<int64_t> FMDIndex::map(const RangeVector& ranges,
 
         // What range index does our current left-side position (the one we just
         // moved) correspond to, if any?
-        sint range = location.position.range(ranges);
+        int64_t range = location.position.range(ranges);
 
         if(location.is_mapped && !location.position.isEmpty() && range != -1) {
             // It mapped. We didn't do a re-start and fail, and our interval is
@@ -495,7 +494,7 @@ std::vector<int64_t> FMDIndex::map(const RangeVector& ranges,
 }
 
 MapAttemptResult FMDIndex::mapPosition(const std::string& pattern,
-    usint index) const {
+    size_t index) const {
 
     DEBUG(std::cout << "Mapping " << index << " in " << pattern << std::endl;)
   
@@ -534,10 +533,10 @@ MapAttemptResult FMDIndex::mapPosition(const std::string& pattern,
         index--;
 
         // Grab the character to extend with.
-        usint character = pattern[index];
+        char character = pattern[index];
 
         DEBUG(std::cout << "Index " << index << " in " << pattern << " is " << 
-            (char) character << "(" << character << ")" << std::endl;)
+            character << "(" << character << ")" << std::endl;)
 
         // Backwards extend with subsequent characters.
         FMDPosition next_position = this->extend(result.position, character,
@@ -573,8 +572,8 @@ MapAttemptResult FMDIndex::mapPosition(const std::string& pattern,
     return result;
 }
 
-MapAttemptResult mapPosition(const RangeVector& ranges, 
-    const std::string& pattern, usint index) const {
+MapAttemptResult FMDIndex::mapPosition(const RangeVector& ranges, 
+    const std::string& pattern, size_t index) const {
     
     
     // We're going to right-map so ranges match up with the things we can map to

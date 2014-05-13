@@ -13,15 +13,18 @@
  */
 struct Mapping
 {
-    // Holds (text, offset)
-    TextPosition location;
-    bool is_mapped;
+public:
     Mapping();
-    Mapping(std::pair<int64_t, int64_t> location, bool is_mapped=true);
+    Mapping(TextPosition location, bool is_mapped=true);
+    
     /**
      * Provide equality comparison for testing.
      */
     bool operator==(const Mapping& other) const;
+    
+    // Holds (text, offset)
+    TextPosition location;
+    bool is_mapped;
 };
 
 /**

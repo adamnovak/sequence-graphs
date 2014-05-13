@@ -1,7 +1,8 @@
 #include <string>
 #include <vector>
 
-#include "BWT.h";
+#include "BWT.h"
+#include "SampledSuffixArray.h"
 
 #include "TextPosition.hpp"
 #include "FMDIndexIterator.hpp"
@@ -201,11 +202,6 @@ protected:
     SampledSuffixArray suffixArray;
     
     /**
-     * How many bases are there? Only 4 in SGA world; N isn't allowed.
-     */
-    static const usint NUM_BASES = 4;
-
-    /**
      * This holds the bases in alphabetcal order by reverse complement. This
      * order is needed when doing the iterative scoping out of the reverse
      * complement intervals in the extension procedure, and there we need to go
@@ -236,7 +232,7 @@ protected:
      * Index must be a valid character position in the string.
      */
     MapAttemptResult mapPosition(const std::string& pattern,
-        usint index) const;
+        size_t index) const;
       
     /**
      * Try RIGHT-mapping the given index in the given string to a unique forward-
@@ -258,6 +254,6 @@ protected:
      * Index must be a valid character position in the string.
      */
     MapAttemptResult mapPosition(const RangeVector& ranges, 
-      const std::string& pattern, usint index) const;
+      const std::string& pattern, size_t index) const;
 
 };

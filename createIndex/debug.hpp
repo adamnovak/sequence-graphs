@@ -7,4 +7,10 @@
 //#define DEBUG(op) op
 #define DEBUG(op)
 
+/**
+ * Define another one for INFO-level information.
+ */
+//#define INFO(op) op
+#define INFO(op)
+
 #endif

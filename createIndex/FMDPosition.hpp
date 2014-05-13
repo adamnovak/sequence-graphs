@@ -16,8 +16,18 @@
 class FMDPosition
 {
 public:
+    /**
+     * Create a new FMDPosition with undefined contents.
+     */
     FMDPosition();
-    FMDPosition(usint forward_start, usint reverse_start, usint end_offset);
+    
+    /**
+     * Create a new FMDPosition representing two ranges starting at the given
+     * positions and extending for the given offset (where an offset of 0
+     * indicates two 1-character ranges).
+     */
+    FMDPosition(int64_t forward_start, int64_t reverse_start, 
+        int64_t end_offset);
     
     /**
      * Get the forward-strand start position of the range.
@@ -107,6 +117,13 @@ public:
      */
     int64_t ranges(const RangeVector& ranges) const;
     
+    /**
+     * Provide pretty-printing for FMDPositions. See
+     * <http://www.parashift.com/c++-faq/output-operator.html>
+     */
+    friend std::ostream& operator<< (std::ostream& o, 
+        FMDPosition const& position);
+    
 protected:
     int64_t forward_start;
     int64_t reverse_start;
@@ -115,11 +132,7 @@ protected:
   
 };
 
-/**
- * Provide pretty-printing for FMDPositions. See
- * <http://www.parashift.com/c++-faq/output-operator.html>
- */
-std::ostream& operator<< (std::ostream& o, FMDPosition const& position);
+
 
 const FMDPosition EMPTY_FMD_POSITION = FMDPosition(0, 0, -1);
 

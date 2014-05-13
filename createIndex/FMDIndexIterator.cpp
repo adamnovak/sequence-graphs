@@ -1,11 +1,15 @@
 #include <string>
 #include <utility>
+#include <stdexcept>
 #include "FMDIndexIterator.hpp"
+#include "FMDIndex.hpp"
+#include "util.hpp"
+#include "debug.hpp"
 
 // Stuff for FMDIndexIterators that traverse the suffix tree.
 
-FMDIndexIterator::FMDIndexIterator(const FMD& parent, size_t depth, bool beEnd,
-    bool reportDeadEnds): 
+FMDIndexIterator::FMDIndexIterator(const FMDIndex& parent, size_t depth,
+    bool beEnd, bool reportDeadEnds): 
     parent(parent), depth(depth), reportDeadEnds(reportDeadEnds), stack(),
     pattern() {
     
@@ -220,44 +224,38 @@ bool FMDIndexIterator::tryRecurseToDepth(size_t baseNumber) {
                 FMDPosition extension = parent.extend(stack.back().first, 
                 ALPHABETICAL_BASES[0], false);
 
-                if(extension.forward_start != 
-                    stack.back().first.forward_start) {
+                if(extension.getForwardStart() != 
+                    stack.back().first.getForwardStart()) {
                 
                     // There are some suffixes that come into this node and
                     // leave before the first real base. They must end the text.
 
                     INFO(
-                    std::cout << "End of text: " << pattern << "$" << std::endl;
-                    std::cout << extension << " vs. " << stack.back().first <<
-                    std::endl;
+                        std::cout << "End of text: " << pattern << "$" << 
+                            std::endl;
+                        std::cout << extension << " vs. " << 
+                        stack.back().first << std::endl;
                     )
 
                     // We got to a place we want to yield.
 
                     // Grab the FMDPosition we want to return
-                    FMDPosition toConvert = stack.back().first; 
+                    FMDPosition patternPosition = stack.back().first; 
 
-                    // But before converting it to SA coordinates, fix it up to
-                    // indicate only the part we aren't covering. Forward start
-                    // is going to be the same, but it is going to run until the
-                    // start of extension. Subtract 1 to keep this as an offset
-                    // where 0 = a 1-base itnerval.
-                    toConvert.end_offset = extension.forward_start - 
-                    toConvert.forward_start - 1;
+                    // Fix it up to indicate only the part we aren't covering.
+                    // Forward start is going to be the same, but it is going to
+                    // run until the start of extension. Subtract 1 to keep this
+                    // as an offset where 0 = a 1-base interval.
+                    patternPosition.setEndOffset(extension.getForwardStart() - 
+                        patternPosition.getForwardStart() - 1);
 
                     // TODO: The reverse start can't be moved sanely and is thus
                     // going to be invalid (we can't search anchored to text
                     // start).
 
-                    // We need to convert it from BWT coordinates (which we use
-                    // internally for extension) to SA coordinates (which are
-                    // natural for locate).
-                    parent.convertToSAIndex(toConvert.forward_start);
-                    parent.convertToSAIndex(toConvert.reverse_start);
-
                     // Grab the pattern and the FMDPosition from the top of the
                     // stack to go with it. Yield the pair.
-                    yield(std::make_pair(pattern, toConvert));
+                    yield(std::make_pair(pattern, patternPosition));
 
                     return true;
                 }
@@ -280,17 +278,9 @@ bool FMDIndexIterator::tryRecurseToDepth(size_t baseNumber) {
 
     // We got to the right depth, and we never go to empty things.
 
-    // Grab the FMDPosition we want to return
-    FMDPosition toConvert = stack.back().first; 
-
-    // We need to convert it from BWT coordinates (which we use internally for
-    // extension) to SA coordinates (which are natural for locate).
-    parent.convertToSAIndex(toConvert.forward_start);
-    parent.convertToSAIndex(toConvert.reverse_start);
-
     // Grab the pattern and the FMDPosition from the top of the stack to go with
-    // it. Yiueld the pair.
-    yield(std::make_pair(pattern, toConvert));
+    // it. Yield the pair.
+    yield(std::make_pair(pattern, stack.back().first));
 
     return true;
 }

@@ -79,7 +79,7 @@ private:
     /**
      * How deep should this iterator go?
      */
-    usint depth;
+    size_t depth;
     
     /**
      * Should this iterator only yield things of the appropriate depth? Or

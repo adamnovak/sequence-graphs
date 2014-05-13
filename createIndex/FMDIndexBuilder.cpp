@@ -106,8 +106,8 @@ void FMDIndexBuilder::add(const std::string& filename) {
                     // And the reverse strand    
                     tempFasta << ">" << name << "-" << runStart << "R" <<
                         std::endl;
-                    std::string reverseComplement = reverse_complement(run);
-                    tempFasta << reverseComplement << std::endl;
+                    std::string reverseStrand = reverseComplement(run);
+                    tempFasta << reverseStrand << std::endl;
                     
                 }
                 

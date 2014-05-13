@@ -147,10 +147,10 @@ makeThreadSet(
     // Construct the thread set first.
     stPinchThreadSet* threadSet = stPinchThreadSet_construct();
     
-    for(size_t i = 0; i < index.lengths.size(); i++) {
+    for(size_t i = 0; i < index.getContigs(); i++) {
         // Add a thread for this contig number. The thread starts at base 1 and
         // has the appropriate length.
-        stPinchThreadSet_addThread(threadSet, i, 1, index.lengths[i]);
+        stPinchThreadSet_addThread(threadSet, i, 1, index.getContigLength(i));
     }
     
     return threadSet;
@@ -199,7 +199,7 @@ mergeNonsymmetric(
             std::cout << pattern << " at " << range << std::endl;
         }
         
-        if(range.end_offset >= 1 || dumpFile != NULL) {
+        if(range.getEndOffset() >= 1 || dumpFile != NULL) {
             // We only need to do any pinching if this context appears in two or
             // more places. And since a range with offset 0 has one thing in it,
             // we check to see if it's 1 or more.
@@ -249,7 +249,7 @@ mergeNonsymmetric(
                         "}\"];" << std::endl;
                     if(firstOffset > 1) {
                         // Link to previous Position
-                        *dumpFile << index.getName(std::make_pair(
+                        *dumpFile << index.getName(TextPosition(
                             // Hack to get the base actually before us on the
                             // contig.
                             firstContigNumber * 2, firstOffset - 2)) << 
@@ -322,7 +322,7 @@ mergeNonsymmetric(
                         
                         if(otherOffset > 1) {
                             // Link previous position to us.
-                            *dumpFile << index.getName(std::make_pair(
+                            *dumpFile << index.getName(TextPosition(
                                 // Hack to get the base actually before us on
                                 // the contig.
                                 otherContigNumber * 2, otherOffset - 2)) << 
@@ -334,13 +334,10 @@ mergeNonsymmetric(
                 
             }
             
-            // Free the location buffer
-            free(locations);
-            
             if(!quiet) {
                 // Say we merged some bases.
-                std::cout << "Merged " << range.end_offset + 1 <<  " bases" <<
-                    std::endl;
+                std::cout << "Merged " << range.getEndOffset() + 1 <<  
+                    " bases" << std::endl;
             }
             
         }
@@ -1008,9 +1005,9 @@ main(
         *dumpFile << "label=\"Level 0\";" << std::endl;
         
         // Add per-contig rank constraints.
-        for(size_t i = 0; i < index.lengths.size(); i++) {
+        for(size_t i = 0; i < index.getContigs(); i++) {
             // For every contig, add rank edges.
-            for(size_t j = 0; j < index.lengths[i] - 1; j++) {
+            for(size_t j = 0; j < index.getContigLength(i) - 1; j++) {
                 // For every base except the last...
                 // Add an edge from this one to the next one, to enforce order.
                 *dumpFile << "N" << i << "B" << j + 1 << 

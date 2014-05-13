@@ -3,6 +3,7 @@
 
 #include <string>
 #include <iostream>
+#include <fstream>
 
 /**
  * A class for building an FMD Index with libsuffixtools. Every index has a
