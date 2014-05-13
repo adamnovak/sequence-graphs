@@ -1,7 +1,14 @@
 CXX=g++
 
-OBJS=createIndex.o FMDIndex.o FMDIndexBuilder.o util.o FMDIndexIterator.o \
-    Mapping.o FMDPosition.o
+# What are our generic objects?
+OBJS=FMDIndex.o FMDIndexBuilder.o util.o FMDIndexIterator.o Mapping.o \
+	FMDPosition.o
+    
+# What objects do we need for our createIndex binary?
+CREATEINDEX_OBJS = createIndex.o
+    
+# What do we need for our test runner binary?
+TEST_OBJS = test/TestRunner.o test/BWTTests.o
 
 # What projects do we depend on? We have rules for each of these.
 DEPS=rlcsa pinchesAndCacti sonLib libsuffixtools
@@ -12,6 +19,9 @@ LDLIBS += ../deps/sonLib/lib/stPinchesAndCacti.a ../deps/sonLib/lib/sonLib.a \
 
 # We need -fopenmp to link against rlcsa.
 LDFLAGS += -L../deps/rlcsa -fopenmp -L../deps/sonLib/lib -L../libsuffixtools
+
+# We need to link against cppunit when we run our tests.
+TEST_LIBS = -lcppunit
 
 # We need to make sure all our dependency header files are where our other
 # dependency includes want them to be. pinchesAndCacti just includes "sonLib.h",
@@ -77,11 +87,21 @@ util.o: util.cpp util.hpp
 
 createIndex.o: createIndex.cpp schemas/Side.hpp schemas/Side_schema.hpp
 
-createIndex: $(OBJS) $(DEPS)
+createIndex: $(CREATEINDEX_OBJS) $(OBJS) $(DEPS)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(LDLIBS)
 	
 clean:
-	rm -Rf $(OBJS) createIndex schemas
+	rm -Rf $(CREATEINDEX_OBJS) $(TEST_OBJS) $(OBJS) createIndex testRunner \
+	schemas
+	
+test: check
+
+check: testRunner
+	./testRunner
+	
+testRunner: $(TEST_OBJS) $(OBJS) $(DEPS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(TEST_OBJS) $(OBJS) $(LDLIBS) \
+	$(TEST_LIBS)
     
 
 
