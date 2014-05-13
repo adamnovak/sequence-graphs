@@ -128,8 +128,8 @@ public:
      * be mapped. A length of -1 means to use the entire string after the start,
      * and is the default.
      */
-    std::vector<Mapping> map(const std::string& query, size_t start = 0,
-        size_t length = -1) const;
+    std::vector<Mapping> map(const std::string& query, int start = 0,
+        int length = -1) const;
       
     /**
      * Try RIGHT-mapping each base in the query to one of the ranges represented
@@ -148,7 +148,7 @@ public:
      * the base did not map to a range.
      */
     std::vector<int64_t> map(const RangeVector& ranges,
-        const std::string& query, size_t start = 0, size_t length = -1) const;
+        const std::string& query, int start = 0, int length = -1) const;
         
     /***************************************************************************
      * Iteration Functions

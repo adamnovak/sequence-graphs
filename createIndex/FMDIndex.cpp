@@ -273,8 +273,8 @@ char FMDIndex::display(int64_t index) const {
     return bwt.getChar(index);
 }
 
-std::vector<Mapping> FMDIndex::map(const std::string& query, size_t start,
-    size_t length) const {
+std::vector<Mapping> FMDIndex::map(const std::string& query, int start,
+    int length) const {
 
     if(length == -1) {
         // Fix up the length parameter if it is -1: that means the whole rest of
@@ -390,13 +390,13 @@ std::vector<Mapping> FMDIndex::map(const std::string& query, size_t start,
 }
 
 std::vector<int64_t> FMDIndex::map(const RangeVector& ranges,
-    const std::string& query, size_t start, size_t length) const {
+    const std::string& query, int start, int length) const {
     
     // RIGHT-map to a range.
 
     if(length == -1) {
-        // Fix up the length parameter if it is -1: that means the whole rest of the
-        // string.
+        // Fix up the length parameter if it is -1: that means the whole rest of
+        // the string.
         length = query.length() - start;
     }
 
@@ -411,8 +411,11 @@ std::vector<int64_t> FMDIndex::map(const RangeVector& ranges,
     // Make sure the scratch position is empty so we re-start on the first base
     location.position = EMPTY_FMD_POSITION;
 
-    for(size_t i = start + length - 1; i >= start; i--) {
+    for(int i = start + length - 1; i >= start; i--) {
         // Go from the end of our selected region to the beginning.
+
+        DEBUG(std::cout << "On position " << i << " from " <<
+            start + length - 1 << " to " << start << std::endl;)
 
         if(location.position.isEmpty()) {
             INFO(std::cout << "Starting over by mapping position " << i <<

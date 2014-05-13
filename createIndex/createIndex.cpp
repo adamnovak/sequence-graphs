@@ -71,7 +71,7 @@ const std::string TEST_READ4(std::string("GCATCCATCTTGGGGCGTCCCAATTGCTGAGTAACAAA
 
     
 // How many times to try mapping this read?
-const int TEST_ITERATIONS = 1000;
+const int TEST_ITERATIONS = 2;
 
 
 /**
