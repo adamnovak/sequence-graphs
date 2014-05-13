@@ -230,6 +230,7 @@ inline char complement(char base)
         case 'N':
             return 'N';
         default:
+            std::cout << "Unknown base " << base << std::endl;
             assert(false && "Unknown base!");
             return 'N';
     }

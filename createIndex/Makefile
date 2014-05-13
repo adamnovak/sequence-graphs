@@ -8,7 +8,8 @@ OBJS=FMDIndex.o FMDIndexBuilder.o util.o FMDIndexIterator.o Mapping.o \
 CREATEINDEX_OBJS = createIndex.o
     
 # What do we need for our test runner binary?
-TEST_OBJS = test/TestRunner.o test/BWTTests.o
+TEST_OBJS = test/TestRunner.o test/BWTTests.o test/FMDIndexBuilderTests.o \
+    test/FMDIndexTests.o
 
 # What projects do we depend on? We have rules for each of these.
 DEPS=rlcsa pinchesAndCacti sonLib libsuffixtools

@@ -1,3 +1,6 @@
+#ifndef FMDINDEX_HPP
+#define FMDINDEX_HPP
+
 #include <string>
 #include <vector>
 
@@ -241,3 +244,5 @@ protected:
       const std::string& pattern, size_t index) const;
 
 };
+
+#endif
