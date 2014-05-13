@@ -202,22 +202,6 @@ protected:
     SampledSuffixArray suffixArray;
     
     /**
-     * This holds the bases in alphabetcal order by reverse complement. This
-     * order is needed when doing the iterative scoping out of the reverse
-     * complement intervals in the extension procedure, and there we need to go
-     * through them in this order. See
-     * <http://stackoverflow.com/q/2312860/402891>
-     */
-    static const std::string BASES;
-
-    /**
-     * This holds the bases in alphabetical order, which is the same as their
-     * sort order in the BWT, and is the order that FMDIterator needs to go
-     * through them in.
-     */
-    static const std::string ALPHABETICAL_BASES;
-    
-    /**
      * Try left-mapping the given index in the given string, starting from
      * scratch. Start a backwards search at that index in the string and extend
      * left until we map to exactly one or zero places. Returns true or false

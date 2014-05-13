@@ -493,6 +493,17 @@ std::vector<int64_t> FMDIndex::map(const RangeVector& ranges,
     
 }
 
+FMDIndex::iterator FMDIndex::begin(size_t depth, bool reportDeadEnds) const {
+    // Make a new suffix tree iterator that automatically searches out the first
+    // suffix of the right length.
+    return FMDIndex::iterator(*this, depth, false, reportDeadEnds);
+}
+     
+FMDIndex::iterator FMDIndex::end(size_t depth, bool reportDeadEnds) const {
+    // Make a new suffix tree iterator that is just a 1-past-the-end sentinel.
+    return FMDIndex::iterator(*this, depth, true, reportDeadEnds);
+}
+
 MapAttemptResult FMDIndex::mapPosition(const std::string& pattern,
     size_t index) const {
 
