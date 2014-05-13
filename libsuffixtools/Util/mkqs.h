@@ -93,140 +93,170 @@ void mkqs2(T* a, int n, int depth, const PrimarySorter& primarySorter, const Fin
     int r, partval;
     T *pa, *pb, *pc, *pd, *pm, *pn, t;
    
-    if (n < 10) 
-    {
-        inssort(a, n, depth, primarySorter, finalSorter);
-        return;
-    }
-
-    // This line does nothing since we replace pn later.
-    pm = a + (n/2);
-    // Get a pointer to the last element in our array.
-    pn = a + (n-1);
-
-    // Pick a pivot element randomly, and swap it out of the way (by putting it
-    // at the start of the array)
-    int mid_idx = rand() % n;
-    pm = &a[mid_idx];
-    mkqs_swap2(a, pm);
-
-    // Grab the pivot's value.
-    partval = ptr2char(a);
-    
-    // Now we need to partition the array into elements less than the pivot,
-    // equal to the pivot, and greater than the pivot.
-    
-    // Set up places to put things <= than the pivot. pa is at the end of a
-    // block of things equal to the pivot, and bp is at the end of a block of
-    // things <= the pivot.
-    pa = pb = a + 1;
-    
-    // Set up places to put things >= the pivot. pc is at the start of a block
-    // of things >= the pivot, and pd is at the start of a block of things equal
-    // to the pivot.
-    pc = pd = a + n-1;
-    
-    // So we're basically splitting up our array like this:
-    //   a       pa        pb                   pc          pd         a + n - 1
-    //   v       v         v                    v           v          v        
-    //  +---------+---------+------------------+-----------+------------+       
-    //  | = pivot | < pivot |  unpartitioned   |  > pivot  | = pivot    |       
-    //  +---------+---------+------------------+-----------+------------+       
-    //                                                                          
-    
-    
-    for (;;) 
-    {
-        // Sort things onto either side of the pivot.
-    
-        while (pb <= pc && (r = ptr2char(pb)-partval) <= 0) 
+    while(true) {
+        // We wrap the entire function in an infinite loop to facilitate manual
+        // tail recursion.
+   
+        if (n < 10) 
         {
-            // For things <= the pivot, on the left
-        
-            if (r == 0) {
-                // Put things equal to the pivot before pa, and advance it
-                // right.
-                mkqs_swap2(pa, pb);
-                pa++;
-            }
-            
-            // Advance pb to encompass one more <= the pivot element.
-            pb++;
+            inssort(a, n, depth, primarySorter, finalSorter);
+            return;
         }
-        while (pb <= pc && (r = ptr2char(pc)-partval) >= 0) 
+
+        // This line does nothing since we replace pn later.
+        pm = a + (n/2);
+        // Get a pointer to the last element in our array.
+        pn = a + (n-1);
+
+        // Pick a pivot element randomly, and swap it over to the start of the
+        // array, wher it will begin a block of elements equal to the pivot.
+        int mid_idx = rand() % n;
+        pm = &a[mid_idx];
+        mkqs_swap2(a, pm);
+
+        // Grab the pivot's value.
+        partval = ptr2char(a);
+        
+        // Now we need to partition the array into elements less than the pivot,
+        // equal to the pivot, and greater than the pivot.
+        
+        // Set up places to put things <= than the pivot. pa is at the end of a
+        // block of things equal to the pivot, and bp is at the end of a block
+        // of things <= the pivot.
+        pa = pb = a + 1;
+        
+        // Set up places to put things >= the pivot. pc is at the start of a
+        // block of things >= the pivot, and pd is at the start of a block of
+        // things equal to the pivot.
+        pc = pd = a + n-1;
+        
+        // So we're basically splitting up our array like this:
+        //   a       pa        pb                   pc          pd     a + n - 1
+        //   v       v         v                    v           v          v        
+        //  +---------+---------+------------------+-----------+------------+       
+        //  | = pivot | < pivot |  unpartitioned   |  > pivot  | = pivot    |       
+        //  +---------+---------+------------------+-----------+------------+       
+        //                                                                          
+        
+        
+        for (;;) 
         {
-            // For things >= the pivot, on the right
+            // Sort things into their appropriate blocks, eating away at the
+            // unpartitioned space in the middle.
+        
+            while (pb <= pc && (r = ptr2char(pb)-partval) <= 0) 
+            {
+                // For things <= the pivot, on the left
             
-            if (r == 0) {
-                // Put things equal to the pivot at pd, and advance it left.
-                mkqs_swap2(pc, pd);
-                pd--;
+                if (r == 0) {
+                    // Put things equal to the pivot before pa, and advance it
+                    // right.
+                    mkqs_swap2(pa, pb);
+                    pa++;
+                }
+                
+                // Advance pb to encompass one more <= the pivot element.
+                pb++;
+            }
+            while (pb <= pc && (r = ptr2char(pc)-partval) >= 0) 
+            {
+                // For things >= the pivot, on the right
+                
+                if (r == 0) {
+                    // Put things equal to the pivot at pd, and advance it left.
+                    mkqs_swap2(pc, pd);
+                    pd--;
+                }
+                
+                // Advance pc to encompass one more >= the pivot element.
+                pc--;
             }
             
-            // Advance pc to encompass one more >= the pivot element.
+            // If we've gotten the <= the pivot block on the left to meet the >=
+            // the pivot block on the right, we've finished partitioning.
+            if (pb > pc) break;
+            
+            // Otherwise, we got here, because something > the pivot was on the
+            // left, and something < the pivot was on the right. so we need to
+            // flip those things to be on the correct sides.
+            mkqs_swap2(pb, pc);
+            // And extend the partition block endpoints inwards accordingly.
+            pb++;
             pc--;
         }
         
-        // If we've gotten the <= the pivot block on the left to meet the >= the
-        // pivot block on the right, we've finished partitioning.
-        if (pb > pc) break;
+        // Get a 1-past-the-end pointer.
+        pn = a + n;
         
-        // Otherwise, we got here, because something > the pivot was on the
-        // left, and something < the pivot was on the right. so we need to flip
-        // those things to be on the correct side.
-        mkqs_swap2(pb, pc);
-        // And extend the partition block endpoints inwards accordingly.
-        pb++;
-        pc--;
-    }
-    
-    // Get a 1-past-the-end pointer.
-    pn = a + n;
-    
-    // Find the smaller of the <-the-pivot and the =-the-pivot blocks on the
-    // left, and do the smallest swap needed to bring the =-the-pivot block to
-    // the middle.
-    r = std::min(pa-a, pb-pa);    vecswap2(a,  pb-r, r);
-    // Do a similar operation on the right side, so that the order of blocks in
-    // the array is now <-the-pivot, =-the-pivot, >-the-pivot.
-    r = std::min(pd-pc, pn-pd-1); vecswap2(pb, pn-r, r);
-    
-    // The array is now partitioned.
-    
-    if ((r = pb-pa) > 1) {
-        // There is more than one element less than the pivot, so we need to
-        // sort those (on this character). Recurse and do that.
-        mkqs2(a, r, depth, primarySorter, finalSorter);
+        // Find the smaller of the <-the-pivot and the =-the-pivot blocks on the
+        // left, and do the smallest swap needed to bring the =-the-pivot block
+        // to the middle.
+        r = std::min(pa-a, pb-pa);    vecswap2(a,  pb-r, r);
+        // Do a similar operation on the right side, so that the order of blocks
+        // in the array is now <-the-pivot, =-the-pivot, >-the-pivot.
+        r = std::min(pd-pc, pn-pd-1); vecswap2(pb, pn-r, r);
         
-        // TODO: If we had a spectacularly bad pivot every time, we could get
-        // O(n) recursion depth here.
-    }
-    if (ptr2char(a + r) != 0) {
-        // The pivot character was not '\0', the stop character, so the strings
-        // equal to the pivot at this character have subsequent characters.
-    
-        // Recurse and sort the elements equal to the pivot at this character on
-        // the next character. TODO: This assumes that the lengths of the
-        // suffixes being sorted is less than the maximum recursion depth we can
-        // support.
-        mkqs2(a + r, pa-a + pn-pd-1, depth+1, primarySorter, finalSorter);
-    } else {
-        // The pivot character was '\0', the stop character.
+        // The array is now partitioned.
         
-        // Count up the number of sequences that had the pivot character.
-        int n2 = pa - a + pn - pd - 1;
+        if ((r = pb-pa) > 1) {
+            // There is more than one element less than the pivot, so we need to
+            // sort those (on this character). Recurse and do that.
+            mkqs2(a, r, depth, primarySorter, finalSorter);
+            
+            // TODO: If we had a spectacularly bad pivot every time, we could
+            // get O(n) recursion depth here.
+        }
+        if ((r = pd-pc) > 1) {
+            // There is more than one element greater than the pivot, so we need
+            // to sort those (on this character). Recurse and do that.
+            mkqs2(a + n-r, r, depth, primarySorter, finalSorter);
+            
+            // TODO: If we had a spectacularly bad pivot every time, we could
+            // get O(n) recursion depth here.
+        }
         
-        // Now that they're sorted by the primary sorter, sort them by the
-        // secondary sorter within that.
-        std::sort(a + r, a + r + n2, finalSorter);
-    }
-    if ((r = pd-pc) > 1) {
-        // There is more than one element greater than the pivot, so we need to
-        // sort those (on this character). Recurse and do that.
-        mkqs2(a + n-r, r, depth, primarySorter, finalSorter);
+        // How far do we have to go to get to the block of things equal to the
+        // pivot?
+        r = pb - pa;
+        if (ptr2char(a + r) == 0) {
+            // The pivot character was '\0', the stop character. The suffixes
+            // that were equal to the pivot at this character all end here. So
+            // we're done with the primary sort by characters.
+            
+            // Count up the number of sequences that had the pivot character.
+            int n2 = pa - a + pn - pd - 1;
+            
+            // Now that they're sorted by the primary sorter, sort them by the
+            // secondary sorter within that.
+            std::sort(a + r, a + r + n2, finalSorter);
+            
+            // Don't do any manually-implemented tail recursion.
+            return;
+            
+        } else {
+            // The pivot character was not '\0', the stop character, so the
+            // strings equal to the pivot at this character have subsequent
+            // characters.
         
-        // TODO: If we had a spectacularly bad pivot every time, we could get
-        // O(n) recursion depth here.
+            // We need to sort the elements that were equal at this character on
+            // the next character, but we need to do it without recursing,
+            // because if we recurse at every character we'll fill up the stack
+            // when our suffixes are bigger than reads.
+            
+            // We need to do the equivalent of:
+            // mkqs2(a + r, pa-a + pn-pd-1, depth+1, primarySorter,
+            //     finalSorter);
+            
+            // If we could force tail call optimization, we could do that, but
+            // we can't. So we loop around.
+            
+            // Set the arguments
+            n = pa - a + pn - pd - 1;
+            a = a + r;
+            depth++;
+            
+            // "Recurse" by not returning, and thus looping around.
+        }
     }
 }
 
