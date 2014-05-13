@@ -68,7 +68,7 @@ class FMDIndexBuilder {
         /**
          * How many threads should we use when building the index?
          */
-        static const size_t NUM_THREADS = 10;
+        static const size_t NUM_THREADS = 100;
 };
 
 #endif
