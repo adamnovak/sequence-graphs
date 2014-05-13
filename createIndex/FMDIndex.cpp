@@ -147,9 +147,15 @@ FMDPosition FMDIndex::extend(FMDPosition range, char c, bool backward) const {
         return extend(range.flip(), complement(c), true).flip();        
     }
 
+    if(c == '\0') {
+        throw std::runtime_error("Can't extend with null byte!");
+    }
+
     if(!isBase(c)) {
-        throw std::runtime_error(std::string("Character ") + c +
-            " is not a DNA base.");
+        std::string errorMessage = std::string("Character #");
+        errorMessage.push_back(c);
+        errorMessage += std::string(" is not a DNA base.");
+        throw std::runtime_error(errorMessage);
     }
 
     DEBUG(std::cout << "Extending " << range << " backwards with " << c <<
