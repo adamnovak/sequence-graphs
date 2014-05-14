@@ -146,6 +146,35 @@ void FMDIndexTests::testSearch() {
     
 }
 
+/**
+ * Test iterating over the suffix tree.
+ */
+void FMDIndexTests::testIterate() {
+
+    // Load the index up
+    FMDIndex index(tempDir + "/index.basename");
+
+    for(int contextLength = 1; contextLength <= 25; contextLength++) {
+        // Try all context lengths shorter than the contigs we put in.
+        
+        for(FMDIndex::iterator i = index.begin(contextLength); 
+            i != index.end(contextLength); ++i) {
+            // For each pair of suffix and position in the suffix tree
+            
+            // Unpack the iterator into pattern and FMDPosition at which it
+            // happens.
+            std::string pattern = (*i).first;
+            // This is in SA coordinates.
+            FMDPosition range = (*i).second;
+        
+            // Make sure we get the same range searching as iterating.
+            CPPUNIT_ASSERT(index.count(pattern) == range);
+        }
+        
+    }
+
+}
+
 
 
 
