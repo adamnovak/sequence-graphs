@@ -237,7 +237,7 @@ mergeNonsymmetric(
                 
                 if(!dumped.count(firstName)) {
                     // Get its base
-                    char baseChar = index.display(range.getForwardStart());
+                    char baseChar = index.displayFirst(range.getForwardStart());
                     if(firstStrand) {
                         // Flip it around so we always see forward strand bases.
                         baseChar = complement(baseChar);
@@ -306,8 +306,8 @@ mergeNonsymmetric(
                     
                     if(!dumped.count(otherName)) {
                         // Get its base character
-                        char baseChar = index.display(range.getForwardStart() +
-                            j);
+                        char baseChar = index.displayFirst(
+                            range.getForwardStart() + j);
                             
                         if(otherStrand) {
                             // Flip it around so we always see forward strand

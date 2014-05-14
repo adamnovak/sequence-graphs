@@ -5,10 +5,10 @@ OBJS=FMDIndex.o FMDIndexBuilder.o util.o FMDIndexIterator.o Mapping.o \
 	FMDPosition.o
     
 # What objects do we need for our createIndex binary?
-CREATEINDEX_OBJS = createIndex.o
+CREATEINDEX_OBJS=createIndex.o
     
 # What do we need for our test runner binary?
-TEST_OBJS = test/TestRunner.o test/BWTTests.o test/FMDIndexBuilderTests.o \
+TEST_OBJS=test/TestRunner.o test/BWTTests.o test/FMDIndexBuilderTests.o \
     test/FMDIndexTests.o
 
 # What projects do we depend on? We have rules for each of these.
@@ -89,7 +89,7 @@ util.o: util.cpp util.hpp
 createIndex.o: createIndex.cpp schemas/Side.hpp schemas/Side_schema.hpp
 
 createIndex: $(CREATEINDEX_OBJS) $(OBJS) $(DEPS)
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(LDLIBS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(CREATEINDEX_OBJS) $(OBJS) $(LDLIBS)
 	
 clean:
 	rm -Rf $(CREATEINDEX_OBJS) $(TEST_OBJS) $(OBJS) createIndex testRunner \
