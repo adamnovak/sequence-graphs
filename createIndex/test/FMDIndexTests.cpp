@@ -43,6 +43,46 @@ void FMDIndexTests::tearDown() {
     boost::filesystem::remove_all(tempDir);
 }
 
+/**
+ * Test index metadata.
+ */
+void FMDIndexTests::testMetadata() {
+    // Load the index up
+    FMDIndex index(tempDir + "/index.basename");
+    
+    // Make sure it has the right number of characters.
+    CPPUNIT_ASSERT(index.getTotalLength() == 35 * 2 * 2);
+    
+    // Make sure it has the right number of BWT positions (characters + texts).
+    CPPUNIT_ASSERT(index.getBWTLength() == index.getTotalLength() + 4);
+}
+
+/**
+ * Test the LF mapping.
+ */
+void FMDIndexTests::testLF() {
+
+    // Load the index up
+    FMDIndex index(tempDir + "/index.basename");
+
+    // Make sure LF behaves sanely and maps the first $ to the first $.
+    std::cout << "Index 21 maps LF to " << index.getLF(21) << std::endl;
+    for(int i = 0; i < 21; i++) {
+        CPPUNIT_ASSERT(index.display(i) != '$');
+    }
+    CPPUNIT_ASSERT(index.display(21) == '$');
+    CPPUNIT_ASSERT(index.displayFirst(0) == '$');
+    CPPUNIT_ASSERT(index.getLF(21) == 0);
+    
+    // Make sure it is consistent and always maps at least to an instance of the
+    // correct character.
+    for(int i = 0; i < index.getBWTLength(); i++) {
+        // Get the first character of where we go, and compare it to the last
+        // character of where we are.
+        CPPUNIT_ASSERT(index.displayFirst(index.getLF(i)) == index.display(i));
+    }
+
+}
 
 /**
  * Test dumping an FMD index's BWT.
@@ -52,22 +92,7 @@ void FMDIndexTests::testDump() {
     // Load the index up
     FMDIndex index(tempDir + "/index.basename");
     
-    // Make sure it has the right number of characters.
-    CPPUNIT_ASSERT(index.getTotalLength() == 35 * 2 * 2);
-    
-    // Make sure it has the right number of BWT positions (characters + texts).
-    CPPUNIT_ASSERT(index.getBWTLength() == index.getTotalLength() + 4);
-    
-    // make sure LF behaves sanely and maps the first $ to the first $.
-    std::cout << "Index 21 maps LF to " << index.getLF(21) << std::endl;
-    for(int i = 0; i < 21; i++) {
-        CPPUNIT_ASSERT(index.display(i) != '$');
-    }
-    CPPUNIT_ASSERT(index.display(21) == '$');
-    CPPUNIT_ASSERT(index.displayFirst(0) == '$');
-    CPPUNIT_ASSERT(index.getLF(21) == 0);
-    
-    // Dump it
+    // Dump the entire BWT
     for(int i = 0; i < index.getBWTLength(); i++) {
         // Reconstruct the string.
         std::string reconstruction;
