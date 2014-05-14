@@ -147,6 +147,41 @@ void FMDIndexTests::testSearch() {
 }
 
 /**
+ * Test locating the positions of things you search up.
+ */
+void FMDIndexTests::testLocate() {
+
+    // Load the index up
+    FMDIndex index(tempDir + "/index.basename");
+    
+    // Find and locate a unique thing.
+    TextPosition base = index.locate(index.count("TCTTTT").getForwardStart());
+    
+    // This is on the second sequence, forward strand.
+    CPPUNIT_ASSERT(base.getText() == 2);
+    // And it has 25 characters before it.
+    CPPUNIT_ASSERT(base.getOffset() == 25);
+    
+    // Now let's try all of the first sequence, forwards
+    base = index.locate(
+        index.count("CATGCTTCGGCGATTCGACGCTCATCTGCGACTCT").getForwardStart());
+        
+    // This is on the first sequence, forward strand.
+    CPPUNIT_ASSERT(base.getText() == 0);
+    // And it has 0 characters before it.
+    CPPUNIT_ASSERT(base.getOffset() == 0);
+    
+    // And backwards
+    base = index.locate(
+        index.count("AGAGTCGCAGATGAGCGTCGAATCGCCGAAGCATG").getForwardStart());
+        
+    // This is on the first sequence, reverse strand.
+    CPPUNIT_ASSERT(base.getText() == 1);
+    // And it has 0 characters before it.
+    CPPUNIT_ASSERT(base.getOffset() == 0);
+}
+
+/**
  * Test iterating over the suffix tree.
  */
 void FMDIndexTests::testIterate() {
