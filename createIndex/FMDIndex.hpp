@@ -129,6 +129,13 @@ public:
      */
     char displayFirst(int64_t index) const;
     
+    /**
+     * Given an index in the BWT, do an LF-mapping to get where the character
+     * that appears in the first column at this index shows up in the last
+     * column.
+     */
+    int64_t getLF(int64_t index) const;
+    
     /***************************************************************************
      * Mapping Functions
      **************************************************************************/

@@ -1,6 +1,7 @@
 // Test the BWT generation.
 
 #include <boost/filesystem.hpp>
+#include <boost/algorithm/string.hpp>
 #include <iostream>
 
 #include "Util/ReadTable.h"
@@ -57,9 +58,50 @@ void FMDIndexTests::testDump() {
     // Make sure it has the right number of BWT positions (characters + texts).
     CPPUNIT_ASSERT(index.getBWTLength() == index.getTotalLength() + 4);
     
+    // make sure LF behaves sanely and maps the first $ to the first $.
+    std::cout << "Index 21 maps LF to " << index.getLF(21) << std::endl;
+    for(int i = 0; i < 21; i++) {
+        CPPUNIT_ASSERT(index.display(i) != '$');
+    }
+    CPPUNIT_ASSERT(index.display(21) == '$');
+    CPPUNIT_ASSERT(index.displayFirst(0) == '$');
+    CPPUNIT_ASSERT(index.getLF(21) == 0);
+    
     // Dump it
     for(int i = 0; i < index.getBWTLength(); i++) {
-        std::cout << i << ": " << index.displayFirst(i) << " ... " << index.display(i) << std::endl;
+        // Reconstruct the string.
+        std::string reconstruction;
+        
+        
+        // Start at the last character of this row in the BWT.
+        int64_t curIndex = i;
+        
+        do {
+            // Put the current character on the reconstruction.
+            reconstruction.push_back(index.display(curIndex));
+            
+            // Go to the previous character in the BWT row.
+            curIndex = index.getLF(curIndex);
+        } while(curIndex != i);      
+    
+        // Flip the string around forwards. See
+        // <http://www.cplusplus.com/forum/beginner/11633/>
+        std::string forwardReconstruction(reconstruction.rbegin(),
+            reconstruction.rend());
+    
+        std::cout << i << ": " << index.displayFirst(i) << " " << 
+            forwardReconstruction << " " << index.display(i) << std::endl;
     }
     
 }
+
+
+
+
+
+
+
+
+
+
+

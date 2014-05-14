@@ -282,6 +282,23 @@ char FMDIndex::displayFirst(int64_t index) const {
     return bwt.getF(index);
 }
 
+int64_t FMDIndex::getLF(int64_t index) const {
+    // Find the character we're looking at
+    char toFind = display(index);
+    
+    // Find the start of that character in the first column. It's just the
+    // number of characters less than it, counting text stops.
+    int64_t charBlockStart = bwt.getPC(toFind);
+    
+    // Find the rank of that instance of that character among instances of the
+    // same character in the last column. Subtract 1 from occurrences since the
+    // first copy should be rank 0.
+    int64_t instanceRank = bwt.getOcc(toFind, index) - 1;
+    
+    // Add that to the start position to produce the LF mapping.
+    return charBlockStart + instanceRank;
+}
+
 std::vector<Mapping> FMDIndex::map(const std::string& query, int start,
     int length) const {
 
