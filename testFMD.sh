@@ -67,7 +67,7 @@ do
 
     echo "Indexing ${GENOME_FASTA}"
 
-    time ../createIndex.sh ${GENOME_FASTA}-index ${GENOME_FASTA} --quiet --context 20
+    time ../createIndex.sh ${GENOME_FASTA}-index ${GENOME_FASTA} --quiet --noMerge
         
     # Check the sizes of the index.
     BWT_BYTES=$(stat -c%s ${GENOME_FASTA}-index/index.basename.bwt)
