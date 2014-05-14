@@ -47,7 +47,9 @@ fi
 # Get an array of all the lists of genome files, one entry per genome.
 FASTAS=("hg38/*.fa" "huRef/*.fa" "koRef/*.fa")
 
-for NUM_GENOMES in 2 3
+printf "RESULTS\tNUM_GENOMES\tBWT_BYTES\tSSA_BYTES\n"
+
+for NUM_GENOMES in 1 2 3
 do
 
     
@@ -65,13 +67,14 @@ do
 
     echo "Indexing ${GENOME_FASTA}"
 
-    time ropebwt2 -bo ${GENOME_FASTA}.fmr ${GENOME_FASTA}
+    time ../createIndex.sh ${GENOME_FASTA}-index ${GENOME_FASTA} --quiet --context 20
         
     # Check the sizes of the index.
-    INDEX_SIZE=$(stat -c%s ${GENOME_FASTA}.fmr)
+    BWT_BYTES=$(stat -c%s ${GENOME_FASTA}-index/index.basename.bwt)
+    SSA_BYTES=$(stat -c%s ${GENOME_FASTA}-index/index.basename.ssa)
     
     # Dump a grepable TSV line
-    echo "RESULTS\t${NUM_GENOMES}\t${INDEX_SIZE}"
+    printf "RESULTS\t${NUM_GENOMES}\t${BWT_BYTES}\t${SSA_BYTES}\n"
 
 done
 
