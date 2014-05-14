@@ -120,6 +120,32 @@ void FMDIndexTests::testDump() {
     
 }
 
+/**
+ * Test searching an an FMD index.
+ */
+void FMDIndexTests::testSearch() {
+    
+    // Load the index up
+    FMDIndex index(tempDir + "/index.basename");
+    
+    // Doesn't find spurious things
+    CPPUNIT_ASSERT(index.count("GATTACA").getLength() == 0);
+    
+    // Finds things which appear once
+    CPPUNIT_ASSERT(index.count("TCTTTT").getLength() == 1);
+    
+    // On both strands
+    CPPUNIT_ASSERT(index.count("AAAAGA").getLength() == 1);
+    
+    // Finds things which appear twice
+    CPPUNIT_ASSERT(index.count("TTCG").getLength() == 2);
+    
+    // Finds whole strands
+    CPPUNIT_ASSERT(
+        index.count("CGGGCGCATCGCTATTATTTCTTTCTCTTTTCACA").getLength() == 1);
+    
+}
+
 
 
 

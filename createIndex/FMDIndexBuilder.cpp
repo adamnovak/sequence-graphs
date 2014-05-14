@@ -137,7 +137,7 @@ void FMDIndexBuilder::close() {
     // TODO: Just keep them there
     ReadTable* readTable = new ReadTable(tempFastaName);
     
-    std::cout << "Computing index..." << std::endl;
+    std::cout << "Computing index of " << tempFastaName << std::endl;
     
     // Compute the suffix array (which computes the BWT)
     SuffixArray* suffixArray = new SuffixArray(readTable, NUM_THREADS);

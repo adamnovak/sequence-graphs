@@ -105,11 +105,11 @@ int64_t FMDIndex::getBWTLength() const {
     return bwt.getBWLen();
 }
 
-FMDPosition FMDIndex::getSAPosition() const {
+FMDPosition FMDIndex::getCoveringPosition() const {
     // We want an FMDPosition that covers the entire BWT.
     
     // Just construct one. TODO: Will this extend properly since it goes to 0?
-    return FMDPosition(0, 0, getTotalLength() - 1);
+    return FMDPosition(0, 0, getBWTLength() - 1);
 }
     
    
@@ -259,6 +259,26 @@ FMDPosition FMDIndex::extend(FMDPosition range, char c, bool backward) const {
     // If we get here, they gave us something not in BASES somehow, even though
     // we checked already.
     throw std::runtime_error("Unrecognized base");
+}
+
+FMDPosition FMDIndex::count(std::string pattern) const {
+    if(pattern.size() == 0) {
+        // We match everything! Say the whole range of the BWT.
+        return getCoveringPosition();
+    }
+    
+
+    // Start at the end and select the first character.
+    FMDPosition position = getCharPosition(pattern[pattern.size() - 1]);
+    
+    for(int i = pattern.size() - 2; !position.isEmpty() && i >= 0; i--) {
+        // Extend backwards with each character
+        position = extend(position, pattern[i], true);
+    }
+    
+    // We either ran out of matching locations or finished the pattern.
+    return position;
+
 }
 
 TextPosition FMDIndex::locate(int64_t index) const {

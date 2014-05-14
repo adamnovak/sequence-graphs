@@ -90,9 +90,9 @@ public:
      **************************************************************************/
      
     /**
-     * Get an FMDPosition covering the whole SA.
+     * Get an FMDPosition covering the whole BWT.
      */
-    FMDPosition getSAPosition() const;
+    FMDPosition getCoveringPosition() const;
     
     /**
      * Get an FMDPosition for the part of the BWT for things starting with the
@@ -105,6 +105,13 @@ public:
      * BWT coordinates.
      */
     FMDPosition extend(FMDPosition range, char c, bool backward) const;
+    
+    /**
+     * Select all the occurrences of the given pattern, using FMD backwards
+     * search.
+     */
+    FMDPosition count(std::string pattern) const;
+    
     
     /***************************************************************************
      * Location/Sampled Suffix Array Functions

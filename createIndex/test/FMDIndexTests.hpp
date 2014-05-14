@@ -12,6 +12,7 @@ class FMDIndexTests : public CppUnit::TestFixture {
     CPPUNIT_TEST(testDump);
     CPPUNIT_TEST(testMetadata);
     CPPUNIT_TEST(testLF);
+    CPPUNIT_TEST(testSearch);
     CPPUNIT_TEST_SUITE_END();
     
     // Keep a string saying where to get the haplotypes to test with.
@@ -27,6 +28,7 @@ public:
     void testMetadata();
     void testLF();
     void testDump();
+    void testSearch();
 };
 
 #endif
