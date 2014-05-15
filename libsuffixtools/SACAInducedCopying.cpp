@@ -125,46 +125,14 @@ void saca_induced_copying(SuffixArray* pSA, const ReadTable* pRT, int numThreads
         
         std::cout << "[saca] checking sort of first " << n1 << " elements..." << 
             std::endl;
-            
-        for(int64_t i = 0; i < (int64_t)n1 - 1; i++) {
-            // Scan it and assert order.
-            
-            SAElem& a = pSA->m_data[i];
-            SAElem& b = pSA->m_data[i + 1];
-            
-            // We need a < b
-
-            // First compare the stings, and ensure a's string <= b's.
-            int comparison = strcmp(radix_compare.getChrPtr(a),
-                radix_compare.getChrPtr(b));
-            
-            if(comparison > 0) {
-                std::cout << "[saca] error: incorrect sorting by string!" << std::endl;
-                std::cout << "Elements:" << std::endl;
-                std::cout << "data[" << i << "] = ID " << a.getID() << 
-                    " Position " << a.getPos() << std::endl;
-                std::cout << "data[" << i + 1 << "] = ID " << b.getID() << 
-                    " Position " << b.getPos() << std::endl;
-                exit(1);
-            }
-            
-            if(comparison == 0 && !index_compare(a, b)) {
-                std::cout << "[saca] error: incorrect sorting by index!" 
-                    << std::endl;
-                std::cout << "Elements:" << std::endl;
-                std::cout << "data[" << i << "] = ID " << a.getID() << 
-                    " Position " << a.getPos() << std::endl;
-                std::cout << "data[" << i + 1 << "] = ID " << b.getID() << 
-                    " Position " << b.getPos() << std::endl;
-                exit(1);
-            
-            }
-            
-            
-            
-        }
         
-        std::cout << "[saca] order OK" << std::endl;
+        if(checkSort(&pSA->m_data[0], n1, radix_compare, index_compare)) {
+            std::cout << "[saca] order OK" << std::endl;
+        } else {
+            std::cerr << "[saca] order incorrect!" << std::endl;
+            exit(1);
+        }
+            
     }
 
     // Induction sort the remaining suffixes

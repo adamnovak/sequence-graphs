@@ -86,7 +86,54 @@ inline void inssort(T* a, int n, int d, const PrimarySorter& primarySorter, cons
     }
 }
 
-// 
+// Function to audit a block and complain if it isn't sorted.
+template<typename T, typename PrimarySorter, typename FinalSorter>
+bool checkSort(T* a, int n, const PrimarySorter& primarySorter, const FinalSorter& finalSorter)
+{
+    for(int64_t i = 0; i < (int64_t)n - 1; i++) {
+        // Scan it and assert order.
+        
+        T& first = a[i];
+        T& second = a[i + 1];
+        
+        // We need a < b
+
+        // First compare the stings.
+        int comparison = strcmp(primarySorter.getChrPtr(first),
+            primarySorter.getChrPtr(second));
+        
+        if(comparison > 0) {
+            // Complain if the sort by string is wrong.
+            std::cerr << "[mkqs] error: incorrect sorting by string!" 
+                << std::endl;
+        } else if(comparison == 0 && !finalSorter(first, second)) {
+            // Complain if the sort by string is right but the sort by index is
+            // wrong.
+            std::cerr << "[mkqs] error: incorrect sorting by index!" 
+                << std::endl;
+        } else {
+            // Both sorts are correct. Try the next pair of positions.
+            continue;
+        }
+        
+        // We already complained that sort is wrong. Say what the sort is
+        // actually.
+        std::cerr << "Elements:" << std::endl;
+        std::cerr << "a[" << i << "] = ID " << first.getID() << 
+            " Position " << first.getPos() << std::endl;
+        std::cerr << "a[" << i + 1 << "] = ID " << second.getID() << 
+            " Position " << second.getPos() << std::endl;
+            
+        // We found a sort error.
+        return false;
+            
+    }
+    
+    // No sort errors were found.
+    return true;
+}
+
+// Serial multi-key quicksort implementation.
 template<typename T, typename PrimarySorter, typename FinalSorter>
 void mkqs2(T* a, int n, int depth, const PrimarySorter& primarySorter, const FinalSorter& finalSorter)
 {   
@@ -99,7 +146,11 @@ void mkqs2(T* a, int n, int depth, const PrimarySorter& primarySorter, const Fin
    
         if (n < 10) 
         {
+            // For small problems, sort with insertion sort. Tell it not to look
+            // before the given depth in the strings it's sorting, since we
+            // already did our sort up to that depth.
             inssort(a, n, depth, primarySorter, finalSorter);
+            checkSort(a, n, primarySorter, finalSorter);
             return;
         }
 
@@ -230,6 +281,10 @@ void mkqs2(T* a, int n, int depth, const PrimarySorter& primarySorter, const Fin
             // secondary sorter within that.
             std::sort(a + r, a + r + n2, finalSorter);
             
+            // Now our whole block is sorted (at least the one we tail recursed
+            // into). Check it.
+            checkSort(a, n, primarySorter, finalSorter);
+            
             // Don't do any manually-implemented tail recursion.
             return;
             
@@ -256,6 +311,8 @@ void mkqs2(T* a, int n, int depth, const PrimarySorter& primarySorter, const Fin
             depth++;
             
             // "Recurse" by not returning, and thus looping around.
+            
+            // TODO: Is there a way to audit the sort here?
         }
     }
 }
@@ -395,6 +452,9 @@ void parallel_mkqs_process(MkqsJob<T>& job,
     if(n < 10) 
     {
         inssort(a, n, depth, primarySorter, finalSorter);
+        
+        checkSort(a, n, primarySorter, finalSorter);
+        
         return;
     }
     
