@@ -138,24 +138,25 @@ void saca_induced_copying(SuffixArray* pSA, const ReadTable* pRT, int numThreads
             int comparison = strcmp(radix_compare.getChrPtr(a),
                 radix_compare.getChrPtr(b));
             
-            if(!(comparison <= 0)) {
+            if(comparison > 0) {
                 std::cout << "[saca] error: incorrect sorting by string!" << std::endl;
                 std::cout << "Elements:" << std::endl;
-                std::cout << a.getID() << ", " << a.getPos() << std::endl;
-                std::cout << b.getID() << ", " << b.getPos() << std::endl;
+                std::cout << "data[" << i << "] = ID " << a.getID() << 
+                    " Position " << a.getPos() << std::endl;
+                std::cout << "data[" << i + 1 << "] = ID " << b.getID() << 
+                    " Position " << b.getPos() << std::endl;
                 exit(1);
             }
             
-            if(comparison == 0) {
-            
-                // If they're the same, index_compare must sort them right.
-                if(!index_compare(a, b)) {
-                    std::cout << "[saca] error: incorrect sorting by index!" << std::endl;
-                    std::cout << "Elements:" << std::endl;
-                    std::cout << a.getID() << ", " << a.getPos() << std::endl;
-                    std::cout << b.getID() << ", " << b.getPos() << std::endl;
-                    exit(1);
-                }
+            if(comparison == 0 && !index_compare(a, b)) {
+                std::cout << "[saca] error: incorrect sorting by index!" 
+                    << std::endl;
+                std::cout << "Elements:" << std::endl;
+                std::cout << "data[" << i << "] = ID " << a.getID() << 
+                    " Position " << a.getPos() << std::endl;
+                std::cout << "data[" << i + 1 << "] = ID " << b.getID() << 
+                    " Position " << b.getPos() << std::endl;
+                exit(1);
             
             }
             
