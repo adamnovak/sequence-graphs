@@ -28,7 +28,7 @@ TEST_LIBS = -lcppunit
 # dependency includes want them to be. pinchesAndCacti just includes "sonLib.h",
 # so we need to explicitly point at its include directory. And similarly we need
 # to grab all the internal include directories from libsuffixtools.
-CXXFLAGS += -g -O3 -I../deps -I../deps/pinchesAndCacti/inc \
+CXXFLAGS += -g -I../deps -I../deps/pinchesAndCacti/inc \
 -I../deps/sonLib/C/inc -DMASSIVE_DATA_RLCSA -I../libsuffixtools \
 -I../libsuffixtools/Concurrency -I../libsuffixtools/Thirdparty \
 -I../libsuffixtools/Util
