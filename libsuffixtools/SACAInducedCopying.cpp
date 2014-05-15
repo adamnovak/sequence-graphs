@@ -117,6 +117,54 @@ void saca_induced_copying(SuffixArray* pSA, const ReadTable* pRT, int numThreads
     
     if(!silent)
         std::cout << "[saca] mkqs finished\n";
+        
+    
+    if(!silent) {
+        // Verify that it worked
+        // TODO: Drop this debug code
+        
+        std::cout << "[saca] checking sort of first " << n1 << " elements..." << 
+            std::endl;
+            
+        for(int64_t i = 0; i < (int64_t)pSA->m_data.size() - 1; i++) {
+            // Scan it and assert order.
+            
+            SAElem& a = pSA->m_data[i];
+            SAElem& b = pSA->m_data[i + 1];
+            
+            // We need a < b
+
+            // First compare the stings, and ensure a's string <= b's.
+            int comparison = strcmp(radix_compare.getChrPtr(a),
+                radix_compare.getChrPtr(b));
+            
+            if(!(comparison <= 0)) {
+                std::cout << "[saca] error: incorrect sorting by string!" << std::endl;
+                std::cout << "Elements:" << std::endl;
+                std::cout << a.getID() << ", " << a.getPos() << std::endl;
+                std::cout << b.getID() << ", " << b.getPos() << std::endl;
+                exit(1);
+            }
+            
+            if(comparison == 0) {
+            
+                // If they're the same, index_compare must sort them right.
+                if(!index_compare(a, b)) {
+                    std::cout << "[saca] error: incorrect sorting by index!" << std::endl;
+                    std::cout << "Elements:" << std::endl;
+                    std::cout << a.getID() << ", " << a.getPos() << std::endl;
+                    std::cout << b.getID() << ", " << b.getPos() << std::endl;
+                    exit(1);
+                }
+            
+            }
+            
+            
+            
+        }
+        
+        std::cout << "[saca] order OK" << std::endl;
+    }
 
     // Induction sort the remaining suffixes
     for(size_t i = n1; i < num_suffixes; ++i)

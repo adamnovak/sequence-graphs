@@ -56,15 +56,14 @@ void MKQSTests::testSort() {
         SAElem b = elems[i + 1];
         
         // We need a < b
+
+        // First compare the stings, and ensure a's string <= b's.
+        int comparison = strcmp(radix_compare.getChrPtr(a),
+            radix_compare.getChrPtr(b));
         
-        // First compare the strings
-        std::string stringA(radix_compare.getChrPtr(a));
-        std::string stringB(radix_compare.getChrPtr(b));
+        CPPUNIT_ASSERT(comparison <= 0);
         
-        // a is smaller, or they're the same
-        CPPUNIT_ASSERT(stringA <= stringB);
-        
-        if(stringA == stringB) {
+        if(comparison == 0) {
         
             // If they're the same, index_compare must sort them right.
             CPPUNIT_ASSERT(index_compare(a, b));
