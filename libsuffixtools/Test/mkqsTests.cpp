@@ -17,6 +17,8 @@ const std::string MKQSTests::filename = "Test/haplotypes.fa";
 
 void MKQSTests::setUp() {
 
+    std::cout << "Loading MKQS test data..." << std::endl;
+
     // Set up the basic suffix array
     readTable = new ReadTable(filename);
     suffixArray = new SuffixArray(readTable, 1);
@@ -45,9 +47,11 @@ void MKQSTests::testSort() {
     }
     
     // Sort the whole suffix array
-    mkqs2(&elems[0], elems.size(), 0, radix_compare,
+    std::cout << "Sorting " << elems.size() << " elements" << std::endl;
+    // Do it in parallel.
+    parallel_mkqs(&elems[0], elems.size(), 100, radix_compare,
         index_compare);
-    
+    std::cout << "Checking order" << std::endl;
     
     for(int i = 0; i < (int)elems.size() - 1; i++) {
         // Scan it and assert order.

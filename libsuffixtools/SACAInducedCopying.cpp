@@ -126,7 +126,7 @@ void saca_induced_copying(SuffixArray* pSA, const ReadTable* pRT, int numThreads
         std::cout << "[saca] checking sort of first " << n1 << " elements..." << 
             std::endl;
             
-        for(int64_t i = 0; i < (int64_t)pSA->m_data.size() - 1; i++) {
+        for(int64_t i = 0; i < (int64_t)n1 - 1; i++) {
             // Scan it and assert order.
             
             SAElem& a = pSA->m_data[i];
