@@ -14,10 +14,10 @@
 template<typename T>
 struct MkqsJob
 {
-    MkqsJob(T* p, int num, int d) : pData(p), n(num), depth(d) {}
+    MkqsJob(T* p, size_t num, size_t d) : pData(p), n(num), depth(d) {}
     T* pData;
-    int n;
-    int depth;
+    size_t n;
+    size_t depth;
 };
 
 //

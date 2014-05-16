@@ -42,8 +42,9 @@ inline void vecswap(int i, int j, int n, T* x)
 #define elem2char(e, d) (primarySorter.getChar((e), (d)))
 
 template<typename T>
-inline void vecswap2(T* a, T* b, int n)
-{   while (n-- > 0) 
+inline void vecswap2(T* a, T* b, size_t n)
+{   
+    for(size_t i = 0; i < n; i++)
     {
         T t = *a;
         *a++ = *b;
@@ -64,7 +65,7 @@ T* med3func(T* a, T* b, T* c, int depth, const PrimarySorter& primarySorter)
 }
 #define med3(a, b, c) med3func(a, b, c, depth, primarySorter)
 template<typename T, typename PrimarySorter, typename FinalSorter>
-inline void inssort(T* a, int n, int d, const PrimarySorter& primarySorter, const FinalSorter& finalSorter)
+inline void inssort(T* a, size_t n, size_t d, const PrimarySorter& primarySorter, const FinalSorter& finalSorter)
 {   
     T *pi, *pj, s, t;
     for (pi = a + 1; --n > 0; pi++)
@@ -88,7 +89,7 @@ inline void inssort(T* a, int n, int d, const PrimarySorter& primarySorter, cons
 
 // Function to audit a block and complain if it isn't sorted.
 template<typename T, typename PrimarySorter, typename FinalSorter>
-bool checkSort(T* a, int n, const PrimarySorter& primarySorter, const FinalSorter& finalSorter)
+bool checkSort(T* a, size_t n, const PrimarySorter& primarySorter, const FinalSorter& finalSorter)
 {
     for(int64_t i = 0; i < (int64_t)n - 1; i++) {
         // Scan it and assert order.
@@ -135,9 +136,12 @@ bool checkSort(T* a, int n, const PrimarySorter& primarySorter, const FinalSorte
 
 // Serial multi-key quicksort implementation.
 template<typename T, typename PrimarySorter, typename FinalSorter>
-void mkqs2(T* a, int n, int depth, const PrimarySorter& primarySorter, const FinalSorter& finalSorter)
+void mkqs2(T* a, size_t n, size_t depth, const PrimarySorter& primarySorter, const FinalSorter& finalSorter)
 {   
-    int r, partval;
+    // r sometimes gets used as a difference between chars, so it needs to be
+    // signed. However' it's sometimes used as  a difference between positions,
+    // so it needs to be big.
+    int64_t r, partval;
     T *pa, *pb, *pc, *pd, *pm, *pn, t;
    
     while(true) {
@@ -161,7 +165,7 @@ void mkqs2(T* a, int n, int depth, const PrimarySorter& primarySorter, const Fin
 
         // Pick a pivot element randomly, and swap it over to the start of the
         // array, wher it will begin a block of elements equal to the pivot.
-        int mid_idx = rand() % n;
+        size_t mid_idx = rand() % n;
         pm = &a[mid_idx];
         mkqs_swap2(a, pm);
 
@@ -275,7 +279,7 @@ void mkqs2(T* a, int n, int depth, const PrimarySorter& primarySorter, const Fin
             // we're done with the primary sort by characters.
             
             // Count up the number of sequences that had the pivot character.
-            int n2 = pa - a + pn - pd - 1;
+            size_t n2 = pa - a + pn - pd - 1;
             
             // Now that they're sorted by the primary sorter, sort them by the
             // secondary sorter within that.
@@ -320,7 +324,7 @@ void mkqs2(T* a, int n, int depth, const PrimarySorter& primarySorter, const Fin
 // Parallel multikey quicksort. It performs mkqs but will
 // subdivide the array to sort into sub jobs which can be sorted using threads.
 template<typename T, typename PrimarySorter, typename FinalSorter>
-void parallel_mkqs(T* pData, int n, int numThreads, const PrimarySorter& primarySorter, const FinalSorter& finalSorter)
+void parallel_mkqs(T* pData, size_t n, int numThreads, const PrimarySorter& primarySorter, const FinalSorter& finalSorter)
 {
     typedef MkqsJob<T> Job;
     typedef std::queue<Job> JobQueue;
@@ -340,7 +344,7 @@ void parallel_mkqs(T* pData, int n, int numThreads, const PrimarySorter& primary
     // Calculate the threshold size for performing serial continuation of the sort. Once the chunks 
     // are below this size, it is better to not subdivide the problem into smaller chunks
     // to avoid the overhead of locking, adding to the queue, etc. 
-    int threshold_size = n / numThreads;
+    size_t threshold_size = n / numThreads;
 
     // Create the semaphore used to signal that data is ready to be processed
     // Initial value is 1 as there is one item on the queue to start
@@ -443,10 +447,10 @@ void parallel_mkqs_process(MkqsJob<T>& job,
                            const FinalSorter& finalSorter)
 {
     T* a = job.pData;
-    int n = job.n;
-    int depth = job.depth;
+    size_t n = job.n;
+    size_t depth = job.depth;
     
-    int r, partval;
+    int64_t r, partval;
     T *pa, *pb, *pc, *pd, *pm, *pn, t;
     
     if(n < 10) 
@@ -461,7 +465,7 @@ void parallel_mkqs_process(MkqsJob<T>& job,
     pm = a + (n/2);
     pn = a + (n-1);
 
-    int mid_idx = rand() % n;
+    size_t mid_idx = rand() % n;
 
     pm = &a[mid_idx];
     mkqs_swap2(a, pm);
@@ -509,8 +513,11 @@ void parallel_mkqs_process(MkqsJob<T>& job,
     else
     {
         // Finalize the sort
-        int n2 = pa - a + pn - pd - 1;
+        size_t n2 = pa - a + pn - pd - 1;
         std::sort(a + r, a + r + n2, finalSorter);
+        
+        checkSort(a + r, n2, primarySorter, finalSorter);
+        
     }
 
     if ((r = pd-pc) > 1)
