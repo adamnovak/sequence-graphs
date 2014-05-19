@@ -5,8 +5,6 @@ CXX = g++
 
 DEBUG_FLAGS = -g
 
-PARALLEL_FLAGS = -DHAVE_OPENMP -fopenmp
-
 HASHMAP_FLAGS = -DHAVE_EXT_HASH_MAP -DHAVE_GOOGLE_SPARSE_HASH_MAP
 
 # We need to define CFLAGS since some of our thirdparty code is in C and needs

@@ -1,7 +1,7 @@
 // Test the BWT generation.
 
-#include "Util/ReadTable.h"
-#include "SuffixArray.h"
+#include <ReadTable.h>
+#include <SuffixArray.h>
 
 #include "BWTTests.hpp"
 

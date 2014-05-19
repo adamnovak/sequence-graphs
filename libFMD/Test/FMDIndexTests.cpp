@@ -4,8 +4,8 @@
 #include <boost/algorithm/string.hpp>
 #include <iostream>
 
-#include "Util/ReadTable.h"
-#include "SuffixArray.h"
+#include <ReadTable.h>
+#include <SuffixArray.h>
 
 #include "FMDIndex.hpp"
 #include "FMDIndexBuilder.hpp"

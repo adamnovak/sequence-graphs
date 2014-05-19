@@ -2,8 +2,8 @@
 
 #include <boost/filesystem.hpp>
 
-#include "Util/ReadTable.h"
-#include "SuffixArray.h"
+#include <ReadTable.h>
+#include <SuffixArray.h>
 
 #include "FMDIndex.hpp"
 #include "FMDIndexBuilder.hpp"
