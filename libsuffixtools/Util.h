@@ -21,7 +21,7 @@
 #include <stdint.h>
 #include <iostream>
 #include "DNAString.h"
-#include "gzstream.h"
+#include "Thirdparty/gzstream.h"
 #include "Quality.h"
 
 #define CAF_SEP ':'

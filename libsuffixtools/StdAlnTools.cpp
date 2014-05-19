@@ -8,7 +8,7 @@
 // stdaln dynamic programming alignment functions
 #include <assert.h>
 #include "StdAlnTools.h"
-#include "stdaln.h"
+#include "Thirdparty/stdaln.h"
 #include "Alphabet.h"
 
 // Perform a global alignment between the given strings

@@ -61,7 +61,7 @@ class MkqsThread
         sem_t* m_pQueueSem; // shared
         sem_t* m_pDoneSem; // shared
         
-        int m_thresholdSize;
+        size_t m_thresholdSize;
         const PrimarySorter* m_pPrimary;
         const FinalSorter* m_pFinal;
 

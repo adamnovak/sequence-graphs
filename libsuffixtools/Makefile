@@ -12,7 +12,7 @@ HASHMAP_FLAGS = -DHAVE_EXT_HASH_MAP -DHAVE_GOOGLE_SPARSE_HASH_MAP
 # We need to define CFLAGS since some of our thirdparty code is in C and needs
 # -fPIC
 CFLAGS = -O3 -Wall -Wextra -fPIC -pthread $(DEBUG_FLAGS) $(PARALLEL_FLAGS) \
-    $(HASHMAP_FLAGS) -IUtil -IThirdparty -IConcurrency
+    $(HASHMAP_FLAGS)
     
 CXXFLAGS = $(CFLAGS)
     
@@ -49,34 +49,32 @@ OBJS = BWTAlgorithms.o \
     STCommon.o \
     SuffixArray.o \
     SuffixCompare.o \
-    Util/Alphabet.o \
-    Util/BitChar.o \
-    Util/BitVector.o \
-    Util/BloomFilter.o \
-    Util/ClusterReader.o \
-    Util/Contig.o \
-    Util/CorrectionThresholds.o \
-    Util/DNAString.o \
-    Util/Interval.o \
-    Util/KmerDistribution.o \
-    Util/Match.o \
-    Util/MultiAlignment.o \
-    Util/MultiOverlap.o \
-    Util/Pileup.o \
-    Util/PrimerScreen.o \
-    Util/Quality.o \
-    Util/QualityTable.o \
-    Util/QualityVector.o \
-    Util/ReadInfoTable.o \
-    Util/ReadTable.o \
-    Util/SGAStats.o \
-    Util/SeqCoord.o \
-    Util/SeqReader.o \
-    Util/StdAlnTools.o \
-    Util/Util.o \
-    Util/VCFUtil.o \
-    Util/bucketSort.o \
-    Thirdparty/MurmurHash3.o \
+    Alphabet.o \
+    BitChar.o \
+    BitVector.o \
+    ClusterReader.o \
+    Contig.o \
+    CorrectionThresholds.o \
+    DNAString.o \
+    Interval.o \
+    KmerDistribution.o \
+    Match.o \
+    MultiAlignment.o \
+    MultiOverlap.o \
+    Pileup.o \
+    PrimerScreen.o \
+    Quality.o \
+    QualityTable.o \
+    QualityVector.o \
+    ReadInfoTable.o \
+    ReadTable.o \
+    SGAStats.o \
+    SeqCoord.o \
+    SeqReader.o \
+    StdAlnTools.o \
+    Util.o \
+    VCFUtil.o \
+    bucketSort.o \
     Thirdparty/bcr.o \
     Thirdparty/stdaln.o \
     Thirdparty/gzstream.o

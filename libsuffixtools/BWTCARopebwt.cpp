@@ -8,7 +8,7 @@
 // using Heng Li's ropebwt implementation
 //
 #include "BWTCARopebwt.h"
-#include "bcr.h"
+#include "Thirdparty/bcr.h"
 #include "SeqReader.h"
 #include "StdAlnTools.h"
 #include "BWTWriterBinary.h"

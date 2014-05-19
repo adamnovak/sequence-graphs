@@ -1,6 +1,6 @@
 // Test the SuffixArray.
 
-#include "Util/ReadTable.h"
+#include "ReadTable.h"
 #include "SuffixArray.h"
 
 #include "suffixArrayTests.h"
