@@ -119,7 +119,7 @@ void FMDIndexBuilder::add(const std::string& filename) {
     kseq_destroy(seq); // Close down the parser.
 }
 
-void FMDIndexBuilder::close() {
+FMDIndex* FMDIndexBuilder::build() {
     // Close up the temp file
     tempFasta.close();
     
@@ -147,8 +147,8 @@ void FMDIndexBuilder::close() {
     // Write the BWT to disk
     suffixArray->writeBWT(bwtFile, readTable);
     
-    // Delete everything we no longer need.
-    delete suffixArray;
+    // Delete the read table since we no lonfger need it. Keep the suffix array
+    // around because the FMDIndex we return can cheat off it.
     delete readTable;
     
     std::cout << "Loading BWT..." << std::endl;
@@ -178,6 +178,9 @@ void FMDIndexBuilder::close() {
     
     // Get rid of the temporary FASTA directory
     boost::filesystem::remove_all(tempDir);
+    
+    // Hand our SuffixArray off to an FMDIndex.
+    return new FMDIndex(basename, suffixArray);
     
 }
 

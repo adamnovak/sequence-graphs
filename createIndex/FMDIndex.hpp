@@ -6,6 +6,7 @@
 
 #include "BWT.h"
 #include "SampledSuffixArray.h"
+#include "SuffixArray.h"
 
 #include "TextPosition.hpp"
 #include "FMDIndexIterator.hpp"
@@ -28,9 +29,13 @@
 class FMDIndex {
 public:
     /**
-     * Load an FMD and metadata from the given basename.
+     * Load an FMD and metadata from the given basename. Optionally, specify a
+     * complete suffix array that the index can use. The index takes ownership
+     * of that suffix array, and will free it on destruction.
      */
-    FMDIndex(std::string basename);
+    FMDIndex(std::string basename, SuffixArray* fullSuffixArray = NULL);
+    
+    ~FMDIndex();
     
     /***************************************************************************
      * Metadata Access Functions
@@ -231,6 +236,12 @@ protected:
     SampledSuffixArray suffixArray;
     
     /**
+     * Holds a full suffix array pointer that we can use for locate queries
+     * instead. Owned by this object, if not null.
+     */
+    SuffixArray* fullSuffixArray;
+    
+    /**
      * Try left-mapping the given index in the given string, starting from
      * scratch. Start a backwards search at that index in the string and extend
      * left until we map to exactly one or zero places. Returns true or false
@@ -268,6 +279,13 @@ protected:
      */
     MapAttemptResult mapPosition(const RangeVector& ranges, 
       const std::string& pattern, size_t index) const;
+      
+private:
+    
+    // No copy constructor.
+    FMDIndex(const FMDIndex& other);
+    // No assignment operator.
+    FMDIndex& operator=(const FMDIndex& other);
 
 };
 

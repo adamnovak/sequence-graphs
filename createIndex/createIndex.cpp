@@ -71,7 +71,7 @@ const std::string TEST_READ4(std::string("GCATCCATCTTGGGGCGTCCCAATTGCTGAGTAACAAA
 
     
 // How many times to try mapping this read?
-const int TEST_ITERATIONS = 2;
+const int TEST_ITERATIONS = 1000;
 
 
 /**
@@ -96,7 +96,7 @@ getArrow(
  * given FASTAs for the bottom level FMD index. Optionally takes a suffix array
  * sample rate to use. Returns the basename of the FMD index that gets created.
  */
-std::string
+FMDIndex*
 buildIndex(
     std::string indexDirectory,
     std::vector<std::string> fastas,
@@ -129,11 +129,8 @@ buildIndex(
     
     std::cout << "Finishing index..." << std::endl;    
     
-    // Save to disk.
-    builder.close();
-    
-    // Return the basename
-    return basename;
+    // Return the built index.
+    return builder.build();
 }
 
 /**
@@ -973,10 +970,14 @@ main(
         std::cout << "Index file: " << *i << std::endl;
     }
     
-    // Index the bottom-level FASTAs and get the basename they go into. Use the
+    // Index the bottom-level FASTAs. Use the
     // sample rate the user specified.
-    std::string basename = buildIndex(indexDirectory, fastas,
+    FMDIndex* indexPointer = buildIndex(indexDirectory, fastas,
         options["sampleRate"].as<unsigned int>());
+        
+    // Make a reference out of the index pointer because we're not letting it
+    // out of our scope.
+    FMDIndex& index = *indexPointer;
     
     if(options.count("noMerge")) {
         // Skip merging any of the higher levels.
@@ -984,9 +985,6 @@ main(
     }
     
     std::cout << "Use " << contextLength << " bases of context." << std::endl;
-    
-    // Load the index and its metadata.
-    FMDIndex index(basename);
     
     // Make an IDSource to produce IDs not already claimed by contigs.
     IDSource<long long int> source(index.getTotalLength());
@@ -1055,6 +1053,9 @@ main(
     
     // Get rid of the range vector
     delete levelIndex.first;
+    
+    // Get rid of the index itself. Invalidates the index reference.
+    delete indexPointer;
 
     // Now we're done!
     return 0;

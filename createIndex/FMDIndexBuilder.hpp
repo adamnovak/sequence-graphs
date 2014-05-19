@@ -5,6 +5,8 @@
 #include <iostream>
 #include <fstream>
 
+#include "FMDIndex.hpp"
+
 /**
  * A class for building an FMD Index with libsuffixtools. Every index has a
  * "basename", which is a filename prefix to which extensions are appended for
@@ -31,8 +33,11 @@ class FMDIndexBuilder {
          * the FMDIndexBuilder. Must be called before the index can be read.
          * After this is called, no other method on the same object may be
          * called.
+         *
+         * Returns the built FMDIndex.
          */
-        void close();
+        FMDIndex* build();
+        
     protected:
         /**
          * Keep track of our index basename.

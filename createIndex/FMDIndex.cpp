@@ -8,8 +8,9 @@
 #include "util.hpp"
 #include "debug.hpp"
 
-FMDIndex::FMDIndex(std::string basename): names(), lengths(),
-    bwt(basename + ".bwt"), suffixArray(basename + ".ssa") {
+FMDIndex::FMDIndex(std::string basename, SuffixArray* fullSuffixArray): 
+    names(), lengths(), bwt(basename + ".bwt"), suffixArray(basename + ".ssa"),
+    fullSuffixArray(fullSuffixArray) {
 
     // We already loaded the index itself in the initializer. Go load the
     // length/order metadata.
@@ -41,6 +42,13 @@ FMDIndex::FMDIndex(std::string basename): names(), lengths(),
     // Close up the contig file. We read our contig metadata.
     contigFile.close();
     
+}
+
+FMDIndex::~FMDIndex() {
+    if(fullSuffixArray != NULL) {
+        // If we were holding a full SuffixArray, throw it out.
+        delete fullSuffixArray;
+    }
 }
 
 size_t FMDIndex::getContigNumber(TextPosition base) const {
@@ -284,9 +292,22 @@ FMDPosition FMDIndex::count(std::string pattern) const {
 TextPosition FMDIndex::locate(int64_t index) const {
     // Wrap up locate functionality.
     
-    // Run the libsuffixtools locate. This returns a composite thing where the
-    // high bits encode the text number, and the low bits encode the offset.
-    SAElem bitfield = suffixArray.calcSA(index, &bwt);
+    // We're going to fill in an SAElem: a composite thing where the high bits
+    // encode the text number, and the low bits encode the offset.
+    SAElem bitfield;
+
+    if(fullSuffixArray != NULL) {
+        // We can just look at the full suffix array cheat sheet.
+        
+        bitfield = fullSuffixArray->get(index);
+        
+    } else {
+        // We need to use the sampled suffix array.
+        
+        // Run the libsuffixtools locate. 
+        bitfield = suffixArray.calcSA(index, &bwt); 
+        
+    }
     
     // Unpack it and convert to our own format.
     return TextPosition(bitfield.getID(), bitfield.getPos());
