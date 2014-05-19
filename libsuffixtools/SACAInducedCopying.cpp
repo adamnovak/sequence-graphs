@@ -119,22 +119,6 @@ void saca_induced_copying(SuffixArray* pSA, const ReadTable* pRT, int numThreads
         std::cout << "[saca] mkqs finished\n";
         
     
-    if(!silent) {
-        // Verify that it worked
-        // TODO: Drop this debug code
-        
-        std::cout << "[saca] checking sort of first " << n1 << " elements..." << 
-            std::endl;
-        
-        if(checkSort(&pSA->m_data[0], n1, radix_compare, index_compare)) {
-            std::cout << "[saca] order OK" << std::endl;
-        } else {
-            std::cerr << "[saca] order incorrect!" << std::endl;
-            exit(1);
-        }
-            
-    }
-
     // Induction sort the remaining suffixes
     for(size_t i = n1; i < num_suffixes; ++i)
         pSA->set(i, SAElem());

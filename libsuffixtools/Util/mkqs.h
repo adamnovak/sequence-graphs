@@ -154,7 +154,6 @@ void mkqs2(T* a, size_t n, size_t depth, const PrimarySorter& primarySorter, con
             // before the given depth in the strings it's sorting, since we
             // already did our sort up to that depth.
             inssort(a, n, depth, primarySorter, finalSorter);
-            checkSort(a, n, primarySorter, finalSorter);
             return;
         }
 
@@ -284,10 +283,6 @@ void mkqs2(T* a, size_t n, size_t depth, const PrimarySorter& primarySorter, con
             // Now that they're sorted by the primary sorter, sort them by the
             // secondary sorter within that.
             std::sort(a + r, a + r + n2, finalSorter);
-            
-            // Now our whole block is sorted (at least the one we tail recursed
-            // into). Check it.
-            checkSort(a, n, primarySorter, finalSorter);
             
             // Don't do any manually-implemented tail recursion.
             return;
@@ -456,9 +451,6 @@ void parallel_mkqs_process(MkqsJob<T>& job,
     if(n < 10) 
     {
         inssort(a, n, depth, primarySorter, finalSorter);
-        
-        checkSort(a, n, primarySorter, finalSorter);
-        
         return;
     }
     
@@ -515,9 +507,6 @@ void parallel_mkqs_process(MkqsJob<T>& job,
         // Finalize the sort
         size_t n2 = pa - a + pn - pd - 1;
         std::sort(a + r, a + r + n2, finalSorter);
-        
-        checkSort(a + r, n2, primarySorter, finalSorter);
-        
     }
 
     if ((r = pd-pc) > 1)
