@@ -41,7 +41,7 @@ inline bool isBase(char input) {
 
 // We provide a complement(char) and reverseComplement(std::string&) from
 // libsuffixtools.
-#include "Util/Util.h"
+#include "Util.h"
 
 /**
  * Make a new temporary directory securely, in the appropriate directory

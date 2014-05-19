@@ -29,9 +29,7 @@ TEST_LIBS = -lcppunit
 # so we need to explicitly point at its include directory. And similarly we need
 # to grab all the internal include directories from libsuffixtools.
 CXXFLAGS += -O3 -g -I../deps -I../deps/pinchesAndCacti/inc \
--I../deps/sonLib/C/inc -DMASSIVE_DATA_RLCSA -I../libsuffixtools \
--I../libsuffixtools/Concurrency -I../libsuffixtools/Thirdparty \
--I../libsuffixtools/Util
+-I../deps/sonLib/C/inc -DMASSIVE_DATA_RLCSA -I../libsuffixtools
 
 # What do we use to explode Avro IDLs into Avro schemas?
 IDL2SCHEMATA=java -jar avro-tools-1.7.6.jar idl2schemata
