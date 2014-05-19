@@ -11,7 +11,7 @@ HASHMAP_FLAGS = -DHAVE_EXT_HASH_MAP -DHAVE_GOOGLE_SPARSE_HASH_MAP
 
 # We need to define CFLAGS since some of our thirdparty code is in C and needs
 # -fPIC
-CFLAGS = -Wall -Wextra -fPIC -pthread $(DEBUG_FLAGS) $(PARALLEL_FLAGS) \
+CFLAGS = -O3 -Wall -Wextra -fPIC -pthread $(DEBUG_FLAGS) $(PARALLEL_FLAGS) \
     $(HASHMAP_FLAGS) -IUtil -IThirdparty -IConcurrency
     
 CXXFLAGS = $(CFLAGS)
