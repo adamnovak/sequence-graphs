@@ -67,35 +67,6 @@ object MapToIndex {
         // our Avro records.
         SequenceGraphKryoProperties.setupContextProperties()
         
-        /*// Set the executors to use a more reasonable amount of memory.
-        System.setProperty("spark.executor.memory", "25G")
-        
-        // Set the parallelism level to have enough reducers to not run out of
-        // memory
-        System.setProperty("spark.default.parallelism", "12")
-        
-        // The first thing we need is a Spark context. We would like to be able
-        // to make one against any Spark URL: either "local" or soemthing like
-        // "mesos://wherever.biz:1234". We need to feed it all the jars it needs
-        // to run our code. Fortunately, they all live next to our jar, if the
-        // sbt native packager has worked correctly.
-        
-        // What File is the jar that this class is from?
-        val jarFile = new File(getClass.getProtectionDomain
-            .getCodeSource.getLocation.toURI)
-        
-        // What files are in that directory (should all be .jars)? Make a list
-        // of their string paths.
-        val jarsToSend = jarFile.getParentFile.listFiles.map(_.toString).toSeq
-            
-        // Set up Spark, giving it the appropriate cluster URL, the SPARK_HOME
-        // environment variable (which must be set!), and the list of jars we
-        // have worked out.
-        println("Initializing Spark")
-        val sc = new SparkContext(opts.cluster.get.get, "mapToIndex", 
-            System.getenv("SPARK_HOME"), jarsToSend)
-        println("Spark initialized")*/
-        
         // Get the hierarchy path
         val indexPath = opts.index.get.get
         
@@ -160,7 +131,7 @@ object MapToIndex {
                 .transpose
             
             rows.map { row =>
-                // Print each roe
+                // Print each row
                 println(row.map(_.padTo(10, ' ')).mkString("\t"))
             }
         }
