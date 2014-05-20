@@ -9,10 +9,26 @@
 #include <ctime>
 
 #include <boost/filesystem.hpp>
-#include "boost/program_options.hpp" 
+#include <boost/program_options.hpp>
 
 // Grab pinchesAndCacti dependency.
-#include "stPinchGraphs.h"
+#include <stPinchGraphs.h>
+
+#include <avro/Encoder.hh>
+#include <avro/DataFile.hh>
+#include <avro/Schema.hh>
+#include <avro/ValidSchema.hh>
+#include <avro/Compiler.hh>
+
+// Grab all the libFMD stuff.
+#include <FMDIndexBuilder.hpp>
+#include <FMDIndex.hpp>
+#include <FMDIndexIterator.hpp>
+#include <RangeVector.hpp>
+#include <TextPosition.hpp>
+#include <util.hpp>
+#include <Mapping.hpp>
+#include <IDSource.hpp>
 
 // Grab the Avro header for the Face/Side objects we need to dump out. Only use
 // the most dependent one, since they all define their dependencies and are thus
@@ -22,21 +38,6 @@
 // Get the variables Side_schema and Side_schema_len that give us the actual
 // text of that schema, before code generation.
 #include "schemas/Side_schema.hpp"
-
-#include <avro/Encoder.hh>
-#include <avro/DataFile.hh>
-#include <avro/Schema.hh>
-#include <avro/ValidSchema.hh>
-#include <avro/Compiler.hh>
-
-#include "FMDIndexBuilder.hpp"
-#include "FMDIndex.hpp"
-#include "FMDIndexIterator.hpp"
-#include "RangeVector.hpp"
-#include "TextPosition.hpp"
-#include "util.hpp"
-#include "Mapping.hpp"
-#include "IDSource.hpp"
 
 #include "debug.hpp"
 
@@ -842,7 +843,7 @@ testBottomMapping(
  */
 void
 testMergedMapping(
-    const FMDIndex& index, const CSA::RLEVector* ranges
+    const FMDIndex& index, const RangeVector* ranges
 ) {
     // Start the timer
     clock_t start = clock();

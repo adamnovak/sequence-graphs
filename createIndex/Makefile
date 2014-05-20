@@ -1,35 +1,25 @@
 CXX=g++
 
 # What are our generic objects?
-OBJS=FMDIndex.o FMDIndexBuilder.o util.o FMDIndexIterator.o Mapping.o \
-	FMDPosition.o
+OBJS=
     
 # What objects do we need for our createIndex binary?
 CREATEINDEX_OBJS=createIndex.o
-    
-# What do we need for our test runner binary?
-TEST_OBJS=test/TestRunner.o test/BWTTests.o test/FMDIndexBuilderTests.o \
-    test/FMDIndexTests.o
 
 # What projects do we depend on? We have rules for each of these.
-DEPS=rlcsa pinchesAndCacti sonLib libsuffixtools
+DEPS=pinchesAndCacti sonLib libsuffixtools libfmd
 
 # Specify all the libs to link with.
 LDLIBS += ../deps/sonLib/lib/stPinchesAndCacti.a ../deps/sonLib/lib/sonLib.a \
-../libsuffixtools/libsuffixtools.a -lboost_filesystem -lrlcsa -lavrocpp
-
-# We need -fopenmp to link against rlcsa.
-LDFLAGS += -L../deps/rlcsa -fopenmp -L../deps/sonLib/lib -L../libsuffixtools
-
-# We need to link against cppunit when we run our tests.
-TEST_LIBS = -lcppunit
+../libFMD/libfmd.a ../libsuffixtools/libsuffixtools.a \
+-lboost_filesystem -lavrocpp
 
 # We need to make sure all our dependency header files are where our other
 # dependency includes want them to be. pinchesAndCacti just includes "sonLib.h",
 # so we need to explicitly point at its include directory. And similarly we need
 # to grab all the internal include directories from libsuffixtools.
 CXXFLAGS += -O3 -g -I../deps -I../deps/pinchesAndCacti/inc \
--I../deps/sonLib/C/inc -DMASSIVE_DATA_RLCSA -I../libsuffixtools
+-I../deps/sonLib/C/inc -I../libFMD -I../libsuffixtools
 
 # What do we use to explode Avro IDLs into Avro schemas?
 IDL2SCHEMATA=java -jar avro-tools-1.7.6.jar idl2schemata
@@ -39,10 +29,6 @@ IDL2SCHEMATA=java -jar avro-tools-1.7.6.jar idl2schemata
 
 all: createIndex
 
-# Build the RLCSA dependency.
-rlcsa:
-	$(MAKE) -C ../deps/rlcsa
-	
 # pinchesAndCacti dependency
 pinchesAndCacti: sonLib
 	$(MAKE) -C ../deps/pinchesAndCacti
@@ -54,6 +40,10 @@ sonLib:
 # libsuffixtools dependency
 libsuffixtools:
 	$(MAKE) -C ../libsuffixtools
+	
+# libFMD dependency
+libfmd:
+	$(MAKE) -C ../libFMD
 
 # Build Avro schema JSON files. IDL2SCHEMATA must be correct.
 schemas/%.avsc: ../src/main/avro/reference.avdl
@@ -78,29 +68,19 @@ schemas/%_schema.hpp: schemas/%.avsc
 	rm $(*F)_schema
 	
 
-FMDIndexBuilder.o: FMDIndexBuilder.cpp FMDIndexBuilder.hpp util.hpp kseq.h
-
-FMDIndex.o: FMDIndex.cpp FMDIndex.hpp
-
-util.o: util.cpp util.hpp
-
-createIndex.o: createIndex.cpp schemas/Side.hpp schemas/Side_schema.hpp
-
 createIndex: $(CREATEINDEX_OBJS) $(OBJS) $(DEPS)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(CREATEINDEX_OBJS) $(OBJS) $(LDLIBS)
 	
 clean:
-	rm -Rf $(CREATEINDEX_OBJS) $(TEST_OBJS) $(OBJS) createIndex testRunner \
+	rm -Rf $(CREATEINDEX_OBJS) $(OBJS) createIndex \
 	schemas
 	
-test: check
-
-check: testRunner
-	./testRunner
+# We can automagically get header dependencies.
+dependencies.mk:
+	g++ $(CXXFLAGS) -MM *.cpp > dependencies.mk
 	
-testRunner: $(TEST_OBJS) $(OBJS) $(DEPS)
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(TEST_OBJS) $(OBJS) $(LDLIBS) \
-	$(TEST_LIBS)
+# Include auto-generated dependencies.
+include dependencies.mk
     
 
 
