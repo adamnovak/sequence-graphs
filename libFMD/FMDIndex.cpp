@@ -99,8 +99,9 @@ size_t FMDIndex::getBaseID(TextPosition base) const {
     // Get the cumulative total of bases by the start of the given contig
     size_t total = cumulativeLengths[getContigNumber(base)];
     
-    // Add in the offset of this base from the start of its contig and return.
-    return total + getOffset(base);
+    // Add in the offset of this base from the start of its contig, convert back
+    // to 0-based, and return.
+    return total + getOffset(base) - 1;
 }
 
 size_t FMDIndex::getContigs() const {

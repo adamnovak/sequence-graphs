@@ -174,17 +174,17 @@ public:
      * Try RIGHT-mapping each base in the query to one of the ranges represented
      * by the range vector. The range vector is in BWT space, and has a 1 in the
      * first position in each range, and is 0 everywhere else. So rank(k) on it
-     * gives the number of the range containing position k, and we can easily
-     * check if both the start and end of our (backwards) search interval are in
-     * the same range.
+     * gives the one-based number of the range containing position k, and we can
+     * easily check if both the start and end of our (backwards) search interval
+     * are in the same range.
      *
      * TODO: Unify semantics!
      *
      * The range starting points must be such that the ranges described are "bi-
      * ranges": each range has its reverse-complement range also present.
      *
-     * Returns a vector of range numbers for left-mapping each base, or -1 if
-     * the base did not map to a range.
+     * Returns a vector of one-based range numbers for left-mapping each base,
+     * or -1 if the base did not map to a range.
      */
     std::vector<int64_t> map(const RangeVector& ranges,
         const std::string& query, int start = 0, int length = -1) const;

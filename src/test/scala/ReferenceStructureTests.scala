@@ -20,7 +20,7 @@ class ReferenceStructureTests extends FMDSuite {
         
         val leftMappings = stringReference.map(pattern, Face.LEFT)
         val rightMappings = stringReference.map(pattern, Face.RIGHT)
-    
+        
         // Zip them together and disambiguate each pair. Note that (a, b).zipped
         // is of a type that provides a map that takes binary functions, while
         // a.zip(b).map takes only unary functions.
@@ -50,6 +50,7 @@ class ReferenceStructureTests extends FMDSuite {
     
     test("maps all bases in reverse complement") {
     
+        // This is the second contig.
         val pattern = "GCTAGTAGCTT"
         val mappings: Seq[Option[Side]] = stringReference.map(pattern)
         
@@ -69,6 +70,7 @@ class ReferenceStructureTests extends FMDSuite {
                 assert(mapping.coordinate >= stringReference.getIndex
                     .getContigLength(0))
                 assert(mapping.coordinate < stringReference.getIndex
+                    .getContigLength(0) + stringReference.getIndex
                     .getContigLength(1))
             }
             case None => {}

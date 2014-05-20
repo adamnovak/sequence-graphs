@@ -125,11 +125,13 @@ class StringReferenceStructure(index: FMDIndex) extends ReferenceStructure {
                 mappingSeq.map { mapping =>
                     if(mapping.getIs_mapped) {
                         // Go get the ID for this base, and match the
-                        // appropriate Face.
+                        // appropriate Face. 
                         Some(new Side(index.getBaseID(mapping.getLocation), 
                             index.getStrand(mapping.getLocation) match { 
-                                case true => Face.LEFT
-                                case false => Face.RIGHT
+                                // Remember that the "true" strand is the
+                                // reverse one.
+                                case true => Face.RIGHT
+                                case false => Face.LEFT
                             }))
                     } else {
                         // Didn't map anywhere.
@@ -213,18 +215,19 @@ class MergedReferenceStructure(index: FMDIndex, directory: String)
                 
                 // Convert to Sides and return.
                 rangeSeq.map {
-                    // An range number of -1 means it didn't map 
+                    // A range number of -1 means it didn't map 
                     case -1 => None
                     // Otherwise go get the Side for the range it mapped to (or
                     // None if there's no side for that range). Make sure to
                     // flip it around, to compensate for range mapping producing
                     // right-side contexts on the forward strand instead of
-                    // left-side ones.
+                    // left-side ones. Also remember that range indices are
+                    // 1-based coming out of the FMD-index.
                     case range => 
-                        if(range < sideArray.length) {
+                        if(range < sideArray.length + 1) {
                             // We got a range that a Side is defined for. Flip
                             // the Side.
-                            Some(!(sideArray(range.toInt)))
+                            Some(!(sideArray(range.toInt - 1)))
                         } else {
                             // Complain we're supposed to be mapping to a range
                             // that doesn't exist.
