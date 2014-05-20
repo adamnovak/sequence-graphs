@@ -15,7 +15,7 @@ TEST_OBJS=Test/TestRunner.o Test/BWTTests.o Test/FMDIndexBuilderTests.o \
 DEPS=libsuffixtools
 
 # Specify all the libs to link with.
-LDLIBS += ../libsuffixtools/libsuffixtools.a -lboost_filesystem
+LDLIBS += ../libsuffixtools/libsuffixtools.a -lboost_filesystem -lboost_system
 
 LDFLAGS += -L../libsuffixtools
 
@@ -42,7 +42,7 @@ libfmd.a: $(OBJS)
 	ar rcs $@ $^
 	
 libfmd.so: $(OBJS) $(SWIG_OBJS)
-	$(CXX) $(LDFLAGS) -shared -o $@ $^
+	$(CXX) $(LDFLAGS) -shared -o $@ $^ $(LDLIBS)
 	
 # libsuffixtools dependency
 libsuffixtools:
@@ -73,7 +73,7 @@ jar-install: libfmd.jar
 	swig -c++ -java -outdir java -package $(JAVA_PACKAGE) $(SIZE_FLAGS) $(VECTOR_FLAGS) $^
 
 clean:
-	rm -Rf $(TEST_OBJS) $(OBJS) testRunner libfmd.a libfmd.so
+	rm -Rf *.o testRunner libfmd.a libfmd.so libfmd.jar java/ jar/ *_wrap.cxx
 	
 test: check
 

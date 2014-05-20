@@ -24,6 +24,12 @@ public class FMDNativeLoader {
         }
         try {
         
+            // Load the libraries which this library depends on. They must be
+            // installed at the system level. See
+            // <http://stackoverflow.com/q/5425034/402891>
+            System.loadLibrary("boost_system");
+            System.loadLibrary("boost_filesystem");
+        
             // Read the library data out of our jar
         	InputStream libraryData = 
         	    FMDNativeLoader.class.getResourceAsStream("libfmd.so");
