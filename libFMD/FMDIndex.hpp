@@ -52,9 +52,8 @@ public:
     bool getStrand(TextPosition base) const;
     
     /**
-     * Given a pair_type representing a base, and a vector of contig lengths by
-     * number, determine the specified base's offset from the left of its
-     * contig, 1-based.
+     * Given a TextPosition representing a base, determine the specified base's
+     * offset from the left of its contig, 1-based.
      */
     size_t getOffset(TextPosition base) const;
     
@@ -62,6 +61,12 @@ public:
      * Get a unique string name for a position.
      */
     std::string getName(TextPosition base) const;
+    
+    /**
+     * Given a TextPosition representing a base as (text, offset), get the index
+     * of that base on that contig out of all bases on all contigs.
+     */
+    size_t getBaseID(TextPosition base) const;
     
     /**
      * Get the total length of all contigs, on both strands.
@@ -224,6 +229,12 @@ protected:
      * Holds the lengths of all the contigs, in the same order.
      */
     std::vector<size_t> lengths;
+    
+    /**
+     * Holds the partial sums of contig lengths, or the ID of the first base in
+     * each contig.
+     */
+    std::vector<size_t> cumulativeLengths;
     
     /**
      * Holds the actual underlying index.

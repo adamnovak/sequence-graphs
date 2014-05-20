@@ -9,14 +9,17 @@
 #include "debug.hpp"
 
 FMDIndex::FMDIndex(std::string basename, SuffixArray* fullSuffixArray): 
-    names(), lengths(), bwt(basename + ".bwt"), suffixArray(basename + ".ssa"),
-    fullSuffixArray(fullSuffixArray) {
+    names(), lengths(), cumulativeLengths(), bwt(basename + ".bwt"),
+    suffixArray(basename + ".ssa"), fullSuffixArray(fullSuffixArray) {
 
     // We already loaded the index itself in the initializer. Go load the
     // length/order metadata.
     
     // Open the contig name/length file for reading.
     std::ifstream contigFile((basename + ".chrom.sizes").c_str());
+    
+    // Keep a cumulative length sum
+    size_t lengthSum = 0;
     
     // Have a string to hold each line in turn.
     std::string line;
@@ -38,6 +41,10 @@ FMDIndex::FMDIndex(std::string basename, SuffixArray* fullSuffixArray):
         
         // And the vector of sizes in number order
         lengths.push_back(lengthNumber);
+        
+        // And the vector of cumulative lengths
+        cumulativeLengths.push_back(lengthSum);
+        lengthSum += lengthNumber;
     }
     // Close up the contig file. We read our contig metadata.
     contigFile.close();
@@ -86,6 +93,14 @@ std::string FMDIndex::getName(TextPosition base) const {
     nameStream << "N" << contig << "B" << offset;
     return nameStream.str(); 
     
+}
+
+size_t FMDIndex::getBaseID(TextPosition base) const {
+    // Get the cumulative total of bases by the start of the given contig
+    size_t total = cumulativeLengths[getContigNumber(base)];
+    
+    // Add in the offset of this base from the start of its contig and return.
+    return total + getOffset(base);
 }
 
 size_t FMDIndex::getContigs() const {

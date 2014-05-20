@@ -1,7 +1,7 @@
 package edu.ucsc.genome
 
 import org.scalatest._
-import fi.helsinki.cs.rlcsa.RangeVectorIterator
+import org.ga4gh.RangeVectorIterator
 
 /**
  * Tests for the IntervalMap class, to make sure it doesn't screw up containment

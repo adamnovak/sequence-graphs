@@ -1,6 +1,6 @@
 package edu.ucsc.genome
 
-import fi.helsinki.cs.rlcsa._
+import org.ga4gh.{RangeVector, RangeEncoder, RangeVectorIterator}
 import org.scalatest._
 
 /**

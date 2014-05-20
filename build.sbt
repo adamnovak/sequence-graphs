@@ -34,9 +34,9 @@ libraryDependencies += "org.apache.spark" %% "spark-core" % "1.0.0-incubating-SN
 
 libraryDependencies += "org.apache.spark" %% "spark-graphx" % "1.0.0-incubating-SNAPSHOT"
 
-// We need RLCSA (with appropriate natives) for mapping. Install from
-// https://github.com/adamnovak/rlcsa
-libraryDependencies += "fi.helsinki.cs" % "rlcsa" % "1.0.0-SNAPSHOT"
+// We need libFMD (with appropriate natives) for mapping. It lives in a
+// subdirectory here. TODO: Work out how to make SBT call a makefile.
+libraryDependencies += "org.ga4gh" % "libfmd" % "1.0.0-SNAPSHOT"
 
 // We need this library for testing
 libraryDependencies += "org.scalatest" %% "scalatest" % "1.9.2" % "test"

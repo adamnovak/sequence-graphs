@@ -5,11 +5,12 @@ import java.io._
 import java.nio.file._
 import org.apache.commons.io._
 import scala.sys.process._
+import org.ga4gh.FMDIndexBuilder
 
 /**
- * A test utility class that provides an RLCSA FMD-index fixture on disk.
+ * A test utility class that provides an FMD-index fixture on disk.
  */
-abstract class RLCSASuite extends FunSuite with BeforeAndAfterAll {
+abstract class FMDSuite extends FunSuite with BeforeAndAfterAll {
 
     // Holds the temporary directory
     var scratch: Path = null
@@ -25,7 +26,7 @@ abstract class RLCSASuite extends FunSuite with BeforeAndAfterAll {
         basename = scratch.resolve("index").toString
     
         // Make the builder
-        val builder = new RLCSABuilder(basename)
+        val builder = new FMDIndexBuilder(basename)
         
         // Pick a name
         val fasta = scratch.resolve("fasta1").toString
@@ -57,8 +58,8 @@ abstract class RLCSASuite extends FunSuite with BeforeAndAfterAll {
         // Add it to the index
         builder.add(fasta2)
         
-        // Print its checksum
-        builder.checksum
+        // Finish the index.
+        builder.build
     }
     
     override def afterAll = {

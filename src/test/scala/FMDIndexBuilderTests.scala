@@ -5,16 +5,18 @@ import java.io._
 import java.nio.file._
 import org.apache.commons.io._
 
+import org.ga4gh.FMDIndexBuilder
+
 /**
- * Tests for making and using RLCSABuilder objects.
+ * Tests for making and using FMDIndexBuilder objects.
  */
-class RLCSABuilderTests extends FunSuite with BeforeAndAfterAll {
+class FMDIndexBuilderTests extends FunSuite with BeforeAndAfterAll {
 
     // Holds the temporary directory
     var scratch: Path = null
     
     // Hold the object under test
-    var builder: RLCSABuilder = null
+    var builder: FMDIndexBuilder = null
     
     override def beforeAll = {
         // Make a new temp directory
@@ -28,15 +30,15 @@ class RLCSABuilderTests extends FunSuite with BeforeAndAfterAll {
     
     // Run the tests
     
-    test("RLCSABuilder can be created") {
+    test("FMDIndexBuilder can be created") {
         // Decide on the index filename
         val basename = scratch.resolve("index").toString
     
         // Make the builder
-        builder = new RLCSABuilder(basename)
+        builder = new FMDIndexBuilder(basename)
     }
     
-    test("RLCSABuilder can add first sequence") {
+    test("FMDIndexBuilder can add first sequence") {
         // Pick a name
         val fasta = scratch.resolve("fasta1").toString
         
@@ -53,7 +55,7 @@ class RLCSABuilderTests extends FunSuite with BeforeAndAfterAll {
         builder.add(fasta)
     }
     
-    test("RLCSABuilder can add additional sequences") {
+    test("FMDIndexBuilder can add additional sequences") {
         // Pick a name
         val fasta = scratch.resolve("fasta2").toString
         
@@ -68,6 +70,10 @@ class RLCSABuilderTests extends FunSuite with BeforeAndAfterAll {
         
         // Add it to the index
         builder.add(fasta)
+    }
+    
+    test("FMDIndexBuilder can finish index") {
+        builder.build
     }
     
     // TODO: Somehow check this index without relying on the index readers to be

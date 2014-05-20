@@ -1,6 +1,6 @@
 package edu.ucsc.genome
 import scala.collection.immutable.HashMap
-import fi.helsinki.cs.rlcsa.{FMDUtil, RangeVector, RangeVectorIterator}
+import org.ga4gh.{FMDUtil, RangeVector, RangeVectorIterator, FMDIndex, Mapping}
 import org.apache.avro.specific.{SpecificDatumReader, SpecificRecord}
 import org.apache.avro.file.DataFileReader
 import scala.collection.JavaConversions._
@@ -84,13 +84,6 @@ trait ReferenceStructure extends Serializable {
     def getIndex: FMDIndex
     
     /**
-     * Given a Side on this level, get the BWT ranges corresponding to it.
-     * At the bottom level, `Face.LEFT` sides are on the forward strand, and
-     * `Face.RIGHT` sides are on the reverse. Ranges are inclusive.
-     */
-    def getRanges(side: Side): Seq[(Long, Long)]
-    
-    /**
      * Map all bases in the given string to Sides using the context on the
      * given face.
      */
@@ -113,18 +106,42 @@ class StringReferenceStructure(index: FMDIndex) extends ReferenceStructure {
 
     // Map with our index
     def map(pattern: String, face: Face): Seq[Option[Side]] = {
-        getIndex.map(pattern, face)
+        face match {
+            case Face.RIGHT =>
+                // Do right-mapping as left-mapping flipped around.
+                map(pattern.reverseComplement, Face.LEFT).reverse
+            case Face.LEFT =>
+                // Get the MappingVector
+                val mappings = getIndex.map(pattern)
+                
+                // Make a Seq of all the mappings
+                var mappingSeq: Seq[Mapping] = Seq()
+                
+                for(i <- 0L until mappings.size()) {
+                    mappingSeq = mappingSeq :+ mappings.get(i.toInt)
+                }
+                
+                // Grab the Sides that the mappings correspond to, or None.
+                mappingSeq.map { mapping =>
+                    if(mapping.getIs_mapped) {
+                        // Go get the ID for this base, and match the
+                        // appropriate Face.
+                        Some(new Side(index.getBaseID(mapping.getLocation), 
+                            index.getStrand(mapping.getLocation) match { 
+                                case true => Face.LEFT
+                                case false => Face.RIGHT
+                            }))
+                    } else {
+                        // Didn't map anywhere.
+                        None
+                    }
+                }
+        }
     }
 
     // Expose our index to the level above us.
     def getIndex = index
     
-    def getRanges(side: Side): Seq[(Long, Long)] = {
-        // Ranges for sides are just the BWT indices corresponding to them.
-        val bwtSide = index.sideToBWT(side)
-        
-        Seq((bwtSide, bwtSide))
-    }
 }
 
 /**
@@ -176,26 +193,45 @@ class MergedReferenceStructure(index: FMDIndex, directory: String)
         
     // We map using the range-based mapping mode on the index.
     def map(pattern: String, face: Face): Seq[Option[Side]] = {
-        // Map to range numbers, or -1 for no mapping.
-        val rangeNumbers = getIndex.map(rangeVector, pattern, face)
-        
-        // Convert to Sides and return.
-        rangeNumbers.map {
-            // An range number of -1 means it didn't map 
-            case -1 => None
-            // Otherwise go get the Side for the range it mapped to (or None
-            // if there's no side for that range). Make sure to flip it
-            // around, to compensate for range mapping producing right-side
-            // contexts on the forward strand instead of left-side ones.
-            case range => 
-                if(range < sideArray.length) {
-                    // We got a range that a Side is defined for. Flip the Side.
-                    Some(!(sideArray(range.toInt)))
-                } else {
-                    // Complain we're supposed to be mapping to a range that
-                    // doesn't exist.
-                    throw new Exception("Mapped to out-of-bounds range %d"
-                        .format(range))
+        face match {
+            case Face.LEFT =>
+                // Try again on the right side.
+                map(pattern.reverseComplement, Face.RIGHT).reverse
+            case Face.RIGHT => 
+                // Mapping to ranges is right-mapping.
+                
+                // Map to range numbers, or -1 for no mapping. This comes as a
+                // SWIG- wrapped IntVector.
+                val ranges = getIndex.map(rangeVector, pattern)
+                
+                // Make a Seq of all the mappings
+                var rangeSeq: Seq[Long] = Seq()
+                
+                for(i <- 0L until ranges.size()) {
+                    rangeSeq = rangeSeq :+ ranges.get(i.toInt)
+                }
+                
+                // Convert to Sides and return.
+                rangeSeq.map {
+                    // An range number of -1 means it didn't map 
+                    case -1 => None
+                    // Otherwise go get the Side for the range it mapped to (or
+                    // None if there's no side for that range). Make sure to
+                    // flip it around, to compensate for range mapping producing
+                    // right-side contexts on the forward strand instead of
+                    // left-side ones.
+                    case range => 
+                        if(range < sideArray.length) {
+                            // We got a range that a Side is defined for. Flip
+                            // the Side.
+                            Some(!(sideArray(range.toInt)))
+                        } else {
+                            // Complain we're supposed to be mapping to a range
+                            // that doesn't exist.
+                            throw new Exception(
+                                "Mapped to out-of-bounds range %d"
+                                .format(range))
+                        }
                 }
         }
     }
@@ -208,170 +244,8 @@ class MergedReferenceStructure(index: FMDIndex, directory: String)
     def bits: Seq[Boolean] = {
         val iterator = new RangeVectorIterator(rangeVector)
         // Look up the index and get the bit for every BWT position.
-        for(i <- 0L until index.bwtRange._2) yield {
+        for(i <- 0L until index.getBWTLength) yield {
             iterator.isSet(i)
         }
-    }
-    
-    /**
-     * Get all the ranges in order, with their Sides.
-     */
-    def getRanges: Seq[((Long, Long), Side)] = {
-        // Get an iterator for looking in the range vector.
-        val iterator = new RangeVectorIterator(rangeVector)
-    
-        for((side, i) <- sideArray.zipWithIndex)  yield {
-            if(i == 0) {
-                // We don't have a 1 at the very start of the very first range.
-                // Decide where it is based on the number of start caharcters.
-                ((index.bwtRange._1, iterator.select(i) - 1), side)
-            } else {
-                // The range for this side runs from one number i to before one
-                // number i+1, but select takes things 0-based.
-                ((iterator.select(i-1), iterator.select(i) - 1), side)
-            }
-        }
-    }
-    
-    def getRanges(side: Side): Seq[(Long, Long)] = {
-        
-        // Get an iterator
-        val iterator = new RangeVectorIterator(rangeVector)
-        
-        for(
-            (candidate, i) <- sideArray.zipWithIndex;
-            if side == candidate
-        ) yield {
-            // Get the bounds of every range belonging to this Side. TODO: unify
-            // with the other getRanges case.
-            if(i == 0) {
-                // We don't have a 1 at the very start of the very first range.
-                // Decide where it is based on the number of start caharcters.
-                (index.bwtRange._1, iterator.select(i) - 1)
-            } else {
-                // The range for this side runs from one number i to before one
-                // number i+1, but select takes things 0-based.
-                (iterator.select(i-1), iterator.select(i) - 1)
-            }
-        }
-    }
-}
-
-/**
- * A ReferenceStructure which has some things in a lower-level
- * ReferenceStructure collapsed together. All sides in this ReferenceStructure
- * get unique IDs: Sides with base incrementing in the order added. TODO: Re-
- * design to merge based on the previous level rather than the lowest.
- */
-class CollapsedReferenceStructure(base: ReferenceStructure) 
-    extends ReferenceStructure {
-    
-    // We have an IntervalMap of intervals we merge to what we merge them into.
-    val intervals = new IntervalMap[Side]
-    
-    // We also keep a map from parent Sides at this level to the lower-level
-    // Sides they merge, which is necessary to get the ranges for a
-    // Side. TODO: can we simplify this?
-    var children: HashMap[Side, Seq[Side]] = HashMap.empty
-    
-    // We have an IDSource for base IDs. TODO: not safe across multiple levels.
-    val source = new IDSource(getIndex.totalLength)
-    
-    // We map using the range-based mapping mode on the index.
-    def map(pattern: String, face: Face): Seq[Option[Side]] = {
-        getIndex.map(intervals.rangeVector, pattern, face).map {
-            // An range number of -1 means it didn't map 
-            case -1 => None
-            // Otherwise go get the Side for the range it mapped to (or None
-            // if there's no side for that range). Make sure to flip it
-            // around, to compensate for range mapping producing right-side
-            // contexts on the forward strand instead of left-side ones.
-            case range => 
-                if(range < intervals.valueArray.length) {
-                    // We got a range that an interval is defined for.
-                    intervals.valueArray(range.toInt).map(!_)
-                } else {
-                    // We probably got the 1-past-the-end range. Maybe our
-                    // IntervalMap is empty?
-                    None
-                }
-        }
-    }
-    
-    // We return our base's index as our own.
-    def getIndex = base.getIndex
-    
-    /**
-     * Given a sequence of Sides from the previous level, create a new base
-     * that merges all the given Sides into its left face, and the opposite
-     * faces of all the given sides into its right face. Uses the specified
-     * Side if given (must be a left Face), or creates a new Side
-     * otherwise. Returns the Side of the left face of the base thus
-     * created.
-     */
-    def addBase(toMerge: Seq[Side], target: Side = null): Side = {
-        // First make a new side left face (i.e. forward orientation) if
-        // needed.
-        val newLeft = target match {
-            case null =>
-                // We need to allocate a new ID.
-                new Side(source.id, Face.LEFT)
-            case thing => thing
-        }
-        // And a flipped version for the right
-        val newRight = !newLeft
-        
-        for(side <- toMerge; range <- base.getRanges(side)) {
-            // Add in all the left side intervals pointing to our new left.
-            intervals(range) = newLeft
-        }
-        
-        for(side <- toMerge; range <- base.getRanges(!side)) {
-            // Add in all the right side intervals pointing to our new right
-            intervals(range) = newRight
-        }
-        
-        // Add child lists
-        children += ((newLeft, toMerge))
-        children += ((newRight, toMerge.map(!_)))
-        
-        // Return our left-face Side
-        newLeft
-    }
-    
-    def getRanges(side: Side): Seq[(Long, Long)] = {
-        // Just concatenate the ranges from all the clildren. TODO: Merging
-        // ranges
-        children(side).flatMap(base.getRanges(_))
-    }
-    
-    /**
-     * Add a new base using the given Side as its left side, and the
-     * opposite face of that side's base as its right side.
-     */
-    def addBase(side: Side): Side = addBase(Seq(side))
-    
-    /**
-     * Shorthand way to merge two bases from the lower level, in the same
-     * orientation.
-     */
-    def merge(contig1: String, base1: Long, contig2: String, base2: Long) = {
-        // Turn the two contig, base pairs into a sequence of Sides.
-        
-        // First turn them into position IDs.
-        val pos1 = getIndex.contigNameBaseToPosition(contig1, base1)
-        val pos2 = getIndex.contigNameBaseToPosition(contig2, base2)
-
-        // Then make Sides and add the bases.        
-        addBase(Seq(new Side(pos1, Face.LEFT), new Side(pos2, Face.LEFT)))
-    }
-    
-    /**
-     * Shorthand way to pass a base from the lower level up to this level.
-     */
-    def pass(passContig: String, passBase: Long) = {
-        // Make the contig, base pair into a side.
-        addBase(new Side(
-            getIndex.contigNameBaseToPosition(passContig, passBase), Face.LEFT))
     }
 }

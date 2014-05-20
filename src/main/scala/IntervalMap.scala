@@ -1,7 +1,7 @@
 package edu.ucsc.genome
 
 import java.util.{TreeMap, NoSuchElementException}
-import fi.helsinki.cs.rlcsa._
+import org.ga4gh.{RangeVector, RangeEncoder, RangeVectorIterator}
 import scala.collection.JavaConversions._
 import scala.collection.mutable.ArrayBuffer
 

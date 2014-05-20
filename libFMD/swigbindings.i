@@ -29,16 +29,36 @@
   }
 }
 
-%{
-  #include "FMDIndex.hpp"
-%}
-%include "TextPosition.hpp"
-%include "FMDIndexIterator.hpp"
-%include "FMDIndex.hpp"
+// Note that build() on an FMDIndexBuilder produces a new object, which we
+// should delete if we don't need it.
+%newobject FMDIndexBuilder::build;
 
 // Add some renames for the bit vector types.
 %rename(RangeVector) NibbleVector;
 %rename(RangeEncoder) NibbleEncoder;
+
+
+%include "BitVector.hpp"
+%include "NibbleVector.hpp"
+
+typedef NibbleVector RangeVector;
+typedef NibbleEncoder RangeEncoder;
+
+%include "Mapping.hpp"
+%include "TextPosition.hpp"
+%{
+  #include "FMDIndex.hpp"
+%}
+%include "FMDIndex.hpp"
+%include "FMDIndexIterator.hpp"
+%{
+  #include "FMDIndexBuilder.hpp"
+%}
+%include "FMDIndexBuilder.hpp"
+
+
+
+
 
 // We need to use the inner vector iterator classes to look at vectors. Give a
 // partial definition under a new name.

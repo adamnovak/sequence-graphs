@@ -1,4 +1,5 @@
 package edu.ucsc.genome
+import org.ga4gh.FMDIndex
 
 /**
  * Represents a reference hierarchy composed of reference structures at
