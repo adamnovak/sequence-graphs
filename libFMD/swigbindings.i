@@ -8,9 +8,18 @@
 %include "std_string.i"
 %include "std_vector.i"
 
+// Set up int types (int64_t)
+%include "stdint.i"
+
 // Set up exception not-killing-the-process-ness. See
 // <http://www.swig.org/Doc1.3/Library.html#Library_nn17>
 %include "exception.i"
+
+// Java can't handle these operator names.
+%rename(operatorLeftShift) operator<<;
+%rename(operatorEquals) operator==;
+%rename(operatorNotEquals) operator!=;
+%rename(operatorIncrement) operator++;
 
 %exception {
   try {
@@ -23,6 +32,9 @@
 %{
   #include "FMDIndex.hpp"
 %}
+%include "TextPosition.hpp"
+%include "FMDIndexIterator.hpp"
+%include "FMDIndex.hpp"
 
 // Add some renames for the bit vector types.
 %rename(RangeVector) NibbleVector;
@@ -64,9 +76,6 @@ void fclose(FILE* file);
 // Java also needs to work with vectors of int64_ts coming back from the map
 // method when working on ranges.
 %template(IntVector) std::vector<int64_t>; 
-
-// Java can't handle this operator name.
-%rename(leftShift) operator<<;
 
 // Whenever any of the JNI classes loads, load the native library.
 %pragma(java) jniclasscode=%{
