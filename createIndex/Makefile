@@ -12,7 +12,7 @@ DEPS=pinchesAndCacti sonLib libsuffixtools libfmd
 # Specify all the libs to link with.
 LDLIBS += ../deps/sonLib/lib/stPinchesAndCacti.a ../deps/sonLib/lib/sonLib.a \
 ../libFMD/libfmd.a ../libsuffixtools/libsuffixtools.a \
--lboost_filesystem
+-lboost_filesystem -lboost_program_options -lpthread -lz
 
 # We need to make sure all our dependency header files are where our other
 # dependency includes want them to be. pinchesAndCacti just includes "sonLib.h",
