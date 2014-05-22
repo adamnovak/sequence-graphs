@@ -19,6 +19,7 @@
 
 #include "kseq.h"
 #include "util.hpp"
+#include "Log.hpp"
 
 #include "FMDIndexBuilder.hpp"
 
@@ -55,8 +56,6 @@ FMDIndexBuilder::FMDIndexBuilder(const std::string& basename, int sampleRate):
 
 void FMDIndexBuilder::add(const std::string& filename) {
     
-    std::cout << "Extracting contiguous runs from " << filename << std::endl;
-        
     // Open the FASTA for reading.
     FILE* fasta = fopen(filename.c_str(), "r");
     
@@ -88,9 +87,6 @@ void FMDIndexBuilder::add(const std::string& filename) {
                 if(i > runStart) {
                     // That run is nonempty. Process it.
                     
-                    std::cout << "Run of " << (i - runStart) <<
-                        " characters on " << name << std::endl;
-                    
                     // Pull it out
                     std::string run = sequence.substr(runStart, i - runStart);
                     
@@ -120,6 +116,9 @@ void FMDIndexBuilder::add(const std::string& filename) {
 }
 
 FMDIndex* FMDIndexBuilder::build() {
+    // TODO: Quiet this procedure down, or get logging down into this library or
+    // something.
+
     // Close up the temp file
     tempFasta.close();
     
@@ -130,19 +129,17 @@ FMDIndex* FMDIndexBuilder::build() {
     std::string bwtFile = basename + ".bwt";
     std::string ssaFile = basename + ".ssa";    
 
-    std::cout << "Loading reads..." << std::endl;
-    
     // Produce the index of the temp file
     // Load all the sequences into memory (again).
     // TODO: Just keep them there
     ReadTable* readTable = new ReadTable(tempFastaName);
     
-    std::cout << "Computing index of " << tempFastaName << std::endl;
+    Log::info() << "Computing index of " << tempFastaName << std::endl;
     
     // Compute the suffix array (which computes the BWT)
-    SuffixArray* suffixArray = new SuffixArray(readTable, NUM_THREADS);
+    SuffixArray* suffixArray = new SuffixArray(readTable, NUM_THREADS, true);
     
-    std::cout << "Saving BWT to " << bwtFile << std::endl;
+    Log::info() << "Saving BWT to " << bwtFile << std::endl;
     
     // Write the BWT to disk
     suffixArray->writeBWT(bwtFile, readTable);
@@ -151,19 +148,15 @@ FMDIndex* FMDIndexBuilder::build() {
     // around because the FMDIndex we return can cheat off it.
     delete readTable;
     
-    std::cout << "Loading BWT..." << std::endl;
-    
     // Load the BWT back in (instead of re-calculating it).
     // TODO: Add ability to save a calculated BWT object with a BWTWriter.
     BWT bwt(bwtFile);
-    
-    std::cout << "Scanning reads..." << std::endl;
     
     // Load all the sequence lengths from the original file.
     // TODO: just store these as we write the file.
     ReadInfoTable infoTable(tempFastaName);
     
-    std::cout << "Sampling suffix array..." << std::endl;
+    Log::info() << "Sampling suffix array..." << std::endl;
     
     // Make a sampled suffix array
     SampledSuffixArray sampled;
@@ -171,7 +164,7 @@ FMDIndex* FMDIndexBuilder::build() {
     // Build it from the BWT and read info, with the specified sample rate
     sampled.build(&bwt, &infoTable, sampleRate);
     
-    std::cout << "Saving sampled suffix array to " << ssaFile << std::endl;
+    Log::info() << "Saving sampled suffix array to " << ssaFile << std::endl;
 
     // Save it to disk    
     sampled.writeSSA(ssaFile);

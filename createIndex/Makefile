@@ -1,7 +1,7 @@
 CXX=g++
 
 # What are our generic objects?
-OBJS=Log.o
+OBJS=
     
 # What objects do we need for our createIndex binary?
 CREATEINDEX_OBJS=createIndex.o
@@ -24,6 +24,9 @@ CXXFLAGS += -O3 -g -I../deps -I../deps/pinchesAndCacti/inc \
 # Stop deleting intermediate files I might need to use in the final program!
 .SECONDARY:
 
+# Re-do things every time
+.PHONY: clean $(DEPS)
+
 all: createIndex
 
 # pinchesAndCacti dependency
@@ -39,14 +42,14 @@ libsuffixtools:
 	$(MAKE) -C ../libsuffixtools
 	
 # libFMD dependency
-libfmd:
+libfmd: libsuffixtools
 	$(MAKE) -C ../libFMD
 
 createIndex: $(CREATEINDEX_OBJS) $(OBJS) $(DEPS)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(CREATEINDEX_OBJS) $(OBJS) $(LDLIBS)
 	
 clean:
-	rm -Rf $(CREATEINDEX_OBJS) $(OBJS) createIndex
+	rm -Rf *.o createIndex
 	
 # We can automagically get header dependencies.
 dependencies.mk: *.cpp *.hpp

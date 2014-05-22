@@ -24,8 +24,7 @@
 #include <Mapping.hpp>
 #include <SmallSide.hpp>
 #include <IDSource.hpp>
-
-#include "Log.hpp"
+#include <Log.hpp>
 
 
 // TODO: replace with cppunit!
