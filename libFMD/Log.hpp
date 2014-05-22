@@ -109,7 +109,7 @@ public:
      * line.
      */
     static inline OUTPUT_STREAM& output() {
-        return outputStream << timestamp << " OUTPUT: ";
+        return outputStream << timestamp << "OUTPUT: ";
     }
     
     /**

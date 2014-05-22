@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <utility>
 #include <ctime>
+#include <sys/resource.h>
+
 
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
@@ -58,6 +60,27 @@ const std::string TEST_READ4(std::string("GCATCCATCTTGGGGCGTCCCAATTGCTGAGTAACAAA
     
 // How many times to try mapping this read?
 const int TEST_ITERATIONS = 1000;
+
+/**
+ * Log current memory usage at INFO level.
+ */
+void logMemory() {
+    
+    // We have to interogate /proc/self/status
+    
+    std::ifstream statusStream("/proc/self/status");
+    
+    std::string line;
+    while(std::getline(statusStream, line)) {
+        if(line.size() >= 2 && line[0] == 'V' && line[1] == 'm') {
+            // This is a virtual memory line. Log it.
+            Log::output() << line << std::endl;
+        }
+    }
+    
+    
+
+}
 
 
 /**
@@ -179,7 +202,7 @@ mergeNonsymmetric(
         
         if(!quiet) {
             // Dump the context and range.
-            Log::info() << pattern << " at " << range << std::endl;
+            Log::debug() << pattern << " at " << range << std::endl;
         }
         
         if(range.getEndOffset() >= 1 || dumpFile != NULL) {
@@ -195,7 +218,7 @@ mergeNonsymmetric(
             // Work out what text and base the first base is.
             TextPosition firstBase = index.locate(range.getForwardStart());
             
-            Log::debug() << "First relative position: text " << 
+            Log::trace() << "First relative position: text " << 
                 firstBase.getText() << " offset " << firstBase.getOffset() <<
                 std::endl;
             
@@ -249,7 +272,7 @@ mergeNonsymmetric(
                 TextPosition otherBase = index.locate(range.getForwardStart() +
                     j);
                 
-                Log::debug() << "Relative position: (" << 
+                Log::trace() << "Relative position: (" << 
                     otherBase.getText() << "," << otherBase.getOffset() << 
                     ")" << std::endl;   
                 
@@ -272,7 +295,7 @@ mergeNonsymmetric(
             
                 // Pinch firstBase on firstNumber and otherBase on otherNumber
                 // in the correct relative orientation.
-                Log::debug() << "\tPinching #" << firstContigNumber << ":" <<
+                Log::trace() << "\tPinching #" << firstContigNumber << ":" <<
                     firstOffset << " strand " << firstStrand << " and #" << 
                     otherContigNumber << ":" << otherOffset << " strand " << 
                     otherStrand << " (orientation: " << orientation << ")" <<
@@ -317,16 +340,28 @@ mergeNonsymmetric(
             
             if(!quiet) {
                 // Say we merged some bases.
-                Log::info() << "Merged " << range.getEndOffset() + 1 <<  
+                Log::debug() << "Merged " << range.getEndOffset() + 1 <<  
                     " bases" << std::endl;
             }
             
         }
     }
     
+    // Write a report before joining trivial boundaries.
+    Log::output() << "Before joining boundaries:" << std::endl;
+    Log::output() << "Pinch Blocks: " << 
+        stPinchThreadSet_getTotalBlockNumber(threadSet) << std::endl;
+    logMemory();
+    
     // Now GC the boundaries in the pinch set
     Log::info() << "Joining trivial boundaries..." << std::endl;
     stPinchThreadSet_joinTrivialBoundaries(threadSet);
+    
+    // Write a similar report afterwards.
+    Log::output() << "After joining boundaries:" << std::endl;
+    Log::output() << "Pinch Blocks: " << 
+        stPinchThreadSet_getTotalBlockNumber(threadSet) << std::endl;
+    logMemory();
     
     // Return the finished thread set
     return threadSet;
@@ -915,13 +950,13 @@ main(
     unsigned int contextLength = options["context"].as<unsigned int>();
     
     // Dump options.
-    Log::info() << "Options:" << std::endl;
-    Log::info() << "Store index in: " << indexDirectory << std::endl;
+    Log::output() << "Options:" << std::endl;
+    Log::output() << "Store index in: " << indexDirectory << std::endl;
     
     for(std::vector<std::string>::iterator i = fastas.begin();
         i != fastas.end(); ++i) {
         
-        Log::info() << "Index file: " << *i << std::endl;
+        Log::output() << "Index file: " << *i << std::endl;
     }
     
     // Index the bottom-level FASTAs. Use the
