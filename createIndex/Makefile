@@ -1,7 +1,7 @@
 CXX=g++
 
 # What are our generic objects?
-OBJS=
+OBJS=Log.o
     
 # What objects do we need for our createIndex binary?
 CREATEINDEX_OBJS=createIndex.o

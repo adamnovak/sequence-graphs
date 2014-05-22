@@ -25,7 +25,7 @@
 #include <SmallSide.hpp>
 #include <IDSource.hpp>
 
-#include "debug.hpp"
+#include "Log.hpp"
 
 
 // TODO: replace with cppunit!
@@ -108,13 +108,13 @@ buildIndex(
     for(std::vector<std::string>::iterator i = fastas.begin(); i < fastas.end();
         ++i) {
         
-        std::cout << "Adding FASTA " << *i << std::endl;
+        Log::info() << "Adding FASTA " << *i << std::endl;
         
         // Add each FASTA file to the index.
         builder.add(*i);
     }
     
-    std::cout << "Finishing index..." << std::endl;    
+    Log::info() << "Finishing index..." << std::endl;    
     
     // Return the built index.
     return builder.build();
@@ -180,7 +180,7 @@ mergeNonsymmetric(
         
         if(!quiet) {
             // Dump the context and range.
-            std::cout << pattern << " at " << range << std::endl;
+            Log::info() << pattern << " at " << range << std::endl;
         }
         
         if(range.getEndOffset() >= 1 || dumpFile != NULL) {
@@ -188,7 +188,7 @@ mergeNonsymmetric(
             // more places. And since a range with offset 0 has one thing in it,
             // we check to see if it's 1 or more.
             
-            DEBUG(std::cout << "Locating " << range << std::endl;)
+            Log::debug() << "Locating " << range << std::endl;
             
             // For each base location, we need to work out the contig and base
             // and orientation, and pinch with the first.
@@ -196,9 +196,9 @@ mergeNonsymmetric(
             // Work out what text and base the first base is.
             TextPosition firstBase = index.locate(range.getForwardStart());
             
-            DEBUG(std::cout << "First relative position: text " << 
+            Log::debug() << "First relative position: text " << 
                 firstBase.getText() << " offset " << firstBase.getOffset() <<
-                std::endl;)
+                std::endl;
             
             // What contig corresponds to that text?
             size_t firstContigNumber = index.getContigNumber(firstBase);
@@ -250,11 +250,9 @@ mergeNonsymmetric(
                 TextPosition otherBase = index.locate(range.getForwardStart() +
                     j);
                 
-                DEBUG(
-                    std::cout << "Relative position: (" << 
+                Log::debug() << "Relative position: (" << 
                     otherBase.getText() << "," << otherBase.getOffset() << 
                     ")" << std::endl;   
-                )
                 
                 size_t otherContigNumber = index.getContigNumber(otherBase);
                 size_t otherStrand = index.getStrand(otherBase);
@@ -275,11 +273,11 @@ mergeNonsymmetric(
             
                 // Pinch firstBase on firstNumber and otherBase on otherNumber
                 // in the correct relative orientation.
-                DEBUG(std::cout << "\tPinching #" << firstContigNumber << ":" <<
+                Log::debug() << "\tPinching #" << firstContigNumber << ":" <<
                     firstOffset << " strand " << firstStrand << " and #" << 
                     otherContigNumber << ":" << otherOffset << " strand " << 
                     otherStrand << " (orientation: " << orientation << ")" <<
-                    std::endl;)
+                    std::endl;
                 
                 stPinchThread_pinch(firstThread, otherThread, firstOffset,
                     otherOffset, 1, orientation);
@@ -320,7 +318,7 @@ mergeNonsymmetric(
             
             if(!quiet) {
                 // Say we merged some bases.
-                std::cout << "Merged " << range.getEndOffset() + 1 <<  
+                Log::info() << "Merged " << range.getEndOffset() + 1 <<  
                     " bases" << std::endl;
             }
             
@@ -328,7 +326,7 @@ mergeNonsymmetric(
     }
     
     // Now GC the boundaries in the pinch set
-    std::cout << "Joining trivial boundaries..." << std::endl;
+    Log::info() << "Joining trivial boundaries..." << std::endl;
     stPinchThreadSet_joinTrivialBoundaries(threadSet);
     
     // Return the finished thread set
@@ -348,8 +346,8 @@ canonicalize(
     bool strand
 ) {
     
-    DEBUG(std::cout << "Canonicalizing " << contigNumber << ":" << offset << 
-        "." << strand << std::endl;)
+    Log::debug() << "Canonicalizing " << contigNumber << ":" << offset << 
+        "." << strand << std::endl;
     
     // Now we need to look up what the pinch set says is the canonical
     // position for this base, and what orientation it should be in. All the
@@ -400,17 +398,17 @@ canonicalize(
             canonicalSegmentOffset - 1;
     }
     
-    DEBUG(std::cout << "Canonicalized segment offset " << segmentOffset << 
-        " to " << canonicalSegmentOffset << std::endl;)
+    Log::debug() << "Canonicalized segment offset " << segmentOffset << 
+        " to " << canonicalSegmentOffset << std::endl;
     
     // What's the offset into the canonical contig? 1-based because we add a
     // 0-based offset to a 1-based position.
     size_t canonicalOffset = stPinchSegment_getStart(firstSegment) + 
         canonicalSegmentOffset;
     
-    DEBUG(std::cout << "Canonicalized contig " << contigNumber << " offset " <<
+    Log::debug() << "Canonicalized contig " << contigNumber << " offset " <<
         offset << " to contig " << canonicalContig << " offset " << 
-        canonicalOffset << std::endl;)
+        canonicalOffset << std::endl;
     
     // Return all three values, and be sad about not having real tuples. What
     // orientation should we use?  Well, we have the canonical position's
@@ -418,13 +416,12 @@ canonicalize(
     // block, and the orientation that this context attaches to the position in.
     // Flipping any of those will flip the orientation in which we need to map,
     // so we need to xor them all together, which for bools is done with !=.
-    DEBUG(
-        std::cout << "Canonical orientation: " << canonicalOrientation << 
+    Log::debug() << "Canonical orientation: " << canonicalOrientation << 
             std::endl;
-        std::cout << "Segment orientation: " << segmentOrientation << 
+    Log::debug() << "Segment orientation: " << segmentOrientation << 
             std::endl;
-        std::cout << "Strand: " << strand << std::endl;
-    )
+    Log::debug() << "Strand: " << strand << std::endl;
+
     return std::make_pair(std::make_pair(canonicalContig, canonicalOffset),
         canonicalOrientation != segmentOrientation != strand);
 }
@@ -492,8 +489,8 @@ void makeMergedAdjacencies(
             
             // For each base in the thread that isn't the last...
             
-            DEBUG(std::cout << "Linking merged base " << j << " on thread " <<
-                name << std::endl;)
+            Log::debug() << "Linking merged base " << j << " on thread " <<
+                name << std::endl;
             
             
             
@@ -579,7 +576,7 @@ makeLevelIndex(
     std::map<std::pair<size_t, size_t>, long long int>
         idReservations;
 
-    std::cout << "Building mapping data structure..." << std::endl;
+    Log::info() << "Building mapping data structure..." << std::endl;
     
     for(FMDIndex::iterator i = index.begin(contextLength, true); 
         i != index.end(contextLength, true); ++i) {
@@ -592,8 +589,8 @@ makeLevelIndex(
         std::string context = (*i).first;
         FMDPosition range = (*i).second;
         
-        DEBUG(std::cout << "===Context: " << context << " at range " << range <<
-            "===" << std::endl;)
+        Log::debug() << "===Context: " << context << " at range " << range <<
+            "===" << std::endl;
         
         if(context.size() == contextLength) {
         
@@ -603,8 +600,8 @@ makeLevelIndex(
             // Locate the first base in the context. It's already in SA
             // coordinates.
             TextPosition base = index.locate(range.getForwardStart());
-            DEBUG(std::cout << "Text/Offset: (" << base.getText() << ", " << 
-                base.getOffset() << ")" << std::endl;)
+            Log::debug() << "Text/Offset: (" << base.getText() << ", " << 
+                base.getOffset() << ")" << std::endl;
             
             // Canonicalize it. The second field here will be the relative
             // orientation and determine the face.
@@ -634,8 +631,8 @@ makeLevelIndex(
                 // OK not to split it off from the stop characters since they
                 // can't ever be searched.
                 encoder.addBit(range.getForwardStart());
-                DEBUG(std::cout << "Set bit " << range.getForwardStart() <<
-                    std::endl;)
+                Log::debug() << "Set bit " << range.getForwardStart() <<
+                    std::endl;
             }
             
             // Put a 1 at the start of its interval, and add a mapping to the
@@ -697,8 +694,8 @@ makeLevelIndex(
                         // the stop characters since they can't ever be
                         // searched.
                         encoder.addBit(range.getForwardStart() + j);
-                        DEBUG(std::cout << "Set bit " << 
-                            range.getForwardStart() + j << std::endl;)
+                        Log::debug() << "Set bit " << 
+                            range.getForwardStart() + j << std::endl;
                     }
                     
                     
@@ -746,7 +743,7 @@ void saveLevelIndex(
     std::string directory
 ) {
     
-    std::cout << "Saving index to disk..." << std::endl;
+    Log::info() << "Saving index to disk..." << std::endl;
     
     // Make the directory
     boost::filesystem::create_directory(directory);
@@ -791,8 +788,8 @@ testBottomMapping(
     double msPerCall = ((double)(end - start)) / 
         (CLOCKS_PER_SEC / 1000.0) / TEST_ITERATIONS;
         
-    std::cout << "Mapping to bottom level: " << msPerCall << " ms per call" <<
-        std::endl;
+    Log::output() << "Mapping to bottom level: " << msPerCall << 
+        " ms per call" << std::endl;
 }
 
 /**
@@ -815,8 +812,8 @@ testMergedMapping(
     double msPerCall = ((double)(end - start)) / 
         (CLOCKS_PER_SEC / 1000.0) / TEST_ITERATIONS;
         
-    std::cout << "Mapping to merged level: " << msPerCall << " ms per call" <<
-        std::endl;
+    Log::output() << "Mapping to merged level: " << msPerCall <<
+        " ms per call" << std::endl;
 }
 
 /**
@@ -919,13 +916,13 @@ main(
     unsigned int contextLength = options["context"].as<unsigned int>();
     
     // Dump options.
-    std::cout << "Options:" << std::endl;
-    std::cout << "Store index in: " << indexDirectory << std::endl;
+    Log::info() << "Options:" << std::endl;
+    Log::info() << "Store index in: " << indexDirectory << std::endl;
     
     for(std::vector<std::string>::iterator i = fastas.begin();
         i != fastas.end(); ++i) {
         
-        std::cout << "Index file: " << *i << std::endl;
+        Log::info() << "Index file: " << *i << std::endl;
     }
     
     // Index the bottom-level FASTAs. Use the
@@ -942,7 +939,7 @@ main(
         return 0;
     }
     
-    std::cout << "Use " << contextLength << " bases of context." << std::endl;
+    Log::info() << "Use " << contextLength << " bases of context." << std::endl;
     
     // Make an IDSource to produce IDs not already claimed by contigs.
     IDSource<long long int> source(index.getTotalLength());
@@ -1004,7 +1001,7 @@ main(
     
     // Run the speed tests if we want to
     if(options.count("test")) {
-        std::cout << "Running performance tests..." << std::endl;
+        Log::output() << "Running performance tests..." << std::endl;
         testBottomMapping(index);
         testMergedMapping(index, levelIndex.first);
     }
