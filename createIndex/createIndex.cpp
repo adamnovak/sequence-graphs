@@ -14,12 +14,6 @@
 // Grab pinchesAndCacti dependency.
 #include <stPinchGraphs.h>
 
-#include <avro/Encoder.hh>
-#include <avro/DataFile.hh>
-#include <avro/Schema.hh>
-#include <avro/ValidSchema.hh>
-#include <avro/Compiler.hh>
-
 // Grab all the libFMD stuff.
 #include <FMDIndexBuilder.hpp>
 #include <FMDIndex.hpp>
@@ -28,16 +22,8 @@
 #include <TextPosition.hpp>
 #include <util.hpp>
 #include <Mapping.hpp>
+#include <SmallSide.hpp>
 #include <IDSource.hpp>
-
-// Grab the Avro header for the Face/Side objects we need to dump out. Only use
-// the most dependent one, since they all define their dependencies and are thus
-// incompatible with the headers for their dependencies.
-#include "schemas/Side.hpp"
-
-// Get the variables Side_schema and Side_schema_len that give us the actual
-// text of that schema, before code generation.
-#include "schemas/Side_schema.hpp"
 
 #include "debug.hpp"
 
@@ -571,7 +557,7 @@ void makeMergedAdjacencies(
  * 
  * Don't forget to delete the bit vector when done!
  */
-std::pair<RangeVector*, std::vector<Side> > 
+std::pair<RangeVector*, std::vector<SmallSide> > 
 makeLevelIndex(
     stPinchThreadSet* threadSet, 
     const FMDIndex& index, 
@@ -584,10 +570,9 @@ makeLevelIndex(
     // encoder, which has 32 byte blocks.
     RangeEncoder encoder(32);
     
-    // We also need to make a vector of Sides, which are (contig, base, face),
-    // and are the things that get matched to by the corresponding ranges in the
-    // bit vector.
-    std::vector<Side> mappings;
+    // We also need to make a vector of SmallSides, which are the things that
+    // get matched to by the corresponding ranges in the bit vector.
+    std::vector<SmallSide> mappings;
     
     // We also need this map of position IDs (long long ints) by canonical
     // contig name (a size_t) and base index (also a size_t)
@@ -622,7 +607,7 @@ makeLevelIndex(
                 base.getOffset() << ")" << std::endl;)
             
             // Canonicalize it. The second field here will be the relative
-            // orientation and determine the Side.
+            // orientation and determine the face.
             std::pair<std::pair<size_t, size_t>, bool> canonicalized = 
                 canonicalize(index, threadSet, base);
             
@@ -639,12 +624,8 @@ makeLevelIndex(
             
             // Say this range is going to belong to the ID we just looked up, on
             // the appropriate face.
-            Side mapping;
-            mapping.coordinate = positionCoordinate;
-            // What face?
-            mapping.face = canonicalized.second ? LEFT : RIGHT;
-            // Add the mapping
-            mappings.push_back(mapping);
+            mappings.push_back(
+                SmallSide(positionCoordinate, canonicalized.second));
             
             if(range.getForwardStart() != 0) {
                 // Record a 1 in the vector at the start of every range except
@@ -656,9 +637,6 @@ makeLevelIndex(
                 DEBUG(std::cout << "Set bit " << range.getForwardStart() <<
                     std::endl;)
             }
-            
-            DEBUG(std::cout << "Mapping to #" << mapping.coordinate << 
-                "." << mapping.face << std::endl;)
             
             // Put a 1 at the start of its interval, and add a mapping to the
             // given ID and Side.
@@ -706,12 +684,8 @@ makeLevelIndex(
                     
                     // Say this range is going to belong to the ID we just
                     // looked up, on the appropriate face.
-                    Side mapping;
-                    mapping.coordinate = positionCoordinate;
-                    // What face?
-                    mapping.face = canonicalized.second ? LEFT : RIGHT;
-                    // Add the mapping
-                    mappings.push_back(mapping);
+                    mappings.push_back(
+                        SmallSide(positionCoordinate, canonicalized.second));
                     
                     // Add in the bit the same as above, only here we add the
                     // offset of i.
@@ -727,8 +701,6 @@ makeLevelIndex(
                             range.getForwardStart() + j << std::endl;)
                     }
                     
-                    DEBUG(std::cout << "Mapping to #" << 
-                        mapping.coordinate << "." << mapping.face << std::endl;)
                     
                     // Remember what canonical base and face we're doing for
                     // this range.
@@ -770,7 +742,7 @@ makeLevelIndex(
  * index, so it can be reused.
  */
 void saveLevelIndex(
-    std::pair<RangeVector*, std::vector<Side> > levelIndex,
+    std::pair<RangeVector*, std::vector<SmallSide> > levelIndex,
     std::string directory
 ) {
     
@@ -780,38 +752,23 @@ void saveLevelIndex(
     boost::filesystem::create_directory(directory);
     
     // Save the bit vector to a file.
-    std::ofstream vectorStream((directory + "/vector.bin").c_str());
+    std::ofstream vectorStream((directory + "/vector.bin").c_str(), 
+        std::ios::binary);
     levelIndex.first->writeTo(vectorStream);
     vectorStream.close();
     
-    // Now write out all the merged positions to Avro, in an Avro-format file.
-    // See <http://avro.apache.org/docs/1.7.6/api/cpp/html/index.html>. This is
-    // complicated by the fact that we need to have the Avro schema JSON text to
-    // write such a file, and the generated C++ classes provide no access to
-    // that text.
-    
-    // We previously hacked the Side schema into globals Side_schema and
-    // Side_schema_len with the xdd tool. Now we make it into an std::string.
-    std::string sideSchema((char*) Side_schema, (size_t) Side_schema_len);
-    std::istringstream sideSchemaStream(sideSchema);
-    
-    // This will hold the actual built schema
-    avro::ValidSchema validSchema;
-    
-    // Now parse the schema. Assume it works.
-    avro::compileJsonSchema(sideSchemaStream, validSchema);
-    
-    // Make a writer to write to the file we want, in the schema we want.
-    avro::DataFileWriter<Side> writer((directory + 
-        "/mappings.avro").c_str(), validSchema);
-    
-    for(std::vector<Side>::iterator i = levelIndex.second.begin(); 
+    // Open a file to save all the sides to
+    std::ofstream sideStream((directory + "/mappings.bin").c_str(), 
+        std::ios::binary);
+    for(std::vector<SmallSide>::iterator i = levelIndex.second.begin(); 
         i != levelIndex.second.end(); ++i) {
-        // Write each mapping to the file.
-        writer.write(*i);
         
+        // For each side, write it. We can't write them all at once since we
+        // might have more than an int's worth of bytes.
+        (*i).write(sideStream);
+    
     }
-    writer.close();
+    sideStream.close();
 }
 
 /**
@@ -990,7 +947,7 @@ main(
     // Make an IDSource to produce IDs not already claimed by contigs.
     IDSource<long long int> source(index.getTotalLength());
     
-    // This si the file we will dump our graph to, if needed.
+    // This is the file we will dump our graph to, if needed.
     std::ofstream* dumpFile = NULL;
     if(options.count("dump")) {
         // Open it up.
@@ -1028,9 +985,9 @@ main(
         *dumpFile << "label=\"Level 1\";" << std::endl;
     }
     
-    // Index it so we have a bit vector and Sides to write out
-    std::pair<RangeVector*, std::vector<Side> > levelIndex = makeLevelIndex(
-        threadSet, index, contextLength, source, dumpFile);
+    // Index it so we have a bit vector and SmallSides to write out
+    std::pair<RangeVector*, std::vector<SmallSide> > levelIndex = 
+        makeLevelIndex(threadSet, index, contextLength, source, dumpFile);
         
     // Write it out, deleting the bit vector in the process
     saveLevelIndex(levelIndex, indexDirectory + "/level1");
