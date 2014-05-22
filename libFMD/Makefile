@@ -85,7 +85,7 @@ testRunner: $(TEST_OBJS) $(OBJS) $(DEPS)
 	$(TEST_LIBS)
 	
 # We can automagically get header dependencies.
-dependencies.mk:
+dependencies.mk: *.cpp Test/*.cpp *.hpp Test/*.hpp
 	g++ $(CXXFLAGS) -MM *.cpp Test/*.cpp > dependencies.mk
 	
 # Include auto-generated dependencies.

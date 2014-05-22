@@ -131,7 +131,7 @@ makeThreadSet(
     // Construct the thread set first.
     stPinchThreadSet* threadSet = stPinchThreadSet_construct();
     
-    for(size_t i = 0; i < index.getContigs(); i++) {
+    for(size_t i = 0; i < index.getNumberOfContigs(); i++) {
         // Add a thread for this contig number. The thread starts at base 1 and
         // has the appropriate length.
         stPinchThreadSet_addThread(threadSet, i, 1, index.getContigLength(i));
@@ -961,7 +961,7 @@ main(
         *dumpFile << "label=\"Level 0\";" << std::endl;
         
         // Add per-contig rank constraints.
-        for(size_t i = 0; i < index.getContigs(); i++) {
+        for(size_t i = 0; i < index.getNumberOfContigs(); i++) {
             // For every contig, add rank edges.
             for(size_t j = 0; j < index.getContigLength(i) - 1; j++) {
                 // For every base except the last...

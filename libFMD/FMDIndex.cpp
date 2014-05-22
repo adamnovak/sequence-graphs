@@ -104,7 +104,7 @@ size_t FMDIndex::getBaseID(TextPosition base) const {
     return total + getOffset(base) - 1;
 }
 
-size_t FMDIndex::getContigs() const {
+size_t FMDIndex::getNumberOfContigs() const {
     // How many contigs do we know about?
     return names.size();
 }

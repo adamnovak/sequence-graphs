@@ -83,7 +83,7 @@ public:
     /** 
      * Get the total number of contigs in the index.
      */
-    size_t getContigs() const;
+    size_t getNumberOfContigs() const;
     
     /**
      * Get the name of the contig at the given index.
