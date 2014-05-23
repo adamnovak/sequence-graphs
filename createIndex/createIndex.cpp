@@ -28,6 +28,9 @@
 #include <IDSource.hpp>
 #include <Log.hpp>
 
+// Grab timers from libsuffixtools
+#include <Timer.h>
+
 
 // TODO: replace with cppunit!
 
@@ -1128,9 +1131,14 @@ main(
         
     }
     
+    // We want to time the merge code.
+    Timer* mergeTimer = new Timer("Non-Symmetric Merging");
+    
     // Make a thread set for the context length we want.
     stPinchThreadSet* threadSet = mergeNonsymmetric(index, contextLength,
         dumpFile, options.count("quiet"));
+        
+    delete mergeTimer;
         
     if(options.count("dump")) {
         // End the cluster and start a new one.
@@ -1143,6 +1151,9 @@ main(
     // Index it so we have a bit vector and SmallSides to write out.
     std::pair<RangeVector*, std::vector<SmallSide> > levelIndex;
     
+    // We also want to time the merged level index building code
+    Timer* levelIndexTimer = new Timer("Level Index Construction");
+    
     if(options.count("scan")) {
         // Use a scanning strategy for indexing.
         levelIndex = makeLevelIndexScanning(threadSet, index, contextLength,
@@ -1152,6 +1163,8 @@ main(
         levelIndex = makeLevelIndex(threadSet, index, contextLength, source,
             dumpFile);
     }
+    
+    delete levelIndexTimer;
         
     // Write it out, deleting the bit vector in the process
     saveLevelIndex(levelIndex, indexDirectory + "/level1");
