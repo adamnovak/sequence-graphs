@@ -26,8 +26,14 @@ do
         # Make a scratch file
         SCRATCH_FILE=`mktemp`
     
+        echo "# Start" >> ${OUT_FILE}
+        echo "# Starting context ${CONTEXT} into ${OUT_FILE}"
+        
+    
         # Run on the FASTA file for each context.
-        createIndex/createIndex ${INDEX} ${FASTA} --context ${CONTEXT} &> ${SCRATCH_FILE} || echo "# Context ${CONTEXT} failed!" && exit 
+        echo "# createIndex/createIndex ${INDEX} ${FASTA} --context ${CONTEXT} &> ${SCRATCH_FILE}"
+        createIndex/createIndex ${INDEX} ${FASTA} --context ${CONTEXT} &> ${SCRATCH_FILE} 
+        echo "# done!"
         
         # Grab the line for the second traversal and extract the first number: wall clock time in seconds.
         TIME_TAKEN=`cat ${SCRATCH_FILE} | grep "timer - Level Index Construction" | sed 's/[^0-9]*\([0-9]\+\.[0-9]\+\).*/\1/'`
@@ -57,9 +63,6 @@ done
 wait
 
 # Aggregate all the output
-cat ${OUT_DIR}/*.tsv | sort -n
-
-# Remove aggregated results.
-rm -Rf ${OUT_DIR}
+cat ${OUT_DIR}/*.tsv
 
 
