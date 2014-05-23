@@ -6,7 +6,7 @@
 
 #include "FMDIndex.hpp"
 #include "util.hpp"
-#include "debug.hpp"
+#include "Log.hpp"
 
 FMDIndex::FMDIndex(std::string basename, SuffixArray* fullSuffixArray): 
     names(), lengths(), cumulativeLengths(), bwt(basename + ".bwt"),
@@ -186,8 +186,8 @@ FMDPosition FMDIndex::extend(FMDPosition range, char c, bool backward) const {
         throw std::runtime_error(errorMessage);
     }
 
-    DEBUG(std::cout << "Extending " << range << " backwards with " << c <<
-        std::endl;)
+    Log::trace() << "Extending " << range << " backwards with " << c <<
+        std::endl;
 
     // We have an array of FMDPositions, one per base, that we will fill in by a
     // tiny dynamic programming.
@@ -196,13 +196,13 @@ FMDPosition FMDIndex::extend(FMDPosition range, char c, bool backward) const {
     for(size_t base = 0; base < NUM_BASES; base++) {
         // Go through the bases in arbitrary order.
 
-        DEBUG(std::cout << "\tThinking about base " << base << "(" << 
-            BASES[base] << ")" << std::endl;)
+        Log::trace() << "\tThinking about base " << base << "(" << 
+            BASES[base] << ")" << std::endl;
 
         // Count up the number of characters < this base.
         int64_t start = bwt.getPC(c);
 
-        DEBUG(std::cout << "\t\tstart = " << start << std::endl;)
+        Log::trace() << "\t\tstart = " << start << std::endl;
 
         // Get the rank among occurrences of the first instance of this base in
         // this slice.
@@ -218,7 +218,7 @@ FMDPosition FMDIndex::extend(FMDPosition range, char c, bool backward) const {
         answers[base].setForwardStart(start + forwardStartRank);
         answers[base].setEndOffset(forwardEndRank - forwardStartRank);
 
-        DEBUG(std::cout << "\t\tWould go to: " << answers[base] << std::endl;)
+        Log::trace() << "\t\tWould go to: " << answers[base] << std::endl;
     }
 
     // Since we don't keep an FMDPosition for the non-base end-of-text
@@ -238,19 +238,19 @@ FMDPosition FMDIndex::extend(FMDPosition range, char c, bool backward) const {
     }
 
 
-    DEBUG(std::cout << "\tendOfTextLength = " << endOfTextLength << std::endl;)
+    Log::trace() << "\tendOfTextLength = " << endOfTextLength << std::endl;
 
     // The endOfText character is the very first character we need to account
     // for when subdividing the reverse range and picking which subdivision to
     // take.
-    DEBUG(std::cout << "\tendOfText reverse_start would be " << 
-        range.getReverseStart() << std::endl;)
+    Log::trace() << "\tendOfText reverse_start would be " << 
+        range.getReverseStart() << std::endl;
 
     // Next, allocate the range for the base that comes first in alphabetical
     // order by reverse complement.
     answers[0].setReverseStart(range.getReverseStart() + endOfTextLength);
-    DEBUG(std::cout << "\t" << BASES[0] << " reverse_start is " << 
-    answers[0].getReverseStart() << std::endl;)
+    Log::trace() << "\t" << BASES[0] << " reverse_start is " << 
+        answers[0].getReverseStart() << std::endl;
 
     for(size_t base = 1; base < NUM_BASES; base++)
     {
@@ -259,8 +259,8 @@ FMDPosition FMDIndex::extend(FMDPosition range, char c, bool backward) const {
 
         answers[base].setReverseStart(answers[base - 1].getReverseStart() + 
             answers[base - 1].getLength());
-        DEBUG(std::cout << "\t" << BASES[base] << " reverse_start is " << 
-        answers[base].getReverseStart() << std::endl;)
+        Log::trace() << "\t" << BASES[base] << " reverse_start is " << 
+        answers[base].getReverseStart() << std::endl;
     }
 
     // Now all the per-base answers are filled in.
@@ -273,8 +273,8 @@ FMDPosition FMDIndex::extend(FMDPosition range, char c, bool backward) const {
             // This is the base we're actually supposed to be extending with. Return
             // its answer.
             
-            DEBUG(std::cout << "Moving " << range << " to " << answers[base] << 
-                " on " << BASES[base] << std::endl;)
+            Log::trace() << "Moving " << range << " to " << answers[base] << 
+                " on " << BASES[base] << std::endl;
             
             return answers[base];
         }
@@ -314,7 +314,6 @@ TextPosition FMDIndex::locate(int64_t index) const {
 
     if(fullSuffixArray != NULL) {
         // We can just look at the full suffix array cheat sheet.
-        
         bitfield = fullSuffixArray->get(index);
         
     } else {
@@ -381,13 +380,13 @@ std::vector<Mapping> FMDIndex::map(const std::string& query, int start,
     {
         if(location.position.isEmpty())
         {
-            INFO(std::cout << "Starting over by mapping position " << i <<
-            std::endl;)
+            Log::debug() << "Starting over by mapping position " << i <<
+                std::endl;
             // We do not currently have a non-empty FMDPosition to extend. Start
             // over by mapping this character by itself.
             location = this->mapPosition(query, i);
         } else {
-            INFO(std::cout << "Extending with position " << i << std::endl;)
+            Log::debug() << "Extending with position " << i << std::endl;
             // The last base either mapped successfully or failed due to multi-
             // mapping. Try to extend the FMDPosition we have to the right (not
             // backwards) with the next base.
@@ -409,9 +408,9 @@ std::vector<Mapping> FMDIndex::map(const std::string& query, int start,
             // which lets us infer the position of the last base in the pattern.
             TextPosition textPosition = locate(start);
 
-            INFO(std::cout << "Mapped " << location.characters << 
-            " context to text " << textPosition.getText() << " position " << 
-            textPosition.getOffset() << std::endl;)
+            Log::debug() << "Mapped " << location.characters << 
+                " context to text " << textPosition.getText() << " position " << 
+                textPosition.getOffset() << std::endl;
 
             // Correct to the position of the last base in the pattern, by
             // offsetting by the length of the pattern that was used. A
@@ -427,15 +426,16 @@ std::vector<Mapping> FMDIndex::map(const std::string& query, int start,
 
         } else {
 
-            INFO(std::cout << "Failed (" << location.position.getLength() << 
-            " options for " << location.characters << " context)." << std::endl;)
+            Log::debug() << "Failed (" << location.position.getLength() << 
+                " options for " << location.characters << " context)." << 
+                std::endl;
 
             if(location.is_mapped && location.position.isEmpty()) {
                 // We extended right until we got no results. We need to try
                 // this base again, in case we tried with a too-long left
                 // context.
 
-                INFO(std::cout << "Restarting from here..." << std::endl;)
+                Log::debug() << "Restarting from here..." << std::endl;
 
                 // Move the loop index back
                 i--;
@@ -497,17 +497,17 @@ std::vector<int64_t> FMDIndex::map(const RangeVector& ranges,
     for(int i = start + length - 1; i >= start; i--) {
         // Go from the end of our selected region to the beginning.
 
-        DEBUG(std::cout << "On position " << i << " from " <<
-            start + length - 1 << " to " << start << std::endl;)
+        Log::trace() << "On position " << i << " from " <<
+            start + length - 1 << " to " << start << std::endl;
 
         if(location.position.isEmpty()) {
-            INFO(std::cout << "Starting over by mapping position " << i <<
-            std::endl;)
+            Log::debug() << "Starting over by mapping position " << i <<
+                std::endl;
             // We do not currently have a non-empty FMDPosition to extend. Start
             // over by mapping this character by itself.
             location = this->mapPosition(ranges, query, i);
         } else {
-            INFO(std::cout << "Extending with position " << i << std::endl;)
+            Log::debug() << "Extending with position " << i << std::endl;
             // The last base either mapped successfully or failed due to multi-
             // mapping. Try to extend the FMDPosition we have to the left
             // (backwards) with the next base.
@@ -523,8 +523,8 @@ std::vector<int64_t> FMDIndex::map(const RangeVector& ranges,
             // It mapped. We didn't do a re-start and fail, and our interval is
             // nonempty and subsumed by a range.
 
-            INFO(std::cout << "Mapped " << location.characters << 
-            " context to range #" << range << " in range vector." << std::endl;)
+            Log::debug() << "Mapped " << location.characters << 
+            " context to range #" << range << " in range vector." << std::endl;
 
             // Remember that this base mapped to this range
             mappings.push_back(range);
@@ -533,16 +533,16 @@ std::vector<int64_t> FMDIndex::map(const RangeVector& ranges,
 
         } else {
 
-            INFO(std::cout << "Failed (" << location.position.ranges(ranges) << 
+            Log::debug() << "Failed (" << location.position.ranges(ranges) << 
                 " options for " << location.characters << " context)." << 
-                std::endl;)
+                std::endl;
 
             if(location.is_mapped && location.position.isEmpty()) {
                 // We extended right until we got no results. We need to try
                 // this base again, in case we tried with a too-long left
                 // context.
 
-                INFO(std::cout << "Restarting from here..." << std::endl;)
+                Log::debug() << "Restarting from here..." << std::endl;
 
                 // Move the loop index towards the end we started from (right)
                 i++;
@@ -599,7 +599,7 @@ FMDIndex::iterator FMDIndex::end(size_t depth, bool reportDeadEnds) const {
 MapAttemptResult FMDIndex::mapPosition(const std::string& pattern,
     size_t index) const {
 
-    DEBUG(std::cout << "Mapping " << index << " in " << pattern << std::endl;)
+    Log::debug() << "Mapping " << index << " in " << pattern << std::endl;
   
     // Initialize the struct we will use to return our somewhat complex result.
     // Contains the FMDPosition (which we work in), an is_mapped flag, and a
@@ -629,7 +629,7 @@ MapAttemptResult FMDIndex::mapPosition(const std::string& pattern,
         return result;
     }
 
-    DEBUG(std::cout << "Starting with " << result.position << std::endl;)
+    Log::trace() << "Starting with " << result.position << std::endl;
 
     do {
         // Now consider the next character to the left.
@@ -638,15 +638,15 @@ MapAttemptResult FMDIndex::mapPosition(const std::string& pattern,
         // Grab the character to extend with.
         char character = pattern[index];
 
-        DEBUG(std::cout << "Index " << index << " in " << pattern << " is " << 
-            character << "(" << character << ")" << std::endl;)
+        Log::trace() << "Index " << index << " in " << pattern << " is " << 
+            character << "(" << character << ")" << std::endl;
 
         // Backwards extend with subsequent characters.
         FMDPosition next_position = this->extend(result.position, character,
             true);
 
-        DEBUG(std::cout << "Now at " << next_position << " after " << 
-            pattern[index] << std::endl;)
+        Log::trace() << "Now at " << next_position << " after " << 
+            pattern[index] << std::endl;
         if(next_position.isEmpty()) {
             // The next place we would go is empty, so return the result holding
             // the last position.
@@ -704,15 +704,15 @@ MapAttemptResult FMDIndex::mapPosition(const RangeVector& ranges,
         return result;
     }
 
-    DEBUG(std::cout << "Starting with " << result.position << std::endl;)
+    Log::trace() << "Starting with " << result.position << std::endl;
 
     for(index++; index < pattern.size(); index++) {
         // Forwards extend with subsequent characters.
         FMDPosition next_position = this->extend(result.position,
             pattern[index], false);
 
-        DEBUG(std::cout << "Now at " << next_position << " after " << 
-            pattern[index] << std::endl;)
+        Log::trace() << "Now at " << next_position << " after " << 
+            pattern[index] << std::endl;
         if(next_position.isEmpty()) {
             // The next place we would go is empty, so return the result holding
             // the last position.

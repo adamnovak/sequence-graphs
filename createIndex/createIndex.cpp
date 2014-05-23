@@ -580,9 +580,9 @@ void makeMergedAdjacencies(
  * implied by the given thread set in the given index. Gets IDs for created
  * positions from the given source.
  * 
- * Manages this by scanning the BWT from left to right, seeing what cannonical
- * position and orientation each base belongs to, and putting 1s in the range
- * vector every time a new one starts.
+ * Manages this by traversing the suffix tree, and blocking out each range
+ * (since we're sure a range of the correct length has all been merged into the
+ * same base and face).
  *
  * If dumpFile is set, also writes a graphviz-format debug graph.
  * 
@@ -610,7 +610,8 @@ makeLevelIndex(
     std::map<std::pair<size_t, size_t>, long long int>
         idReservations;
 
-    Log::info() << "Building mapping data structure..." << std::endl;
+    Log::info() << "Building mapping data structure by tree traversal..." <<
+        std::endl;
     
     for(FMDIndex::iterator i = index.begin(contextLength, true); 
         i != index.end(contextLength, true); ++i) {
@@ -768,6 +769,128 @@ makeLevelIndex(
 }
 
 /**
+ * Make the range vector and list of matching Sides for the hierarchy level
+ * implied by the given thread set in the given index. Gets IDs for created
+ * positions from the given source.
+ * 
+ * Manages this by scanning the BWT from left to right, seeing what cannonical
+ * position and orientation each base belongs to, and putting 1s in the range
+ * vector every time a new one starts.
+ *
+ * If dumpFile is set, also writes a graphviz-format debug graph.
+ * 
+ * Don't forget to delete the bit vector when done!
+ */
+std::pair<RangeVector*, std::vector<SmallSide> > 
+makeLevelIndexScanning(
+    stPinchThreadSet* threadSet, 
+    const FMDIndex& index, 
+    size_t contextLength,
+    IDSource<long long int>& source, 
+    std::ofstream* dumpFile = NULL
+) {
+    
+    // We need to make bit vector denoting ranges, which we encode with this
+    // encoder, which has 32 byte blocks.
+    RangeEncoder encoder(32);
+    
+    // We also need to make a vector of SmallSides, which are the things that
+    // get matched to by the corresponding ranges in the bit vector.
+    std::vector<SmallSide> mappings;
+    
+    // We also need this map of position IDs (long long ints) by canonical
+    // contig name (a size_t) and base index (also a size_t)
+    std::map<std::pair<size_t, size_t>, long long int>
+        idReservations;
+
+    Log::info() << "Building mapping data structure by scan..." << std::endl;
+    
+    
+    // Otherwise if it's a shorter than requested context, it's possible not
+    // everything has been merged. So do the old thing where we locate each base
+    // and, when the canonical position changes, add a 1 to start a new range
+    // and add a mapping.
+
+    // Keep track of the ID and relative orientation for the last position we
+    // canonicalized.
+    std::pair<std::pair<size_t, size_t>, bool> lastCanonicalized;
+    
+    for(int64_t j = index.getNumberOfContigs() * 2; j < index.getBWTLength();
+        j++) {
+        
+        // For each base in the BWT (skipping over the 2*contigs stop
+        // characters)...
+        
+        // Where is it located?
+        TextPosition base = index.locate(j);
+        
+        // Canonicalize it. The second field here will be the relative
+        // orientation and determine the Side.
+        std::pair<std::pair<size_t, size_t>, bool> canonicalized = 
+            canonicalize(index, threadSet, base);
+            
+        if(j == 0 || canonicalized != lastCanonicalized) {
+            // We need to start a new range here, because this BWT base maps to
+            // a different position than the last one.
+            
+            // What position is that?
+            long long int positionCoordinate;
+            if(idReservations.count(canonicalized.first) > 0) {
+                // Load the previously chosen ID
+                positionCoordinate = 
+                    idReservations[canonicalized.first];
+            } else {
+                // Allocate and remember a new ID.
+                positionCoordinate = 
+                    idReservations[canonicalized.first] = 
+                    source.next();
+            }
+            
+            // Say this range is going to belong to the ID we just looked up, on
+            // the appropriate face.
+            mappings.push_back(
+                SmallSide(positionCoordinate, canonicalized.second));
+            
+            if(j != index.getNumberOfContigs() * 2) {
+                // Record a 1 in the vector at the start of every range except
+                // the first. The first needs no 1 before it so it will be rank
+                // 0 (and match up with mapping 0), and it's OK not to split it
+                // off from the stop characters since they can't ever be
+                // searched.
+                encoder.addBit(j);
+                Log::debug() << "Set bit " << j << std::endl;
+            }
+            
+            
+            // Remember what canonical base and face we're doing for this range.
+            lastCanonicalized = canonicalized;
+        }
+        // Otherwise we had the same canonical base, so we want this in the same
+        // range we already started.
+    }
+            
+    // Set a bit after the end of the last range.
+    encoder.addBit(index.getTotalLength());
+    
+    // Finish the vector encoder into a vector of the right length.
+    // This should always end in a 1!
+    // Make sure to flush first.
+    encoder.flush();
+    RangeVector* bitVector = new RangeVector(encoder,
+        index.getTotalLength() + 1);
+    
+    if(dumpFile != NULL) {
+        // We need to add in the edges that connect merged positions together.
+        // This requires walking all the contigs again, so we put it in its own
+        // function.
+        makeMergedAdjacencies(threadSet, idReservations, dumpFile);
+    }
+    
+    // Return the bit vector and the Side vector
+    return make_pair(bitVector, mappings);
+}
+
+/**
  * Save both parts of the given level index to files in the given directory,
  * which must not yet exist. Does not delete the bit vector from the level
  * index, so it can be reused.
@@ -874,6 +997,7 @@ main(
         ("test", "Run a mapping speed test")
         ("quiet", "Don't print every context")
         ("noMerge", "Don't compute merged level, only make lowest-level index")
+        ("scan", "Make merged mapping bit vector by scanning BWT")
         ("context", boost::program_options::value<unsigned int>()
             ->default_value(3), 
             "Set the context length to merge on")
@@ -1016,9 +1140,18 @@ main(
         *dumpFile << "label=\"Level 1\";" << std::endl;
     }
     
-    // Index it so we have a bit vector and SmallSides to write out
-    std::pair<RangeVector*, std::vector<SmallSide> > levelIndex = 
-        makeLevelIndex(threadSet, index, contextLength, source, dumpFile);
+    // Index it so we have a bit vector and SmallSides to write out.
+    std::pair<RangeVector*, std::vector<SmallSide> > levelIndex;
+    
+    if(options.count("scan")) {
+        // Use a scanning strategy for indexing.
+        levelIndex = makeLevelIndexScanning(threadSet, index, contextLength,
+            source, dumpFile);
+     } else {
+        // Use a range-based strategy for indexing.
+        levelIndex = makeLevelIndex(threadSet, index, contextLength, source,
+            dumpFile);
+    }
         
     // Write it out, deleting the bit vector in the process
     saveLevelIndex(levelIndex, indexDirectory + "/level1");
