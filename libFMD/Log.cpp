@@ -1,7 +1,7 @@
 #include "Log.hpp"
 
 // Set the time format.
-const std::string Log::TIME_FORMAT = "[%m-%d-%Y %I:%M:%S] ";
+const std::string Log::TIME_FORMAT = "[%m-%d-%Y %H:%M:%S] ";
 
 // Have static initializations of all the streams.
 CRITICAL_STREAM Log::criticalStream;
