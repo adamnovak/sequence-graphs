@@ -22,7 +22,7 @@ LDFLAGS += -L../libsuffixtools
 # We need to link against cppunit when we run our tests.
 TEST_LIBS = -lcppunit
 
-CXXFLAGS += -O3 -fPIC -g -I../deps -I../libsuffixtools
+CXXFLAGS += -O3 -fPIC -g -pg -I../deps -I../libsuffixtools
 
 # What Java package should we put the SWIG bindings in? Also used as the Maven
 # groupID.

@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <utility>
 #include <ctime>
+#include <csignal>
 #include <sys/resource.h>
 
 
@@ -85,6 +86,17 @@ void logMemory() {
 
 }
 
+/**
+ * Signal handler to exit with exit(), preserving gprof profiling data if
+ * applicable.
+ */
+void exitOnSignal(int signalNumber) {
+    // Log the signal.
+    Log::info() << "Exiting on signal " << signalNumber << std::endl;
+    
+    // Call exit and report the signal.
+    exit(signalNumber);
+}
 
 /**
  * Look at the text of a base to see what arrow it needs to
@@ -984,6 +996,11 @@ main(
     int argc, 
     char** argv
 ) {
+
+    // Register ctrl+c handler. See
+    // <http://www.yolinux.com/TUTORIALS/C++Signals.html>
+    signal(SIGINT, exitOnSignal);
+
     // Parse options with boost::programOptions. See
     // <http://www.radmangames.com/programming/how-to-use-boost-program_options>
 
