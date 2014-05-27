@@ -1112,12 +1112,17 @@ main(
     // out of our scope.
     FMDIndex& index = *indexPointer;
     
+    // Log memory usage with no pinch graph stuff having yet happened.
+    Log::output() << "Memory usage with no merging:" << std::endl;
+    logMemory();
+    
     if(options.count("noMerge")) {
         // Skip merging any of the higher levels.
         return 0;
     }
     
-    Log::info() << "Use " << contextLength << " bases of context." << std::endl;
+    Log::info() << "Merge on " << contextLength << " bases of context." <<
+        std::endl;
     
     // Make an IDSource to produce IDs not already claimed by contigs.
     IDSource<long long int> source(index.getTotalLength());
