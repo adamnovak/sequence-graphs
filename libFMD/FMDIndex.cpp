@@ -156,6 +156,71 @@ FMDPosition FMDIndex::getCharPosition(char c) const {
     
 }
      
+void FMDIndex::extendFast(FMDPosition& range, char c, bool backward) const {
+    // Extend the search with this character in an optimized way. We work on our
+    // argument so we don't need to bother with copies.
+    
+    // Skip any sort of argument validation.
+    
+    if(!backward) {
+        // Flip the arguments around so we can work on the reverse strand.
+        c = complement(c);
+        range.flipInPlace();
+    }
+    
+    // Read occurrences of everything from the BWT
+    
+    // What rank among occurrences is the first instance of every character in
+    // the BWT range?
+    AlphaCount64 startRanks = bwt.getFullOcc(range.getForwardStart() - 1);
+    
+    // And the last? If endOffset() is 0, this will be 1 character later than
+    // the call for startRanks, which is what we want. TODO: do I need to knock
+    // 1 off all of these?
+    AlphaCount64 endRanks = bwt.getFullOcc(range.getForwardStart() + 
+        range.getEndOffset());
+        
+    // Get the number of suffixes that had '$' (end of text) next. TODO: should
+    // this be '\0' instead?
+    range.setReverseStart(range.getReverseStart() + 
+        (endRanks.get('$') - startRanks.get('$')));
+        
+    for(size_t base = 0; base < NUM_BASES; base++) {
+        // For each base in alphabetical order by reverse complement
+        
+        // Work out the length of the interval this base gets.
+        size_t intervalLength = endRanks.get(BASES[base]) - 
+            startRanks.get(BASES[base]);
+        
+        if(BASES[base] == c) {
+            // This is the base we're looking for. Finish up and break out of
+            // the loop.
+            
+            // Range reverse start is already set.
+            
+            // Set the range forward start.
+            range.setForwardStart(bwt.getPC(c) + startRanks.get(c));
+            
+            // Set the range length.
+            range.setEndOffset((int64_t)intervalLength - 1);
+            
+            // Now we've put together the range.
+            break;
+            
+        } else {
+            // This is not the base we're looking for. Budge the reverse strand
+            // interval over by the length of the interval, to account for the
+            // bit this base took up.
+            range.setReverseStart(range.getReverseStart() + intervalLength);
+        }
+    }
+    
+    if(!backward) {
+        // Flip the result since we were working on the opposite strand.
+        range.flipInPlace();
+    }
+    
+}
    
 FMDPosition FMDIndex::extend(FMDPosition range, char c, bool backward) const {
     // Extend the search with this character.

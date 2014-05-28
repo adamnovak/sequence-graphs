@@ -19,8 +19,9 @@ LDLIBS += ../libsuffixtools/libsuffixtools.a -lboost_filesystem -lboost_system
 
 LDFLAGS += -L../libsuffixtools
 
-# We need to link against cppunit when we run our tests.
-TEST_LIBS = -lcppunit
+# We need to link against cppunit when we run our tests. And also the libs that
+# our libs need.
+TEST_LIBS = -lcppunit -lpthread -lz
 
 CXXFLAGS += -O3 -fPIC -g -pg -I../deps -I../libsuffixtools
 

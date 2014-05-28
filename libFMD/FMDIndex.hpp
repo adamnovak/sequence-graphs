@@ -111,10 +111,16 @@ public:
     FMDPosition getCharPosition(char c) const;
      
     /**
-     * Extend a search by a character, either backward or forward. Ranges are in
-     * BWT coordinates.
+     * Extend a search by a character, either backward or forward.
      */
     FMDPosition extend(FMDPosition range, char c, bool backward) const;
+    
+    /**
+     * Extend a search by a character, either backward or forward, in an
+     * optimized way. Modifies the range to be extended, replacing it with the
+     * extended version.
+     */
+    void extendFast(FMDPosition& range, char c, bool backward) const;
     
     /**
      * Select all the occurrences of the given pattern, using FMD backwards

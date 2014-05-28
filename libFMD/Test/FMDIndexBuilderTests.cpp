@@ -16,7 +16,7 @@
 CPPUNIT_TEST_SUITE_REGISTRATION( FMDIndexBuilderTests );
 
 // Define constants
-const std::string FMDIndexBuilderTests::filename = "test/haplotypes.fa";
+const std::string FMDIndexBuilderTests::filename = "Test/haplotypes.fa";
 
 void FMDIndexBuilderTests::setUp() {
     // Set up a temporary directory to put the index in.
@@ -41,5 +41,5 @@ void FMDIndexBuilderTests::testBuild() {
     builder.add(filename);
     
     // Finish the index.
-    builder.close();
+    delete builder.build();
 }

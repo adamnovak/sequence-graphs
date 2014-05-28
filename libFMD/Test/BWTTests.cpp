@@ -9,7 +9,7 @@
 CPPUNIT_TEST_SUITE_REGISTRATION( BWTTests );
 
 // Define constants
-const std::string BWTTests::filename = "test/haplotypes.fa";
+const std::string BWTTests::filename = "Test/haplotypes.fa";
 
 void BWTTests::setUp() {
 }

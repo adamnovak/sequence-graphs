@@ -2,6 +2,8 @@
 #define FMDPOSITION_HPP
 
 #include <iostream>
+#include <algorithm>
+#include <utility>
 
 #include "RangeVector.hpp"
 
@@ -79,6 +81,14 @@ public:
      * forward interval and visa versa.
      */
     FMDPosition flip() const;
+    
+    /**
+     * Flip the FMDPosition around in place, modifying it so the reverse
+     * complement interval is the forward interval and visa versa.
+     */
+    inline void flipInPlace() {
+        std::swap(forward_start, reverse_start);
+    }
 
     /**
      * Are two FMDPositions equal?
@@ -88,8 +98,7 @@ public:
     /**
      * Is an FMDPosition empty?
      */
-    inline bool isEmpty() const
-    {
+    inline bool isEmpty() const {
         return end_offset < 0;
     }
 

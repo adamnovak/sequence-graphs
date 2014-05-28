@@ -168,8 +168,8 @@ bool FMDIndexIterator::recurse(size_t baseNumber) {
     else {
         // Work out what we would select if we extended forwards with this
         // letter (i.e. appended it to the suffix).
-        extension = parent.extend(stack.back().first, 
-            ALPHABETICAL_BASES[baseNumber], false);
+        extension = stack.back().first;
+        parent.extendFast(extension, ALPHABETICAL_BASES[baseNumber], false);
     }
 
 
@@ -216,13 +216,15 @@ bool FMDIndexIterator::tryRecurseToDepth(size_t baseNumber) {
                 // by end of text and don't show up in an extension with any
                 // base), we have to stop so that we yield them. Those positions
                 // will be the first ones in our range if they exist.
+                
+                // TODO: replace with asking the BWT about the stop character
 
                 // See what we would get if we extended. TODO: Can we show that
                 // this will always work? It seems to work when there are none
                 // of the first base, and should always work when there is some
                 // of the first base, but I'm not sure it won't break.
-                FMDPosition extension = parent.extend(stack.back().first, 
-                ALPHABETICAL_BASES[0], false);
+                FMDPosition extension = stack.back().first;
+                parent.extendFast(extension, ALPHABETICAL_BASES[0], false);
 
                 if(extension.getForwardStart() != 
                     stack.back().first.getForwardStart()) {

@@ -18,7 +18,7 @@
 CPPUNIT_TEST_SUITE_REGISTRATION( FMDIndexTests );
 
 // Define constants
-const std::string FMDIndexTests::filename = "test/haplotypes.fa";
+const std::string FMDIndexTests::filename = "Test/haplotypes.fa";
 
 void FMDIndexTests::setUp() {
     // We ened a built index as a fixture.
@@ -33,7 +33,7 @@ void FMDIndexTests::setUp() {
     builder.add(filename);
     
     // Finish the index.
-    builder.close();
+    delete builder.build();
     
 }
 
