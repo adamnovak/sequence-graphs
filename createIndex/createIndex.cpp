@@ -762,15 +762,16 @@ makeLevelIndex(
         }
     }
     
-    // Set a bit after the end of the last range.
-    encoder.addBit(index.getTotalLength());
+    // Set a bit after the end of the last range in the BWT.
+    encoder.addBit(index.getBWTLength());
     
-    // Finish the vector encoder into a vector of the right length.
-    // This should always end in a 1!
-    // Make sure to flush first.
+    // Make sure to flush the encoder so it finishes encoding.
     encoder.flush();
+    
+    // Finish the vector encoder into a vector of the right length (i.e. the
+    // length of the BWT). This should always end in a 1! 
     RangeVector* bitVector = new RangeVector(encoder,
-        index.getTotalLength() + 1);
+        index.getBWTLength() + 1);
     
     if(dumpFile != NULL) {
         // We need to add in the edges that connect merged positions together.
