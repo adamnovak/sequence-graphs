@@ -1,10 +1,11 @@
 package edu.ucsc.genome
 import scala.collection.immutable.HashMap
 import org.ga4gh.{FMDUtil, RangeVector, RangeVectorIterator, FMDIndex, Mapping}
-import org.apache.avro.specific.{SpecificDatumReader, SpecificRecord}
-import org.apache.avro.file.DataFileReader
 import scala.collection.JavaConversions._
 import java.io.File
+import java.nio.file._
+import java.nio.{ByteBuffer, ByteOrder}
+import java.nio.channels.FileChannel
 
 /**
  * Represents a Reference Structure: a phased or unphased sequence graph, with a
@@ -147,6 +148,60 @@ class StringReferenceStructure(index: FMDIndex) extends ReferenceStructure {
 }
 
 /**
+ * Represents an array of Side objects that live in an on-disk file, as written
+ * by createIndex (on an x86_64 system). The file format is a series of little-
+ * endian 8 byte records, where the low bit represents the face (LEFT or RIGHT),
+ * and the high 63 bits represent the ID. Unfortunately, this means in practice
+ * we only get 63 bits of ID storage instead of 64.
+ *
+ */
+class SideArray(filename: String) {
+    // Open the file for random access.
+    val file = FileChannel.open(Paths.get(filename), StandardOpenOption.READ)
+    
+    /**
+     * Get the number of items in the array. This is just how many 8-byte
+     * records fit in the file.
+     */
+    def length = file.size / 8
+    
+    /**
+     * Load the record at the given index and return it as a Side.
+     */
+    def apply(index: Long): Side = {
+        // Make a buffer to read into
+        val buffer = ByteBuffer.allocate(8)
+        
+        // Pop it into little endian mode
+        buffer.order(ByteOrder.LITTLE_ENDIAN)
+        
+        // Seek to the right place
+        file.position(index * 8)
+        
+        // Read the bytes
+        file.read(buffer)
+        
+        // Rewind to start of buffer
+        buffer.flip
+        
+        // Grab the record as the first long in the buffer.
+        val record = buffer.getLong
+        
+        // Unpack the high 63 bits as the ID of the Side
+        val coordinate = record >> 1
+        // And the low bit as the face        
+        val face = record & 1 match {
+            case 0 => Face.LEFT
+            case 1 => Face.RIGHT
+        }
+        
+        // Make and return the Side
+        new Side(coordinate, face)
+        
+    }
+}
+
+/**
  * A ReferenceStructure that has been built by the createIndex program and
  * loaded form disk. Internally keeps track of its bit vector of ranges and
  * array of Sides to which ranges map things.
@@ -176,22 +231,8 @@ class MergedReferenceStructure(index: FMDIndex, directory: String)
         toReturn
     }
     
-    // Load the array of Sides that correspond to the ranges
-    val sideArray: Array[Side] = {
-        // We're loading a plain Avro file (no Parquet). See <http://avro.apache
-        // .org/docs/current/gettingstartedjava.html#Deserializing>
-    
-        // Make a DatumReader because Avro thinks we might want to not have one
-        // sometimes.
-        val datumReader = new SpecificDatumReader[Side](classOf[Side])
-        
-        // Make a file reader to read the file with the datum reader.
-        val fileReader = new DataFileReader[Side](
-            new File(directory + "/mappings.avro"), datumReader)
-        
-        // Get an iterator over the file, and turn it into an array.
-        fileReader.iterator.toArray
-    }
+    // Open (and wrap) the array of Sides that correspond to the ranges
+    val sideArray = new SideArray(directory + "/mappings.bin")
         
     // We map using the range-based mapping mode on the index.
     def map(pattern: String, face: Face): Seq[Option[Side]] = {
