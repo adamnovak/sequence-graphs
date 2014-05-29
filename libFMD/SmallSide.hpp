@@ -15,7 +15,7 @@ public:
      * Make a new SmallSide for the given coordinate (63 bits) and face (1 bit).
      */
     inline SmallSide(size_t coordinate, bool face): 
-        bits(coordinate << 1 + face) {
+        bits((coordinate << 1) | face) {
         
         // Nothing to do. Already packed coordinate and face into the same
         // field.
