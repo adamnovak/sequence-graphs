@@ -9,7 +9,7 @@ SWIG_OBJS=swigbindings_wrap.o
     
 # What do we need for our test runner binary?
 TEST_OBJS=Test/TestRunner.o Test/BWTTests.o Test/FMDIndexBuilderTests.o \
-    Test/FMDIndexTests.o
+    Test/FMDIndexTests.o Test/SmallSideTests.o
 
 # What projects do we depend on? We have rules for each of these.
 DEPS=libsuffixtools
