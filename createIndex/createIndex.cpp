@@ -206,7 +206,7 @@ mergeNonsymmetric(
     // To construct the non-symmetric merged graph with p context:
     // Traverse the suffix tree down to depth p + 1
     // Make the end iterator once.
-    FMDIndex::iterator end = index.end(contextLength)
+    FMDIndex::iterator end = index.end(contextLength);
     for(FMDIndex::iterator i = index.begin(contextLength); i != end; ++i) {
         // For each pair of suffix and position in the suffix tree
         
