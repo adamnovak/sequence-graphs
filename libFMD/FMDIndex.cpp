@@ -175,8 +175,7 @@ void FMDIndex::extendFast(FMDPosition& range, char c, bool backward) const {
     AlphaCount64 startRanks = bwt.getFullOcc(range.getForwardStart() - 1);
     
     // And the last? If endOffset() is 0, this will be 1 character later than
-    // the call for startRanks, which is what we want. TODO: do I need to knock
-    // 1 off all of these?
+    // the call for startRanks, which is what we want.
     AlphaCount64 endRanks = bwt.getFullOcc(range.getForwardStart() + 
         range.getEndOffset());
         

@@ -205,8 +205,9 @@ mergeNonsymmetric(
     
     // To construct the non-symmetric merged graph with p context:
     // Traverse the suffix tree down to depth p + 1
-    for(FMDIndex::iterator i = index.begin(contextLength); 
-        i != index.end(contextLength); ++i) {
+    // Make the end iterator once.
+    FMDIndex::iterator end = index.end(contextLength)
+    for(FMDIndex::iterator i = index.begin(contextLength); i != end; ++i) {
         // For each pair of suffix and position in the suffix tree
         
         // Unpack the iterator into pattern and FMDPosition at which it happens.
@@ -628,8 +629,10 @@ makeLevelIndex(
     Log::info() << "Building mapping data structure by tree traversal..." <<
         std::endl;
     
-    for(FMDIndex::iterator i = index.begin(contextLength, true); 
-        i != index.end(contextLength, true); ++i) {
+    // Make an ending iterator once, instead of on every loop.
+    FMDIndex::iterator end = index.end(contextLength, true);
+    for(FMDIndex::iterator i = index.begin(contextLength, true); i != end;
+        ++i) {
         
         // Go through all the contexts, including shortened ones before end of
         // text.

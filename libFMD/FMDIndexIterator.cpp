@@ -10,8 +10,8 @@
 
 FMDIndexIterator::FMDIndexIterator(const FMDIndex& parent, size_t depth,
     bool beEnd, bool reportDeadEnds): 
-    parent(parent), depth(depth), reportDeadEnds(reportDeadEnds), stack(),
-    pattern() {
+    parent(parent), depth(depth), isEnd(beEnd), reportDeadEnds(reportDeadEnds),
+    stack(), pattern() {
     
     // By default we start out with empty everything, which is what we should
     // have at the end.
@@ -59,27 +59,6 @@ void FMDIndexIterator::yield(std::pair<std::string, FMDPosition> value) {
     toYield = value;
 }
 
-bool FMDIndexIterator::operator==(const FMDIndexIterator& other) const {
-    return 
-        // We have the same parent addresses
-        &parent == &(other.parent) && 
-        // And go to the same depth
-        depth == other.depth && 
-        // And both report dead ends or not
-        reportDeadEnds == other.reportDeadEnds &&
-        // And are at the same depth
-        stack.size() == other.stack.size() && 
-        // And followed the same path to get there
-        std::equal(stack.begin(), stack.end(), other.stack.begin()) && 
-        // And we have the same string pattern (which the above should imply)
-        pattern == other.pattern;
-}
-
-bool FMDIndexIterator::operator!=(const FMDIndexIterator& other) const {
-    // Just use the equality check.
-    return !(*this == other);
-}
-
 void FMDIndexIterator::search() {
     // TODO: Unify with tryRecurseToDepth by making its topDepth a parameter.
 
@@ -114,6 +93,8 @@ void FMDIndexIterator::search() {
         // If we get here, we have gone all the way back up and popped and tried
         // replacing everything with no more results. That means we have
         // finished the search, and should be equal to end.
+        
+        isEnd = true;
 
     } else if(reportDeadEnds) {
         // We weren't at the right depth; we were at a node that happened to
@@ -145,6 +126,12 @@ void FMDIndexIterator::search() {
             // pop and try the next one over, which we will do on the next loop
             // iteration.
         } while(stack.size() > 0);    
+        
+        // If we get here, we have gone all the way back up and popped and tried
+        // replacing everything with no more results. That means we have
+        // finished the search, and should be equal to end.
+        
+        isEnd = true;
 
     } else {
         // We broke something.

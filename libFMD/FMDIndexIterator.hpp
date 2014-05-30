@@ -61,12 +61,32 @@ public:
     /**
      * Equality check operator.
      */
-    bool operator==(const FMDIndexIterator& other) const;
+    inline bool operator==(const FMDIndexIterator& other) const {
+        return
+            // First a quick check to optimize the case where one is end and the
+            // other isn't done.
+            isEnd == other.isEnd &&
+            // We have the same parent addresses
+            &parent == &(other.parent) && 
+            // And go to the same depth
+            depth == other.depth && 
+            // And both report dead ends or not
+            reportDeadEnds == other.reportDeadEnds &&
+            // And are at the same depth
+            stack.size() == other.stack.size() && 
+            // And followed the same path to get there
+            std::equal(stack.begin(), stack.end(), other.stack.begin()) &&
+            // We have the same string pattern
+            pattern == other.pattern;
+    }
     
     /**
      * Inquality check operator.
      */
-    bool operator!=(const FMDIndexIterator& other) const;
+    inline bool operator!=(const FMDIndexIterator& other) const {
+        // Just use the equality check.
+        return !(*this == other);
+    }
     
     // Default assignment operator is fine.
   
@@ -80,6 +100,11 @@ private:
      * How deep should this iterator go?
      */
     size_t depth;
+    
+    /**
+     * Keep track of whether we have reached the end of our search or not.
+     */
+    bool isEnd;
     
     /**
      * Should this iterator only yield things of the appropriate depth? Or
