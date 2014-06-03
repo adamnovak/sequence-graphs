@@ -592,6 +592,114 @@ void makeMergedAdjacencies(
 }
 
 /**
+ * Write the given threadSet on the contigs in the given index out as a multiple
+ * alignment. Produces a cactus2hal (.c2h) file as described in
+ * <https://github.com/benedictpaten/cactus/blob/development/hal/impl/hal.c>/
+ *
+ * Such a file looks like this.
+ * 
+ * s    'event1'   'seq1'    1
+ * a    segment1 10   10
+ * s    'event1'    'seq2'  0
+ * a    20  10  segment1    0
+ *
+ * These files describe trees of sequences, with an alignment of each child onto
+ * its parent. Each sequence has two ways of dividing it up into "segments", or
+ * blocks: one which applies for alignments mapping upwards, and one which
+ * appplies for alignments mapping downwards. 
+ * 
+ * The s lines define sequences. Sequences can be bottom or not. Each sequence
+ * is defined by an event name, a contig name/FASTA header, and a bottom-or-not
+ * flag. After each s line there are a series of a lines, which define alignment
+ * segments on that sequence.
+ * 
+ * "Bottom" alignment lines define "bottom" segments, which are mapped down;
+ * they consist only of a name, a start, and a length. Bottom sequences only
+ * have bottom segments.
+ *
+ * "Top" alignment lines define "top" segments, which have a start, a length, a
+ * name of a bottom alignment block which they are aligned to, and a flag for
+ * the relative orientation of the alignment (0 for same direction, right for
+ * different directions). Top sequences only have top segments.
+ */
+void
+writeAlignment(
+    stPinchThreadSet* threadSet, 
+    const FMDIndex& index, 
+    std::string filename) 
+{
+    
+    // Open up the file to write.
+    std::ofstream c2h(filename.c_str());
+    
+    // First, make a hacked-up consensus reference sequence to be the root of
+    // the tree. It just has all the pinch blocks in some order.
+    
+    // Write the root sequence line. It is a bottom sequence since it has bottom
+    // segments.
+    c2h << "s\t'rootEvent'\t'rootSeq'\t1" << std::endl;
+    
+    // Keep track of the total root sequence space already used
+    size_t nextBlockStart = 0;
+    
+    // Make an iterator over the blocks in the threadset
+    stPinchThreadSetBlockIt blockIterator = stPinchThreadSet_getBlockIt(
+        threadSet);
+    // And a pointer to hold its result.
+    stPinchBlock* block;
+    while((block = stPinchThreadSetBlockIt_getNext(&blockIterator)) != NULL) {
+        // For each block, put a bottom segment. Just name the segment after the
+        // block's address.
+        c2h << "a\t" << block << "\t" << nextBlockStart << "\t" << 
+            (nextBlockStart += stPinchBlock_getLength(block)) << std::endl;
+            
+        // Already advanced nextBlockStart.
+    }
+    
+    
+    stPinchThreadSetIt threadIterator = stPinchThreadSet_getIt(threadSet);
+    stPinchThread* thread;
+    while((thread = stPinchThreadSetIt_getNext(&threadIterator)) != NULL) {
+        // For each thread
+        
+        // Look up what input contig string name it came from and make a
+        // sequence named after that.
+        std::string contigName = index.getContigName(
+            stPinchThread_getName(thread));
+        
+        // The sequence is a top sequence, since it is only connected up.
+        c2h << "s\t'" << contigName << "-event'\t'" << contigName << "'\t1" <<
+            std::endl;
+        
+        // Go through all its pinch segments in order. There's no iterator so we
+        // have to keep looking 3'
+        
+        // Get the first segment in the thread.
+        stPinchSegment* segment = stPinchThread_getFirst(thread);
+        while(segment != NULL) {
+            
+            if(stPinchSegment_getBlock(segment) != NULL) {
+                // It actually aligned
+            
+                // Write a top segment mapping to the segment named after the
+                // address of the block this segment belongs to.
+                c2h << "a\t" << stPinchSegment_getStart(segment) << "\t" << 
+                    stPinchSegment_getLength(segment) << "\t" << 
+                    stPinchSegment_getBlock(segment) << "\t" << 
+                    stPinchSegment_getBlockOrientation(segment) << std::endl;
+            }
+            
+            // Jump to the next 3' segment. This needs to return NULL if we go
+            // off the end.
+            segment = stPinchSegment_get3Prime(segment);
+        }
+    }
+    
+    // Close up the finished file
+    c2h.close();
+}
+
+/**
  * Make the range vector and list of matching Sides for the hierarchy level
  * implied by the given thread set in the given index. Gets IDs for created
  * positions from the given source.
@@ -1022,6 +1130,8 @@ main(
         ("quiet", "Don't print every context")
         ("noMerge", "Don't compute merged level, only make lowest-level index")
         ("scan", "Make merged mapping bit vector by scanning BWT")
+        ("alignment", boost::program_options::value<std::string>(), 
+            "File to save .c2h-format alignment in")
         ("context", boost::program_options::value<unsigned int>()
             ->default_value(3), 
             "Set the context length to merge on")
@@ -1172,6 +1282,13 @@ main(
         *dumpFile << "style=filled;" << std::endl;
         *dumpFile << "color=lightgrey;" << std::endl;
         *dumpFile << "label=\"Level 1\";" << std::endl;
+    }
+    
+    if(options.count("alignment")) {
+        // Save the alignment defined by the pinched pinch graph to the file the
+        // user specified.
+        writeAlignment(threadSet, index,
+            options["alignment"].as<std::string>());
     }
     
     // Index it so we have a bit vector and SmallSides to write out.
