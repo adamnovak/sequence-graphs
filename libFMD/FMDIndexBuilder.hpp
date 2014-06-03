@@ -60,7 +60,7 @@ class FMDIndexBuilder {
         std::ofstream tempFasta;
         
         /**
-         * Keep around a file to save the contig names and lengths in.
+         * Keep around a file to save the contig names, starts and lengths in.
          */
         std::ofstream contigFile;
         

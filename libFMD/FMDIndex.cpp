@@ -9,13 +9,13 @@
 #include "Log.hpp"
 
 FMDIndex::FMDIndex(std::string basename, SuffixArray* fullSuffixArray): 
-    names(), lengths(), cumulativeLengths(), bwt(basename + ".bwt"),
+    names(), starts(), lengths(), cumulativeLengths(), bwt(basename + ".bwt"),
     suffixArray(basename + ".ssa"), fullSuffixArray(fullSuffixArray) {
 
     // We already loaded the index itself in the initializer. Go load the
     // length/order metadata.
     
-    // Open the contig name/length file for reading.
+    // Open the contig name/start/length file for reading.
     std::ifstream contigFile((basename + ".chrom.sizes").c_str());
     
     // Keep a cumulative length sum
@@ -26,18 +26,28 @@ FMDIndex::FMDIndex(std::string basename, SuffixArray* fullSuffixArray):
     while(std::getline(contigFile, line)) {
         // For each <contig>\t<length> pair...
         
-        // Find the \t
-        size_t separator = line.find('\t');
+        // Find the \t separating the name field from the length
+        size_t tab2 = line.rfind('\t');
         
-        // Split into name and length
-        std::string contigName = line.substr(0, separator - 1);
-        std::string contigLength = line.substr(separator + 1, line.size() - 1);
+        // Find the \t dividing the start position from the sequence name.
+        size_t tab1 = line.rfind('\t', tab2 - 1);
+        
+        // Split into name, start, and length
+        std::string contigName = line.substr(0, tab1);
+        std::string contigStart = line.substr(tab1 + 1, tab2);
+        std::string contigLength = line.substr(tab2 + 1, line.size() - 1);
+        
+        // Parse the start
+        long long int startNumber = atoll(contigStart.c_str());
         
         // Parse the length
         long long int lengthNumber = atoll(contigLength.c_str());
         
         // Add it to the vector of names in number order.
         names.push_back(contigName);
+        
+        // And the vector of starts in number order.
+        starts.push_back(startNumber);
         
         // And the vector of sizes in number order
         lengths.push_back(lengthNumber);
@@ -112,6 +122,11 @@ size_t FMDIndex::getNumberOfContigs() const {
 const std::string& FMDIndex::getContigName(size_t index) const {
     // Get the name of that contig.
     return names[index];
+}
+
+size_t FMDIndex::getContigStart(size_t index) const {
+    // Get the start of that contig.
+    return starts[index];
 }
 
 size_t FMDIndex::getContigLength(size_t index) const {

@@ -86,9 +86,18 @@ public:
     size_t getNumberOfContigs() const;
     
     /**
-     * Get the name of the contig at the given index.
+     * Get the name of the contig at the given index. This is the sequence name
+     * from the FASTA header that the sequence which contained the contig
+     * originally had, for an index made with FMDIndexBuilder.
      */
     const std::string& getContigName(size_t index) const;
+    
+    /**
+     * Get the start position of the contig at the given index. This is the
+     * start in the original FASTA sequence from which the contig was obtained,
+     * 0-based, for an index made with FMDIndexBuilder.
+     */
+    size_t getContigStart(size_t index) const;
     
     /**
      * Get the length of the contig at the given index.
@@ -227,9 +236,14 @@ public:
 protected:
     
     /**
-     * Holds the names of all the contigs.
+     * Holds the sequence names of all the contigs.
      */
     std::vector<std::string> names;
+    
+    /**
+     * Holds the starts of all the contigs, in the same order.
+     */
+    std::vector<size_t> starts;
     
     /**
      * Holds the lengths of all the contigs, in the same order.

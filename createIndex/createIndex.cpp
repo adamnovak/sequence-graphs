@@ -656,20 +656,32 @@ writeAlignment(
         // Already advanced nextBlockStart.
     }
     
+    // Keep track of the original source sequence
+    std::string sourceSequence;
     
-    stPinchThreadSetIt threadIterator = stPinchThreadSet_getIt(threadSet);
-    stPinchThread* thread;
-    while((thread = stPinchThreadSetIt_getNext(&threadIterator)) != NULL) {
-        // For each thread
+    // Go through contigs in order. The index spec requires them to be grouped
+    // by original source sequence.
+    for(size_t contig = 0; contig < index.getNumberOfContigs(); contig++) {
+        // Grab the sequence name that the contig is on
+        std::string contigName = index.getContigName(contig) ;
         
-        // Look up what input contig string name it came from and make a
-        // sequence named after that.
-        std::string contigName = index.getContigName(
-            stPinchThread_getName(thread));
+        if(contigName != sourceSequence || contig == 0) {
+            // This is a new sequence
+            
+            // Start a new sequence with a sequence line. The sequence is a top
+            // sequence, since it is only connected up.
+            c2h << "s\t'event" << contig << "'\t'" << contigName << "'\t1" <<
+                std::endl;
+            
+            // Remember that we are on this sequence
+            sourceSequence = contigName;
+        }
         
-        // The sequence is a top sequence, since it is only connected up.
-        c2h << "s\t'" << contigName << "-event'\t'" << contigName << "'\t1" <<
-            std::endl;
+        // Regardless of whether we changed sequence or not, we need an
+        // alignment segment for every segment in this thread.
+        
+        // So first get the thread by name.
+        stPinchThread* thread = stPinchThreadSet_getThread(threadSet, contig);
         
         // Go through all its pinch segments in order. There's no iterator so we
         // have to keep looking 3'
@@ -693,6 +705,7 @@ writeAlignment(
             // off the end.
             segment = stPinchSegment_get3Prime(segment);
         }
+        
     }
     
     // Close up the finished file

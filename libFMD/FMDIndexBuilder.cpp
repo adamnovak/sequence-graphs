@@ -95,8 +95,10 @@ void FMDIndexBuilder::add(const std::string& filename) {
                         std::endl;
                     tempFasta << run << std::endl;
                     
-                    // And the contig file
-                    contigFile << name << "-" << runStart << "\t" <<
+                    // And the contig file (where we store FASTA record name,
+                    // start, an length for each contig), under the constraint
+                    // that the entries be grouped by FASTA record.
+                    contigFile << name << "\t" << runStart << "\t" <<
                         (i - runStart) << std::endl;
                     
                     // And the reverse strand    
