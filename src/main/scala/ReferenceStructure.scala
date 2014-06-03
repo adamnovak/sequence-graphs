@@ -1,5 +1,6 @@
 package edu.ucsc.genome
 import scala.collection.immutable.HashMap
+import scala.collection.mutable.{ArrayBuilder, ArrayBuffer}
 import org.ga4gh.{FMDUtil, RangeVector, RangeVectorIterator, FMDIndex, Mapping}
 import scala.collection.JavaConversions._
 import java.io.File
@@ -115,11 +116,12 @@ class StringReferenceStructure(index: FMDIndex) extends ReferenceStructure {
                 // Get the MappingVector
                 val mappings = getIndex.map(pattern)
                 
-                // Make a Seq of all the mappings
-                var mappingSeq: Seq[Mapping] = Seq()
+                // Make an ArrayBuffer of all the mappings, to which we can
+                // efficiently append
+                var mappingSeq: ArrayBuffer[Mapping] = new ArrayBuffer()
                 
                 for(i <- 0L until mappings.size()) {
-                    mappingSeq = mappingSeq :+ mappings.get(i.toInt)
+                    mappingSeq += mappings.get(i.toInt)
                 }
                 
                 // Grab the Sides that the mappings correspond to, or None.
@@ -247,15 +249,18 @@ class MergedReferenceStructure(index: FMDIndex, directory: String)
                 // SWIG- wrapped IntVector.
                 val ranges = getIndex.map(rangeVector, pattern)
                 
-                // Make a Seq of all the mappings
-                var rangeSeq: Seq[Long] = Seq()
+                // Make an ArrayBuilder of all the mappings (which are Longs).
+                // We use an ArrayBuilder instead of an ArrayBuffer since it's
+                // better for primitive things like Longs. See
+                // <http://stackoverflow.com/a/15839802/402891>
+                val rangeSeq = new ArrayBuilder.ofLong
                 
                 for(i <- 0L until ranges.size()) {
-                    rangeSeq = rangeSeq :+ ranges.get(i.toInt)
+                    rangeSeq += ranges.get(i.toInt)
                 }
                 
-                // Convert to Sides and return.
-                rangeSeq.map {
+                // Convert to Sides in an Array and return.
+                rangeSeq.result.map {
                     // A range number of -1 means it didn't map 
                     case -1 => None
                     // Otherwise go get the Side for the range it mapped to (or

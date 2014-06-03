@@ -10,9 +10,11 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.graphx
 import org.apache.spark.graphx._
 
+import org.biojava3.core.sequence.io.FastaReaderHelper
+
 import edu.ucsc.genome._
 
-import java.io.File
+import java.io.{File, FileInputStream}
 import java.nio.file.Paths
 
 // We want to be able to loop over Java iterators: load a bunch of conversions.
@@ -45,8 +47,12 @@ object MapToIndex {
             val index = trailArg[String](required = true,
                 descr = "index path to load")
                 
-            val pattern = trailArg[String](required = true, 
+            // Pattern can be a string or a file, but one is needed.
+            val pattern = opt[String](
                 descr = "string to map")
+            val fasta = opt[String](
+                descr = "single-record FASTA file to map")
+            requireOne(pattern, fasta)
             
             val repeat = opt[Int](noshort = true, default=Some(1),
                 descr = "number of times to repeat the mapping")
@@ -71,7 +77,15 @@ object MapToIndex {
         val indexPath = opts.index.get.get
         
         // And the string to map
-        val pattern = opts.pattern.get.get 
+        val pattern = opts.pattern.get match {
+            case Some(pattern) => pattern
+            case None => 
+                // We need to load patternFile instead.
+                val records = FastaReaderHelper.readFastaDNASequence(
+                    new FileInputStream(opts.fasta.get.get))
+                // Get the first entry's value, as a string.
+                records.entrySet.iterator.next.getValue.getSequenceAsString
+        } 
 
         // Make the ReferenceHierarchy from the index we built
         val hierarchy = new ReferenceHierarchy(indexPath)
