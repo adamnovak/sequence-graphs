@@ -8,6 +8,8 @@
 #include <utility>
 #include <ctime>
 #include <csignal>
+// Ought to be <cstdint>, but that's C++11
+#include <stdint.h> 
 #include <sys/resource.h>
 
 
@@ -599,9 +601,9 @@ void makeMergedAdjacencies(
  * Such a file looks like this.
  * 
  * s    'event1'   'seq1'    1
- * a    segment1 10   10
+ * a    1 10   10
  * s    'event1'    'seq2'  0
- * a    20  10  segment1    0
+ * a    20  10  1    0
  *
  * These files describe trees of sequences, with an alignment of each child onto
  * its parent. Each sequence has two ways of dividing it up into "segments", or
@@ -614,13 +616,19 @@ void makeMergedAdjacencies(
  * segments on that sequence.
  * 
  * "Bottom" alignment lines define "bottom" segments, which are mapped down;
- * they consist only of a name, a start, and a length. Bottom sequences only
- * have bottom segments.
+ * they consist only of a name (really a number), a start, and a length. Bottom
+ * sequences only have bottom segments.
  *
  * "Top" alignment lines define "top" segments, which have a start, a length, a
- * name of a bottom alignment block which they are aligned to, and a flag for
- * the relative orientation of the alignment (0 for same direction, right for
- * different directions). Top sequences only have top segments.
+ * name (which is numerical) of a bottom alignment block which they are aligned
+ * to, and a flag for the relative orientation of the alignment (0 for same
+ * direction, right for different directions). If the segment is an insertion
+ * (i.e. unaligned) it has only a start and a length. Top sequences only have
+ * top segments.
+ *
+ * All segments in a sequence are sorted by position. Each sequence appears only
+ * once. Every base in a sequence is part of some segment. All positions are
+ * 0-based. Ancestors must come before descendants.
  */
 void
 writeAlignment(
@@ -637,7 +645,7 @@ writeAlignment(
     
     // Write the root sequence line. It is a bottom sequence since it has bottom
     // segments.
-    c2h << "s\t'rootEvent'\t'rootSeq'\t1" << std::endl;
+    c2h << "s\t'rootSeq'\t'rootSeq'\t1" << std::endl;
     
     // Keep track of the total root sequence space already used
     size_t nextBlockStart = 0;
@@ -649,11 +657,13 @@ writeAlignment(
     stPinchBlock* block;
     while((block = stPinchThreadSetBlockIt_getNext(&blockIterator)) != NULL) {
         // For each block, put a bottom segment. Just name the segment after the
-        // block's address.
-        c2h << "a\t" << block << "\t" << nextBlockStart << "\t" << 
-            (nextBlockStart += stPinchBlock_getLength(block)) << std::endl;
+        // block's address. We need block name (number), start, and length.
+        c2h << "a\t" << (uintptr_t)block << "\t" << nextBlockStart <<
+            "\t" << stPinchBlock_getLength(block) <<
+            std::endl;
             
-        // Already advanced nextBlockStart.
+        // Advance nextBlockStart.
+        nextBlockStart += stPinchBlock_getLength(block);
     }
     
     // Keep track of the original source sequence
@@ -663,22 +673,40 @@ writeAlignment(
     // by original source sequence.
     for(size_t contig = 0; contig < index.getNumberOfContigs(); contig++) {
         // Grab the sequence name that the contig is on
-        std::string contigName = index.getContigName(contig) ;
+        std::string contigName = index.getContigName(contig);
         
         if(contigName != sourceSequence || contig == 0) {
             // This is a new sequence
             
             // Start a new sequence with a sequence line. The sequence is a top
             // sequence, since it is only connected up.
-            c2h << "s\t'event" << contig << "'\t'" << contigName << "'\t1" <<
+            c2h << "s\t'" << contigName << "'\t'" << contigName << "'\t0" <<
                 std::endl;
             
             // Remember that we are on this sequence
             sourceSequence = contigName;
+        } else {
+            // This is the same sequence as before, but we need an unaligned
+            // segment to cover the distance from the last contig to the start
+            // of this one.
+            
+            // What's 1 base after the end of the last contig? Leave as 0-based.
+            size_t prevContigEnd = index.getContigStart(contig - 1) + 
+                index.getContigLength(contig - 1);
+            
+            // Unaligned top segments are "a <start> <length>" only. Leave as
+            // 0-based.
+            c2h << "a\t" << prevContigEnd << "\t" << 
+                index.getContigStart(contig) - prevContigEnd << std::endl;
+            
         }
         
         // Regardless of whether we changed sequence or not, we need an
         // alignment segment for every segment in this thread.
+        
+        // Each segment has to account for the offset of the contig on the
+        // sequence.
+        size_t contigStart = index.getContigStart(contig);
         
         // So first get the thread by name.
         stPinchThread* thread = stPinchThreadSet_getThread(threadSet, contig);
@@ -690,15 +718,24 @@ writeAlignment(
         stPinchSegment* segment = stPinchThread_getFirst(thread);
         while(segment != NULL) {
             
+            // Start where the next segment starts. Convert from 1-based pinch
+            // segments to 0-based HAL.
+            size_t segmentStart = contigStart +
+                stPinchSegment_getStart(segment) - 1;
+            
             if(stPinchSegment_getBlock(segment) != NULL) {
                 // It actually aligned
             
                 // Write a top segment mapping to the segment named after the
                 // address of the block this segment belongs to.
-                c2h << "a\t" << stPinchSegment_getStart(segment) << "\t" << 
+                c2h << "a\t" << segmentStart << "\t" << 
                     stPinchSegment_getLength(segment) << "\t" << 
-                    stPinchSegment_getBlock(segment) << "\t" << 
+                    (uintptr_t)stPinchSegment_getBlock(segment) << "\t" << 
                     stPinchSegment_getBlockOrientation(segment) << std::endl;
+            } else {
+                // Write a segment for the unaligned sequence.
+                c2h << "a\t" << segmentStart << "\t" << 
+                    stPinchSegment_getLength(segment) << std::endl;
             }
             
             // Jump to the next 3' segment. This needs to return NULL if we go
