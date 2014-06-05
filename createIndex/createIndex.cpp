@@ -8,6 +8,7 @@
 #include <utility>
 #include <ctime>
 #include <csignal>
+#include <iterator>
 // Ought to be <cstdint>, but that's C++11
 #include <stdint.h> 
 #include <sys/resource.h>
@@ -629,8 +630,11 @@ void makeMergedAdjacencies(
  * All segments in a sequence are sorted by position. Each sequence appears only
  * once. Every base in a sequence is part of some segment. All positions are
  * 0-based. Ancestors must come before descendants.
+ *
+ * Returns the total number of bases in the made-up root node used to tie the
+ * actual sequences together.
  */
-void
+size_t
 writeAlignment(
     stPinchThreadSet* threadSet, 
     const FMDIndex& index, 
@@ -747,6 +751,71 @@ writeAlignment(
     
     // Close up the finished file
     c2h.close();
+    
+    // Return the total length of the made-up root sequence. Later we will
+    // probably need a FASTA with this many Ns in order to turn this c2h into a
+    // HAL file.
+    return nextBlockStart;
+}
+
+/**
+ * Write a FASTA file that goes with the .c2h file written by writeAlignment, so
+ * that the halAppendCactusSubtree tool can turn both into a HAL file.
+ *
+ * TODO: Drop this and just use the HAL API directly
+ */
+void
+writeAlignmentFasta(
+    std::vector<std::string> inputFastas,
+    size_t rootBases,
+    std::string filename
+) {
+
+    // Open the FASTA to write
+    std::ofstream fasta(filename.c_str());
+    
+    Log::info() << "Generating " << rootBases << 
+        " bases of root node sequence." << std::endl;
+    
+    // First we put the right number of Ns in a sequence named "rootSeq"
+    fasta << ">rootSeq" << std::endl;
+    for(size_t i = 0; i < rootBases; i++) {
+        fasta << "N";
+        if(i % 80 == 0 && i > 0) {
+            // Wrap lines at 80 characters.
+            fasta << std::endl;
+        }
+    }
+    
+    fasta << std::endl;
+    
+    for(std::vector<std::string>::iterator i = inputFastas.begin(); 
+        i != inputFastas.end(); ++i) {
+        
+        Log::info() << "Copying over " << *i << std::endl;
+        
+        // Then we just copy all the other FASTAs in order.
+        
+        // Open the input FASTA
+        std::ifstream inputFasta((*i).c_str());
+        
+        // Copy characters until end of stream. See
+        // <http://stackoverflow.com/a/4064640/402891>. Using streambuf
+        // iterators preserves newlines.
+        std::copy(std::istreambuf_iterator<char>(inputFasta),
+            std::istreambuf_iterator<char>(),
+            std::ostreambuf_iterator<char>(fasta));
+            
+        // Close up this input file and move to the next one.
+        inputFasta.close();
+        
+        // Insert a linebreak to make sure we don't mess up the next header.
+        fasta << std::endl;
+    }
+    
+    // Now we're done.
+    fasta.close();
+
 }
 
 /**
@@ -1182,6 +1251,8 @@ main(
         ("scan", "Make merged mapping bit vector by scanning BWT")
         ("alignment", boost::program_options::value<std::string>(), 
             "File to save .c2h-format alignment in")
+        ("alignmentFasta", boost::program_options::value<std::string>(), 
+            "File in which to save FASTA records for building HAL from .c2h")
         ("context", boost::program_options::value<unsigned int>()
             ->default_value(3), 
             "Set the context length to merge on")
@@ -1336,9 +1407,17 @@ main(
     
     if(options.count("alignment")) {
         // Save the alignment defined by the pinched pinch graph to the file the
-        // user specified.
-        writeAlignment(threadSet, index,
+        // user specified. Save the number of bases of root sequence that were
+        // used in the center of the star tree.
+        size_t rootBases = writeAlignment(threadSet, index,
             options["alignment"].as<std::string>());
+            
+        if(options.count("alignmentFasta")) {
+            // Also save a FASTA with the sequences necessary to generate a HAL
+            // from the above.
+            writeAlignmentFasta(fastas, rootBases,
+                options["alignmentFasta"].as<std::string>());
+        }
     }
     
     // Index it so we have a bit vector and SmallSides to write out.
