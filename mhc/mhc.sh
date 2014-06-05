@@ -13,7 +13,7 @@ do
             
         # Set their FASTA headers to something nice and clean with no special characters.
         # TODO: Support multiple sequences.
-        sed -e "s/>.*/>GI${GI_NUMBER}/" GI${GI_NUMBER}.fa
+        sed -i "s/>.*/>GI${GI_NUMBER}/" GI${GI_NUMBER}.fa
             
     fi
 done
@@ -27,7 +27,7 @@ then
         -O refmhc.fa
         
     # Set the FASTA header to something nice and clean with no special characters.
-    sed -e "s/>.*/>refmhc/" refmhc.fa
+    sed -i "s/>.*/>refmhc/" refmhc.fa
     
 fi
 
@@ -49,7 +49,7 @@ TREE="(${FASTA_SEQ_NAMES})rootSeq;"
 
 echo ${TREE}
 
-echo "Creatig HAL..."
+echo "Creating HAL..."
 
 rm -f mhc.hal
 halAppendCactusSubtree mhc.c2h mhc.c2h.fasta "${TREE}" mhc.hal
