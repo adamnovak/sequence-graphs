@@ -25,5 +25,24 @@ fi
 
 echo "Indexing..."
 
-time ../createIndex/createIndex --quiet --context 20 mhc-index *.fa
+time ../createIndex/createIndex --quiet --context 20 --alignment mhc.c2h --alignmentFasta mhc.c2h.fasta mhc-index *.fa
+
+echo "Making tree..."
+
+# Make a star tree off of rootSeq
+FASTA_SEQ_NAMES=$(cat *.fa | grep ">" | cut -f 1 -d " " | sed 's/>//' | 
+    tr '\n' ',')
+# Drop the training comma. See <http://www.cyberciti.biz/faq/bash-remove-last-
+# character-from-string-line-word/>
+FASTA_SEQ_NAMES=${FASTA_SEQ_NAMES%?}
+
+# Make the actual tree
+TREE="(${FASTA_SEQ_NAMES})rootSeq;"
+
+echo ${TREE}
+
+echo "Creatig HAL..."
+
+rm -f mhc.hal
+halAppendCactusSubtree mhc.c2h mhc.c2h.fasta "${TREE}" test.hal
     
