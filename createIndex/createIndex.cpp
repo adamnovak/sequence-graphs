@@ -762,6 +762,9 @@ writeAlignment(
  * Write a FASTA file that goes with the .c2h file written by writeAlignment, so
  * that the halAppendCactusSubtree tool can turn both into a HAL file.
  *
+ * Strips out newlines so halAppendCactusSubtree will be happy with the
+ * resulting FASTA.
+ *
  * TODO: Drop this and just use the HAL API directly
  */
 void
@@ -781,13 +784,8 @@ writeAlignmentFasta(
     fasta << ">rootSeq" << std::endl;
     for(size_t i = 0; i < rootBases; i++) {
         fasta << "N";
-        if(i % 80 == 0 && i > 0) {
-            // Wrap lines at 80 characters.
-            fasta << std::endl;
-        }
+        // Entire sequence must be on one line.
     }
-    
-    fasta << std::endl;
     
     for(std::vector<std::string>::iterator i = inputFastas.begin(); 
         i != inputFastas.end(); ++i) {
@@ -799,19 +797,31 @@ writeAlignmentFasta(
         // Open the input FASTA
         std::ifstream inputFasta((*i).c_str());
         
-        // Copy characters until end of stream. See
-        // <http://stackoverflow.com/a/4064640/402891>. Using streambuf
-        // iterators preserves newlines.
-        std::copy(std::istreambuf_iterator<char>(inputFasta),
-            std::istreambuf_iterator<char>(),
-            std::ostreambuf_iterator<char>(fasta));
+        // Read it line by line. See <http://stackoverflow.com/a/7868998/402891>
+        std::string line;
+        while(std::getline(inputFasta, line)) {
+            // For each line (without trailing newline)
+        
+            if(line.size() == 0) {
+                // Drop blank lines
+                continue;
+            }
+            
+            if(line[0] == '>') {
+                // Make sure there are newlines before and after header lines.
+                fasta << std::endl << line << std::endl;
+            } else {
+                // Don't put any newlines.
+                fasta << line;
+            }
+        }
             
         // Close up this input file and move to the next one.
         inputFasta.close();
-        
-        // Insert a linebreak to make sure we don't mess up the next header.
-        fasta << std::endl;
     }
+    
+    // Insert a linebreak at the end of the file.
+    fasta << std::endl;
     
     // Now we're done.
     fasta.close();
