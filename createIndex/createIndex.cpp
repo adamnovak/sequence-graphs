@@ -595,6 +595,84 @@ void makeMergedAdjacencies(
 }
 
 /**
+ * Given a pinch thread set and a filename, write the degree of each pinch block
+ * or segment without a block (always degree 2) to the file, one per line.
+ *
+ * TODO: Maybe restructure as one pass through all blocks, and one scan through
+ * threads ignoring any blocks? Then we could eliminate the seen set for blocks.
+ */
+void
+writeDegrees(
+    stPinchThreadSet* threadSet, 
+    std::string filename
+) {
+
+    Log::info() << "Saving pinch graph degrees to " << filename << std::endl;
+
+    // Open up the file to write.
+    std::ofstream degrees(filename.c_str());
+
+    // We're going go through each thread one segment at a time, to make sure we
+    // catch all the single segments.
+    // TODO: When we get c++11, make this an unordered_set
+    std::set<stPinchBlock*> seen;
+    
+    // Make an iterator over pinch threads
+    stPinchThreadSetIt threadIterator = stPinchThreadSet_getIt(threadSet);
+    
+    // And a pointer to hold the current thread
+    stPinchThread* thread;
+    while((thread = stPinchThreadSetIt_getNext(&threadIterator)) != NULL) {
+        // For each pinch thread
+        
+        // Go through all its pinch segments in order. There's no iterator so we
+        // have to keep looking 3'
+        
+        // Get the first segment in the thread.
+        stPinchSegment* segment = stPinchThread_getFirst(thread);
+        while(segment != NULL) {
+        
+            stPinchBlock* block;
+            if((block = stPinchSegment_getBlock(segment)) != NULL) {
+                // Look at its block if it has one
+                
+                if(seen.count(block) == 0) {
+                    // This is a new block we haven't reported the degree of
+                    // yet.
+                    
+                    // Report the degree.
+                    degrees << stPinchBlock_getDegree(block) << std::endl;
+                    
+                    // Remember we saw it.
+                    seen.insert(block);
+                }
+            } else {
+                // This is a bare segment; report degree depending on what it's
+                // attached to on each end.
+                
+                // How many neighbors do we have. TODO: track this as we scan,
+                // resulting in fewer queries.
+                int degree = (int)(stPinchSegment_get3Prime(segment) != NULL) +
+                    (int)(stPinchSegment_get5Prime(segment) != NULL);
+                    
+                degrees << degree << std::endl;
+                
+            }
+            
+            // Jump to the next 3' segment. This needs to return NULL if we go
+            // off the end.
+            segment = stPinchSegment_get3Prime(segment);
+        }
+        
+    }
+    
+    // We wrote out all the degrees
+    degrees.flush();
+    degrees.close();
+
+}
+
+/**
  * Write the given threadSet on the contigs in the given index out as a multiple
  * alignment. Produces a cactus2hal (.c2h) file as described in
  * <https://github.com/benedictpaten/cactus/blob/development/hal/impl/hal.c>/
@@ -640,6 +718,12 @@ writeAlignment(
     const FMDIndex& index, 
     std::string filename) 
 {
+
+    // We're going to lay out the segments in our root sequence with some
+    // locality. We're going to scan through all threads, and put each new block
+    // as it is encountered. So we need a set of the encountered blocks.
+    // TODO: When we get c++11, make this an unordered_set
+    std::set<stPinchBlock*> seen;
     
     // Open up the file to write.
     std::ofstream c2h(filename.c_str());
@@ -654,20 +738,48 @@ writeAlignment(
     // Keep track of the total root sequence space already used
     size_t nextBlockStart = 0;
     
-    // Make an iterator over the blocks in the threadset
-    stPinchThreadSetBlockIt blockIterator = stPinchThreadSet_getBlockIt(
-        threadSet);
-    // And a pointer to hold its result.
-    stPinchBlock* block;
-    while((block = stPinchThreadSetBlockIt_getNext(&blockIterator)) != NULL) {
-        // For each block, put a bottom segment. Just name the segment after the
-        // block's address. We need block name (number), start, and length.
-        c2h << "a\t" << (uintptr_t)block << "\t" << nextBlockStart <<
-            "\t" << stPinchBlock_getLength(block) <<
-            std::endl;
+    // Make an iterator over pinch threads
+    stPinchThreadSetIt threadIterator = stPinchThreadSet_getIt(threadSet);
+    
+    // And a pointer to hold the current thread
+    stPinchThread* thread;
+    while((thread = stPinchThreadSetIt_getNext(&threadIterator)) != NULL) {
+        // For each pinch thread
+        
+        // Go through all its pinch segments in order. There's no iterator so we
+        // have to keep looking 3'
+        
+        // Get the first segment in the thread.
+        stPinchSegment* segment = stPinchThread_getFirst(thread);
+        while(segment != NULL) {
+        
+            stPinchBlock* block;
+            if((block = stPinchSegment_getBlock(segment)) != NULL) {
+                // Look at its block if it has one
+                
+                if(seen.count(block) == 0) {
+                    // This is a new block we haven't allocated a range for yet.
+                    
+                    // For each block, put a bottom segment. Just name the
+                    // segment after the block's address. We need block name
+                    // (number), start, and length.
+                    c2h << "a\t" << (uintptr_t)block << "\t" << 
+                        nextBlockStart << "\t" << 
+                        stPinchBlock_getLength(block) << std::endl;
+                        
+                    // Advance nextBlockStart.
+                    nextBlockStart += stPinchBlock_getLength(block);
+                    
+                    // Record that we have seen this block now.
+                    seen.insert(block);
+                }
+            }
             
-        // Advance nextBlockStart.
-        nextBlockStart += stPinchBlock_getLength(block);
+            // Jump to the next 3' segment. This needs to return NULL if we go
+            // off the end.
+            segment = stPinchSegment_get3Prime(segment);
+        }
+        
     }
     
     // Keep track of the original source sequence
@@ -1263,6 +1375,8 @@ main(
             "File to save .c2h-format alignment in")
         ("alignmentFasta", boost::program_options::value<std::string>(), 
             "File in which to save FASTA records for building HAL from .c2h")
+        ("degrees", boost::program_options::value<std::string>(), 
+            "File in which to save degrees of pinch graph nodes")
         ("context", boost::program_options::value<unsigned int>()
             ->default_value(3), 
             "Set the context length to merge on")
@@ -1413,6 +1527,12 @@ main(
         *dumpFile << "style=filled;" << std::endl;
         *dumpFile << "color=lightgrey;" << std::endl;
         *dumpFile << "label=\"Level 1\";" << std::endl;
+    }
+    
+    if(options.count("degrees")) {
+        // Save a dump of pinch grpah node degrees (for both blocks and bare
+        // segments).
+        writeDegrees(threadSet, options["degrees"].as<std::string>());
     }
     
     if(options.count("alignment")) {
