@@ -975,15 +975,6 @@ makeLevelIndex(
     std::map<std::pair<size_t, size_t>, long long int>
         idReservations;
         
-    // We're going to track number of actual contexts that can map to each
-    // position ID. This is the same thing as base occurrences. TODO: Handle
-    // under-length contexts.
-    std::map<long long int, size_t> baseOccurrences;
-    
-    // We're also going to track number of unique contextLength contexts that
-    // can map to each position ID. TODO: Handle under-length contexts.
-    std::map<long long int, size_t> contextSetMembers;
-
     Log::info() << "Building mapping data structure by tree traversal..." <<
         std::endl;
     
@@ -1048,19 +1039,6 @@ makeLevelIndex(
             
             // Put a 1 at the start of its interval, and add a mapping to the
             // given ID and Side.
-            
-            // Log that we observed a full-length context that belongs in the
-            // context set of this base.
-            if(contextSetMembers.count(positionCoordinate) == 0) {
-                contextSetMembers[positionCoordinate] = 0;
-            }
-            contextSetMembers[positionCoordinate]++;
-            
-            // Log that we observed this many instances of the base
-            if(baseOccurrences.count(positionCoordinate) == 0) {
-                baseOccurrences[positionCoordinate] = 0;
-            }
-            baseOccurrences[positionCoordinate] += range.getLength();
             
             // TODO: Make edges by traversing the pinch graph.
                 
@@ -1153,23 +1131,6 @@ makeLevelIndex(
         // function.
         makeMergedAdjacencies(threadSet, idReservations, dumpFile);
     }
-    
-    // Output counts of full-length contexts mapping to each base, and
-    // occurrences of each base. Outputs as <ID>\t<number of kmers in context
-    // set>\t<number of instances>.TODO: make optional.
-    std::ofstream contextSizes("contextSizes.tsv");
-    
-    for(std::map<long long int, size_t>::iterator i = contextSetMembers.begin();
-        i != contextSetMembers.end(); ++i) {
-        
-        // For each position ID and the number of things in its context set...
-        // Output ID, context set size, and number of occurrences.
-        contextSizes << i->first << "\t" << i->second << "\t" << 
-            baseOccurrences[i->first] << std::endl;
-        
-    }
-    
-    contextSizes.close();
     
     
     // Return the bit vector and the Side vector
