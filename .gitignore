@@ -4,4 +4,13 @@ target/
 *.o
 *.so
 *.a
-
+*_wrap.cxx
+*.log
+dependencies.mk
+createIndex/createIndex
+createIndex/schemas/
+libFMD/jar/
+libFMD/java/
+libFMD/libfmd.jar
+nbproject/
+data/*
