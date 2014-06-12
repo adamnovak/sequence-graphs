@@ -5,17 +5,17 @@
 namespace CSA {
 
 NibbleVector::NibbleVector(std::ifstream& file) :
-  BitVector(file)
+  BitVectorBase(file)
 {
 }
 
 NibbleVector::NibbleVector(FILE* file) :
-  BitVector(file)
+  BitVectorBase(file)
 {
 }
 
 NibbleVector::NibbleVector(Encoder& encoder, size_t universe_size) :
-  BitVector(encoder, universe_size)
+  BitVectorBase(encoder, universe_size)
 {
 }
 
@@ -29,14 +29,14 @@ size_t
 NibbleVector::reportSize() const
 {
   size_t bytes = sizeof(*this);
-  bytes += BitVector::reportSize();
+  bytes += BitVectorBase::reportSize();
   return bytes;
 }
 
 //--------------------------------------------------------------------------
 
 NibbleVector::Iterator::Iterator(const NibbleVector& par) :
-  BitVector::Iterator(par),
+  BitVectorBase::Iterator(par),
   use_rle(false)
 {
 }

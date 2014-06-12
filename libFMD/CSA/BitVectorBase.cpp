@@ -5,7 +5,7 @@
 
 namespace CSA {
 
-BitVector::BitVector(std::ifstream& file) :
+BitVectorBase::BitVectorBase(std::ifstream& file) :
   rank_index(0), select_index(0)
 {
   this->readHeader(file);
@@ -18,7 +18,7 @@ BitVector::BitVector(std::ifstream& file) :
   this->indexForSelect();
 }
 
-BitVector::BitVector(FILE* file) :
+BitVectorBase::BitVectorBase(FILE* file) :
   rank_index(0), select_index(0)
 {
   this->readHeader(file);
@@ -31,7 +31,7 @@ BitVector::BitVector(FILE* file) :
   this->indexForSelect();
 }
 
-BitVector::BitVector(VectorEncoder& encoder, size_t universe_size) :
+BitVectorBase::BitVectorBase(VectorEncoder& encoder, size_t universe_size) :
   size(universe_size), items(encoder.items),
   block_size(encoder.block_size),
   number_of_blocks(encoder.blocks),
@@ -69,12 +69,12 @@ BitVector::BitVector(VectorEncoder& encoder, size_t universe_size) :
   this->indexForSelect();
 }
 
-BitVector::BitVector() :
+BitVectorBase::BitVectorBase() :
   array(0), samples(0), rank_index(0), select_index(0)
 {
 }
 
-BitVector::~BitVector()
+BitVectorBase::~BitVectorBase()
 {
   delete[] this->array;
   delete this->samples;
@@ -85,7 +85,7 @@ BitVector::~BitVector()
 //--------------------------------------------------------------------------
 
 void
-BitVector::writeTo(std::ofstream& file) const
+BitVectorBase::writeTo(std::ofstream& file) const
 {
   this->writeHeader(file);
   this->writeArray(file);
@@ -93,7 +93,7 @@ BitVector::writeTo(std::ofstream& file) const
 }
 
 void
-BitVector::writeTo(FILE* file) const
+BitVectorBase::writeTo(FILE* file) const
 {
   this->writeHeader(file);
   this->writeArray(file);
@@ -101,7 +101,7 @@ BitVector::writeTo(FILE* file) const
 }
 
 void
-BitVector::writeHeader(std::ofstream& file) const
+BitVectorBase::writeHeader(std::ofstream& file) const
 {
   file.write((char*)&(this->size), sizeof(this->size));
   file.write((char*)&(this->items), sizeof(this->items));
@@ -110,7 +110,7 @@ BitVector::writeHeader(std::ofstream& file) const
 }
 
 void
-BitVector::writeHeader(FILE* file) const
+BitVectorBase::writeHeader(FILE* file) const
 {
   if(file == 0) { return; }
   std::fwrite(&(this->size), sizeof(this->size), 1, file);
@@ -120,20 +120,20 @@ BitVector::writeHeader(FILE* file) const
 }
 
 void
-BitVector::writeArray(std::ofstream& file) const
+BitVectorBase::writeArray(std::ofstream& file) const
 {
   file.write((char*)(this->array), this->block_size * this->number_of_blocks * sizeof(size_t));
 }
 
 void
-BitVector::writeArray(FILE* file) const
+BitVectorBase::writeArray(FILE* file) const
 {
   if(file == 0) { return; }
   std::fwrite(this->array, this->block_size * sizeof(size_t), this->number_of_blocks, file);
 }
 
 void
-BitVector::readHeader(std::ifstream& file)
+BitVectorBase::readHeader(std::ifstream& file)
 {
   file.read((char*)&(this->size), sizeof(this->size));
   file.read((char*)&(this->items), sizeof(this->items));
@@ -142,7 +142,7 @@ BitVector::readHeader(std::ifstream& file)
 }
 
 void
-BitVector::readHeader(FILE* file)
+BitVectorBase::readHeader(FILE* file)
 {
   if(file == 0) { return; }
   if(!std::fread(&(this->size), sizeof(this->size), 1, file)) { return; }
@@ -152,7 +152,7 @@ BitVector::readHeader(FILE* file)
 }
 
 void
-BitVector::readArray(std::ifstream& file)
+BitVectorBase::readArray(std::ifstream& file)
 {
   size_t* array_buffer = new size_t[this->block_size * this->number_of_blocks];
   file.read((char*)(array_buffer), this->block_size * this->number_of_blocks * sizeof(size_t));
@@ -160,7 +160,7 @@ BitVector::readArray(std::ifstream& file)
 }
 
 void
-BitVector::readArray(FILE* file)
+BitVectorBase::readArray(FILE* file)
 {
   if(file == 0) { return; }
   size_t* array_buffer = new size_t[this->block_size * this->number_of_blocks];
@@ -171,7 +171,7 @@ BitVector::readArray(FILE* file)
 //--------------------------------------------------------------------------
 
 void
-BitVector::copyArray(VectorEncoder& encoder, bool use_directly)
+BitVectorBase::copyArray(VectorEncoder& encoder, bool use_directly)
 {
   if(use_directly && encoder.array_blocks.size() == 0)
   {
@@ -199,7 +199,7 @@ BitVector::copyArray(VectorEncoder& encoder, bool use_directly)
 //--------------------------------------------------------------------------
 
 size_t
-BitVector::reportSize() const
+BitVectorBase::reportSize() const
 {
   // We assume the reportSize() of derived classes includes any class variables of BitVector.
   size_t bytes = this->block_size * this->number_of_blocks * sizeof(size_t);
@@ -210,7 +210,7 @@ BitVector::reportSize() const
 }
 
 size_t
-BitVector::getCompressedSize() const
+BitVectorBase::getCompressedSize() const
 {
   return this->block_size * this->number_of_blocks * sizeof(size_t);
 }
@@ -218,7 +218,7 @@ BitVector::getCompressedSize() const
 //--------------------------------------------------------------------------
 
 void
-BitVector::strip()
+BitVectorBase::strip()
 {
   delete this->rank_index; this->rank_index = 0;
 }
@@ -226,11 +226,11 @@ BitVector::strip()
 //--------------------------------------------------------------------------
 
 void
-BitVector::indexForRank()
+BitVectorBase::indexForRank()
 {
   delete this->rank_index;
 
-  size_t value_samples = (this->number_of_blocks + BitVector::INDEX_RATE - 1) / BitVector::INDEX_RATE;
+  size_t value_samples = (this->number_of_blocks + BitVectorBase::INDEX_RATE - 1) / BitVectorBase::INDEX_RATE;
   this->rank_rate = (this->size + value_samples - 1) / value_samples;
   value_samples = (this->size + this->rank_rate - 1) / this->rank_rate + 1;
   WriteBuffer index_buffer(value_samples, length(this->number_of_blocks - 1));
@@ -255,11 +255,11 @@ BitVector::indexForRank()
 }
 
 void
-BitVector::indexForSelect()
+BitVectorBase::indexForSelect()
 {
   delete this->select_index;
 
-  size_t index_samples = (this->number_of_blocks + BitVector::INDEX_RATE - 1) / BitVector::INDEX_RATE;
+  size_t index_samples = (this->number_of_blocks + BitVectorBase::INDEX_RATE - 1) / BitVectorBase::INDEX_RATE;
   this->select_rate = (this->items + index_samples - 1) / index_samples;
   index_samples = (this->items + this->select_rate - 1) / this->select_rate + 1;
   WriteBuffer index_buffer(index_samples, length(this->number_of_blocks - 1));
@@ -285,19 +285,19 @@ BitVector::indexForSelect()
 
 //--------------------------------------------------------------------------
 
-BitVector::Iterator::Iterator(const BitVector& par) :
+BitVectorBase::Iterator::Iterator(const BitVectorBase& par) :
   parent(par),
   buffer(par.array, par.block_size),
   samples(*(par.samples))
 {
 }
 
-BitVector::Iterator::~Iterator()
+BitVectorBase::Iterator::~Iterator()
 {
 }
 
 size_t
-BitVector::Iterator::sampleForIndex(size_t index)
+BitVectorBase::Iterator::sampleForIndex(size_t index)
 {
   size_t low = this->parent.select_index->readItemConst(index / this->parent.select_rate);
   size_t high = this->parent.number_of_blocks - 1;
@@ -313,7 +313,7 @@ BitVector::Iterator::sampleForIndex(size_t index)
 }
 
 size_t
-BitVector::Iterator::sampleForValue(size_t value)
+BitVectorBase::Iterator::sampleForValue(size_t value)
 {
   size_t low = this->parent.rank_index->readItemConst(value / this->parent.rank_rate);
   size_t high = this->parent.number_of_blocks - 1;

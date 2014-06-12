@@ -3,7 +3,7 @@
 
 #include <fstream>
 
-#include "BitVector.hpp"
+#include "BitVectorBase.hpp"
 
 namespace CSA {
 
@@ -50,7 +50,7 @@ class NibbleEncoder : public VectorEncoder
   // FIXME reverting to gap encoding not implemented yet
 */
 
-class NibbleVector : public BitVector
+class NibbleVector : public BitVectorBase
 {
   public:
     typedef NibbleEncoder Encoder;
@@ -66,7 +66,7 @@ class NibbleVector : public BitVector
 
 //--------------------------------------------------------------------------
 
-    class Iterator : public BitVector::Iterator
+    class Iterator : public BitVectorBase::Iterator
     {
       public:
         explicit Iterator(const NibbleVector& par);
@@ -97,7 +97,7 @@ class NibbleVector : public BitVector
 
         inline void getSample(size_t sample_number)
         {
-          BitVector::Iterator::getSample(sample_number);
+          BitVectorBase::Iterator::getSample(sample_number);
           this->run = 0;
 //           this->use_rle = this->buffer.readNibble();
         }

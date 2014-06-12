@@ -22,7 +22,7 @@
 
 // Grab all the libFMD stuff.
 #include <FMDIndexBuilder.hpp>
-#include <FMDIndex.hpp>
+#include <BitVector.hpp>
 #include <FMDIndexIterator.hpp>
 #include <BitVector.hpp>
 #include <TextPosition.hpp>

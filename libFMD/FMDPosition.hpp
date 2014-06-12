@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <utility>
 
-#include "BitVector.hpp"
+#include "CSA/BitVectorBase.hpp"
 
 /**
  * Represents the state (or result) of an FMD-index search, which is two ranges

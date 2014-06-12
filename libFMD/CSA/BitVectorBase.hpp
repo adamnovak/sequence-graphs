@@ -75,16 +75,16 @@ class VectorEncoder
   A bit vector must have at least one 1-bit. This class is abstract.
 */
 
-class BitVector
+class BitVectorBase
 {
   public:
     static const size_t INDEX_RATE = 5;
 
-    explicit BitVector(std::ifstream& file);
-    explicit BitVector(FILE* file);
-    BitVector(VectorEncoder& encoder, size_t universe_size);
-    explicit BitVector(WriteBuffer& vector);
-    ~BitVector();
+    explicit BitVectorBase(std::ifstream& file);
+    explicit BitVectorBase(FILE* file);
+    BitVectorBase(VectorEncoder& encoder, size_t universe_size);
+    explicit BitVectorBase(WriteBuffer& vector);
+    ~BitVectorBase();
 
 //--------------------------------------------------------------------------
 
@@ -108,7 +108,7 @@ class BitVector
     class Iterator
     {
       public:
-        explicit Iterator(const BitVector& par);
+        explicit Iterator(const BitVectorBase& par);
         ~Iterator();
 
         inline bool hasNext() const
@@ -156,7 +156,7 @@ class BitVector
         virtual size_t countRuns() = 0;
 
       protected:
-        const BitVector& parent;
+        const BitVectorBase& parent;
 
         size_t      block;
         pair_type  sample;
@@ -243,9 +243,9 @@ class BitVector
     void copyArray(VectorEncoder& encoder, bool use_directly = false);
 private:
     // These are not allowed.
-    BitVector();
-    BitVector(const BitVector&);
-    BitVector& operator = (const BitVector&);
+    BitVectorBase();
+    BitVectorBase(const BitVectorBase&);
+    BitVectorBase& operator = (const BitVectorBase&);
 };
 
 }
