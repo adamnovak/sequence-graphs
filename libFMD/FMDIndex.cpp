@@ -485,8 +485,16 @@ std::vector<Mapping> FMDIndex::map(const std::string& query, BitVector* mask,
             // one thing in our interval.
 
             // Take the first (only) thing in the bi-interval's forward strand
-            // side.
+            // side, not accounting for the mask.
             int64_t start = location.position.getForwardStart();
+            
+            if(maskIterator != NULL) {
+                // Account for the mask. The start position of the interval may
+                // be masked out. Get the first 1 after (or at) the start,
+                // instead of the start itself. Since the interval is nonempty
+                // under the mask, we know this will exist.
+                start = maskIterator->valueAfter(start).first;
+            }
 
             // Locate it, and then report position as a (text, offset) pair.
             // This will give us the position of the first base in the pattern,
