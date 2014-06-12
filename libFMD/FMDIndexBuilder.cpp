@@ -48,7 +48,8 @@ KSEQ_INIT(int, read)
 FMDIndexBuilder::FMDIndexBuilder(const std::string& basename, int sampleRate):
     basename(basename), tempDir(make_tempdir()), 
     tempFastaName(tempDir + "/temp.fa"), tempFasta(tempFastaName.c_str()), 
-    contigFile((basename + ".chrom.sizes").c_str()), sampleRate(sampleRate) {
+    contigFile((basename + ".chrom.sizes").c_str()), genomeAssignments(),
+    sampleRate(sampleRate) {
 
     // Nothing to do, already made everything.
     
@@ -63,9 +64,14 @@ void FMDIndexBuilder::add(const std::string& filename) {
         report_error("Failed to open FASTA " + filename);
     }
     
+    // Work out what genome number this file gets. Either 0, or 1 more than the
+    // last one used.
+    size_t genomeNumber = (genomeAssignments.size() == 0) ? 0 : 
+        genomeAssignments.back() + 1;
+        
+    // Start up the parser
     int fileNumber = fileno(fasta);
-    
-    kseq_t* seq = kseq_init(fileNumber); // Start up the parser
+    kseq_t* seq = kseq_init(fileNumber); 
     while (kseq_read(seq) >= 0) { // Read sequences until we run out.
         // Stringify the sequence name
         std::string name(seq->name.s);
@@ -107,6 +113,9 @@ void FMDIndexBuilder::add(const std::string& filename) {
                     std::string reverseStrand = reverseComplement(run);
                     tempFasta << reverseStrand << std::endl;
                     
+                    // Record that this sequence belongs to this genome.
+                    genomeAssignments.push_back(genomeNumber);
+                    
                 }
                 
                 // The next run must start after here (or later).
@@ -127,9 +136,11 @@ FMDIndex* FMDIndexBuilder::build() {
     // And the contig sizes file
     contigFile.close();
     
-    // Compute what we want to save: BWT and sampled suffix array
+    // Compute what we want to save: BWT, sampled suffix array, and per-genome
+    // BitVector masks.
     std::string bwtFile = basename + ".bwt";
-    std::string ssaFile = basename + ".ssa";    
+    std::string ssaFile = basename + ".ssa";
+    std::string bitmaskFile = basename + ".msk";
 
     // Produce the index of the temp file
     // Load all the sequences into memory (again).
@@ -149,6 +160,70 @@ FMDIndex* FMDIndexBuilder::build() {
     // Delete the read table since we no lonfger need it. Keep the suffix array
     // around because the FMDIndex we return can cheat off it.
     delete readTable;
+    
+    // How many genomes are there?
+    size_t numGenomes = (genomeAssignments.size() == 0) ? 0 :
+        genomeAssignments.back() + 1;
+        
+    Log::info() << "Creating " << numGenomes << " genome bitmasks..." <<
+        std::endl;
+    
+    // Holds a bit vector encoder for each genome.
+    BitVectorEncoder** encoders = new BitVectorEncoder*[numGenomes];
+    for(size_t i = 0; i < numGenomes; i++) {
+        // Make each of the individual encoders.
+        encoders[i] = new BitVectorEncoder(32);
+    }
+    
+   
+    for(size_t i = 0; i < suffixArray->getSize(); i++) {
+        // Scan the suffix array, and make a 1 in the correct place in each bit
+        // vector for each genome.
+    
+        // For each place in the SA
+        
+        // Get the SA element which stores text and offset.
+        SAElem element = suffixArray->get(i);
+        
+        // Get the text ID
+        size_t text = element.getID();
+        
+        // Compute the contig from the text. Easy since each contig has exactly
+        // 2 texts.
+        size_t contig = text / 2;
+        
+        // Look up the genome, and set this bit in the appropriate encoder.
+        encoders[genomeAssignments[contig]]->addBit(i);
+    }
+    
+    // Open the bitmask file
+    std::ofstream bitmaskStream(bitmaskFile.c_str(), std::ios::binary);
+    
+    for(size_t i = 0; i < numGenomes; i++) {
+        // Save all the bit vectors to the bitmask file.
+        
+        // Finish encoding to an actual BitVector
+        encoders[i]->flush();
+        BitVector bitVector(*encoders[i], suffixArray->getSize() + 1);
+        
+        // Save the BitVector
+        bitVector.writeTo(bitmaskStream);
+        
+        // All the bitvectors can go in the same file. When reading them just
+        // see if there are any bytes left. TODO: This is probably true.
+        
+        // Delete the encoder, sicne we've already encoded with it.
+        delete encoders[i];
+    }
+
+    // Delete the encoders array altogether.
+    delete[] encoders;
+    
+    // Finish up the bitmask file.
+    bitmaskStream.flush();
+    bitmaskStream.close();
+    
+    Log::info() << "Re-loading BWT..." << std::endl;
     
     // Load the BWT back in (instead of re-calculating it).
     // TODO: Add ability to save a calculated BWT object with a BWTWriter.

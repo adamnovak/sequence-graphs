@@ -65,6 +65,12 @@ class FMDIndexBuilder {
         std::ofstream contigFile;
         
         /**
+         * Keep a vector mapping from contig number to the genome it belongs to.
+         * TODO: Use a better index here that also plugs into contigFile.
+         */
+        std::vector<size_t> genomeAssignments;
+        
+        /**
          * Keep track of the sample rate to use when we produce the sampled
          * suffix array (when close() is called).
          */
