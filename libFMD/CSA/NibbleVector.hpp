@@ -1,9 +1,11 @@
-#ifndef NIBBLEVECTOR_H
-#define NIBBLEVECTOR_H
+#ifndef CSA_NIBBLEVECTOR_H
+#define CSA_NIBBLEVECTOR_H
 
 #include <fstream>
 
 #include "BitVector.hpp"
+
+namespace CSA {
 
 /*
   This class is used to construct a NibbleVector.
@@ -118,4 +120,6 @@ class NibbleVector : public BitVector
     NibbleVector& operator = (const NibbleVector&);
 };
 
-#endif // NIBBLEVECTOR_H
+}
+
+#endif

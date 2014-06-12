@@ -3,6 +3,7 @@
 
 #include "BitVector.hpp"
 
+namespace CSA {
 
 BitVector::BitVector(std::ifstream& file) :
   rank_index(0), select_index(0)
@@ -413,3 +414,4 @@ VectorEncoder::setFirstBit(size_t value)
   this->current_samples = 1;
 }
 
+}

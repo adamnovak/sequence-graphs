@@ -73,7 +73,7 @@ const int TEST_ITERATIONS = 1000;
  */
 void logMemory() {
     
-    // We have to interogate /proc/self/status
+    // We have to interrogate /proc/self/status
     
     std::ifstream statusStream("/proc/self/status");
     
@@ -1134,7 +1134,7 @@ makeLevelIndex(
     
     
     // Return the bit vector and the Side vector
-    return make_pair(bitVector, mappings);
+    return std::make_pair(bitVector, mappings);
 }
 
 /**
@@ -1256,7 +1256,7 @@ makeLevelIndexScanning(
     }
     
     // Return the bit vector and the Side vector
-    return make_pair(bitVector, mappings);
+    return std::make_pair(bitVector, mappings);
 }
 
 /**

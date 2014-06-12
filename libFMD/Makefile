@@ -2,7 +2,7 @@ CXX=g++
 
 # What are our generic objects?
 OBJS=FMDIndex.o FMDIndexBuilder.o util.o FMDIndexIterator.o Mapping.o \
-	FMDPosition.o BitBuffer.o BitVector.o NibbleVector.o Log.o
+	FMDPosition.o CSA/BitBuffer.o CSA/BitVector.o CSA/NibbleVector.o Log.o
 	
 # Waht are our SWIG JNI wrapper objects?
 SWIG_OBJS=swigbindings_wrap.o

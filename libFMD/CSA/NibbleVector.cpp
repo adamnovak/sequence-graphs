@@ -2,6 +2,8 @@
 
 #include "NibbleVector.hpp"
 
+namespace CSA {
+
 NibbleVector::NibbleVector(std::ifstream& file) :
   BitVector(file)
 {
@@ -372,3 +374,4 @@ NibbleEncoder::flush()
   this->run.second = 0;
 }
 
+}

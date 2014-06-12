@@ -1,11 +1,13 @@
-#ifndef BITVECTOR_H
-#define BITVECTOR_H
+#ifndef CSA_BITVECTOR_H
+#define CSA_BITVECTOR_H
 
 #include <cstdio>
 #include <fstream>
 #include <list>
 
 #include "BitBuffer.hpp"
+
+namespace CSA {
 
 /*
   This class provides the core functionality for encoding a bit vector.
@@ -235,5 +237,6 @@ class BitVector
     BitVector& operator = (const BitVector&);
 };
 
+}
 
-#endif // BITVECTOR_H
+#endif 

@@ -1,4 +1,4 @@
-all: createIndex scala
+all: createIndex
 
 .PHONY: createIndex scala libFMD libFMD-jar libsuffixtools
 

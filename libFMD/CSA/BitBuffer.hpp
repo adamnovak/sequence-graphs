@@ -1,11 +1,13 @@
-#ifndef BITBUFFER_H
-#define BITBUFFER_H
+#ifndef CSA_BITBUFFER_H
+#define CSA_BITBUFFER_H
 
 #include <algorithm>
 #include <cstdio>
 #include <fstream>
 #include <iostream>
 #include <climits>
+
+namespace CSA {
 
 // Stuff that used to be in RLCSA's definitions.h
 
@@ -554,8 +556,9 @@ class WriteBuffer
     WriteBuffer& operator = (const WriteBuffer&);
 };
 
+}
 
 //--------------------------------------------------------------------------
 
 
-#endif // BITBUFFER_H
+#endif 
