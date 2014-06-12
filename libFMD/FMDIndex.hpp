@@ -201,7 +201,7 @@ public:
      * Returns a vector of one-based range numbers for left-mapping each base,
      * or -1 if the base did not map to a range.
      */
-    std::vector<int64_t> map(const RangeVector& ranges,
+    std::vector<int64_t> map(const BitVector& ranges,
         const std::string& query, int start = 0, int length = -1) const;
         
     /***************************************************************************
@@ -308,7 +308,7 @@ protected:
      *
      * Index must be a valid character position in the string.
      */
-    MapAttemptResult mapPosition(const RangeVector& ranges, 
+    MapAttemptResult mapPosition(const BitVector& ranges, 
       const std::string& pattern, size_t index) const;
       
 private:

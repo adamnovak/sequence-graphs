@@ -21,10 +21,10 @@ bool FMDPosition::operator==(const FMDPosition& other) const {
         end_offset == other.end_offset;
 }
 
-int64_t FMDPosition::range(const RangeVector& ranges) const {
+int64_t FMDPosition::range(const BitVector& ranges) const {
     // Get an iterator for making rank queries.
     // TODO: Is it efficient to do this a lot?
-    RangeVector::Iterator iter(ranges);
+    BitVector::Iterator iter(ranges);
 
     // Look up the range that the forward starting position is in
     int64_t start_range = iter.rank(forward_start);
@@ -41,10 +41,10 @@ int64_t FMDPosition::range(const RangeVector& ranges) const {
     }
 }
 
-int64_t FMDPosition::ranges(const RangeVector& ranges) const {
+int64_t FMDPosition::ranges(const BitVector& ranges) const {
     // Get an iterator for making rank queries.
     // TODO: Is it efficient to do this a lot?
-    RangeVector::Iterator iter(ranges);
+    BitVector::Iterator iter(ranges);
 
     // Look up the range that the starting position is in
     int64_t start_range = iter.rank(forward_start);

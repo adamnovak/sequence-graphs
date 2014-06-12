@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <utility>
 
-#include "CSA/BitVectorBase.hpp"
+#include "BitVector.hpp"
 
 /**
  * Represents the state (or result) of an FMD-index search, which is two ranges
@@ -118,13 +118,13 @@ public:
      * Note that empty intervals (where the end is before the start) may still
      * be contained in ranges.
      */
-    int64_t range(const RangeVector& ranges) const;
+    int64_t range(const BitVector& ranges) const;
 
     /**
      * Return the number of ranges that the forward-strand interval of this
      * FMDPosition overlaps.
      */
-    int64_t ranges(const RangeVector& ranges) const;
+    int64_t ranges(const BitVector& ranges) const;
     
     /**
      * Provide pretty-printing for FMDPositions. See

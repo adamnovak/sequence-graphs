@@ -551,7 +551,7 @@ std::vector<Mapping> FMDIndex::map(const std::string& query, int start,
 
 }
 
-std::vector<int64_t> FMDIndex::map(const RangeVector& ranges,
+std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
     const std::string& query, int start, int length) const {
     
     // RIGHT-map to a range.
@@ -754,7 +754,7 @@ MapAttemptResult FMDIndex::mapPosition(const std::string& pattern,
     return result;
 }
 
-MapAttemptResult FMDIndex::mapPosition(const RangeVector& ranges, 
+MapAttemptResult FMDIndex::mapPosition(const BitVector& ranges, 
     const std::string& pattern, size_t index) const {
     
     
