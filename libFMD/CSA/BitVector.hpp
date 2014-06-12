@@ -9,8 +9,9 @@
 
 namespace CSA {
 
-/*
-  This class provides the core functionality for encoding a bit vector.
+/**
+ * This class provides the core functionality for encoding a bit vector. It is 
+ * abstract and cannot be directly instantiated.
 */
 
 class VectorEncoder
@@ -19,23 +20,29 @@ class VectorEncoder
     static const size_t SUPERBLOCK_SIZE = MEGABYTE;
 
     // We assume superblock size is divisible by block and sample size.
-    VectorEncoder(size_t block_bytes, size_t superblock_size = SUPERBLOCK_SIZE, bool _use_small_blocks = true);
+    VectorEncoder(size_t block_bytes, size_t superblock_size = SUPERBLOCK_SIZE,
+        bool _use_small_blocks = true);
+    
     ~VectorEncoder();
 
-/*
-    This should be implemented in any inherited class.
+    /*
+     * These must be implemented in any inherited class.
+     */
 
-    // These functions are assumed to be greedy, encoding the 1-bits immediately.
-    void setBit(size_t value);  // Values must be in increasing order.
-    void setRun(size_t start, size_t len);
+    // These functions are assumed to be greedy, encoding the 1-bits
+    // immediately.
+    
+    // Values must be in increasing order.
+    virtual void setBit(size_t value) = 0;  
+    virtual void setRun(size_t start, size_t len) = 0;
 
     // These versions may combine 1-bits into maximal runs.
     // Use flush() to finish the encoding when using these functions.
     // Do not mix with the greedy versions.
-    void addBit(size_t value);
-    void addRun(size_t start, size_t len);
-    void flush();
-*/
+    virtual void addBit(size_t value) = 0;
+    virtual void addRun(size_t start, size_t len) = 0;
+    virtual void flush() = 0;
+
 
     void addNewBlock();
     void setFirstBit(size_t value);
@@ -65,7 +72,7 @@ class VectorEncoder
 
 /*
   This class provides the core functionality for a bit vector.
-  A bit vector must have at least one 1-bit.
+  A bit vector must have at least one 1-bit. This class is abstract.
 */
 
 class BitVector
@@ -108,6 +115,45 @@ class BitVector
         {
           return (this->sample.first + this->cur < this->parent.items - 1);
         }
+        
+        /*
+         * These functions must be implemented by derived classes.
+         */
+        
+        // rank invalidates the "next" functionality
+        // regular:   \sum_{i = 0}^{value} V[i]
+        // at_least:  \sum_{i = 0}^{value - 1} V[i] + 1
+        virtual size_t rank(size_t value, bool at_least = false) = 0;
+
+        // \min value: \sum_{i = 0}^{value} V[i] = index + 1
+        virtual size_t select(size_t index) = 0;      
+        virtual size_t selectNext() = 0;
+
+        // (\max i <= value: V[i] = 1, rank(i) - 1)
+        // Returns (size, items) if not found.
+        virtual pair_type valueBefore(size_t value) = 0;
+
+        // (\min i >= value: V[i] = 1, rank(i) - 1)
+        virtual pair_type valueAfter(size_t value) = 0; 
+        virtual pair_type nextValue() = 0;
+
+        // These versions of select return (value, length_of_run).
+        // max_length is an upper bound for the length of the run returned.
+        // V[value] is not included in the length of the run
+        // These functions are not greedy: the actual length of the run can be
+        // more than reported.
+        // This can happen even if max_length was not reached.
+        // length_of_run is actually the number of extra items returned past
+        // value
+
+        virtual pair_type selectRun(size_t index, size_t max_length) = 0;
+        virtual pair_type selectNextRun(size_t max_length) = 0;
+
+        // isSet invalidates the "next" functionality
+        virtual bool isSet(size_t value) = 0; // V[value]
+
+        // Counts the number of 1-bit runs.
+        virtual size_t countRuns() = 0;
 
       protected:
         const BitVector& parent;
@@ -154,41 +200,6 @@ class BitVector
         Iterator& operator = (const Iterator&);
     };
 
-/*
-    These should be implemented in any actual iterator.
-
-    // rank invalidates the "next" functionality
-    // regular:   \sum_{i = 0}^{value} V[i]
-    // at_least:  \sum_{i = 0}^{value - 1} V[i] + 1
-    size_t rank(size_t value, bool at_least = false);
-
-    size_t select(size_t index);      // \min value: \sum_{i = 0}^{value} V[i] = index + 1
-    size_t selectNext();
-
-    // (\max i <= value: V[i] = 1, rank(i) - 1)
-    // Returns (size, items) if not found.
-    pair_type valueBefore(size_t value);
-
-    pair_type valueAfter(size_t value); // (\min i >= value: V[i] = 1, rank(i) - 1)
-    pair_type nextValue();
-
-    // These versions of select return (value, length_of_run).
-    // max_length is an upper bound for the length of the run returned.
-    // V[value] is not included in the length of the run
-    // These functions are not greedy: the actual length of the run can be more than reported.
-    // This can happen even if max_length was not reached.
-    // length_of_run is actually the number of extra items returned past value
-
-    pair_type selectRun(size_t index, size_t max_length);
-    pair_type selectNextRun(size_t max_length);
-
-    // isSet invalidates the "next" functionality
-    bool isSet(size_t value); // V[value]
-
-    // Counts the number of 1-bit runs.
-    size_t countRuns();
-*/
-
 //--------------------------------------------------------------------------
 
   protected:
@@ -212,9 +223,9 @@ class BitVector
     size_t        select_rate;
 
     /*
-       These functions build a higher level index for faster rank/select queries.
-       The index consists of about (number of samples) / INDEX_RATE pointers.
-       The bit vector cannot be used without the index.
+       These functions build a higher level index for faster rank/select
+       queries. The index consists of about (number of samples) / INDEX_RATE 
+       pointers. The bit vector cannot be used without the index.
     */
     void indexForRank();
     void indexForSelect();
@@ -230,7 +241,7 @@ class BitVector
     void readArray(FILE* file);
 
     void copyArray(VectorEncoder& encoder, bool use_directly = false);
-
+private:
     // These are not allowed.
     BitVector();
     BitVector(const BitVector&);

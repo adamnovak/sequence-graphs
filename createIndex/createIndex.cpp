@@ -24,7 +24,7 @@
 #include <FMDIndexBuilder.hpp>
 #include <FMDIndex.hpp>
 #include <FMDIndexIterator.hpp>
-#include <RangeVector.hpp>
+#include <BitVector.hpp>
 #include <TextPosition.hpp>
 #include <util.hpp>
 #include <Mapping.hpp>

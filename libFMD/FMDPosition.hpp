@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <utility>
 
-#include "RangeVector.hpp"
+#include "BitVector.hpp"
 
 /**
  * Represents the state (or result) of an FMD-index search, which is two ranges

@@ -38,8 +38,8 @@
 %rename(RangeEncoder) NibbleEncoder;
 
 
-%include "BitVector.hpp"
-%include "NibbleVector.hpp"
+%include "CSA/BitVector.hpp"
+%include "CSA/NibbleVector.hpp"
 
 typedef NibbleVector RangeVector;
 typedef NibbleEncoder RangeEncoder;
@@ -56,7 +56,9 @@ typedef NibbleEncoder RangeEncoder;
 %}
 %include "FMDIndexBuilder.hpp"
 
-
+%{
+  using namespace CSA;
+%}
 
 
 

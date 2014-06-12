@@ -10,7 +10,7 @@
 
 #include "TextPosition.hpp"
 #include "FMDIndexIterator.hpp"
-#include "RangeVector.hpp"
+#include "BitVector.hpp"
 #include "Mapping.hpp"
 #include "MapAttemptResult.hpp"
 

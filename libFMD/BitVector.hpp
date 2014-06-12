@@ -7,7 +7,7 @@
  */
 
 // Use Nibble Vectors, borrowed from RLCSA, to encode our range endpoint bitmaps
-#include "NibbleVector.hpp"
+#include "CSA/NibbleVector.hpp"
 typedef CSA::NibbleVector RangeVector;
 typedef CSA::NibbleVector::Iterator RangeVectorIterator;
 typedef CSA::NibbleEncoder RangeEncoder;
