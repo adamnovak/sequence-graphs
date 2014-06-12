@@ -96,18 +96,31 @@ public:
     bool operator==(const FMDPosition& other) const;
 
     /**
-     * Is an FMDPosition empty?
+     * Is an FMDPosition empty? If a mask is specified, only counts matches with
+     * 1s in the mask.
      */
-    inline bool isEmpty() const {
-        return end_offset < 0;
+    inline bool isEmpty(BitVectorIterator* mask = NULL) const {
+        return getLength(mask) <= 0;
     }
 
     /**
-    * Return the actual number of matches represented by an FMDPosition.
+    * Return the actual number of matches represented by an FMDPosition. If a
+    * mask is specified, only counts matches with 1s in the mask.
     */
-    inline int64_t getLength() const
+    inline int64_t getLength(BitVectorIterator* mask = NULL) const
     {
-        return end_offset + 1;
+        if(mask == NULL) {
+            // Fast path: no mask, can just look at our end offset.
+            return end_offset + 1;
+        } else {
+            // Slow path: need to make rank queries. Get the rank at the end of
+            // the region (inclusive), and subtract the rank at the beginning of
+            // the region (exclusive). We need a +1 since we actually measure 1
+            // + the inclusive rank of the previous position and need to get rid
+            // of the extra 1.
+            return mask->rank(forward_start + end_offset) + 1 - 
+                mask->rank(forward_start, true);
+        }
     }
 
     /**
@@ -117,14 +130,19 @@ public:
      *
      * Note that empty intervals (where the end is before the start) may still
      * be contained in ranges.
+     *
+     * If a mask is specified, only counts matches with 1s in the mask.
      */
-    int64_t range(const BitVector& ranges) const;
+    int64_t range(BitVectorIterator& ranges, BitVectorIterator* mask = NULL)
+        const;
 
     /**
      * Return the number of ranges that the forward-strand interval of this
-     * FMDPosition overlaps.
+     * FMDPosition overlaps. If a mask is specified, only counts matches with 1s
+     * in the mask.
      */
-    int64_t ranges(const BitVector& ranges) const;
+    int64_t ranges(BitVectorIterator& ranges,BitVectorIterator* mask = NULL)
+        const;
     
     /**
      * Provide pretty-printing for FMDPositions. See

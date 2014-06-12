@@ -434,8 +434,8 @@ int64_t FMDIndex::getLF(int64_t index) const {
     return charBlockStart + instanceRank;
 }
 
-std::vector<Mapping> FMDIndex::map(const std::string& query, int start,
-    int length) const {
+std::vector<Mapping> FMDIndex::map(const std::string& query, BitVector* mask, 
+    int start, int length) const {
 
     if(length == -1) {
         // Fix up the length parameter if it is -1: that means the whole rest of
@@ -552,9 +552,12 @@ std::vector<Mapping> FMDIndex::map(const std::string& query, int start,
 }
 
 std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
-    const std::string& query, int start, int length) const {
+    const std::string& query, BitVector* mask, int start, int length) const {
     
     // RIGHT-map to a range.
+    
+    // Make an iterator for ranges, so we can query it.
+    BitVectorIterator rangeIterator(ranges);
 
     if(length == -1) {
         // Fix up the length parameter if it is -1: that means the whole rest of
@@ -584,7 +587,7 @@ std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
                 std::endl;
             // We do not currently have a non-empty FMDPosition to extend. Start
             // over by mapping this character by itself.
-            location = this->mapPosition(ranges, query, i);
+            location = this->mapPosition(rangeIterator, query, i);
         } else {
             Log::debug() << "Extending with position " << i << std::endl;
             // The last base either mapped successfully or failed due to multi-
@@ -596,7 +599,7 @@ std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
 
         // What range index does our current left-side position (the one we just
         // moved) correspond to, if any?
-        int64_t range = location.position.range(ranges);
+        int64_t range = location.position.range(rangeIterator);
 
         if(location.is_mapped && !location.position.isEmpty() && range != -1) {
             // It mapped. We didn't do a re-start and fail, and our interval is
@@ -612,9 +615,9 @@ std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
 
         } else {
 
-            Log::debug() << "Failed (" << location.position.ranges(ranges) << 
-                " options for " << location.characters << " context)." << 
-                std::endl;
+            Log::debug() << "Failed (" << 
+                location.position.ranges(rangeIterator) << " options for " << 
+                location.characters << " context)." << std::endl;
 
             if(location.is_mapped && location.position.isEmpty()) {
                 // We extended right until we got no results. We need to try
@@ -676,7 +679,7 @@ FMDIndex::iterator FMDIndex::end(size_t depth, bool reportDeadEnds) const {
 }
 
 MapAttemptResult FMDIndex::mapPosition(const std::string& pattern,
-    size_t index) const {
+    size_t index, BitVectorIterator* mask) const {
 
     Log::debug() << "Mapping " << index << " in " << pattern << std::endl;
   
@@ -754,8 +757,8 @@ MapAttemptResult FMDIndex::mapPosition(const std::string& pattern,
     return result;
 }
 
-MapAttemptResult FMDIndex::mapPosition(const BitVector& ranges, 
-    const std::string& pattern, size_t index) const {
+MapAttemptResult FMDIndex::mapPosition(BitVectorIterator& ranges, 
+    const std::string& pattern, size_t index, BitVectorIterator* mask) const {
     
     
     // We're going to right-map so ranges match up with the things we can map to

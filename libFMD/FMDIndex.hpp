@@ -177,13 +177,16 @@ public:
      * The vector returned will have one entry for each character in the
      * selected range.
      * 
+     * If a mask is specified, only positions in the index with a 1 in the mask
+     * will be counted for mapping purposes.
+     *
      * Optionally a start and length for the region to map can be specified. The
      * whole string will be used as context, but only that region will actually
      * be mapped. A length of -1 means to use the entire string after the start,
      * and is the default.
      */
-    std::vector<Mapping> map(const std::string& query, int start = 0,
-        int length = -1) const;
+    std::vector<Mapping> map(const std::string& query, BitVector* mask = NULL, 
+        int start = 0, int length = -1) const;
       
     /**
      * Try RIGHT-mapping each base in the query to one of the ranges represented
@@ -198,11 +201,15 @@ public:
      * The range starting points must be such that the ranges described are "bi-
      * ranges": each range has its reverse-complement range also present.
      *
+     * If a mask is specified, only positions in the index with a 1 in the mask
+     * will be counted for mapping purposes.
+     *
      * Returns a vector of one-based range numbers for left-mapping each base,
      * or -1 if the base did not map to a range.
      */
     std::vector<int64_t> map(const BitVector& ranges,
-        const std::string& query, int start = 0, int length = -1) const;
+        const std::string& query, BitVector* mask = NULL, int start = 0,
+        int length = -1) const;
         
     /***************************************************************************
      * Iteration Functions
@@ -285,9 +292,12 @@ protected:
      * which is the mapping upstream context.
      *
      * Index must be a valid character position in the string.
+     *
+     * If a mask is specified, only positions in the index with a 1 in the mask
+     * will be counted for mapping purposes.
      */
     MapAttemptResult mapPosition(const std::string& pattern,
-        size_t index) const;
+        size_t index, BitVectorIterator* mask = NULL) const;
       
     /**
      * Try RIGHT-mapping the given index in the given string to a unique forward-
@@ -307,9 +317,13 @@ protected:
      * mapped.
      *
      * Index must be a valid character position in the string.
+     *
+     * If a mask is specified, only positions in the index with a 1 in the mask
+     * will be counted for mapping purposes.
      */
-    MapAttemptResult mapPosition(const BitVector& ranges, 
-      const std::string& pattern, size_t index) const;
+    MapAttemptResult mapPosition(BitVectorIterator& ranges, 
+        const std::string& pattern, size_t index, 
+        BitVectorIterator* mask = NULL) const;
       
 private:
     
