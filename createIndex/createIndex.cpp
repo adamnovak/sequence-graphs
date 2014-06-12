@@ -953,7 +953,7 @@ writeAlignmentFasta(
  * 
  * Don't forget to delete the bit vector when done!
  */
-std::pair<RangeVector*, std::vector<SmallSide> > 
+std::pair<BitVector*, std::vector<SmallSide> > 
 makeLevelIndex(
     stPinchThreadSet* threadSet, 
     const FMDIndex& index, 
@@ -964,7 +964,7 @@ makeLevelIndex(
     
     // We need to make bit vector denoting ranges, which we encode with this
     // encoder, which has 32 byte blocks.
-    RangeEncoder encoder(32);
+    BitVectorEncoder encoder(32);
     
     // We also need to make a vector of SmallSides, which are the things that
     // get matched to by the corresponding ranges in the bit vector.
@@ -986,7 +986,7 @@ makeLevelIndex(
         // Go through all the contexts, including shortened ones before end of
         // text.
         
-        // Unpack the iterator into pattern and FMDPosition at which it happens,
+        // Unpack the iterator into pattern and FMDPosition at which it happens
         // which is in BWT coordinates.
         std::string context = (*i).first;
         FMDPosition range = (*i).second;
@@ -1122,7 +1122,7 @@ makeLevelIndex(
     
     // Finish the vector encoder into a vector of the right length (i.e. the
     // length of the BWT). This should always end in a 1! 
-    RangeVector* bitVector = new RangeVector(encoder,
+    BitVector* bitVector = new BitVector(encoder,
         index.getBWTLength() + 1);
     
     if(dumpFile != NULL) {
@@ -1150,7 +1150,7 @@ makeLevelIndex(
  * 
  * Don't forget to delete the bit vector when done!
  */
-std::pair<RangeVector*, std::vector<SmallSide> > 
+std::pair<BitVector*, std::vector<SmallSide> > 
 makeLevelIndexScanning(
     stPinchThreadSet* threadSet, 
     const FMDIndex& index, 
@@ -1161,7 +1161,7 @@ makeLevelIndexScanning(
     
     // We need to make bit vector denoting ranges, which we encode with this
     // encoder, which has 32 byte blocks.
-    RangeEncoder encoder(32);
+    BitVectorEncoder encoder(32);
     
     // We also need to make a vector of SmallSides, which are the things that
     // get matched to by the corresponding ranges in the bit vector.
@@ -1245,7 +1245,7 @@ makeLevelIndexScanning(
     // This should always end in a 1!
     // Make sure to flush first.
     encoder.flush();
-    RangeVector* bitVector = new RangeVector(encoder,
+    BitVector* bitVector = new BitVector(encoder,
         index.getTotalLength() + 1);
     
     if(dumpFile != NULL) {
@@ -1265,7 +1265,7 @@ makeLevelIndexScanning(
  * index, so it can be reused.
  */
 void saveLevelIndex(
-    std::pair<RangeVector*, std::vector<SmallSide> > levelIndex,
+    std::pair<BitVector*, std::vector<SmallSide> > levelIndex,
     std::string directory
 ) {
     
@@ -1323,7 +1323,7 @@ testBottomMapping(
  */
 void
 testMergedMapping(
-    const FMDIndex& index, const RangeVector* ranges
+    const FMDIndex& index, const BitVector* ranges
 ) {
     // Start the timer
     clock_t start = clock();
@@ -1552,7 +1552,7 @@ main(
     }
     
     // Index it so we have a bit vector and SmallSides to write out.
-    std::pair<RangeVector*, std::vector<SmallSide> > levelIndex;
+    std::pair<BitVector*, std::vector<SmallSide> > levelIndex;
     
     // We also want to time the merged level index building code
     Timer* levelIndexTimer = new Timer("Level Index Construction");

@@ -34,15 +34,15 @@
 %newobject FMDIndexBuilder::build;
 
 // Add some renames for the bit vector types.
-%rename(RangeVector) NibbleVector;
-%rename(RangeEncoder) NibbleEncoder;
+%rename(BitVector) NibbleVector;
+%rename(BitVectorEncoder) NibbleEncoder;
 
 
-%include "CSA/BitVector.hpp"
+%include "CSA/BitVectorBase.hpp"
 %include "CSA/NibbleVector.hpp"
 
-typedef NibbleVector RangeVector;
-typedef NibbleEncoder RangeEncoder;
+typedef NibbleVector BitVector;
+typedef NibbleEncoder BitVectorEncoder;
 
 %include "Mapping.hpp"
 %include "TextPosition.hpp"
@@ -64,11 +64,11 @@ typedef NibbleEncoder RangeEncoder;
 
 // We need to use the inner vector iterator classes to look at vectors. Give a
 // partial definition under a new name.
-class RangeVectorIterator
+class BitVectorIterator
 {
 public:
-  explicit RangeVectorIterator(const RangeVector& par);
-  ~RangeVectorIterator();
+  explicit BitVectorIterator(const BitVector& par);
+  ~BitVectorIterator();
 
   size_t rank(size_t value, bool at_least = false);
 
