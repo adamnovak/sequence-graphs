@@ -443,6 +443,10 @@ std::vector<Mapping> FMDIndex::map(const std::string& query, BitVector* mask,
         length = query.length() - start;
     }
 
+    // Make an itarator for the mask, if needed, so we can query it.
+    BitVectorIterator* maskIterator = (mask == NULL) ? NULL : 
+        new BitVectorIterator(*mask);
+
     // We need a vector to return.
     std::vector<Mapping> mappings;
 
@@ -457,13 +461,13 @@ std::vector<Mapping> FMDIndex::map(const std::string& query, BitVector* mask,
 
     for(size_t i = start; i < start + length; i++)
     {
-        if(location.position.isEmpty())
+        if(location.position.isEmpty(maskIterator))
         {
             Log::debug() << "Starting over by mapping position " << i <<
                 std::endl;
             // We do not currently have a non-empty FMDPosition to extend. Start
             // over by mapping this character by itself.
-            location = this->mapPosition(query, i);
+            location = this->mapPosition(query, i, maskIterator);
         } else {
             Log::debug() << "Extending with position " << i << std::endl;
             // The last base either mapped successfully or failed due to multi-
@@ -474,7 +478,9 @@ std::vector<Mapping> FMDIndex::map(const std::string& query, BitVector* mask,
             location.characters++;
         }
 
-        if(location.is_mapped && location.position.getLength() == 1) {
+        if(location.is_mapped && 
+            location.position.getLength(maskIterator) == 1) {
+            
             // It mapped. We didn't do a re-start and fail, and there's exactly
             // one thing in our interval.
 
@@ -505,11 +511,11 @@ std::vector<Mapping> FMDIndex::map(const std::string& query, BitVector* mask,
 
         } else {
 
-            Log::debug() << "Failed (" << location.position.getLength() << 
-                " options for " << location.characters << " context)." << 
-                std::endl;
+            Log::debug() << "Failed (" << 
+                location.position.getLength(maskIterator) << " options for " <<
+                location.characters << " context)." << std::endl;
 
-            if(location.is_mapped && location.position.isEmpty()) {
+            if(location.is_mapped && location.position.isEmpty(maskIterator)) {
                 // We extended right until we got no results. We need to try
                 // this base again, in case we tried with a too-long left
                 // context.
@@ -556,14 +562,18 @@ std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
     
     // RIGHT-map to a range.
     
-    // Make an iterator for ranges, so we can query it.
-    BitVectorIterator rangeIterator(ranges);
-
     if(length == -1) {
         // Fix up the length parameter if it is -1: that means the whole rest of
         // the string.
         length = query.length() - start;
     }
+
+    // Make an iterator for ranges, so we can query it.
+    BitVectorIterator rangeIterator(ranges);
+    
+    // And one for the mask, if needed
+    BitVectorIterator* maskIterator = (mask == NULL) ? NULL : 
+        new BitVectorIterator(*mask);
 
     // We need a vector to return.
     std::vector<int64_t> mappings;
@@ -587,7 +597,7 @@ std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
                 std::endl;
             // We do not currently have a non-empty FMDPosition to extend. Start
             // over by mapping this character by itself.
-            location = this->mapPosition(rangeIterator, query, i);
+            location = this->mapPosition(rangeIterator, query, i, maskIterator);
         } else {
             Log::debug() << "Extending with position " << i << std::endl;
             // The last base either mapped successfully or failed due to multi-
@@ -599,9 +609,11 @@ std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
 
         // What range index does our current left-side position (the one we just
         // moved) correspond to, if any?
-        int64_t range = location.position.range(rangeIterator);
+        int64_t range = location.position.range(rangeIterator, maskIterator);
 
-        if(location.is_mapped && !location.position.isEmpty() && range != -1) {
+        if(location.is_mapped && !location.position.isEmpty(maskIterator) && 
+            range != -1) {
+            
             // It mapped. We didn't do a re-start and fail, and our interval is
             // nonempty and subsumed by a range.
 
@@ -616,10 +628,11 @@ std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
         } else {
 
             Log::debug() << "Failed (" << 
-                location.position.ranges(rangeIterator) << " options for " << 
-                location.characters << " context)." << std::endl;
+                location.position.ranges(rangeIterator, maskIterator) <<
+                " options for " << location.characters << " context)." << 
+                std::endl;
 
-            if(location.is_mapped && location.position.isEmpty()) {
+            if(location.is_mapped && location.position.isEmpty(maskIterator)) {
                 // We extended right until we got no results. We need to try
                 // this base again, in case we tried with a too-long left
                 // context.
@@ -661,6 +674,11 @@ std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
     // See <http://www.cplusplus.com/reference/algorithm/reverse/>
     std::reverse(mappings.begin(), mappings.end());
 
+    // Get rid of the mask iterator if needed
+    if(maskIterator != NULL) {
+        delete maskIterator;
+    }
+
     // Give back our answers.
     return mappings;
     
@@ -693,13 +711,13 @@ MapAttemptResult FMDIndex::mapPosition(const std::string& pattern,
     result.is_mapped = false;
     result.position = this->getCharPosition(pattern[index]);
     result.characters = 1;
-    if(result.position.isEmpty()) {
+    if(result.position.isEmpty(mask)) {
         // This character isn't even in it. Just return the result with an empty
         // FMDPosition; the next character we want to map is going to have to
         // deal with having some never-before-seen character right upstream of
         // it.
         return result;
-    } else if(result.position.getLength() == 1) {
+    } else if(result.position.getLength(mask) == 1) {
         // We've already mapped.
         result.is_mapped = true;
         return result;
@@ -729,11 +747,11 @@ MapAttemptResult FMDIndex::mapPosition(const std::string& pattern,
 
         Log::trace() << "Now at " << next_position << " after " << 
             pattern[index] << std::endl;
-        if(next_position.isEmpty()) {
+        if(next_position.isEmpty(mask)) {
             // The next place we would go is empty, so return the result holding
             // the last position.
             return result;
-        } else if(next_position.getLength() == 1) {
+        } else if(next_position.getLength(mask) == 1) {
             // We have successfully mapped to exactly one place. Update our
             // result to reflect the additional extension and our success, and
             // return it.
@@ -774,13 +792,13 @@ MapAttemptResult FMDIndex::mapPosition(BitVectorIterator& ranges,
     result.is_mapped = false;
     result.position = this->getCharPosition(pattern[index]);
     result.characters = 1;
-    if(result.position.isEmpty()) {
+    if(result.position.isEmpty(mask)) {
         // This character isn't even in it. Just return the result with an empty
         // FMDPosition; the next character we want to map is going to have to
         // deal with having some never-before-seen character right upstream of
         // it.
         return result;
-    } else if (result.position.range(ranges) != -1) {
+    } else if (result.position.range(ranges, mask) != -1) {
         // We've already mapped.
         result.is_mapped = true;
         return result;
@@ -795,13 +813,13 @@ MapAttemptResult FMDIndex::mapPosition(BitVectorIterator& ranges,
 
         Log::trace() << "Now at " << next_position << " after " << 
             pattern[index] << std::endl;
-        if(next_position.isEmpty()) {
+        if(next_position.isEmpty(mask)) {
             // The next place we would go is empty, so return the result holding
             // the last position.
             return result;
         }
 
-        if(next_position.range(ranges) != -1) {
+        if(next_position.range(ranges, mask) != -1) {
             // We have successfully mapped to exactly one range. Update our
             // result to reflect the additional extension and our success, and
             // return it.
