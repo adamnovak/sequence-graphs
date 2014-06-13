@@ -10,7 +10,7 @@ cd testFMD
 # Get hg38
 if [ ! -d hg38 ]
 then
-    wget http://hgdownload-test.cse.ucsc.edu/goldenPath/hg38/bigZips/hg38.chromFa.tar.gz
+    wget --progress=dot:giga http://hgdownload-test.cse.ucsc.edu/goldenPath/hg38/bigZips/hg38.chromFa.tar.gz
     mkdir hg38
     tar -C hg38 -xvzf hg38.chromFa.tar.gz
     mv hg38/chroms/* hg38/
@@ -27,7 +27,7 @@ then
     # <http://stackoverflow.com/a/8789815/402891> for 0-padding.
     for CHROM in $(seq -f "%02g" 1 22) MT Un X Y
     do
-        wget ftp://ftp.ncbi.nih.gov/genomes/Homo_sapiens/CHR_${CHROM}/hs_alt_HuRef_*.fa.gz
+        wget --progress=dot:giga ftp://ftp.ncbi.nih.gov/genomes/Homo_sapiens/CHR_${CHROM}/hs_alt_HuRef_*.fa.gz
     done
     gunzip *.gz
     cd ..
@@ -39,7 +39,7 @@ then
     mkdir koRef
     cd koRef
     
-    wget ftp://ftp.kobic.re.kr/pub/KOBIC-KoreanGenome/fasta/*.fa.gz
+    wget --progress=dot:giga ftp://ftp.kobic.re.kr/pub/KOBIC-KoreanGenome/fasta/*.fa.gz
     gunzip *.gz
     cd ..
 fi
