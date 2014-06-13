@@ -49,7 +49,7 @@ FASTAS=("hg38/*.fa" "huRef/*.fa" "koRef/*.fa")
 
 printf "RESULTS\tNUM_GENOMES\tBWT_BYTES\tSSA_BYTES\n"
 
-for NUM_GENOMES in 1 2 3
+for NUM_GENOMES in 1
 do
 
     
@@ -67,7 +67,7 @@ do
 
     echo "Indexing ${GENOME_FASTA}"
 
-    time ../createIndex.sh ${GENOME_FASTA}-index ${GENOME_FASTA} --quiet --context 20
+    time ../createIndex/createIndex ${GENOME_FASTA}-index ${GENOME_FASTA} --quiet --context 20
         
     # Check the sizes of the index.
     BWT_BYTES=$(stat -c%s ${GENOME_FASTA}-index/index.basename.bwt)
@@ -75,6 +75,12 @@ do
     
     # Dump a grepable TSV line
     printf "RESULTS\t${NUM_GENOMES}\t${BWT_BYTES}\t${SSA_BYTES}\n"
+    
+    if [ -e gmon.out ]
+    then
+        # Make the profiling report
+        gprof ../createIndex/createIndex gmon.out > ${GENOME_FASTA}.gprof.txt
+    fi
 
 done
 
