@@ -41,5 +41,8 @@ void FMDIndexBuilderTests::testBuild() {
     builder.add(filename);
     
     // Finish the index.
-    delete builder.build();
+    FMDIndex* index = builder.build();
+    
+    // Don't leak 
+    delete index;
 }

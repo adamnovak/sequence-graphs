@@ -264,6 +264,17 @@ protected:
     std::vector<size_t> cumulativeLengths;
     
     /**
+     * Holds the bit vector masks for the BWT positions belonging to each
+     * genome. Note that we can't get genome by contig or contigs for genome.
+     * Only genome by BWT position.
+     *
+     * If we had C++11 we would use a vector, but we don't and sicne BitVector
+     * is not copy constructable/assignable we can't put it in a vector. So we
+     * put pointers in a vector.
+     */
+    std::vector<BitVector*> genomeMasks;
+    
+    /**
      * Holds the actual underlying index.
      */
     BWT bwt;

@@ -33,7 +33,10 @@ void FMDIndexTests::setUp() {
     builder.add(filename);
     
     // Finish the index.
-    delete builder.build();
+    FMDIndex* index = builder.build();
+    
+    // Don't leak it.
+    delete index;
     
 }
 

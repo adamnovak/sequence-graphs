@@ -168,7 +168,9 @@ FMDIndex* FMDIndexBuilder::build() {
     Log::info() << "Creating " << numGenomes << " genome bitmasks..." <<
         std::endl;
     
-    // Holds a bit vector encoder for each genome.
+    // Holds a bit vector encoder for each genome. TODO: Make this a C++11
+    // vector with emplace_back to work around non-copy-constructability of
+    // encoders. TODO: Before that, make this pointers in a vector.
     BitVectorEncoder** encoders = new BitVectorEncoder*[numGenomes];
     for(size_t i = 0; i < numGenomes; i++) {
         // Make each of the individual encoders.

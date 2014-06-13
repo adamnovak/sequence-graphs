@@ -9,8 +9,11 @@
 #include "Log.hpp"
 
 FMDIndex::FMDIndex(std::string basename, SuffixArray* fullSuffixArray): 
-    names(), starts(), lengths(), cumulativeLengths(), bwt(basename + ".bwt"),
-    suffixArray(basename + ".ssa"), fullSuffixArray(fullSuffixArray) {
+    names(), starts(), lengths(), cumulativeLengths(), genomeMasks(),
+    bwt(basename + ".bwt"), suffixArray(basename + ".ssa"), 
+    fullSuffixArray(fullSuffixArray) {
+
+    Log::info() << "Loading " << basename << std::endl;
 
     // We already loaded the index itself in the initializer. Go load the
     // length/order metadata.
@@ -59,12 +62,41 @@ FMDIndex::FMDIndex(std::string basename, SuffixArray* fullSuffixArray):
     // Close up the contig file. We read our contig metadata.
     contigFile.close();
     
+    // Now read the genome bit masks.
+    
+    // What file are they in? Make sure to hold onto it while we construct the
+    // stream with its c_str pointer.
+    std::string genomeMaskFile = basename + ".msk";
+    
+    // Open the file where they live.
+    std::ifstream genomeMaskStream(genomeMaskFile.c_str(), std::ios::binary);
+    
+    while(genomeMaskStream.peek() != EOF && !genomeMaskStream.eof()) {
+        // As long as there is data left to read
+        
+        // Read a new BitVector from the stream and put it in our list.
+        genomeMasks.push_back(new BitVector(genomeMaskStream));
+        
+        // This lets us autodetect how many genomes there are.
+    }
+    
+    Log::info() << "Loaded " << names.size() << " contigs in " << 
+        genomeMasks.size() << " genomes" << std::endl;
+    
+    
 }
 
 FMDIndex::~FMDIndex() {
     if(fullSuffixArray != NULL) {
         // If we were holding a full SuffixArray, throw it out.
         delete fullSuffixArray;
+    }
+    
+    for(std::vector<BitVector*>::iterator i = genomeMasks.begin(); 
+        i != genomeMasks.end(); ++i) {
+        
+        // Also delete all the genome masks we loaded.
+        delete (*i);
     }
 }
 
