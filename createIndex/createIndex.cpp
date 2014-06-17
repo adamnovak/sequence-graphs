@@ -28,12 +28,13 @@
 #include <util.hpp>
 #include <Mapping.hpp>
 #include <SmallSide.hpp>
-#include <IDSource.hpp>
 #include <Log.hpp>
 
 // Grab timers from libsuffixtools
 #include <Timer.h>
 
+
+#include "IDSource.hpp"
 #include "ConcurrentQueue.hpp"
 
 

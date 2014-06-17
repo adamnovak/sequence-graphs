@@ -19,6 +19,11 @@ class ConcurrentQueue {
 public:
     
     /**
+     * This defines a lock we can give or demand for access.
+     */
+    typedef std::unique_lock<std::mutex> Lock;
+    
+    /**
      * Construct a ConcurrentQueue that doesn't track writers (i.e. a normal
      * one).
      */
@@ -40,20 +45,28 @@ public:
      * Lock the queue so it can be safely read or written to. Caller must not
      * already hold a lock on the queue.
      */
-    std::unique_lock<std::mutex> lock() {
+    Lock lock() {
         return std::unique_lock<std::mutex>(mutex);
     }
     
     /**
      * Remove and return the first thing in the queue. Caller must hold a lock
-     * on the queue, and the queue must be nonempty.
+     * on the queue, and the queue must be nonempty. The lock passed is
+     * released.
+     *
+     * TODO: would it be faster to hold onto the lock and check again for stuff?
      */
-    T dequeue(std::unique_lock<std::mutex>& callerLock) {
+    T dequeue(Lock& callerLock) {
         // Grab the first element.
         T toReturn = queue.front();
+        
         // Remove it form our queue.
         queue.pop();
-        // Give it to the caller.
+        
+        // Unlock the caller's lock.
+        callerLock.unlock();
+        
+        // Give the value to the caller.
         return toReturn;
     }
     
@@ -64,7 +77,7 @@ public:
      * The lock passed is released, and a waiting thread, if any, is notified
      * that data is available.
      */
-    void enqueue(const T& value, std::unique_lock<std::mutex>& callerLock) {
+    void enqueue(const T& value, Lock& callerLock) {
         // Put the element at the end of the queue.
         queue.push(value);
         
@@ -79,7 +92,7 @@ public:
      * Returns true if the queue is empty, and false otherwise. Caller must hold
      * a lock on the queue, but it is not released.
      */
-    bool isEmpty(std::unique_lock<std::mutex>& callerLock) {
+    bool isEmpty(Lock& callerLock) {
         return queue.empty();
     }
     
@@ -87,9 +100,9 @@ public:
      * Wait for the queue to be nonempty and lock it. Will return a lock on a
      * nonempty queue. Caller must not already hold a lock on the queue.
      */
-    std::unique_lock<std::mutex> waitForNonempty() {
+    Lock waitForNonempty() {
         // Lock the queue
-        std::unique_lock<std::mutex> waitLock = lock();
+        Lock waitLock = lock();
         while(isEmpty()) {
             // If the queue is empty, unlock it and wait for someone to ring the
             // nonempty bell. When that happens, re-lock it and check again to
@@ -110,7 +123,7 @@ public:
      *
      * The lock passed is released.
      */
-    void close(std::unique_lock<std::mutex>& callerLock) {
+    void close(Lock& callerLock) {
         // Say we're done.
         numWriters--;
         
@@ -130,10 +143,10 @@ public:
      * must not already hold a lock on the queue. Only works if the queue was
      * told that a nonzero number of writers exist in the constructor.
      */
-    std::unique_lock<std::mutex> waitForNonemptyOrEnd() {
+    Lock waitForNonemptyOrEnd() {
         // Lock the queue
-        std::unique_lock<std::mutex> waitLock = lock();
-        while(isEmpty() && numWriters > 0) {
+        Lock waitLock = lock();
+        while(isEmpty(waitLock) && numWriters > 0) {
             // If the queue is empty, unlock it and wait for someone to ring the
             // nonempty bell. When that happens, re-lock it and check again to
             // see if we won the item.
@@ -144,7 +157,15 @@ public:
         return waitLock;
     }
     
+    /**
+     * Ask for the default move assignment operator.
+     */
+    ConcurrentQueue<T>& operator=(ConcurrentQueue<T>&& other) = default;
     
+    /**
+     * Ask for the default move constructor.
+     */
+    ConcurrentQueue(ConcurrentQueue<T>&& other) = default;
 
 protected:
     // Keep around an actual queue that we controll access to.
@@ -164,6 +185,21 @@ protected:
     // How many writers are writing to the queue still (if writer counting is
     // enabled).
     size_t numWriters;
+    
+private:
+    
+    /**
+     * No copy constructor is allowed.
+     */
+    ConcurrentQueue<T>(const ConcurrentQueue<T>& other) = delete;
+    
+    /**
+     * No assignment operator either.
+     */
+    ConcurrentQueue<T>& operator=(const ConcurrentQueue<T> other) = delete;
+    
+    // Move assignment and move are OK
+     
     
 
 };
