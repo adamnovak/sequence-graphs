@@ -9,8 +9,7 @@
 #include <ctime>
 #include <csignal>
 #include <iterator>
-// Ought to be <cstdint>, but that's C++11
-#include <stdint.h> 
+#include <cstdint> 
 #include <sys/resource.h>
 
 
@@ -34,6 +33,8 @@
 
 // Grab timers from libsuffixtools
 #include <Timer.h>
+
+#include "ConcurrentQueue.hpp"
 
 
 // TODO: replace with cppunit!
