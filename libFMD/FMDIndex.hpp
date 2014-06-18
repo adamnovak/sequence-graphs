@@ -170,7 +170,7 @@ public:
     /**
      * Find the endpoint of the given contig in the BWT.
      */
-    int64_t getContigEndIndex(size_t contig);
+    int64_t getContigEndIndex(size_t contig) const;
     
     /***************************************************************************
      * Retrieval Functions

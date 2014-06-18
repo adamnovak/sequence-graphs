@@ -29,8 +29,7 @@ FMDIndex::FMDIndex(std::string basename, SuffixArray* fullSuffixArray):
     // Have a string to hold each line in turn.
     std::string line;
     while(std::getline(contigFile, line)) {
-        // For each <contig>\t<start>\t<length>\t<genome>\t<end index in BWT>
-        // line...
+        // For each <contig>\t<start>\t<length>\t<genome> line...
         
         // Make a stringstream we can read out of.
         std::stringstream lineData(line);
@@ -66,14 +65,6 @@ FMDIndex::FMDIndex(std::string basename, SuffixArray* fullSuffixArray):
         
         // Add it to the vector of genome assignments in number order
         genomeAssignments.push_back(genomeNumber);
-        
-        // Read in the BWT index of the last base in the contig.
-        int64_t endBwtIndex;
-        lineData >> endBwtIndex;
-        
-        // Add it to the vector of BWT indices of last bases
-        endIndices.push_back(endBwtIndex);
-    
     }
         
         
@@ -149,7 +140,26 @@ FMDIndex::FMDIndex(std::string basename, SuffixArray* fullSuffixArray):
     }
     
     // Save the last range
-    genomeRanges[currentGenome] = currentRange;    
+    genomeRanges[currentGenome] = currentRange;
+    
+    // First make sure the vector is big enough for them.
+    endIndices.resize(getNumberOfContigs());
+    
+    for(int64_t i = 0; i < getNumberOfContigs() * 2; i++) {
+        // The first #-of-texts rows in the BWT table have a '$' in the F
+        // column, so the L column (what our BWT string actually is) will have
+        // the last real character in some text.
+        
+        // Locate it to a text and offset
+        TextPosition position = locate(i);
+        
+        if(position.getText() % 2 == 0) {
+            // This is a forward strand. Save the index of the last real
+            // character in the forward strand of the contig.
+            endIndices[position.getText() / 2] = i;
+        }
+        
+    }
     
     Log::info() << "Loaded " << names.size() << " contigs in " << numGenomes <<
         " genomes" << std::endl;
@@ -524,7 +534,7 @@ TextPosition FMDIndex::locate(int64_t index) const {
     return TextPosition(bitfield.getID(), bitfield.getPos());
 }
 
-int64_t getContigEndIndex(size_t contig) {
+int64_t FMDIndex::getContigEndIndex(size_t contig) const {
     // Looks a bit like the metadata functions from earlier. Actually pulls info
     // from the same file.
     return endIndices[contig];
@@ -541,9 +551,9 @@ char FMDIndex::displayFirst(int64_t index) const {
 }
 
 std::string FMDIndex::displayContig(size_t index) const {
-    // We can't efficiently un-locate, so we just store the last BWT index in
-    // every contig. This works since there are no 0-length contigs.
-    int64_t bwtIndex = getContigEnd(index);
+    // We can't efficiently un-locate, so we just use a vector of the last BWT
+    // index in every contig. This works since there are no 0-length contigs.
+    int64_t bwtIndex = getContigEndIndex(index);
     
     // Make a string to hold all the bases.
     std::string bases;

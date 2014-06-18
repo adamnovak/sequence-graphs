@@ -144,6 +144,10 @@ void FMDIndexTests::testDisplay() {
     // Load the index up
     FMDIndex index(tempDir + "/index.basename");
     
+    std::cout << index.displayContig(0) << std::endl;
+    
+    std::cout << "CATGCTTCGGCGATTCGACGCTCATCTGCGACTCT" << std::endl;
+    
     // Make sure the first contig comes out right
     CPPUNIT_ASSERT(index.displayContig(0) == 
         "CATGCTTCGGCGATTCGACGCTCATCTGCGACTCT");
