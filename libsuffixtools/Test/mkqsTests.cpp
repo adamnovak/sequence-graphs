@@ -2,10 +2,10 @@
 
 #include <vector>
 
-#include "ReadTable.h"
-#include "SuffixArray.h"
-#include "SuffixCompare.h"
-#include "mkqs.h"
+#include "../ReadTable.h"
+#include "../SuffixArray.h"
+#include "../SuffixCompare.h"
+#include "../mkqs.h"
 
 #include "mkqsTests.h"
 

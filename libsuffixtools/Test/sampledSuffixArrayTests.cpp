@@ -1,8 +1,8 @@
 // Test the SampledSuffixArray's ability to build a Sampled Suffix Array.
 
-#include "ReadTable.h"
-#include "SuffixArray.h"
-#include "SampledSuffixArray.h"
+#include "../ReadTable.h"
+#include "../SuffixArray.h"
+#include "../SampledSuffixArray.h"
 
 #include "sampledSuffixArrayTests.h"
 
