@@ -1,8 +1,79 @@
+#Sequence Graphs
+
+This repository contains tools for generating and working with Reference
+Structures and Reference Hierarchies.
+
 ##Dependencies
 
-###To Install Spark 1.0.0
+### Tool Dependencies
 
-Make sure to set `SPARK_HADOOP_VERSION=<your Hadoop version>` and `SPARK_YARN=<true or false depending on whether you want to use the new map-reduce>`.
+The code in this repository is written in C++11 and Scala, with a bit of Java.
+To build it, you need:
+
+* A C++11-supporting `g++` (GCC 4.9 works great)
+
+* `sbt`, for building Scala projects
+
+* The JDK, for building Java code
+
+* Maven, for installing Scala and Java JARs into the local Maven cache.
+
+All these should probably come from your distribution, but everything except the
+JDK can be fairly easily installed in your home directory with a `--prefix`.
+
+###C++ Library Dependencies
+
+The code in this repository uses a few libraries at the C++ level. These need to
+be built in C++11 mode, because the C++11 ABI (in GCC) is not compatible with
+the C++03 ABI in some cases.
+
+####Install Boost
+
+If the version of Boost that you can install from your distribution does not
+present a C++11 ABI, you will need to install Boost yourself. (If it does, you
+can just install that.)
+
+```
+wget http://sourceforge.net/projects/boost/files/boost/1.55.0/boost_1_55_0.tar.bz2/download
+tar -xvjf boost_1_55_0.tar.bz2
+cd boost_1_55_0
+./bootstrap.sh --prefix=$HOME/.local
+./b2 cxxflags="-std=c++11"
+./b2 install
+```
+
+Make sure to add `$HOME/.local/include` to your `CPLUS_INCLUDE_PATH`, and
+`$HOME/.local/lib` to your `LD_LIBRARY_PATH`.
+
+####Install CPPUnit
+
+The C++ code includes test cases, which you can run if you have a version of
+CPPUnit installed that has been built with an appropriate compiler. You probably
+don't need to build it in C++11 mode, as it doesn't use any STL in its API.
+
+```
+wget "http://downloads.sourceforge.net/project/cppunit/cppunit/1.12.1/cppunit-1.12.1.tar.gz?r=http%3A%2F%2Fsourceforge.net%2Fapps%2Fmediawiki%2Fcppunit%2Findex.php%3Ftitle%3DMain_Page&ts=1403118115&use_mirror=softlayer-dal"
+tar -xvzf cppunit-1.12.1.tar.gz
+cd cppunit-1.12.1
+./configure --prefix=$HOME/.local
+make
+make install
+```
+
+Again, make sure your environment variables are set so that your compiler snd
+linker will pick up your installed CPPUnit.
+
+###Scala Library Dependencies
+
+Almost all the Scala dependencies are automatically downloaded and installed by
+`sbt`. However, some need to be built from source in order for them to be
+properly configured for your environment.
+
+####Install Apache Spark 1.0.0
+
+Make sure to set `SPARK_HADOOP_VERSION=<your Hadoop version>` and
+`SPARK_YARN=<true or false depending on whether you want to use the new map-
+reduce>`.
 
 ```
 export SPARK_HADOOP_VERSION=<your Hadoop version>
@@ -13,52 +84,6 @@ cd incubator-spark
 sbt clean
 sbt assembly
 sbt publish-local
-```
-
-### To Install ADAM
-
-```
-git clone git@github.com:bigdatagenomics/adam.git
-cd adam
-```
-
-Make sure to edit `pom.xml`, following the instructions to fill in your Hadoop version. If you are running against a Mesos cluster, it is vitally important to be correct about whether Hadoop 2.2.0 or greater is being used or not, because this determines the version of protobuf that gets used. An incorrect version of protobuf can lead to jobs segfaulting when trying to load Mesos
-
-```
-MAVEN_OPTS="-Xmx512m -XX:MaxPermSize=128m" mvn clean package install
-```
-
-### To Install Boost 1.38 or higher, including the filesystem, system and program_options libraries
-
-This really should come from your distribution; C++ without Boost isn't a real language anymore. If you want to install it yourself, refer to the Boost documentation. If you install it in a non-standard location, be sure to set `LIBRARY_PATH`, `CPLUS_INCLUDE_PATH`, `C_INCLUDE_PATH`, `LD_LIBRARY_PATH`, and `LD_RUN_PATH` as appropriate so that your gcc knows where to find it.
-
-### To Install Avro 1.7.6 for C++
-
-```
-wget http://mirror.cogentco.com/pub/apache/avro/avro-1.7.6/avro-src-1.7.6.tar.gz
-tar -xvzf avro-src-1.7.6.tar.gz
-cd avro-src-1.7.6
-cd lang/c++
-./build.sh test
-sudo ./build.sh install
-```
-
-If you are not root, you will have to install Avro to a nonstandard location. If your standard nonstandard location is `~/.local`, you can do something like:
-
-```
-cmake -DCMAKE_INSTALL_PREFIX=$HOME/.local build
-cd build && make && make install
-```
-
-And then in your .bashrc make sure you have something like:
-
-```
-export LD_LIBRARY_PATH=$HOME/.local/lib:$LD_LIBRARY_PATH
-export LD_RUN_PATH=$HOME/.local/lib:$LD_RUN_PATH
-export LIBRARY_PATH=$HOME/.local/lib:$LIBRARY_PATH
-export C_INCLUDE_PATH=$HOME/.local/include:$C_INCLUDE_PATH
-export CPLUS_INCLUDE_PATH=$HOME/.local/include:$CPLUS_INCLUDE_PATH
-export PATH=$HOLE/.local/bin:$PATH
 ```
 
 ##Installation
@@ -74,35 +99,28 @@ git submodule update
 
 ###Building
 
-####Building RLCSA
+The system consists of three C++ components (`libsuffixtools`, `libFMD`, and
+`createIndex`), each of which depends on the previous one, and some Scala code
+which depends on a JAR file from `libFMD`.
 
-Mapping into sequence graphs relies on the Run-Length-Compressed Suffix Arrays (RLCSA) library. More specifically, a fork of the library with FMD-Index support and the appropriate SWIG bindings is required. This library ships with the program, but needs to be installed into your local Maven repository, and have some tools available on your `$PATH`. To install RLCSA's SWIG bindings in your local Maven repository:
+####Building the C++ Tools and Libraries
+
+All the C++ code can be built from the root directory of the repository with:
 
 ```
-cd deps/rlcsa
 make
-make rlcsa_grep
+```
+
+####Satisfying the Scala->C++ Dependency
+
+In order for the scala code to work, you need to install the `libFMD` wrapper
+JAR file into your local Maven repository, where Scala can find it:
+
+```
+cd libFMD
 make jar-install
+cd ..
 ```
-
-If this doesn't work, make sure you have SWIG, Maven, and JDK 7+ installed, that your $JAVA_HOME environment variable is set, and that you are building on Linux. Building and loading natives for other platforms (OS X) will require enhancements to the current RLCSA build system.
-
-Once this is done, make sure to add the RLCSA tools to your `$PATH` in your `.bashrc`. If you cloned into your home directory, that would be:
-
-```
-export PATH=$PATH:$HOME/sequence-graphs/deps/rlcsa
-```
-
-####Building createIndex
-
-The tool to create sequence graph indexes for mapping to, `createIndex`, needs to be built manually since I don't know how to hook up makefiles to SBT yet. From the repository root, if you've done everything above, all you have to do is:
-
-```
-cd createIndex
-make
-```
-
-The tool can then be run as `createIndex` in that directory, or as `createIndex.sh` in the repository root.
 
 ####Building the Scala Tools
 
@@ -114,13 +132,27 @@ sbt stage
 
 ###Testing
 
+The C++ `libsuffixtools` and `libFMD` libraries have CPPUnit tests. To invoke
+them, run:
+
+```
+cd libsuffixtools
+make check
+cd ../libFMD
+make check
+```
+
+
+The scala code can be tested with:
+
 ```
 sbt test
 ```
 
 ###Packaging
 
-A single JAR which includes all dependencies can be created by running:
+A single JAR of the Scala code which includes all dependencies (including the
+native `libFMD` library) can be created by running:
 
 ```
 sbt assembly
@@ -129,7 +161,44 @@ sbt assembly
 ###Running command-line tools
 
 ```
-./createIndex.sh <index directory name> [<fasta> [<fasta> [<fasta> ... ]]]
+./createIndex.sh [--context <number of bases to merge on>] <index directory name> [<fasta> [<fasta> [<fasta> ... ]]]
 
 ./mapToIndex.sh [--cluster <Spark cluster URL>] [--repeat <times to repeat mapping>] <index directory name> <literal DNA sequence>
+```
+
+##Additional Procedures
+
+Here are some other things you can install if you want to.
+
+###Install Avro 1.7.6 for C++
+
+This library lets you read and write Avro-format data from C++.
+
+```
+wget http://mirror.cogentco.com/pub/apache/avro/avro-1.7.6/avro-src-1.7.6.tar.gz
+tar -xvzf avro-src-1.7.6.tar.gz
+cd avro-src-1.7.6
+cd lang/c++
+export CXXFLAGS=-stc=c++11 # TODO: This may or may not work
+./build.sh test
+sudo ./build.sh install
+```
+
+If you are not root, you will have to install Avro to a nonstandard location. If
+your standard nonstandard location is `~/.local`, you can do something like:
+
+```
+cmake -DCMAKE_INSTALL_PREFIX=$HOME/.local build
+cd build && make && make install
+```
+
+And then in your .bashrc make sure you have something like:
+
+```
+export LD_LIBRARY_PATH=$HOME/.local/lib:$LD_LIBRARY_PATH
+export LD_RUN_PATH=$HOME/.local/lib:$LD_RUN_PATH
+export LIBRARY_PATH=$HOME/.local/lib:$LIBRARY_PATH
+export C_INCLUDE_PATH=$HOME/.local/include:$C_INCLUDE_PATH
+export CPLUS_INCLUDE_PATH=$HOME/.local/include:$CPLUS_INCLUDE_PATH
+export PATH=$HOLE/.local/bin:$PATH
 ```
