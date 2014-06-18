@@ -58,6 +58,20 @@ void FMDIndexTests::testMetadata() {
     
     // Make sure it has the right number of BWT positions (characters + texts).
     CPPUNIT_ASSERT(index.getBWTLength() == index.getTotalLength() + 4);
+    
+    // Make sure it has the right number of contigs
+    CPPUNIT_ASSERT(index.getNumberOfContigs() == 2);
+    
+    // Make sure it has the right number of genomes.
+    CPPUNIT_ASSERT(index.getNumberOfGenomes() == 1);
+    
+    // Make sure the genome contains the contigs
+    CPPUNIT_ASSERT(index.getGenomeContigs(0).first == 0);
+    CPPUNIT_ASSERT(index.getGenomeContigs(0).second == 2);
+    
+    // Make sure the contigs belong to the genome
+    CPPUNIT_ASSERT(index.getContigGenome(0) == 0);
+    CPPUNIT_ASSERT(index.getContigGenome(1) == 0);
 }
 
 /**
