@@ -61,7 +61,7 @@ class RLBWT
             assert(current_position <= idx && current_position + unit.getCount() >= idx);
             return unit.getChar();
         }
-
+        
         // Get the index of the marker nearest to position in the bwt
         inline size_t getNearestMarkerIdx(size_t position, size_t sampleRate, size_t shiftValue) const
         {

@@ -10,7 +10,7 @@
 
 FMDIndex::FMDIndex(std::string basename, SuffixArray* fullSuffixArray): 
     names(), starts(), lengths(), cumulativeLengths(), genomeAssignments(),
-    genomeRanges(), genomeMasks(), bwt(basename + ".bwt"), 
+    endIndices(), genomeRanges(), genomeMasks(), bwt(basename + ".bwt"), 
     suffixArray(basename + ".ssa"), fullSuffixArray(fullSuffixArray) {
     
     // TODO: Too many initializers
@@ -29,50 +29,54 @@ FMDIndex::FMDIndex(std::string basename, SuffixArray* fullSuffixArray):
     // Have a string to hold each line in turn.
     std::string line;
     while(std::getline(contigFile, line)) {
-        // For each <contig>\t<length>\t<position>\t<genome> line...
+        // For each <contig>\t<start>\t<length>\t<genome>\t<end index in BWT>
+        // line...
         
-        // Find the \t separating the genome ID from the contig position
-        size_t tab3 = line.rfind('\t');
+        // Make a stringstream we can read out of.
+        std::stringstream lineData(line);
         
-        // Find the \t separating the position from the length
-        size_t tab2 = line.rfind('\t', tab3 - 1);
-        
-        // Find the \t separating the start position from the sequence name.
-        size_t tab1 = line.rfind('\t', tab2 - 1);
-        
-        // Split into name, start, length, and genome
-        std::string contigName = line.substr(0, tab1);
-        std::string contigStart = line.substr(tab1 + 1, tab2);
-        std::string contigLength = line.substr(tab2 + 1, tab3);
-        std::string genome = line.substr(tab3 + 1, line.size() - 1);
-        
-        // TODO: Genericize this whole parser.
-        
-        // Parse the start
-        long long int startNumber = atoll(contigStart.c_str());
-        
-        // Parse the length
-        long long int lengthNumber = atoll(contigLength.c_str());
-        
-        // Parse the genome
-        long long int genomeNumber = atoll(genome.c_str());
+        // Read in the name of the contig
+        std::string contigName;
+        lineData >> contigName;
         
         // Add it to the vector of names in number order.
         names.push_back(contigName);
         
-        // And the vector of starts in number order.
+        // Read in the contig start position on its scaffold
+        size_t startNumber;
+        lineData >> startNumber;
+        
+        // Add it to the vector of starts in number order.
         starts.push_back(startNumber);
         
-        // And the vector of sizes in number order
+        // Read in the contig's length
+        size_t lengthNumber;
+        lineData >> lengthNumber;
+        
+        // Add it to the vector of sizes in number order
         lengths.push_back(lengthNumber);
         
-        // And the vector of cumulative lengths
+        // And to the vector of cumulative lengths
         cumulativeLengths.push_back(lengthSum);
         lengthSum += lengthNumber;
         
-        // And the vector of genome assignments in number order
+        // Read in the number of the genome that the contig belongs to.
+        size_t genomeNumber;
+        lineData >> genomeNumber;
+        
+        // Add it to the vector of genome assignments in number order
         genomeAssignments.push_back(genomeNumber);
+        
+        // Read in the BWT index of the last base in the contig.
+        int64_t endBwtIndex;
+        lineData >> endBwtIndex;
+        
+        // Add it to the vector of BWT indices of last bases
+        endIndices.push_back(endBwtIndex);
+    
     }
+        
+        
     // Close up the contig file. We read our contig metadata.
     contigFile.close();
     
@@ -520,6 +524,12 @@ TextPosition FMDIndex::locate(int64_t index) const {
     return TextPosition(bitfield.getID(), bitfield.getPos());
 }
 
+int64_t getContigEndIndex(size_t contig) {
+    // Looks a bit like the metadata functions from earlier. Actually pulls info
+    // from the same file.
+    return endIndices[contig];
+}
+
 char FMDIndex::display(int64_t index) const {
     // Just pull straight from the BWT string.
     return bwt.getChar(index);
@@ -528,6 +538,32 @@ char FMDIndex::display(int64_t index) const {
 char FMDIndex::displayFirst(int64_t index) const {
     // Our BWT supports this natively.
     return bwt.getF(index);
+}
+
+std::string FMDIndex::displayContig(size_t index) const {
+    // We can't efficiently un-locate, so we just store the last BWT index in
+    // every contig. This works since there are no 0-length contigs.
+    int64_t bwtIndex = getContigEnd(index);
+    
+    // Make a string to hold all the bases.
+    std::string bases;
+
+    for(size_t i = 0; i < getContigLength(index); i++) {
+        // Until we have the right number of bases...
+        
+        // Grab this base
+        bases.push_back(display(bwtIndex));
+        
+        // LF-map to the previous position in the contig (or off the front end).
+        bwtIndex = getLF(bwtIndex);
+    }
+    
+    // Flip the string around so it's front to front.
+    std::reverse(bases.begin(), bases.end());
+    
+    // Give it back.
+    return bases;
+    
 }
 
 int64_t FMDIndex::getLF(int64_t index) const {

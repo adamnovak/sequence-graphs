@@ -164,6 +164,14 @@ public:
      */
     TextPosition locate(int64_t index) const;
     
+    // Unfortunately, unlocate cannot be efficiently implemented with
+    // libsuffixtools's SampledSuffixArray.
+    
+    /**
+     * Find the endpoint of the given contig in the BWT.
+     */
+    int64_t getContigEndIndex(size_t contig);
+    
     /***************************************************************************
      * Retrieval Functions
      **************************************************************************/
@@ -177,6 +185,11 @@ public:
      * Get the character in the first column of the given row in the BWT matrix.
      */
     char displayFirst(int64_t index) const;
+    
+    /**
+     * Extract and return the forward strand of the given contig.
+     */
+    std::string displayContig(size_t index) const;
     
     /**
      * Given an index in the BWT, do an LF-mapping to get where the character
@@ -284,6 +297,11 @@ protected:
      * Holds the genome index to which each contig belongs.
      */
     std::vector<size_t> genomeAssignments;
+    
+    /**
+     * Holds the index in the BWT of the last base in each contig.
+     */
+    std::vector<int64_t> endIndices;
     
     // TODO: Change all these indexed-by-contig things into one vector of Contig
     // objects.

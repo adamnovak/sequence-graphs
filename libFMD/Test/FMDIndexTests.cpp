@@ -138,6 +138,22 @@ void FMDIndexTests::testDump() {
 }
 
 /**
+ * Test pulling out a contig.
+ */
+void FMDIndexTests::testDisplay() {
+    // Load the index up
+    FMDIndex index(tempDir + "/index.basename");
+    
+    // Make sure the first contig comes out right
+    CPPUNIT_ASSERT(index.displayContig(0) == 
+        "CATGCTTCGGCGATTCGACGCTCATCTGCGACTCT");
+        
+    // And the second
+    CPPUNIT_ASSERT(index.displayContig(1) == 
+        "CGGGCGCATCGCTATTATTTCTTTCTCTTTTCACA");
+}
+
+/**
  * Test searching an an FMD index.
  */
 void FMDIndexTests::testSearch() {

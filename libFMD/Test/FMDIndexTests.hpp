@@ -10,6 +10,7 @@
 class FMDIndexTests : public CppUnit::TestFixture {
     CPPUNIT_TEST_SUITE(FMDIndexTests);
     CPPUNIT_TEST(testDump);
+    CPPUNIT_TEST(testDisplay);
     CPPUNIT_TEST(testMetadata);
     CPPUNIT_TEST(testLF);
     CPPUNIT_TEST(testSearch);
@@ -30,6 +31,7 @@ public:
     void testMetadata();
     void testLF();
     void testDump();
+    void testDisplay();
     void testSearch();
     void testLocate();
     void testIterate();
