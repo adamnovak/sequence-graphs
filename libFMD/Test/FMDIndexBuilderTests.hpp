@@ -2,7 +2,7 @@
 #define FMDINDEXBUILDERTESTS_HPP
 
 #include <cppunit/extensions/HelperMacros.h>
-#include "FMDIndexBuilder.hpp"
+#include "../FMDIndexBuilder.hpp"
 
 /**
  * Tests for the FMDIndexBuilder.

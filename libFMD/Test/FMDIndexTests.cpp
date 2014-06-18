@@ -7,9 +7,9 @@
 #include <ReadTable.h>
 #include <SuffixArray.h>
 
-#include "FMDIndex.hpp"
-#include "FMDIndexBuilder.hpp"
-#include "util.hpp"
+#include "../FMDIndex.hpp"
+#include "../FMDIndexBuilder.hpp"
+#include "../util.hpp"
 
 #include "FMDIndexTests.hpp"
 

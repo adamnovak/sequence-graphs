@@ -1,6 +1,6 @@
 // Test SmallSide objects.
 
-#include "SmallSide.hpp"
+#include "../SmallSide.hpp"
 
 #include "SmallSideTests.hpp"
 
