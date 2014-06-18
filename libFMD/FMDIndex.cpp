@@ -9,17 +9,19 @@
 #include "Log.hpp"
 
 FMDIndex::FMDIndex(std::string basename, SuffixArray* fullSuffixArray): 
-    names(), starts(), lengths(), cumulativeLengths(), genomeMasks(),
-    bwt(basename + ".bwt"), suffixArray(basename + ".ssa"), 
-    fullSuffixArray(fullSuffixArray) {
+    names(), starts(), lengths(), cumulativeLengths(), genomeAssignments(),
+    genomeRanges(), genomeMasks(), bwt(basename + ".bwt"), 
+    suffixArray(basename + ".ssa"), fullSuffixArray(fullSuffixArray) {
+    
+    // TODO: Too many initializers
 
     Log::info() << "Loading " << basename << std::endl;
 
     // We already loaded the index itself in the initializer. Go load the
     // length/order metadata.
     
-    // Open the contig name/start/length file for reading.
-    std::ifstream contigFile((basename + ".chrom.sizes").c_str());
+    // Open the contig name/start/length/genome file for reading.
+    std::ifstream contigFile((basename + ".contigs").c_str());
     
     // Keep a cumulative length sum
     size_t lengthSum = 0;
@@ -27,24 +29,33 @@ FMDIndex::FMDIndex(std::string basename, SuffixArray* fullSuffixArray):
     // Have a string to hold each line in turn.
     std::string line;
     while(std::getline(contigFile, line)) {
-        // For each <contig>\t<length> pair...
+        // For each <contig>\t<length>\t<position>\t<genome> line...
         
-        // Find the \t separating the name field from the length
-        size_t tab2 = line.rfind('\t');
+        // Find the \t separating the genome ID from the contig position
+        size_t tab3 = line.rfind('\t');
         
-        // Find the \t dividing the start position from the sequence name.
+        // Find the \t separating the position from the length
+        size_t tab2 = line.rfind('\t', tab3 - 1);
+        
+        // Find the \t separating the start position from the sequence name.
         size_t tab1 = line.rfind('\t', tab2 - 1);
         
-        // Split into name, start, and length
+        // Split into name, start, length, and genome
         std::string contigName = line.substr(0, tab1);
         std::string contigStart = line.substr(tab1 + 1, tab2);
-        std::string contigLength = line.substr(tab2 + 1, line.size() - 1);
+        std::string contigLength = line.substr(tab2 + 1, tab3);
+        std::string genome = line.substr(tab3 + 1, line.size() - 1);
+        
+        // TODO: Genericize this whole parser.
         
         // Parse the start
         long long int startNumber = atoll(contigStart.c_str());
         
         // Parse the length
         long long int lengthNumber = atoll(contigLength.c_str());
+        
+        // Parse the genome
+        long long int genomeNumber = atoll(genome.c_str());
         
         // Add it to the vector of names in number order.
         names.push_back(contigName);
@@ -58,6 +69,9 @@ FMDIndex::FMDIndex(std::string basename, SuffixArray* fullSuffixArray):
         // And the vector of cumulative lengths
         cumulativeLengths.push_back(lengthSum);
         lengthSum += lengthNumber;
+        
+        // And the vector of genome assignments in number order
+        genomeAssignments.push_back(genomeNumber);
     }
     // Close up the contig file. We read our contig metadata.
     contigFile.close();
@@ -80,10 +94,61 @@ FMDIndex::FMDIndex(std::string basename, SuffixArray* fullSuffixArray):
         // This lets us autodetect how many genomes there are.
     }
     
-    Log::info() << "Loaded " << names.size() << " contigs in " << 
-        genomeMasks.size() << " genomes" << std::endl;
+    // Now invert the contig-to-genome index to make the genome-to-contig-range
+    // index.
     
+    // How many genomes are there?
+    size_t numGenomes = genomeMasks.size();
     
+    // Make the genome range vector big enough. Fill it with empty ranges for
+    // genomes that somehow have no contigs.
+    genomeRanges.resize(numGenomes, std::make_pair(0, 0));
+    
+    // Start out the first range.
+    std::pair<size_t, size_t> currentRange = std::make_pair(0, 0);
+    
+    // Which genome are we on?
+    size_t currentGenome;
+    
+    for(std::vector<size_t>::iterator i = genomeAssignments.begin(); 
+        i != genomeAssignments.end(); ++i) {
+    
+        if(i == genomeAssignments.begin()) {
+            // We're starting. Grab this genome as our current genome (since the
+            // file may not start with genome 0).
+            // TODO: Maybe just require that?
+            currentGenome = *i;
+        }
+        
+        if(*i == currentGenome) {
+            // This is the same genome as the last one. Extend the range.
+            currentRange.second++;
+        } else {
+            // This is now a different genome. Save the range.
+            genomeRanges[currentGenome] = currentRange;
+            
+            // Make a new range that comes after it, with length 0.
+            currentRange = std::make_pair(currentRange.second,
+                currentRange.second);
+            
+            // Remember what new genome we're looking at.
+            currentGenome = *i;
+            
+            if(currentGenome >= numGenomes) {
+                // Complain if we have a genome number higher than the number of
+                // masks we loaded.
+                throw std::runtime_error(
+                    "Got a contig for a genome with no mask!");
+            }
+        }
+    
+    }
+    
+    // Save the last range
+    genomeRanges[currentGenome] = currentRange;    
+    
+    Log::info() << "Loaded " << names.size() << " contigs in " << numGenomes <<
+        " genomes" << std::endl;
 }
 
 FMDIndex::~FMDIndex() {
@@ -164,6 +229,22 @@ size_t FMDIndex::getContigStart(size_t index) const {
 size_t FMDIndex::getContigLength(size_t index) const {
     // Get the length of that contig.
     return lengths[index];
+}
+
+size_t FMDIndex::getContigGenome(size_t index) const {
+    // Get the genome that that contig belongs to.
+    return genomeAssignments[index];
+}
+    
+size_t FMDIndex::getNumberOfGenomes() const {
+    // Get the number of genomes that are in the index.
+    // TODO: Several things are this length. There should only be one.
+    return genomeMasks.size();
+}
+    
+std::pair<size_t, size_t> FMDIndex::getGenomeContigs(size_t genome) {
+    // Get the range of contigs belonging to the given genome.
+    return genomeRanges[genome];
 }
 
 int64_t FMDIndex::getTotalLength() const {

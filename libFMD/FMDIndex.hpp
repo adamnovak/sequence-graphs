@@ -104,6 +104,23 @@ public:
      */
     size_t getContigLength(size_t index) const;
     
+    /**
+     * Get the number of the genome to which the contig at the given index
+     * belongs.
+     */
+    size_t getContigGenome(size_t index) const;
+    
+    /**
+     * Get the total number of genomes in the index.
+     */
+    size_t getNumberOfGenomes() const;
+    
+    /**
+     * Get the range of contig numbers [start, end) that belong to the given
+     * genome. All contigs in a genome appear one after the other.
+     */
+    std::pair<size_t, size_t> getGenomeContigs(size_t genome);
+    
     /***************************************************************************
      * Search Functions
      **************************************************************************/
@@ -262,6 +279,20 @@ protected:
      * each contig.
      */
     std::vector<size_t> cumulativeLengths;
+    
+    /**
+     * Holds the genome index to which each contig belongs.
+     */
+    std::vector<size_t> genomeAssignments;
+    
+    // TODO: Change all these indexed-by-contig things into one vector of Contig
+    // objects.
+    
+    /**
+     * Holds, for each genome, a [start, end) range of contig numbers that
+     * belong to it.
+     */
+    std::vector<std::pair<size_t, size_t>> genomeRanges;
     
     /**
      * Holds the bit vector masks for the BWT positions belonging to each

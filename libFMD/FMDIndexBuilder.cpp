@@ -48,7 +48,7 @@ KSEQ_INIT(int, read)
 FMDIndexBuilder::FMDIndexBuilder(const std::string& basename, int sampleRate):
     basename(basename), tempDir(make_tempdir()), 
     tempFastaName(tempDir + "/temp.fa"), tempFasta(tempFastaName.c_str()), 
-    contigFile((basename + ".chrom.sizes").c_str()), genomeAssignments(),
+    contigFile((basename + ".contigs").c_str()), genomeAssignments(),
     sampleRate(sampleRate) {
 
     // Nothing to do, already made everything.
@@ -101,17 +101,18 @@ void FMDIndexBuilder::add(const std::string& filename) {
                         std::endl;
                     tempFasta << run << std::endl;
                     
-                    // And the contig file (where we store FASTA record name,
-                    // start, an length for each contig), under the constraint
-                    // that the entries be grouped by FASTA record.
-                    contigFile << name << "\t" << runStart << "\t" <<
-                        (i - runStart) << std::endl;
-                    
                     // And the reverse strand    
                     tempFasta << ">" << name << "-" << runStart << "R" <<
                         std::endl;
                     std::string reverseStrand = reverseComplement(run);
                     tempFasta << reverseStrand << std::endl;
+                    
+                    // Add the contig to the contig file (where we store FASTA
+                    // record name, start, length, and genome). All contigs will
+                    // be ordered by FASTA record they are from, and FASTA
+                    // records from the same genome all appear together.
+                    contigFile << name << "\t" << runStart << "\t" <<
+                        (i - runStart) << "\t" << genomeNumber << std::endl;
                     
                     // Record that this sequence belongs to this genome.
                     genomeAssignments.push_back(genomeNumber);

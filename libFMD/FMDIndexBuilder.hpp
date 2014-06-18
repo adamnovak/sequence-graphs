@@ -24,7 +24,8 @@ class FMDIndexBuilder {
         
         /**
          * Add the contents of the given FASTA file to the index, both forwards
-         * and in reverse complement.
+         * and in reverse complement. All the sequences in the file are taken to
+         * constitute a genome.
          */
         void add(const std::string& filename);
         
