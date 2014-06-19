@@ -89,7 +89,7 @@ void SymmetricMergeScheme::generateMerges(size_t targetGenome,
     std::pair<size_t, size_t> contigRange = index.getGenomeContigs(queryGenome);
     
     for(size_t i = contigRange.first; i < contigRange.second; i++) {
-        Log::info() << "Merge thread mapping contig " << i << " to genome " << 
+        Log::debug() << "Merge thread mapping contig " << i << " to genome " << 
             targetGenome << std::endl;
         
         // Grab each contig as a string
@@ -107,7 +107,7 @@ void SymmetricMergeScheme::generateMerges(size_t targetGenome,
                 continue;
             }
             
-            Log::info() << "Mapped base " << base << std::endl;
+            Log::debug() << "Mapped base " << base << std::endl;
             
             // Produce a merge between the base we're looking at on the forward
             // strand of this contig, and the location (and strand) it mapped to
