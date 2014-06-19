@@ -552,9 +552,26 @@ writeAlignment(
         if(contigName != sourceSequence || contig == 0) {
             // This is a new sequence
             
+            // What genome does it belong to?
+            size_t genomeNumber = index.getContigGenome(contig);
+            
+            // What contigs are in that genome?
+            auto genomeRange = index.getGenomeContigs(genomeNumber);
+            
+            // Generate a name for the genome.
+            std::string genomeName;
+            
+            if(genomeRange.second - genomeRange.first > 0) {
+                // Genome has multiple contigs. Generate a procedural name.
+                genomeName = "genome-" + std::to_string(genomeNumber);
+            } else {
+                // Genome has exactly one contig. Name it after that.
+                genomeName = contigName;
+            }
+            
             // Start a new sequence with a sequence line. The sequence is a top
             // sequence, since it is only connected up.
-            c2h << "s\t'" << contigName << "'\t'" << contigName << "'\t0" <<
+            c2h << "s\t'" << genomeName << "'\t'" << contigName << "'\t0" <<
                 std::endl;
             
             // Remember that we are on this sequence
