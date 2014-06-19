@@ -82,15 +82,33 @@ void SymmetricMergeScheme::join() {
 void SymmetricMergeScheme::generateMerges(size_t targetGenome,
     size_t queryGenome) {
     
+    // What's our thread name?
+    std::string threadName = "T" + std::to_string(queryGenome) + "->" + 
+        std::to_string(targetGenome);
+    
     // Now we just have to generate some merges by mapping each contig in the
     // query to the target, and write them to the queue.
+    
+    // Keep track of total bases mapped and unmapped
+    size_t basesMapped = 0;
+    size_t basesUnmapped = 0;
     
     // Get the range of contigs we need to map.
     std::pair<size_t, size_t> contigRange = index.getGenomeContigs(queryGenome);
     
+    // How many are in there?
+    size_t contigsToDo = contigRange.second - contigRange.first;
+    
+    // Say how many we are doing.
+    Log::info() << threadName << " has to map " << contigsToDo << " contigs" <<
+        std::endl;
+    
     for(size_t i = contigRange.first; i < contigRange.second; i++) {
-        Log::debug() << "Merge thread mapping contig " << i << " to genome " << 
-            targetGenome << std::endl;
+        Log::debug() << threadName << " mapping contig " << i << std::endl;
+        
+        // Keep track of mapped and unmapped bases per contig.
+        size_t basesMappedInContig = 0;
+        size_t basesUnmappedInContig = 0;
         
         // Grab each contig as a string
         std::string contig = index.displayContig(i);
@@ -98,18 +116,18 @@ void SymmetricMergeScheme::generateMerges(size_t targetGenome,
         // Map it to the target genome in both orientations, and disambiguate.
         std::vector<Mapping> mappings = index.mapBoth(contig, targetGenome);
         
-        Log::info() << "Mapped contig " << i << " to genome " << targetGenome <<
-            std::endl;
-        
         for(size_t base = 0; base < mappings.size(); base++) {
             // For each base that we tried to map
             
             if(!mappings[base].is_mapped) {
                 // Skip the unmapped ones
+                basesUnmappedInContig++;
                 continue;
             }
             
-            Log::debug() << "Mapped base " << base << std::endl;
+            // If we get here, we mapped a base.
+            basesMappedInContig++;
+            Log::debug() << threadName << " mapped base " << base << std::endl;
             
             // Produce a merge between the base we're looking at on the forward
             // strand of this contig, and the location (and strand) it mapped to
@@ -121,7 +139,19 @@ void SymmetricMergeScheme::generateMerges(size_t targetGenome,
             auto lock = queue->lock();
             // Spend our lock to add something to it.
             queue->enqueue(merge, lock);
+            
+            // Put bases into total stats
+            basesMapped += basesMappedInContig;
+            basesUnmapped += basesUnmappedInContig;
         }
+        
+        // How much is left to do?
+        size_t contigsDone = i + 1 - contigRange.first;
+        
+        
+        Log::info() << threadName << " mapped contig " << i << " (" << 
+            basesMappedInContig << "|" << basesUnmappedInContig << ") " << 
+            contigsDone << "/" << contigsToDo << std::endl;
         
     }
     
@@ -129,8 +159,9 @@ void SymmetricMergeScheme::generateMerges(size_t targetGenome,
     auto lock = queue->lock();
     queue->close(lock);
     
-    Log::info() << "Merge thread " << queryGenome << "->" << targetGenome << 
-        " finished." << std::endl;
+    // Report that we're done and how many bases we mapped.
+    Log::info() << threadName << " finished (" << basesMapped << "|" << 
+        basesUnmapped << ")" << std::endl;
 }
 
 

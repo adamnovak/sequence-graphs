@@ -125,9 +125,10 @@ FMDIndex::FMDIndex(std::string basename, SuffixArray* fullSuffixArray):
             // This is now a different genome. Save the range.
             genomeRanges[currentGenome] = currentRange;
             
-            // Make a new range that comes after it, with length 0.
+            // Make a new range that comes after it, with length 1, since we
+            // include this contig.
             currentRange = std::make_pair(currentRange.second,
-                currentRange.second);
+                currentRange.second + 1);
             
             // Remember what new genome we're looking at.
             currentGenome = *i;

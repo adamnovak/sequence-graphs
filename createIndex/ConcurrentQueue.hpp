@@ -135,6 +135,8 @@ public:
             // check again
             nonempty.notify_all();
         }
+        
+        Log::info() << "Queue writers remaining: " << numWriters << std::endl;
     }
     
     /**
