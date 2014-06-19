@@ -126,6 +126,11 @@ public:
      */
     std::pair<size_t, size_t> getGenomeContigs(size_t genome) const;
     
+    /**
+     * Return whether the given BWT position is in the given genome.
+     */
+    bool isInGenome(int64_t bwtIndex, size_t genome) const;
+    
     /***************************************************************************
      * Search Functions
      **************************************************************************/
@@ -346,7 +351,7 @@ protected:
      * genome. Note that we can't get genome by contig or contigs for genome.
      * Only genome by BWT position.
      *
-     * If we had C++11 we would use a vector, but we don't and sicne BitVector
+     * If we had C++11 we would use a vector, but we don't and since BitVector
      * is not copy constructable/assignable we can't put it in a vector. So we
      * put pointers in a vector.
      */

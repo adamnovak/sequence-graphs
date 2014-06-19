@@ -139,7 +139,8 @@ void FMDIndexTests::testDump() {
             reconstruction.rend());
     
         std::cout << i << ": " << index->displayFirst(i) << " " << 
-            forwardReconstruction << " " << index->display(i) << std::endl;
+            forwardReconstruction << " " << index->display(i) << " " << 
+            index->isInGenome(i, 0) << std::endl;
     }
     
 }
@@ -287,6 +288,18 @@ void FMDIndexTests::testMap() {
         // Make sure each base maps in order, but now to the other strand.
         CPPUNIT_ASSERT(mappings[i].is_mapped == true);
         CPPUNIT_ASSERT(mappings[i].location.getText() == 1);
+        CPPUNIT_ASSERT(mappings[i].location.getOffset() == i);
+    }
+    
+    // Test again with the genome restriction on
+    mappings = index->mapBoth(query, 0);
+    
+    for(size_t i = 0; i < query2.size(); i++ ) {
+        std::cout << mappings[i] << std::endl;
+    
+        // Make sure each base maps in order still.
+        CPPUNIT_ASSERT(mappings[i].is_mapped == true);
+        CPPUNIT_ASSERT(mappings[i].location.getText() == 0);
         CPPUNIT_ASSERT(mappings[i].location.getOffset() == i);
     }
 }

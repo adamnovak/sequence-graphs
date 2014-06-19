@@ -264,6 +264,10 @@ std::pair<size_t, size_t> FMDIndex::getGenomeContigs(size_t genome) const {
     return genomeRanges[genome];
 }
 
+bool FMDIndex::isInGenome(int64_t bwtIndex, size_t genome) const {
+    return BitVectorIterator(*genomeMasks[genome]).isSet(bwtIndex);
+}
+
 int64_t FMDIndex::getTotalLength() const {
     // Sum all the contig lengths and double (to make it be for both strands).
     // See <http://stackoverflow.com/a/3221813/402891>

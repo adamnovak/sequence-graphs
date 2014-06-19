@@ -193,14 +193,14 @@ mergeSymmetric(
     const FMDIndex& index
 ) {
 
-    Log::info() << "Applying symmetric merging scheme." << std::endl;
+    Log::info() << "Creating initial pinch thread set" << std::endl;
     
     // Make a thread set from our index.
     stPinchThreadSet* threadSet = makeThreadSet(index);
     
     // Make the merge scheme we want to use
     SymmetricMergeScheme scheme(index);
-    
+
     // Set it running and grab the queue where its results come out.
     ConcurrentQueue<Merge>& queue = scheme.run();
     
