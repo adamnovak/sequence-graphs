@@ -139,11 +139,11 @@ void SymmetricMergeScheme::generateMerges(size_t targetGenome,
             auto lock = queue->lock();
             // Spend our lock to add something to it.
             queue->enqueue(merge, lock);
-            
-            // Put bases into total stats
-            basesMapped += basesMappedInContig;
-            basesUnmapped += basesUnmappedInContig;
         }
+        
+        // Put bases from this contig into total stats
+        basesMapped += basesMappedInContig;
+        basesUnmapped += basesUnmappedInContig;
         
         // How much is left to do?
         size_t contigsDone = i + 1 - contigRange.first;
