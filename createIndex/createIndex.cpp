@@ -217,212 +217,6 @@ mergeSymmetric(
 }
 
 /**
- * Create a new thread set from the given FMDIndex, and merge it down by the
- * nonsymmetric merging scheme to contexts of the given length (including the
- * base being matched itself). Returns the pinched thread set.
- *
- * If dumpFile is set, dumps debug graph data to that file.
- * If quiet is true, don't announce contexts.
- *
- * Note that due to the nature of this merging scheme, any two nodes that would
- * merge at a longer context length will also merge at a shorter context length,
- * so we can just directly calculate each upper level in turn.
- */
-stPinchThreadSet*
-mergeNonsymmetric(
-    const FMDIndex& index,
-    size_t contextLength,
-    std::ostream* dumpFile = NULL,
-    bool quiet = false
-) {
-    
-    // Keep track of nodes we have already dumped.
-    std::set<std::string> dumped;
-    
-    // Make a thread set from our index.
-    stPinchThreadSet* threadSet = makeThreadSet(index);
-    
-    // To construct the non-symmetric merged graph with p context:
-    // Traverse the suffix tree down to depth p + 1
-    // Make the end iterator once.
-    FMDIndex::iterator end = index.end(contextLength);
-    for(FMDIndex::iterator i = index.begin(contextLength); i != end; ++i) {
-        // For each pair of suffix and position in the suffix tree
-        
-        // Unpack the iterator into pattern and FMDPosition at which it happens.
-        std::string pattern = (*i).first;
-        // This is in SA coordinates.
-        FMDPosition range = (*i).second;
-        
-        
-        if(!quiet) {
-            // Dump the context and range.
-            Log::debug() << pattern << " at " << range << std::endl;
-        }
-        
-        if(range.getEndOffset() >= 1 || dumpFile != NULL) {
-            // We only need to do any pinching if this context appears in two or
-            // more places. And since a range with offset 0 has one thing in it,
-            // we check to see if it's 1 or more.
-            
-            Log::debug() << "Locating " << range << std::endl;
-            
-            // For each base location, we need to work out the contig and base
-            // and orientation, and pinch with the first.
-            
-            // Work out what text and base the first base is.
-            TextPosition firstBase = index.locate(range.getForwardStart());
-            
-            Log::trace() << "First relative position: text " << 
-                firstBase.getText() << " offset " << firstBase.getOffset() <<
-                std::endl;
-            
-            // What contig corresponds to that text?
-            size_t firstContigNumber = index.getContigNumber(firstBase);
-            // And what strand corresponds to that text?
-            size_t firstStrand = index.getStrand(firstBase);
-            // And what base position is that?
-            size_t firstOffset = index.getOffset(firstBase);
-            
-            // Grab the first pinch thread
-            stPinchThread* firstThread = stPinchThreadSet_getThread(threadSet,
-                firstContigNumber);
-                
-            if(firstThread == NULL) {
-                throw std::runtime_error("First thread was NULL!");
-            }
-            
-            if(dumpFile != NULL) {
-                // Report the first position as existing.
-                std::string firstName = index.getName(firstBase); 
-                
-                if(!dumped.count(firstName)) {
-                    // Get its base
-                    char baseChar = index.displayFirst(range.getForwardStart());
-                    if(firstStrand) {
-                        // Flip it around so we always see forward strand bases.
-                        baseChar = complement(baseChar);
-                    }
-                
-                    // Write a node for it
-                    *dumpFile << firstName << "[shape=\"record\",label=\"{" << 
-                        firstName << "|" << baseChar <<
-                        "}\"];" << std::endl;
-                    if(firstOffset > 1) {
-                        // Link to previous Position
-                        *dumpFile << index.getName(TextPosition(
-                            // Hack to get the base actually before us on the
-                            // contig.
-                            firstContigNumber * 2, firstOffset - 2)) << 
-                            " -> " << firstName << ";" << std::endl;
-                    }
-                    dumped.insert(firstName);
-                }
-            }
-            
-            for(int64_t j = 1; j < range.getEndOffset() + 1; j++) {
-                // For each subsequent base
-                
-                // Locate the base
-                TextPosition otherBase = index.locate(range.getForwardStart() +
-                    j);
-                
-                Log::trace() << "Relative position: (" << 
-                    otherBase.getText() << "," << otherBase.getOffset() << 
-                    ")" << std::endl;   
-                
-                size_t otherContigNumber = index.getContigNumber(otherBase);
-                size_t otherStrand = index.getStrand(otherBase);
-                size_t otherOffset = index.getOffset(otherBase);
-                
-                // Grab the other pinch thread.
-                stPinchThread* otherThread = stPinchThreadSet_getThread(
-                    threadSet, otherContigNumber);
-                    
-                if(firstThread == NULL) {
-                    throw std::runtime_error("Other thread was NULL!");
-                }
-            
-                // What orientation should we use for the second strand, given
-                // that we are pinching against the first strand in orientation
-                // 1 (reverse)?
-                bool orientation = firstStrand == otherStrand;
-            
-                // Pinch firstBase on firstNumber and otherBase on otherNumber
-                // in the correct relative orientation.
-                Log::trace() << "\tPinching #" << firstContigNumber << ":" <<
-                    firstOffset << " strand " << firstStrand << " and #" << 
-                    otherContigNumber << ":" << otherOffset << " strand " << 
-                    otherStrand << " (orientation: " << orientation << ")" <<
-                    std::endl;
-                
-                stPinchThread_pinch(firstThread, otherThread, firstOffset,
-                    otherOffset, 1, orientation);
-                    
-                if(dumpFile != NULL) {
-                    // Report the other position as existing.
-                    std::string otherName = index.getName(otherBase); 
-                    
-                    if(!dumped.count(otherName)) {
-                        // Get its base character
-                        char baseChar = index.displayFirst(
-                            range.getForwardStart() + j);
-                            
-                        if(otherStrand) {
-                            // Flip it around so we always see forward strand
-                            // bases.
-                            baseChar = complement(baseChar);
-                        }
-                    
-                        // Write a node for it
-                        *dumpFile << otherName << 
-                            "[shape=\"record\",label=\"{" << otherName << "|" <<
-                            baseChar << "}\"];" << std::endl;
-                        
-                        if(otherOffset > 1) {
-                            // Link previous position to us.
-                            *dumpFile << index.getName(TextPosition(
-                                // Hack to get the base actually before us on
-                                // the contig.
-                                otherContigNumber * 2, otherOffset - 2)) << 
-                                " -> " << otherName << ";" << std::endl;
-                        }
-                        dumped.insert(otherName);
-                    }
-                }
-                
-            }
-            
-            if(!quiet) {
-                // Say we merged some bases.
-                Log::debug() << "Merged " << range.getEndOffset() + 1 <<  
-                    " bases" << std::endl;
-            }
-            
-        }
-    }
-    
-    // Write a report before joining trivial boundaries.
-    Log::output() << "Before joining boundaries:" << std::endl;
-    Log::output() << "Pinch Blocks: " << 
-        stPinchThreadSet_getTotalBlockNumber(threadSet) << std::endl;
-    logMemory();
-    
-    // Now GC the boundaries in the pinch set
-    Log::info() << "Joining trivial boundaries..." << std::endl;
-    stPinchThreadSet_joinTrivialBoundaries(threadSet);
-    
-    // Write a similar report afterwards.
-    Log::output() << "After joining boundaries:" << std::endl;
-    Log::output() << "Pinch Blocks: " << 
-        stPinchThreadSet_getTotalBlockNumber(threadSet) << std::endl;
-    logMemory();
-    
-    // Return the finished thread set
-    return threadSet;
-}
-
-/**
  * Turn the given (contig number, 1-based offset from start, orientation)
  * position into the same sort of structure for the canonical base that
  * represents all the bases it has been pinched with.
@@ -539,94 +333,6 @@ canonicalize(
     
     // Canonicalize that pinch thread set position.
     return canonicalize(threadSet, contigNumber, offset, strand);
-    
-}
-
-/**
- * Write GraphViz edges for adjacencies between merged nodes, which are derived
- * by canonicalizing and looking up the IDs for successive positions, and
- * linking them together.
- *
- * Takes a pinch thread set that knows what all the contigs are and how they got
- * pinched, a map from canonical pinch thread bases to merged position IDs, and
- * the stream to send the GraphViz data to.
- */
-void makeMergedAdjacencies(
-    stPinchThreadSet* threadSet, 
-    std::map<std::pair<size_t, size_t>, long long int> idReservations, 
-    std::ofstream* dumpFile
-) {
-
-    // We need a way to keep track of what edges we have already made between
-    // sides. So keep a set of merged base IDs and orientation flags. Make sure
-    // the key pairs are sorted!
-    typedef std::pair<long long int, bool> mergedSide;
-    std::set<std::pair<mergedSide, mergedSide> > addedEdges;
-    
-    // Iterate through the pinch threads. We need to do a bit of an odd loop
-    // since this is a bit of an odd iterator.
-    stPinchThread* thread;
-    for(stPinchThreadSetIt i = stPinchThreadSet_getIt(threadSet); 
-        (thread = stPinchThreadSetIt_getNext(&i)) != NULL; ) {
-        // For each thread...
-        
-        // Get its name
-        size_t name = stPinchThread_getName(thread);
-        for(size_t j = stPinchThread_getStart(thread); 
-            j < stPinchThread_getStart(thread) + 
-            stPinchThread_getLength(thread) - 1; j++) {
-            
-            // For each base in the thread that isn't the last...
-            
-            Log::debug() << "Linking merged base " << j << " on thread " <<
-                name << std::endl;
-            
-            
-            
-            // Canonicalize its right side (strand 0 or false), which is the one
-            // linked by this adjacency to the next base.
-            std::pair<std::pair<size_t, size_t>, bool> canonicalBase =
-                canonicalize(threadSet, name, j, false);
-            
-            // Also canonicalize the left side of the next base.
-            std::pair<std::pair<size_t, size_t>, bool> canonicalNextBase =
-                canonicalize(threadSet, name, j + 1, true);
-                
-            // What IDs and sides do these go to? Hold pairs of coordinate and
-            // side.
-            mergedSide side = 
-                std::make_pair(idReservations[canonicalBase.first],
-                canonicalBase.second);
-            mergedSide nextSide = 
-                std::make_pair(idReservations[canonicalNextBase.first],
-                canonicalNextBase.second);
-            
-            
-            if(nextSide < side) {
-                // These are in the wrong order. All our edges need to go from
-                // smallest to largest, so we don't repeat them.
-                std::swap(side, nextSide);
-            }
-            
-            // What edge would we make? Pair up the sides in order.
-            std::pair<mergedSide, mergedSide> edge = std::make_pair(side,
-                nextSide);
-                
-            if(addedEdges.count(edge) == 0) {
-                // This is a new edge between merged sides. Print it out.
-                *dumpFile << "M" << side.first << " -> " << "M" << 
-                    nextSide.first << "[dir=both,arrowtail=" << 
-                    getArrow(!side.second) << ",arrowhead=" << 
-                    getArrow(!nextSide.second) << ",color=red];" << std::endl;
-                    
-                // Add the edge.
-                addedEdges.insert(edge);
-            }
-        
-        }  
-        
-    }
-
     
 }
 
@@ -981,218 +687,17 @@ writeAlignmentFasta(
  * implied by the given thread set in the given index. Gets IDs for created
  * positions from the given source.
  * 
- * Manages this by traversing the suffix tree, and blocking out each range
- * (since we're sure a range of the correct length has all been merged into the
- * same base and face).
- *
- * If dumpFile is set, also writes a graphviz-format debug graph.
- * 
- * Don't forget to delete the bit vector when done!
- */
-std::pair<BitVector*, std::vector<SmallSide> > 
-makeLevelIndex(
-    stPinchThreadSet* threadSet, 
-    const FMDIndex& index, 
-    size_t contextLength,
-    IDSource<long long int>& source, 
-    std::ofstream* dumpFile = NULL
-) {
-    
-    // We need to make bit vector denoting ranges, which we encode with this
-    // encoder, which has 32 byte blocks.
-    BitVectorEncoder encoder(32);
-    
-    // We also need to make a vector of SmallSides, which are the things that
-    // get matched to by the corresponding ranges in the bit vector.
-    std::vector<SmallSide> mappings;
-    
-    // We also need this map of position IDs (long long ints) by canonical
-    // contig name (a size_t) and base index (also a size_t)
-    std::map<std::pair<size_t, size_t>, long long int>
-        idReservations;
-        
-    Log::info() << "Building mapping data structure by tree traversal..." <<
-        std::endl;
-    
-    // Make an ending iterator once, instead of on every loop.
-    FMDIndex::iterator end = index.end(contextLength, true);
-    for(FMDIndex::iterator i = index.begin(contextLength, true); i != end;
-        ++i) {
-        
-        // Go through all the contexts, including shortened ones before end of
-        // text.
-        
-        // Unpack the iterator into pattern and FMDPosition at which it happens
-        // which is in BWT coordinates.
-        std::string context = (*i).first;
-        FMDPosition range = (*i).second;
-        
-        Log::debug() << "===Context: " << context << " at range " << range <<
-            "===" << std::endl;
-        
-        if(context.size() == contextLength) {
-        
-            // If it's a full-requested-length context (and therefore all the
-            // bases in it have been pinched)...
-            
-            // Locate the first base in the context. It's already in SA
-            // coordinates.
-            TextPosition base = index.locate(range.getForwardStart());
-            Log::debug() << "Text/Offset: (" << base.getText() << ", " << 
-                base.getOffset() << ")" << std::endl;
-            
-            // Canonicalize it. The second field here will be the relative
-            // orientation and determine the face.
-            std::pair<std::pair<size_t, size_t>, bool> canonicalized = 
-                canonicalize(index, threadSet, base);
-            
-            // Figure out what the ID of the canonical base is.
-            long long int positionCoordinate;
-            if(idReservations.count(canonicalized.first) > 0) {
-                // Load the previously chosen ID
-                positionCoordinate = idReservations[canonicalized.first];
-            } else {
-                // Allocate and remember a new ID.
-                positionCoordinate = idReservations[canonicalized.first] = 
-                    source.next();
-            }
-            
-            // Say this range is going to belong to the ID we just looked up, on
-            // the appropriate face.
-            mappings.push_back(
-                SmallSide(positionCoordinate, canonicalized.second));
-            
-            if(range.getForwardStart() != 0) {
-                // Record a 1 in the vector at the start of every range except
-                // the first, in BWT coordinates. The first needs no 1 before it
-                // so it will be rank 0 (and match up with mapping 0), and it's
-                // OK not to split it off from the stop characters since they
-                // can't ever be searched.
-                encoder.addBit(range.getForwardStart());
-                Log::debug() << "Set bit " << range.getForwardStart() <<
-                    std::endl;
-            }
-            
-            // Put a 1 at the start of its interval, and add a mapping to the
-            // given ID and Side.
-            
-            // TODO: Make edges by traversing the pinch graph.
-                
-        } else if(context.size() < contextLength) {
-            // Otherwise if it's a shorter than requested context, it's
-            // possible not everything has been merged. So do the old thing
-            // where we locate each base and, when the canonical position
-            // changes, add a 1 to start a new range and add a mapping.
-
-            // Keep track of the ID and relative orientation for the last
-            // position we canonicalized.
-            std::pair<std::pair<size_t, size_t>, bool> lastCanonicalized;
-            
-            for(int64_t j = 0; j < range.getEndOffset() + 1; j++) {
-                // For each base in the range...
-                
-                // Where is it located?
-                TextPosition base = index.locate(range.getForwardStart() + j);
-                
-                // Canonicalize it. The second field here will be the relative
-                // orientation and determine the Side.
-                std::pair<std::pair<size_t, size_t>, bool> canonicalized = 
-                    canonicalize(index, threadSet, base);
-                    
-                if(j == 0 || canonicalized != lastCanonicalized) {
-                    // We need to start a new range here, because this BWT base
-                    // maps to a different position than the last one.
-                    
-                    // What position is that? TODO: Unify with ID assignment
-                    // above.
-                    long long int positionCoordinate;
-                    if(idReservations.count(canonicalized.first) > 0) {
-                        // Load the previously chosen ID
-                        positionCoordinate = 
-                            idReservations[canonicalized.first];
-                    } else {
-                        // Allocate and remember a new ID.
-                        positionCoordinate = 
-                            idReservations[canonicalized.first] = 
-                            source.next();
-                    }
-                    
-                    // Say this range is going to belong to the ID we just
-                    // looked up, on the appropriate face.
-                    mappings.push_back(
-                        SmallSide(positionCoordinate, canonicalized.second));
-                    
-                    // Add in the bit the same as above, only here we add the
-                    // offset of i.
-                    if(range.getForwardStart() + j != 0) {
-                        // Record a 1 in the vector at the start of every range
-                        // except the first, in BWT coordinates. The first needs
-                        // no 1 before it so it will be rank 0 (and match up
-                        // with mapping 0), and it's OK not to split it off from
-                        // the stop characters since they can't ever be
-                        // searched.
-                        encoder.addBit(range.getForwardStart() + j);
-                        Log::debug() << "Set bit " << 
-                            range.getForwardStart() + j << std::endl;
-                    }
-                    
-                    
-                    // Remember what canonical base and face we're doing for
-                    // this range.
-                    lastCanonicalized = canonicalized;
-                }
-                // Otherwise we had the same canonical base, so we want this in
-                // the same range we already started.
-            }
-        } else {
-            // We got a context that's longer than we asked for?
-            throw std::runtime_error("Iterated context longer than requested!");
-        }
-    }
-    
-    // Set a bit after the end of the last range in the BWT.
-    encoder.addBit(index.getBWTLength());
-    
-    // Make sure to flush the encoder so it finishes encoding.
-    encoder.flush();
-    
-    // Finish the vector encoder into a vector of the right length (i.e. the
-    // length of the BWT). This should always end in a 1! 
-    BitVector* bitVector = new BitVector(encoder,
-        index.getBWTLength() + 1);
-    
-    if(dumpFile != NULL) {
-        // We need to add in the edges that connect merged positions together.
-        // This requires walking all the contigs again, so we put it in its own
-        // function.
-        makeMergedAdjacencies(threadSet, idReservations, dumpFile);
-    }
-    
-    
-    // Return the bit vector and the Side vector
-    return std::make_pair(bitVector, mappings);
-}
-
-/**
- * Make the range vector and list of matching Sides for the hierarchy level
- * implied by the given thread set in the given index. Gets IDs for created
- * positions from the given source.
- * 
  * Manages this by scanning the BWT from left to right, seeing what cannonical
  * position and orientation each base belongs to, and putting 1s in the range
  * vector every time a new one starts.
  *
- * If dumpFile is set, also writes a graphviz-format debug graph.
- * 
  * Don't forget to delete the bit vector when done!
  */
 std::pair<BitVector*, std::vector<SmallSide> > 
 makeLevelIndexScanning(
     stPinchThreadSet* threadSet, 
     const FMDIndex& index, 
-    size_t contextLength,
-    IDSource<long long int>& source, 
-    std::ofstream* dumpFile = NULL
+    IDSource<long long int>& source
 ) {
     
     // We need to make bit vector denoting ranges, which we encode with this
@@ -1211,10 +716,8 @@ makeLevelIndexScanning(
     Log::info() << "Building mapping data structure by scan..." << std::endl;
     
     
-    // Otherwise if it's a shorter than requested context, it's possible not
-    // everything has been merged. So do the old thing where we locate each base
-    // and, when the canonical position changes, add a 1 to start a new range
-    // and add a mapping.
+    // Do the thing where we locate each base and, when the canonical position
+    // changes, add a 1 to start a new range and add a mapping.
 
     // Keep track of the ID and relative orientation for the last position we
     // canonicalized.
@@ -1283,13 +786,6 @@ makeLevelIndexScanning(
     encoder.flush();
     BitVector* bitVector = new BitVector(encoder,
         index.getTotalLength() + 1);
-    
-    if(dumpFile != NULL) {
-        // We need to add in the edges that connect merged positions together.
-        // This requires walking all the contigs again, so we put it in its own
-        // function.
-        makeMergedAdjacencies(threadSet, idReservations, dumpFile);
-    }
     
     // Return the bit vector and the Side vector
     return std::make_pair(bitVector, mappings);
@@ -1403,20 +899,14 @@ main(
     // Add all the options
     description.add_options() 
         ("help", "Print help messages") 
-        ("dump", "Dump GraphViz graphs")
         ("test", "Run a mapping speed test")
-        ("quiet", "Don't print every context")
         ("noMerge", "Don't compute merged level, only make lowest-level index")
-        ("scan", "Make merged mapping bit vector by scanning BWT")
         ("alignment", boost::program_options::value<std::string>(), 
             "File to save .c2h-format alignment in")
         ("alignmentFasta", boost::program_options::value<std::string>(), 
             "File in which to save FASTA records for building HAL from .c2h")
         ("degrees", boost::program_options::value<std::string>(), 
             "File in which to save degrees of pinch graph nodes")
-        ("context", boost::program_options::value<unsigned int>()
-            ->default_value(3), 
-            "Set the context length to merge on")
         ("sampleRate", boost::program_options::value<unsigned int>()
             ->default_value(64), 
             "Set the suffix array sample rate to use")
@@ -1486,9 +976,6 @@ main(
     std::vector<std::string> fastas(options["fastas"]
         .as<std::vector<std::string> >());
         
-    // This holds the length of context to use
-    unsigned int contextLength = options["context"].as<unsigned int>();
-    
     // Dump options.
     Log::output() << "Options:" << std::endl;
     Log::output() << "Store index in: " << indexDirectory << std::endl;
@@ -1517,37 +1004,8 @@ main(
         return 0;
     }
     
-    Log::info() << "Merge on " << contextLength << " bases of context." <<
-        std::endl;
-    
     // Make an IDSource to produce IDs not already claimed by contigs.
     IDSource<long long int> source(index.getTotalLength());
-    
-    // This is the file we will dump our graph to, if needed.
-    std::ofstream* dumpFile = NULL;
-    if(options.count("dump")) {
-        // Open it up.
-        dumpFile = new std::ofstream("dump.dot");
-        *dumpFile << "digraph dump {" << std::endl;
-        
-        // Start a cluster
-        *dumpFile << "subgraph cluster_L0 {" << std::endl; 
-        *dumpFile << "style=filled;" << std::endl;
-        *dumpFile << "color=lightgrey;" << std::endl;
-        *dumpFile << "label=\"Level 0\";" << std::endl;
-        
-        // Add per-contig rank constraints.
-        for(size_t i = 0; i < index.getNumberOfContigs(); i++) {
-            // For every contig, add rank edges.
-            for(size_t j = 0; j < index.getContigLength(i) - 1; j++) {
-                // For every base except the last...
-                // Add an edge from this one to the next one, to enforce order.
-                *dumpFile << "N" << i << "B" << j + 1 << 
-                "->N" << i << "B" << j + 2 << "[style=invis];" << std::endl;
-            }
-        }
-        
-    }
     
     // We want to time the merge code.
     Timer* mergeTimer = new Timer("Symmetric Merging");
@@ -1557,16 +1015,8 @@ main(
         
     delete mergeTimer;
         
-    if(options.count("dump")) {
-        // End the cluster and start a new one.
-        *dumpFile << "}" << std::endl << "subgraph cluster_L1 {" << std::endl;
-        *dumpFile << "style=filled;" << std::endl;
-        *dumpFile << "color=lightgrey;" << std::endl;
-        *dumpFile << "label=\"Level 1\";" << std::endl;
-    }
-    
     if(options.count("degrees")) {
-        // Save a dump of pinch grpah node degrees (for both blocks and bare
+        // Save a dump of pinch graph node degrees (for both blocks and bare
         // segments).
         writeDegrees(threadSet, options["degrees"].as<std::string>());
     }
@@ -1592,15 +1042,8 @@ main(
     // We also want to time the merged level index building code
     Timer* levelIndexTimer = new Timer("Level Index Construction");
     
-    if(options.count("scan")) {
-        // Use a scanning strategy for indexing.
-        levelIndex = makeLevelIndexScanning(threadSet, index, contextLength,
-            source, dumpFile);
-     } else {
-        // Use a range-based strategy for indexing.
-        levelIndex = makeLevelIndex(threadSet, index, contextLength, source,
-            dumpFile);
-    }
+    // Use a scanning strategy for indexing.
+    levelIndex = makeLevelIndexScanning(threadSet, index, source);
     
     delete levelIndexTimer;
         
@@ -1609,13 +1052,6 @@ main(
     
     // Clean up the thread set
     stPinchThreadSet_destruct(threadSet);
-    
-    if(options.count("dump")) {
-        // Finish and clean up the dump file
-        *dumpFile << "}" << std::endl << "}" << std::endl;
-        dumpFile->close();
-        delete dumpFile;
-    }
     
     // Run the speed tests if we want to
     if(options.count("test")) {
