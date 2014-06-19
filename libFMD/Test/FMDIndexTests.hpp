@@ -16,6 +16,7 @@ class FMDIndexTests : public CppUnit::TestFixture {
     CPPUNIT_TEST(testSearch);
     CPPUNIT_TEST(testLocate);
     CPPUNIT_TEST(testIterate);
+    CPPUNIT_TEST(testDisambiguate);
     CPPUNIT_TEST_SUITE_END();
     
     // Keep a string saying where to get the haplotypes to test with.
@@ -24,7 +25,14 @@ class FMDIndexTests : public CppUnit::TestFixture {
     // Also we need an index temp directory
     std::string tempDir;
     
+    // Keep a pointer to a single index. That index is const, so we can't mess
+    // it up between test cases.
+    FMDIndex const* index;
+    
 public:
+    FMDIndexTests();
+    ~FMDIndexTests();
+    
     void setUp();
     void tearDown();
 
@@ -35,6 +43,7 @@ public:
     void testSearch();
     void testLocate();
     void testIterate();
+    void testDisambiguate();
 };
 
 #endif

@@ -1025,6 +1025,56 @@ MapAttemptResult FMDIndex::mapPosition(BitVectorIterator& ranges,
 
 }
 
+Mapping FMDIndex::disambiguate(const Mapping& left, 
+    const Mapping& right) const {
+
+    if(right.is_mapped) {
+        
+        // Either left is mapped, and we need to compare right to it, or it
+        // isn't, and we need to return a left-ified version of right. Either
+        // way we need to work out what right would look like on the left.
+        
+        // That requires the length of the contig it is on.
+        size_t contigLength = getContigLength(getContigNumber(right.location));
+            
+        // What's the new text we map to? Just toggle the low bit (since text 2n
+        // and 2n + 1 go together).
+        size_t flippedText = right.location.getText() ^ 1;
+        
+        // And what's our offset on that text? -1 because we want a 0-based
+        // answer still.
+        size_t flippedOffset = contigLength - right.location.getOffset() - 1;
+    
+        // TODO: as an optimization, if left did map, try only computing the
+        // above as they are needed for the comparison.
+    
+        // TODO: Add a flip method to TextPositions (taking contig length) and
+        // use that.
+    
+        if(left.is_mapped) {
+            // Check if they are mapped to the same base
+            
+            if(left.location.getText() == flippedText && 
+                left.location.getOffset() == flippedOffset) {
+                
+                // We successfully 2-sided-mapped. Return either one.
+                return left;
+            } else {
+                // We didn't map at all. Construct an unmapped answer.
+                return Mapping(TextPosition(0, 0), false);
+            }
+            
+            
+        } else {
+            // Only right is mapped. Return a flipped version of it.
+            return Mapping(TextPosition(flippedText, flippedOffset));
+        }
+    } else {
+        // Right isn't mapped, so whether left is mapped or not, we can return
+        // it and be correct.
+        return left;
+    }
+}
 
 
 

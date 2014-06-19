@@ -20,8 +20,10 @@ CPPUNIT_TEST_SUITE_REGISTRATION( FMDIndexTests );
 // Define constants
 const std::string FMDIndexTests::filename = "Test/haplotypes.fa";
 
-void FMDIndexTests::setUp() {
-    // We ened a built index as a fixture.
+FMDIndexTests::FMDIndexTests() {
+
+    // We need a built index as a fixture, and we don't want to rebuild it for
+    // every test.
 
     // Set up a temporary directory to put the index in.
     tempDir = make_tempdir();
@@ -33,45 +35,55 @@ void FMDIndexTests::setUp() {
     builder.add(filename);
     
     // Finish the index.
-    FMDIndex* index = builder.build();
+    FMDIndex* tmpIndex = builder.build();
     
     // Don't leak it.
-    delete index;
+    delete tmpIndex;
+    
+    // Save a pointer to a new index that we just load (so we don't have the
+    // full SA).
+    index = new FMDIndex(tempDir + "/index.basename");
+    
+}
+
+FMDIndexTests::~FMDIndexTests() {
+    // Get rid of the temporary index directory
+    boost::filesystem::remove_all(tempDir);
+}
+
+void FMDIndexTests::setUp() {
     
 }
 
 
 void FMDIndexTests::tearDown() {
-    // Get rid of the temporary index directory
-    boost::filesystem::remove_all(tempDir);
+    
 }
 
 /**
  * Test index metadata.
  */
 void FMDIndexTests::testMetadata() {
-    // Load the index up
-    FMDIndex index(tempDir + "/index.basename");
     
     // Make sure it has the right number of characters.
-    CPPUNIT_ASSERT(index.getTotalLength() == 35 * 2 * 2);
+    CPPUNIT_ASSERT(index->getTotalLength() == 35 * 2 * 2);
     
     // Make sure it has the right number of BWT positions (characters + texts).
-    CPPUNIT_ASSERT(index.getBWTLength() == index.getTotalLength() + 4);
+    CPPUNIT_ASSERT(index->getBWTLength() == index->getTotalLength() + 4);
     
     // Make sure it has the right number of contigs
-    CPPUNIT_ASSERT(index.getNumberOfContigs() == 2);
+    CPPUNIT_ASSERT(index->getNumberOfContigs() == 2);
     
     // Make sure it has the right number of genomes.
-    CPPUNIT_ASSERT(index.getNumberOfGenomes() == 1);
+    CPPUNIT_ASSERT(index->getNumberOfGenomes() == 1);
     
     // Make sure the genome contains the contigs
-    CPPUNIT_ASSERT(index.getGenomeContigs(0).first == 0);
-    CPPUNIT_ASSERT(index.getGenomeContigs(0).second == 2);
+    CPPUNIT_ASSERT(index->getGenomeContigs(0).first == 0);
+    CPPUNIT_ASSERT(index->getGenomeContigs(0).second == 2);
     
     // Make sure the contigs belong to the genome
-    CPPUNIT_ASSERT(index.getContigGenome(0) == 0);
-    CPPUNIT_ASSERT(index.getContigGenome(1) == 0);
+    CPPUNIT_ASSERT(index->getContigGenome(0) == 0);
+    CPPUNIT_ASSERT(index->getContigGenome(1) == 0);
 }
 
 /**
@@ -79,24 +91,22 @@ void FMDIndexTests::testMetadata() {
  */
 void FMDIndexTests::testLF() {
 
-    // Load the index up
-    FMDIndex index(tempDir + "/index.basename");
-
     // Make sure LF behaves sanely and maps the first $ to the first $.
-    std::cout << "Index 21 maps LF to " << index.getLF(21) << std::endl;
+    std::cout << "Index 21 maps LF to " << index->getLF(21) << std::endl;
     for(int i = 0; i < 21; i++) {
-        CPPUNIT_ASSERT(index.display(i) != '$');
+        CPPUNIT_ASSERT(index->display(i) != '$');
     }
-    CPPUNIT_ASSERT(index.display(21) == '$');
-    CPPUNIT_ASSERT(index.displayFirst(0) == '$');
-    CPPUNIT_ASSERT(index.getLF(21) == 0);
+    CPPUNIT_ASSERT(index->display(21) == '$');
+    CPPUNIT_ASSERT(index->displayFirst(0) == '$');
+    CPPUNIT_ASSERT(index->getLF(21) == 0);
     
     // Make sure it is consistent and always maps at least to an instance of the
     // correct character.
-    for(int i = 0; i < index.getBWTLength(); i++) {
+    for(int i = 0; i < index->getBWTLength(); i++) {
         // Get the first character of where we go, and compare it to the last
         // character of where we are.
-        CPPUNIT_ASSERT(index.displayFirst(index.getLF(i)) == index.display(i));
+        CPPUNIT_ASSERT(index->displayFirst(index->getLF(i)) == 
+            index->display(i));
     }
 
 }
@@ -106,11 +116,8 @@ void FMDIndexTests::testLF() {
  */
 void FMDIndexTests::testDump() {
     
-    // Load the index up
-    FMDIndex index(tempDir + "/index.basename");
-    
     // Dump the entire BWT
-    for(int i = 0; i < index.getBWTLength(); i++) {
+    for(int i = 0; i < index->getBWTLength(); i++) {
         // Reconstruct the string.
         std::string reconstruction;
         
@@ -120,10 +127,10 @@ void FMDIndexTests::testDump() {
         
         do {
             // Put the current character on the reconstruction.
-            reconstruction.push_back(index.display(curIndex));
+            reconstruction.push_back(index->display(curIndex));
             
             // Go to the previous character in the BWT row.
-            curIndex = index.getLF(curIndex);
+            curIndex = index->getLF(curIndex);
         } while(curIndex != i);      
     
         // Flip the string around forwards. See
@@ -131,8 +138,8 @@ void FMDIndexTests::testDump() {
         std::string forwardReconstruction(reconstruction.rbegin(),
             reconstruction.rend());
     
-        std::cout << i << ": " << index.displayFirst(i) << " " << 
-            forwardReconstruction << " " << index.display(i) << std::endl;
+        std::cout << i << ": " << index->displayFirst(i) << " " << 
+            forwardReconstruction << " " << index->display(i) << std::endl;
     }
     
 }
@@ -141,15 +148,13 @@ void FMDIndexTests::testDump() {
  * Test pulling out a contig.
  */
 void FMDIndexTests::testDisplay() {
-    // Load the index up
-    FMDIndex index(tempDir + "/index.basename");
     
     // Make sure the first contig comes out right
-    CPPUNIT_ASSERT(index.displayContig(0) == 
+    CPPUNIT_ASSERT(index->displayContig(0) == 
         "CATGCTTCGGCGATTCGACGCTCATCTGCGACTCT");
         
     // And the second
-    CPPUNIT_ASSERT(index.displayContig(1) == 
+    CPPUNIT_ASSERT(index->displayContig(1) == 
         "CGGGCGCATCGCTATTATTTCTTTCTCTTTTCACA");
 }
 
@@ -158,24 +163,21 @@ void FMDIndexTests::testDisplay() {
  */
 void FMDIndexTests::testSearch() {
     
-    // Load the index up
-    FMDIndex index(tempDir + "/index.basename");
-    
     // Doesn't find spurious things
-    CPPUNIT_ASSERT(index.count("GATTACA").getLength() == 0);
+    CPPUNIT_ASSERT(index->count("GATTACA").getLength() == 0);
     
     // Finds things which appear once
-    CPPUNIT_ASSERT(index.count("TCTTTT").getLength() == 1);
+    CPPUNIT_ASSERT(index->count("TCTTTT").getLength() == 1);
     
     // On both strands
-    CPPUNIT_ASSERT(index.count("AAAAGA").getLength() == 1);
+    CPPUNIT_ASSERT(index->count("AAAAGA").getLength() == 1);
     
     // Finds things which appear twice
-    CPPUNIT_ASSERT(index.count("TTCG").getLength() == 2);
+    CPPUNIT_ASSERT(index->count("TTCG").getLength() == 2);
     
     // Finds whole strands
     CPPUNIT_ASSERT(
-        index.count("CGGGCGCATCGCTATTATTTCTTTCTCTTTTCACA").getLength() == 1);
+        index->count("CGGGCGCATCGCTATTATTTCTTTCTCTTTTCACA").getLength() == 1);
     
 }
 
@@ -184,11 +186,8 @@ void FMDIndexTests::testSearch() {
  */
 void FMDIndexTests::testLocate() {
 
-    // Load the index up
-    FMDIndex index(tempDir + "/index.basename");
-    
     // Find and locate a unique thing.
-    TextPosition base = index.locate(index.count("TCTTTT").getForwardStart());
+    TextPosition base = index->locate(index->count("TCTTTT").getForwardStart());
     
     // This is on the second sequence, forward strand.
     CPPUNIT_ASSERT(base.getText() == 2);
@@ -196,8 +195,8 @@ void FMDIndexTests::testLocate() {
     CPPUNIT_ASSERT(base.getOffset() == 25);
     
     // Now let's try all of the first sequence, forwards
-    base = index.locate(
-        index.count("CATGCTTCGGCGATTCGACGCTCATCTGCGACTCT").getForwardStart());
+    base = index->locate(
+        index->count("CATGCTTCGGCGATTCGACGCTCATCTGCGACTCT").getForwardStart());
         
     // This is on the first sequence, forward strand.
     CPPUNIT_ASSERT(base.getText() == 0);
@@ -205,8 +204,8 @@ void FMDIndexTests::testLocate() {
     CPPUNIT_ASSERT(base.getOffset() == 0);
     
     // And backwards
-    base = index.locate(
-        index.count("AGAGTCGCAGATGAGCGTCGAATCGCCGAAGCATG").getForwardStart());
+    base = index->locate(
+        index->count("AGAGTCGCAGATGAGCGTCGAATCGCCGAAGCATG").getForwardStart());
         
     // This is on the first sequence, reverse strand.
     CPPUNIT_ASSERT(base.getText() == 1);
@@ -219,14 +218,11 @@ void FMDIndexTests::testLocate() {
  */
 void FMDIndexTests::testIterate() {
 
-    // Load the index up
-    FMDIndex index(tempDir + "/index.basename");
-
     for(int contextLength = 1; contextLength <= 25; contextLength++) {
         // Try all context lengths shorter than the contigs we put in.
         
-        for(FMDIndex::iterator i = index.begin(contextLength); 
-            i != index.end(contextLength); ++i) {
+        for(FMDIndex::iterator i = index->begin(contextLength); 
+            i != index->end(contextLength); ++i) {
             // For each pair of suffix and position in the suffix tree
             
             // Unpack the iterator into pattern and FMDPosition at which it
@@ -236,11 +232,31 @@ void FMDIndexTests::testIterate() {
             FMDPosition range = (*i).second;
         
             // Make sure we get the same range searching as iterating.
-            CPPUNIT_ASSERT(index.count(pattern) == range);
+            CPPUNIT_ASSERT(index->count(pattern) == range);
         }
         
     }
 
+}
+
+/**
+ * Make sure disambiguating of Mappings works.
+ */
+void FMDIndexTests::testDisambiguate() {
+
+    // Make some positions    
+    Mapping mapped(TextPosition(1, 1));
+    Mapping otherSide(TextPosition(0, 33)); 
+    Mapping unmapped(TextPosition(0, 0), false);
+    Mapping elsewhere(TextPosition(2, 10));
+    
+    // Make sure disambiguate does the right things
+    CPPUNIT_ASSERT(index->disambiguate(mapped, otherSide) == mapped);
+    CPPUNIT_ASSERT(index->disambiguate(otherSide, mapped) == otherSide);
+    CPPUNIT_ASSERT(index->disambiguate(mapped, unmapped) == mapped);
+    CPPUNIT_ASSERT(index->disambiguate(unmapped, mapped) == otherSide);
+    CPPUNIT_ASSERT(index->disambiguate(unmapped, unmapped).is_mapped == false);
+    CPPUNIT_ASSERT(index->disambiguate(elsewhere, mapped).is_mapped == false);
 }
 
 

@@ -14,7 +14,8 @@
 #include "Mapping.hpp"
 #include "MapAttemptResult.hpp"
 
-
+// State that the test cases class exists, even though we can't see it.
+class FMDIndexTests;
 
 /**
  * A class that encapsulates access to an FMDIndex, consisting of the underlying
@@ -27,6 +28,10 @@
  *
  */
 class FMDIndex {
+
+    // Let the test code test our protected methods.
+    friend FMDIndexTests;
+
 public:
     /**
      * Load an FMD and metadata from the given basename. Optionally, specify a
@@ -399,6 +404,15 @@ protected:
     MapAttemptResult mapPosition(BitVectorIterator& ranges, 
         const std::string& pattern, size_t index, 
         BitVectorIterator* mask = NULL) const;
+        
+    /**
+     * Given a left mapping and a right mapping for a base, disambiguate them to
+     * produce one left mapping. If only one of them is actually mapped, returns
+     * that converted to a left mapping. If they are both mapped to opposite
+     * sides of the same base, returns the left one. Otherwise, returns an
+     * unmapped Mapping.
+     */
+    Mapping disambiguate(const Mapping& left, const Mapping& right) const;
       
 private:
     
