@@ -3,6 +3,9 @@
 #include <numeric>
 #include <sstream>
 #include <stdexcept>
+#include <algorithm>
+
+#include <Util.h>
 
 #include "FMDIndex.hpp"
 #include "util.hpp"
@@ -729,6 +732,59 @@ std::vector<Mapping> FMDIndex::map(const std::string& query, int64_t genome,
     
     // Get the appropriate mask, or NULL if given the special all-genomes value.
     return map(query, genome == -1 ? NULL : genomeMasks[genome], start, length);    
+}
+
+char op_increase (char i) { return ++i; }
+
+std::vector<Mapping> FMDIndex::mapBoth(const std::string& query, int64_t genome, 
+    int start, int length) const {
+    
+    if(length == -1) {
+        // Fix up the length parameter if it is -1: that means the whole rest of
+        // the string.
+        
+        // We need to do this ourselves since we go clipping out that bit of the
+        // string to reverse complement.
+        length = query.length() - start;
+    }
+    
+    // Map it forward
+    std::vector<Mapping> forward = map(query, genome, start, length);
+    
+    // Make a reversed copy of the appropriate region of the query string.
+    
+    // Where does our selected region end (as a reverse iterator)?
+    std::string::const_reverse_iterator reverseStart = query.rbegin() + 
+        (query.size() - length);
+    
+    // And what's one before it started?
+    std::string::const_reverse_iterator reverseEnd = query.rend() - start;
+    
+    // Copy the string over, complementing bases as we go with libsuffixtools's
+    // complement function that goes char -> char. See
+    // <http://stackoverflow.com/a/7531885/402891>. Also remember to make a
+    // back_inserter so we actually can put in new characters.
+    std::string reverseComplemented;
+    std::transform(reverseStart, reverseEnd, 
+        std::back_inserter(reverseComplemented), (char(*)(char))complement);
+        
+    // Map it backward
+    std::vector<Mapping> reverse = map(reverseComplemented, genome);
+    
+    if(forward.size() != reverse.size()) {
+        throw std::runtime_error("Forward and reverse region size mismatch!");
+    }
+    
+    for(size_t i = 0; i < forward.size(); i++) {
+        // Go through and disambiguate in place to resolve multi-mappings and
+        // such. Make sure to read reverse backwards.
+        
+        forward[i] = disambiguate(forward[i], reverse[reverse.size() - i - 1]);
+    }
+    
+    // Give back the disambiguated vector.
+    return forward;
+    
 }
 
 std::vector<int64_t> FMDIndex::map(const BitVector& ranges,

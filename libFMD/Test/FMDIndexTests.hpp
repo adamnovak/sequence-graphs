@@ -17,6 +17,7 @@ class FMDIndexTests : public CppUnit::TestFixture {
     CPPUNIT_TEST(testLocate);
     CPPUNIT_TEST(testIterate);
     CPPUNIT_TEST(testDisambiguate);
+    CPPUNIT_TEST(testMap);
     CPPUNIT_TEST_SUITE_END();
     
     // Keep a string saying where to get the haplotypes to test with.
@@ -44,6 +45,7 @@ public:
     void testLocate();
     void testIterate();
     void testDisambiguate();
+    void testMap();
 };
 
 #endif

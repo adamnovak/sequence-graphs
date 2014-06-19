@@ -259,6 +259,38 @@ void FMDIndexTests::testDisambiguate() {
     CPPUNIT_ASSERT(index->disambiguate(elsewhere, mapped).is_mapped == false);
 }
 
+/**
+ * Make sure mapping works
+ */
+void FMDIndexTests::testMap() {
+    
+    // Grab all of the first contig.
+    std::string query = "CATGCTTCGGCGATTCGACGCTCATCTGCGACTCT";
+    
+    // Map all of the first contig.
+    std::vector<Mapping> mappings = index->mapBoth(query);
+    
+    for(size_t i = 0; i < query.size(); i++ ) {
+        // Make sure each base maps in order
+        CPPUNIT_ASSERT(mappings[i].is_mapped == true);
+        CPPUNIT_ASSERT(mappings[i].location.getText() == 0);
+        CPPUNIT_ASSERT(mappings[i].location.getOffset() == i);
+    }
+    
+    // Grab all of the first contig's reverse strand.
+    std::string query2 = "AGAGTCGCAGATGAGCGTCGAATCGCCGAAGCATG";
+    
+    // Map it
+    mappings = index->mapBoth(query2);
+    
+    for(size_t i = 0; i < query2.size(); i++ ) {
+        // Make sure each base maps in order, but now to the other strand.
+        CPPUNIT_ASSERT(mappings[i].is_mapped == true);
+        CPPUNIT_ASSERT(mappings[i].location.getText() == 1);
+        CPPUNIT_ASSERT(mappings[i].location.getOffset() == i);
+    }
+}
+
 
 
 

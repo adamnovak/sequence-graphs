@@ -229,6 +229,15 @@ public:
      */
     std::vector<Mapping> map(const std::string& query, int64_t genome = -1, 
         int start = 0, int length = -1) const;
+    
+    /**
+     * Both left- and right-map the given string to the given genome (or all
+     * genomes if genome is -1). Start and length can optionally be used to
+     * select a region; a length of -1 means to use the entire string after the
+     * start.
+     */
+    std::vector<Mapping> mapBoth(const std::string& query, int64_t genome = -1, 
+        int start = 0, int length = -1) const;
       
     /**
      * Try RIGHT-mapping each base in the query to one of the ranges represented
