@@ -80,7 +80,20 @@ void SymmetricMergeScheme::generateMerges(size_t targetGenome,
     // Now we just have to generate some merges by mapping each contig in the
     // query to the target, and write them to the queue.
     
-    // TODO: Implement this
+    // Get the range of contigs we need to map.
+    std::pair<size_t, size_t> contigRange = index.getGenomeContigs(queryGenome);
+    
+    for(size_t i = contigRange.first; i < contigRange.second; i++) {
+        // Grab each contig as a string
+        std::string contig = index.displayContig(i);
+        
+        // Map it to the target genome.
+        std::vector<Mapping> mappings = index.map(contig, targetGenome);
+        
+        // TODO: do the reverse complement.
+        
+        // TODO: create pinches.
+    }
     
     // Close the queue to say we're done.
     auto lock = queue->lock();

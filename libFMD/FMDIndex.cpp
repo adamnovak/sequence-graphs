@@ -256,7 +256,7 @@ size_t FMDIndex::getNumberOfGenomes() const {
     return genomeMasks.size();
 }
     
-std::pair<size_t, size_t> FMDIndex::getGenomeContigs(size_t genome) {
+std::pair<size_t, size_t> FMDIndex::getGenomeContigs(size_t genome) const {
     // Get the range of contigs belonging to the given genome.
     return genomeRanges[genome];
 }
@@ -724,6 +724,13 @@ std::vector<Mapping> FMDIndex::map(const std::string& query, BitVector* mask,
 
 }
 
+std::vector<Mapping> FMDIndex::map(const std::string& query, int64_t genome, 
+    int start, int length) const {
+    
+    // Get the appropriate mask, or NULL if given the special all-genomes value.
+    return map(query, genome == -1 ? NULL : genomeMasks[genome], start, length);    
+}
+
 std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
     const std::string& query, BitVector* mask, int start, int length) const {
     
@@ -850,6 +857,14 @@ std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
     return mappings;
     
     
+}
+
+std::vector<int64_t> FMDIndex::map(const BitVector& ranges, 
+    const std::string& query, int64_t genome, int start, int length) const {
+    
+    // Get the appropriate mask, or NULL if given the special all-genomes value.
+    return map(ranges, query, genome == -1 ? NULL : genomeMasks[genome], start,
+        length);    
 }
 
 FMDIndex::iterator FMDIndex::begin(size_t depth, bool reportDeadEnds) const {

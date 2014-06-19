@@ -119,7 +119,7 @@ public:
      * Get the range of contig numbers [start, end) that belong to the given
      * genome. All contigs in a genome appear one after the other.
      */
-    std::pair<size_t, size_t> getGenomeContigs(size_t genome);
+    std::pair<size_t, size_t> getGenomeContigs(size_t genome) const;
     
     /***************************************************************************
      * Search Functions
@@ -203,11 +203,11 @@ public:
      **************************************************************************/
       
     /**
-     * Attempt to map each base in the query string to a (text, position) pair.
-     * The vector returned will have one entry for each character in the
+     * Attempt to LEFT-map each base in the query string to a (text, position)
+     * pair. The vector returned will have one entry for each character in the
      * selected range.
      * 
-     * If a mask is specified, only positions in the index with a 1 in the mask
+     * If a mask is non-NULL, only positions in the index with a 1 in the mask
      * will be counted for mapping purposes.
      *
      * Optionally a start and length for the region to map can be specified. The
@@ -215,7 +215,14 @@ public:
      * be mapped. A length of -1 means to use the entire string after the start,
      * and is the default.
      */
-    std::vector<Mapping> map(const std::string& query, BitVector* mask = NULL, 
+    std::vector<Mapping> map(const std::string& query, BitVector* mask, 
+        int start = 0, int length = -1) const;
+        
+    /**
+     * LEFT-map to a specific genome, or to all genomes if genome is -1. Same
+     * semantics as the function above.
+     */
+    std::vector<Mapping> map(const std::string& query, int64_t genome = -1, 
         int start = 0, int length = -1) const;
       
     /**
@@ -231,14 +238,22 @@ public:
      * The range starting points must be such that the ranges described are "bi-
      * ranges": each range has its reverse-complement range also present.
      *
-     * If a mask is specified, only positions in the index with a 1 in the mask
+     * If a mask is non-NULL, only positions in the index with a 1 in the mask
      * will be counted for mapping purposes.
      *
      * Returns a vector of one-based range numbers for left-mapping each base,
      * or -1 if the base did not map to a range.
      */
     std::vector<int64_t> map(const BitVector& ranges,
-        const std::string& query, BitVector* mask = NULL, int start = 0,
+        const std::string& query, BitVector* mask, int start = 0,
+        int length = -1) const;
+        
+    /**
+     * RIGHT-map to ranges intersecting a specific genome, or all genomes if
+     * genome is -1. Same semantics as the function above.
+     */
+    std::vector<int64_t> map(const BitVector& ranges,
+        const std::string& query, int64_t genome = -1, int start = 0,
         int length = -1) const;
         
     /***************************************************************************
