@@ -211,6 +211,22 @@ mergeSymmetric(
     scheme.join();
     applier.join();
     
+    // Write a report before joining trivial boundaries.
+    Log::output() << "Before joining boundaries:" << std::endl;
+    Log::output() << "Pinch Blocks: " <<
+        stPinchThreadSet_getTotalBlockNumber(threadSet) << std::endl;
+    logMemory();
+    
+    // Now GC the boundaries in the pinch set
+    Log::info() << "Joining trivial boundaries..." << std::endl;
+    stPinchThreadSet_joinTrivialBoundaries(threadSet);
+    
+    // Write a similar report afterwards.
+    Log::output() << "After joining boundaries:" << std::endl;
+    Log::output() << "Pinch Blocks: " <<
+        stPinchThreadSet_getTotalBlockNumber(threadSet) << std::endl;
+    logMemory();
+    
     // Now our thread set has been pinched. Return it.
     return threadSet;
 
