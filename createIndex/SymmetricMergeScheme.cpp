@@ -87,12 +87,29 @@ void SymmetricMergeScheme::generateMerges(size_t targetGenome,
         // Grab each contig as a string
         std::string contig = index.displayContig(i);
         
-        // Map it to the target genome.
-        std::vector<Mapping> mappings = index.map(contig, targetGenome);
+        // Map it to the target genome in both orientations, and disambiguate.
+        std::vector<Mapping> mappings = index.mapBoth(contig, targetGenome);
         
-        // TODO: do the reverse complement.
+        for(size_t base = 0; base < mappings.size(); base++) {
+            // For each base that we tried to map
+            
+            if(!mappings[base].is_mapped) {
+                // Skip the unmapped ones
+                continue;
+            }
+            
+            // Produce a merge between the base we're looking at on the forward
+            // strand of this contig, and the location (and strand) it mapped to
+            // in the other genome.
+            Merge merge(TextPosition(i * 2, base), mappings[base].location);
+            
+            // Send that merge to the queue.
+            // Lock the queue.
+            auto lock = queue->lock();
+            // Spend our lock to add something to it.
+            queue->enqueue(merge, lock);
+        }
         
-        // TODO: create pinches.
     }
     
     // Close the queue to say we're done.

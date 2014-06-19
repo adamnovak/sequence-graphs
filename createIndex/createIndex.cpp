@@ -36,6 +36,8 @@
 
 #include "IDSource.hpp"
 #include "ConcurrentQueue.hpp"
+#include "SymmetricMergeScheme.hpp"
+#include "MergeApplier.hpp"
 
 
 // TODO: replace with cppunit!
@@ -180,6 +182,38 @@ makeThreadSet(
     }
     
     return threadSet;
+}
+
+/**
+ * Create a new thread set from the given FMDIndex, and merge it down by the
+ * symmetric merging scheme, in parallel. Returns the pinched thread set.
+ */
+stPinchThreadSet*
+mergeSymmetric(
+    const FMDIndex& index
+) {
+
+    Log::info() << "Applying symmetric merging scheme." << std::endl;
+    
+    // Make a thread set from our index.
+    stPinchThreadSet* threadSet = makeThreadSet(index);
+    
+    // Make the merge scheme we want to use
+    SymmetricMergeScheme scheme(index);
+    
+    // Set it running and grab the queue where its results come out.
+    ConcurrentQueue<Merge>& queue = scheme.run();
+    
+    // Make a merge applier to apply all those merges, and plug it in.
+    MergeApplier applier(index, queue, threadSet);
+    
+    // Wait for these things to be done.
+    scheme.join();
+    applier.join();
+    
+    // Now our thread set has been pinched. Return it.
+    return threadSet;
+
 }
 
 /**
@@ -1516,11 +1550,10 @@ main(
     }
     
     // We want to time the merge code.
-    Timer* mergeTimer = new Timer("Non-Symmetric Merging");
+    Timer* mergeTimer = new Timer("Symmetric Merging");
     
-    // Make a thread set for the context length we want.
-    stPinchThreadSet* threadSet = mergeNonsymmetric(index, contextLength,
-        dumpFile, options.count("quiet"));
+    // Make a thread set that's all merged.
+    stPinchThreadSet* threadSet = mergeSymmetric(index);
         
     delete mergeTimer;
         
