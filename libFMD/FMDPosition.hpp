@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "BitVector.hpp"
+#include "Log.hpp"
 
 /**
  * Represents the state (or result) of an FMD-index search, which is two ranges
@@ -109,15 +110,23 @@ public:
     */
     inline int64_t getLength(BitVectorIterator* mask = NULL) const
     {
-        if(mask == NULL) {
-            // Fast path: no mask, can just look at our end offset.
+        if(mask == NULL || end_offset == -1) {
+            // Fast path: no mask or an actually empty interval. Can just look
+            // at our end offset.
             return end_offset + 1;
         } else {
-            // Slow path: need to make rank queries. Get the rank at the end of
-            // the region (inclusive), and subtract the rank at the beginning of
-            // the region (exclusive). We need a +1 since we actually measure 1
-            // + the inclusive rank of the previous position and need to get rid
-            // of the extra 1.
+            // Slow path: need to make rank queries, but we know the interval is
+            // nonempty. Get the rank at the end of the region (inclusive), and
+            // subtract the rank at the beginning of the region (exclusive). We
+            // need a +1 since we actually measure 1 the inclusive rank of the
+            // previous position and need to get rid of the extra 1.
+            
+            Log::trace() << "Mask rank at " << forward_start + end_offset <<
+                ": " << mask->rank(forward_start + end_offset) << std::endl;
+                
+            Log::trace() << "Mask rank at least at " << forward_start <<
+                ": " << mask->rank(forward_start, true) << std::endl;
+            
             return mask->rank(forward_start + end_offset) + 1 - 
                 mask->rank(forward_start, true);
         }

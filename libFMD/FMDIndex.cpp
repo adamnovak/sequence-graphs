@@ -612,6 +612,14 @@ std::vector<Mapping> FMDIndex::map(const std::string& query, BitVector* mask,
     // Make an itarator for the mask, if needed, so we can query it.
     BitVectorIterator* maskIterator = (mask == NULL) ? NULL : 
         new BitVectorIterator(*mask);
+        
+    if(maskIterator == NULL) {
+        Log::debug() << "Mapping " << length << " bases to all genomes." <<
+            std::endl;
+    } else {
+        Log::debug() << "Mapping " << length << " bases to one genome only." <<
+            std::endl;
+    }
 
     // We need a vector to return.
     std::vector<Mapping> mappings;

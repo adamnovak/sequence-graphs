@@ -295,8 +295,6 @@ void FMDIndexTests::testMap() {
     mappings = index->mapBoth(query, 0);
     
     for(size_t i = 0; i < query2.size(); i++ ) {
-        std::cout << mappings[i] << std::endl;
-    
         // Make sure each base maps in order still.
         CPPUNIT_ASSERT(mappings[i].is_mapped == true);
         CPPUNIT_ASSERT(mappings[i].location.getText() == 0);
