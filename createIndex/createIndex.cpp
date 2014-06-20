@@ -561,7 +561,7 @@ writeAlignment(
             // Generate a name for the genome.
             std::string genomeName;
             
-            if(genomeRange.second - genomeRange.first > 0) {
+            if(genomeRange.second - genomeRange.first > 1) {
                 // Genome has multiple contigs. Generate a procedural name.
                 genomeName = "genome-" + std::to_string(genomeNumber);
             } else {
