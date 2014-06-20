@@ -70,9 +70,9 @@ jar-install: libfmd.jar
 %_wrap.o: %_wrap.cxx
 	$(CXX) $(INCLUDES) $(SWIG_FLAGS) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $^
 	
-%_wrap.cxx: %.i
+%_wrap.cxx: %.i *.hpp CSA/*.hpp
 	mkdir -p java
-	swig -c++ -java -outdir java -package $(JAVA_PACKAGE) $(SIZE_FLAGS) $(VECTOR_FLAGS) $^
+	swig -c++ -java -outdir java -package $(JAVA_PACKAGE) $(SIZE_FLAGS) $(VECTOR_FLAGS) $<
 
 clean:
 	rm -Rf *.o testRunner libfmd.a libfmd.so libfmd.jar java/ jar/ *_wrap.cxx

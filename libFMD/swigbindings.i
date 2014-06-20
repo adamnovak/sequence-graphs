@@ -38,6 +38,9 @@
 
 %include "CSA/BitVectorBase.hpp"
 %include "CSA/BitVector.hpp"
+// If we don't have this, it somehow manages to think that BitVector doesn't
+// mean CSA::BitVector;
+%include "BitVector.hpp"
 
 %include "Mapping.hpp"
 %include "TextPosition.hpp"

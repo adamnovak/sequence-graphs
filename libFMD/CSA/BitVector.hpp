@@ -1,5 +1,5 @@
-#ifndef CSA_NIBBLEVECTOR_H
-#define CSA_NIBBLEVECTOR_H
+#ifndef CSA_BITVECTOR_HPP
+#define CSA_BITVECTOR_HPP
 
 #include <fstream>
 
@@ -63,6 +63,14 @@ class BitVector : public BitVectorBase
 //--------------------------------------------------------------------------
 
     size_t reportSize() const;
+    
+    /**
+     * We add a method to get the address of a BitVector, hopefully convincing
+     * SWIG to give us a SWIGTYPE_p_BitVector.
+     */
+    BitVector* getAddress();
+    
+    void checkAddress(BitVector* a, const BitVector& b);
 
 //--------------------------------------------------------------------------
 
@@ -111,7 +119,7 @@ class BitVector : public BitVectorBase
     };
 
 //--------------------------------------------------------------------------
-
+  
   protected:
 
     // These are not allowed.

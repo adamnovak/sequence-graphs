@@ -1,5 +1,5 @@
-#ifndef RANGEVECTOR_HPP
-#define RANGEVECTOR_HPP
+#ifndef BITVECTOR_HPP
+#define BITVECTOR_HPP
 
 /**
  * Defines a BitVector type that is a bit vector we use for ranges and genome
@@ -10,7 +10,7 @@
 // our range endpoint bitmaps
 #include "CSA/BitVector.hpp"
 
-// Previously we just typedef'd NibbleVector thigns to BitVector things, but
+// Previously we just typedef'd NibbleVector things to BitVector things, but
 // that confused SWIG.
 
 using CSA::BitVector;
