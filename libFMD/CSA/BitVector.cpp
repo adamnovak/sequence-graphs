@@ -1,32 +1,32 @@
 #include <cstdlib>
 
-#include "NibbleVector.hpp"
+#include "BitVector.hpp"
 
 namespace CSA {
 
-NibbleVector::NibbleVector(std::ifstream& file) :
+BitVector::BitVector(std::ifstream& file) :
   BitVectorBase(file)
 {
 }
 
-NibbleVector::NibbleVector(FILE* file) :
+BitVector::BitVector(FILE* file) :
   BitVectorBase(file)
 {
 }
 
-NibbleVector::NibbleVector(Encoder& encoder, size_t universe_size) :
+BitVector::BitVector(Encoder& encoder, size_t universe_size) :
   BitVectorBase(encoder, universe_size)
 {
 }
 
-NibbleVector::~NibbleVector()
+BitVector::~BitVector()
 {
 }
 
 //--------------------------------------------------------------------------
 
 size_t
-NibbleVector::reportSize() const
+BitVector::reportSize() const
 {
   size_t bytes = sizeof(*this);
   bytes += BitVectorBase::reportSize();
@@ -35,22 +35,22 @@ NibbleVector::reportSize() const
 
 //--------------------------------------------------------------------------
 
-NibbleVector::Iterator::Iterator(const NibbleVector& par) :
+BitVector::Iterator::Iterator(const BitVector& par) :
   BitVectorBase::Iterator(par),
   use_rle(false)
 {
 }
 
-NibbleVector::Iterator::~Iterator()
+BitVector::Iterator::~Iterator()
 {
 }
 
 // FIXME gap encoding for all operations
 
 size_t
-NibbleVector::Iterator::rank(size_t value, bool at_least)
+BitVector::Iterator::rank(size_t value, bool at_least)
 {
-  const NibbleVector& par = (const NibbleVector&)(this->parent);
+  const BitVector& par = (const BitVector&)(this->parent);
 
   if(value >= par.size) { return par.items; }
 
@@ -70,9 +70,9 @@ NibbleVector::Iterator::rank(size_t value, bool at_least)
 }
 
 size_t
-NibbleVector::Iterator::select(size_t index)
+BitVector::Iterator::select(size_t index)
 {
-  const NibbleVector& par = (const NibbleVector&)(this->parent);
+  const BitVector& par = (const BitVector&)(this->parent);
 
   if(index >= par.items) { return par.size; }
   this->getSample(this->sampleForIndex(index));
@@ -96,7 +96,7 @@ NibbleVector::Iterator::select(size_t index)
 }
 
 size_t
-NibbleVector::Iterator::selectNext()
+BitVector::Iterator::selectNext()
 {
   if(this->cur >= this->block_items)
   {
@@ -120,9 +120,9 @@ NibbleVector::Iterator::selectNext()
 }
 
 pair_type
-NibbleVector::Iterator::valueBefore(size_t value)
+BitVector::Iterator::valueBefore(size_t value)
 {
-  const NibbleVector& par = (const NibbleVector&)(this->parent);
+  const BitVector& par = (const BitVector&)(this->parent);
 
   if(value >= par.size) { return pair_type(par.size, par.items); }
 
@@ -151,9 +151,9 @@ NibbleVector::Iterator::valueBefore(size_t value)
 }
 
 pair_type
-NibbleVector::Iterator::valueAfter(size_t value)
+BitVector::Iterator::valueAfter(size_t value)
 {
-  const NibbleVector& par = (const NibbleVector&)(this->parent);
+  const BitVector& par = (const BitVector&)(this->parent);
 
   if(value >= par.size) { return pair_type(par.size, par.items); }
 
@@ -168,7 +168,7 @@ NibbleVector::Iterator::valueAfter(size_t value)
 }
 
 pair_type
-NibbleVector::Iterator::nextValue()
+BitVector::Iterator::nextValue()
 {
   if(this->cur >= this->block_items)
   {
@@ -192,7 +192,7 @@ NibbleVector::Iterator::nextValue()
 }
 
 pair_type
-NibbleVector::Iterator::selectRun(size_t index, size_t max_length)
+BitVector::Iterator::selectRun(size_t index, size_t max_length)
 {
   size_t value = this->select(index);
 
@@ -203,7 +203,7 @@ NibbleVector::Iterator::selectRun(size_t index, size_t max_length)
 }
 
 pair_type
-NibbleVector::Iterator::selectNextRun(size_t max_length)
+BitVector::Iterator::selectNextRun(size_t max_length)
 {
   size_t value = this->selectNext();
 
@@ -214,9 +214,9 @@ NibbleVector::Iterator::selectNextRun(size_t max_length)
 }
 
 bool
-NibbleVector::Iterator::isSet(size_t value)
+BitVector::Iterator::isSet(size_t value)
 {
-  const NibbleVector& par = (const NibbleVector&)(this->parent);
+  const BitVector& par = (const BitVector&)(this->parent);
 
   if(value >= par.size) { return false; }
 
@@ -226,9 +226,9 @@ NibbleVector::Iterator::isSet(size_t value)
 }
 
 size_t
-NibbleVector::Iterator::countRuns()
+BitVector::Iterator::countRuns()
 {
-  const NibbleVector& par = (const NibbleVector&)(this->parent);
+  const BitVector& par = (const BitVector&)(this->parent);
 
   if(par.items == 0) { return 0; }
 
@@ -248,7 +248,7 @@ NibbleVector::Iterator::countRuns()
 
 // FIXME for gap encoding
 void
-NibbleVector::Iterator::valueLoop(size_t value)
+BitVector::Iterator::valueLoop(size_t value)
 {
   this->getSample(this->sampleForValue(value));
 
@@ -275,25 +275,25 @@ NibbleVector::Iterator::valueLoop(size_t value)
 
 //--------------------------------------------------------------------------
 
-NibbleEncoder::NibbleEncoder(size_t block_bytes, size_t superblock_size) :
+BitVectorEncoder::BitVectorEncoder(size_t block_bytes, size_t superblock_size) :
   VectorEncoder(block_bytes, superblock_size),
   run(EMPTY_PAIR)
 {
 }
 
-NibbleEncoder::~NibbleEncoder()
+BitVectorEncoder::~BitVectorEncoder()
 {
 }
 
 void
-NibbleEncoder::setBit(size_t value)
+BitVectorEncoder::setBit(size_t value)
 {
   this->setRun(value, 1);
 }
 
 // FIXME for gap encoding
 void
-NibbleEncoder::setRun(size_t start, size_t len)
+BitVectorEncoder::setRun(size_t start, size_t len)
 {
   if(this->items == 0)
   {
@@ -344,13 +344,13 @@ NibbleEncoder::setRun(size_t start, size_t len)
 }
 
 void
-NibbleEncoder::addBit(size_t value)
+BitVectorEncoder::addBit(size_t value)
 {
   this->addRun(value, 1);
 }
 
 void
-NibbleEncoder::addRun(size_t start, size_t len)
+BitVectorEncoder::addRun(size_t start, size_t len)
 {
   if(this->run.second == 0)
   {
@@ -368,7 +368,7 @@ NibbleEncoder::addRun(size_t start, size_t len)
 }
 
 void
-NibbleEncoder::flush()
+BitVectorEncoder::flush()
 {
   this->setRun(this->run.first, this->run.second);
   this->run.second = 0;

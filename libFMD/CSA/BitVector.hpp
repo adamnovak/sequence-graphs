@@ -8,14 +8,14 @@
 namespace CSA {
 
 /*
-  This class is used to construct a NibbleVector.
+  This class is used to construct a BitVector.
 */
 
-class NibbleEncoder : public VectorEncoder
+class BitVectorEncoder : public VectorEncoder
 {
   public:
-    NibbleEncoder(size_t block_bytes, size_t superblock_size = VectorEncoder::SUPERBLOCK_SIZE);
-    ~NibbleEncoder();
+    BitVectorEncoder(size_t block_bytes, size_t superblock_size = VectorEncoder::SUPERBLOCK_SIZE);
+    ~BitVectorEncoder();
 
     void setBit(size_t value);
     void setRun(size_t start, size_t len);
@@ -37,9 +37,9 @@ class NibbleEncoder : public VectorEncoder
     pair_type run;
 
     // These are not allowed.
-    NibbleEncoder();
-    NibbleEncoder(const NibbleEncoder&);
-    NibbleEncoder& operator = (const NibbleEncoder&);
+    BitVectorEncoder();
+    BitVectorEncoder(const BitVectorEncoder&);
+    BitVectorEncoder& operator = (const BitVectorEncoder&);
 };
 
 
@@ -50,15 +50,15 @@ class NibbleEncoder : public VectorEncoder
   // FIXME reverting to gap encoding not implemented yet
 */
 
-class NibbleVector : public BitVectorBase
+class BitVector : public BitVectorBase
 {
   public:
-    typedef NibbleEncoder Encoder;
+    typedef BitVectorEncoder Encoder;
 
-    explicit NibbleVector(std::ifstream& file);
-    explicit NibbleVector(FILE* file);
-    NibbleVector(Encoder& encoder, size_t universe_size);
-    ~NibbleVector();
+    explicit BitVector(std::ifstream& file);
+    explicit BitVector(FILE* file);
+    BitVector(Encoder& encoder, size_t universe_size);
+    ~BitVector();
 
 //--------------------------------------------------------------------------
 
@@ -69,7 +69,7 @@ class NibbleVector : public BitVectorBase
     class Iterator : public BitVectorBase::Iterator
     {
       public:
-        explicit Iterator(const NibbleVector& par);
+        explicit Iterator(const BitVector& par);
         ~Iterator();
 
         size_t rank(size_t value, bool at_least = false);
@@ -115,10 +115,13 @@ class NibbleVector : public BitVectorBase
   protected:
 
     // These are not allowed.
-    NibbleVector();
-    NibbleVector(const NibbleVector&);
-    NibbleVector& operator = (const NibbleVector&);
+    BitVector();
+    BitVector(const BitVector&);
+    BitVector& operator = (const BitVector&);
 };
+
+// Expose the iterator type.
+typedef BitVector::Iterator BitVectorIterator;
 
 }
 

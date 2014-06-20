@@ -1,7 +1,7 @@
 package edu.ucsc.genome
 
 import org.scalatest._
-import org.ga4gh.RangeVectorIterator
+import org.ga4gh.BitVectorIterator
 
 /**
  * Tests for the IntervalMap class, to make sure it doesn't screw up containment
@@ -59,7 +59,7 @@ class IntervalMapTests extends FunSuite {
     }
     
     test("correctly creates the range vector") {
-        val iterator = new RangeVectorIterator(map.rangeVector)
+        val iterator = new BitVectorIterator(map.rangeVector)
         
         assert(iterator.rank(0) === 0)
         assert(iterator.rank(1) === 1)
@@ -78,9 +78,9 @@ class IntervalMapTests extends FunSuite {
         assert(emptyMap.get(1, 3) === None)
         assert(emptyMap.valueArray.size === 0)
         
-        val iterator = new RangeVectorIterator(emptyMap.rangeVector)
+        val iterator = new BitVectorIterator(emptyMap.rangeVector)
         // TODO: this probably ought to properly be 1, as 0 is past the end of a
-        // truly empty vector, but we can't make a RangeVector that doesn't have
+        // truly empty vector, but we can't make a BitVector that doesn't have
         // at least one space (which is implicitly a 0) or the vanilla RLCSA
         // code crashes.
         assert(iterator.rank(0) === 0)

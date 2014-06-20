@@ -225,7 +225,7 @@ public:
      * be mapped. A length of -1 means to use the entire string after the start,
      * and is the default.
      */
-    std::vector<Mapping> map(const std::string& query, BitVector* mask, 
+    std::vector<Mapping> map(const std::string& query, const BitVector* mask, 
         int start = 0, int length = -1) const;
         
     /**
@@ -264,7 +264,7 @@ public:
      * or -1 if the base did not map to a range.
      */
     std::vector<int64_t> map(const BitVector& ranges,
-        const std::string& query, BitVector* mask, int start = 0,
+        const std::string& query, const BitVector* mask, int start = 0,
         int length = -1) const;
         
     /**

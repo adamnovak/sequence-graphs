@@ -1,7 +1,7 @@
 package edu.ucsc.genome
 
 import java.util.{TreeMap, NoSuchElementException}
-import org.ga4gh.{RangeVector, RangeEncoder, RangeVectorIterator}
+import org.ga4gh.{BitVector, BitVectorEncoder, BitVectorIterator}
 import scala.collection.JavaConversions._
 import scala.collection.mutable.ArrayBuffer
 
@@ -156,17 +156,17 @@ class IntervalMap[ValueType] extends Serializable {
     }
     
     /**
-     * Turn into a RangeVector and sequence of values for ranges in that vector,
+     * Turn into a BitVector and sequence of values for ranges in that vector,
      * for efficient mapping.
      *
      * TODO: Cache the result.
      */
-    def bake: (RangeVector, Seq[Option[ValueType]]) = {
+    def bake: (BitVector, Seq[Option[ValueType]]) = {
         // Make a new encoder with this arbitrary block size.
-        val encoder = new RangeEncoder(32)
+        val encoder = new BitVectorEncoder(32)
         
         // Make an ArrayBuffer to store pointers to the things we map to by
-        // RangeVector range number. Some "ranges" may really be the ranges
+        // BitVector range number. Some "ranges" may really be the ranges
         // between ranges we have values for, so this needs to be full of
         // Options.
         val rangeMapping = new ArrayBuffer[Option[ValueType]]
@@ -196,7 +196,7 @@ class IntervalMap[ValueType] extends Serializable {
             lastEnd = end
         }
         
-        // Finish and return the RangeVector and out range to value mapping.
+        // Finish and return the BitVector and out range to value mapping.
         encoder.flush()
         
         // Where should we tell the vector its last position is? Really only
@@ -204,7 +204,7 @@ class IntervalMap[ValueType] extends Serializable {
         // this is at least 1 even if we are empty.
         val vectorEnd = Math.max(lastEnd + 1, 1)
         
-        (new RangeVector(encoder, vectorEnd), rangeMapping)
+        (new BitVector(encoder, vectorEnd), rangeMapping)
     }
     
     // Cache the bake result. After this is referenced, no more intervals may be
@@ -213,14 +213,14 @@ class IntervalMap[ValueType] extends Serializable {
     lazy val baked = bake
     
     /**
-     * Convert to a RangeVector for efficient mapping. After this is called, no
+     * Convert to a BitVector for efficient mapping. After this is called, no
      * more intervals may be added.
      */
-    def rangeVector: RangeVector = baked._1
+    def rangeVector: BitVector = baked._1
     
     /**
      * Get the array of values by interval index, for mapping back from ranges
-     * in our RangeVector representation to the actual values in the map. After
+     * in our BitVector representation to the actual values in the map. After
      * this is called, no more intervals may be added.
      */
     def valueArray: Seq[Option[ValueType]] = baked._2

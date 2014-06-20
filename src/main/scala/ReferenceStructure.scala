@@ -1,7 +1,7 @@
 package edu.ucsc.genome
 import scala.collection.immutable.HashMap
 import scala.collection.mutable.{ArrayBuilder, ArrayBuffer}
-import org.ga4gh.{FMDUtil, RangeVector, RangeVectorIterator, FMDIndex, Mapping}
+import org.ga4gh.{FMDUtil, BitVector, BitVectorIterator, FMDIndex, Mapping}
 import scala.collection.JavaConversions._
 import java.io.File
 import java.nio.file._
@@ -224,12 +224,12 @@ class MergedReferenceStructure(index: FMDIndex, directory: String)
         // First open a C FILE* with the minimal API that FMDUtil in RLCSA comes
         // with.
         val file = FMDUtil.fopen(directory + "/vector.bin", "r")
-        // Load the RangeVector from it
-        val toReturn = new RangeVector(file)
+        // Load the BitVector from it
+        val toReturn = new BitVector(file)
         // Close the file. OS should free it.
         FMDUtil.fclose(file)
      
-        // Send out the RangeVector   
+        // Send out the BitVector   
         toReturn
     }
     
@@ -291,7 +291,7 @@ class MergedReferenceStructure(index: FMDIndex, directory: String)
      * Dump the whole BitVector.
      */
     def bits: Seq[Boolean] = {
-        val iterator = new RangeVectorIterator(rangeVector)
+        val iterator = new BitVectorIterator(rangeVector)
         // Look up the index and get the bit for every BWT position.
         for(i <- 0L until index.getBWTLength) yield {
             iterator.isSet(i)

@@ -6,12 +6,16 @@
  * masking, with efficient rank and select.
  */
 
-// Use Nibble Vectors, borrowed from RLCSA, to encode our range endpoint bitmaps
-#include "CSA/NibbleVector.hpp"
-typedef CSA::NibbleVector BitVector;
-typedef CSA::NibbleVector::Iterator BitVectorIterator;
-typedef CSA::NibbleEncoder BitVectorEncoder;
+// Use Nibble Vectors, borrowed from RLCSA, and renamed to BitVectors, to encode
+// our range endpoint bitmaps
+#include "CSA/BitVector.hpp"
 
+// Previously we just typedef'd NibbleVector thigns to BitVector things, but
+// that confused SWIG.
+
+using CSA::BitVector;
+using CSA::BitVectorIterator;
+using CSA::BitVectorEncoder;
  
 
 #endif

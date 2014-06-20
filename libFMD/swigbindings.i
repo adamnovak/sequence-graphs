@@ -15,6 +15,9 @@
 // <http://www.swig.org/Doc1.3/Library.html#Library_nn17>
 %include "exception.i"
 
+// Also bring in the typemaps library
+%include "typemaps.i"
+
 // Java can't handle these operator names.
 %rename(operatorLeftShift) operator<<;
 %rename(operatorEquals) operator==;
@@ -33,16 +36,8 @@
 // should delete if we don't need it.
 %newobject FMDIndexBuilder::build;
 
-// Add some renames for the bit vector types.
-%rename(BitVector) NibbleVector;
-%rename(BitVectorEncoder) NibbleEncoder;
-
-
 %include "CSA/BitVectorBase.hpp"
-%include "CSA/NibbleVector.hpp"
-
-typedef NibbleVector BitVector;
-typedef NibbleEncoder BitVectorEncoder;
+%include "CSA/BitVector.hpp"
 
 %include "Mapping.hpp"
 %include "TextPosition.hpp"

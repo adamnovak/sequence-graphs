@@ -2,7 +2,7 @@ CXX=g++
 
 # What are our generic objects?
 OBJS=FMDIndex.o FMDIndexBuilder.o util.o FMDIndexIterator.o Mapping.o \
-	FMDPosition.o CSA/BitBuffer.o CSA/BitVectorBase.o CSA/NibbleVector.o \
+	FMDPosition.o CSA/BitBuffer.o CSA/BitVectorBase.o CSA/BitVector.o \
 	Log.o
 	
 # Waht are our SWIG JNI wrapper objects?
@@ -87,8 +87,8 @@ testRunner: $(TEST_OBJS) $(OBJS) $(DEPS)
 	$(TEST_LIBS)
 	
 # We can automagically get header dependencies.
-dependencies.mk: *.cpp Test/*.cpp *.hpp Test/*.hpp
-	g++ $(CXXFLAGS) -MM *.cpp Test/*.cpp > dependencies.mk
+dependencies.mk: *.cpp Test/*.cpp CSA/*.cpp *.hpp Test/*.hpp CSA/*.hpp
+	g++ $(CXXFLAGS) -MM *.cpp Test/*.cpp CSA/*.cpp > dependencies.mk
 	
 # Include auto-generated dependencies.
 include dependencies.mk

@@ -601,8 +601,8 @@ int64_t FMDIndex::getLF(int64_t index) const {
     return charBlockStart + instanceRank;
 }
 
-std::vector<Mapping> FMDIndex::map(const std::string& query, BitVector* mask, 
-    int start, int length) const {
+std::vector<Mapping> FMDIndex::map(const std::string& query,
+    const BitVector* mask, int start, int length) const {
 
     if(length == -1) {
         // Fix up the length parameter if it is -1: that means the whole rest of
@@ -801,7 +801,8 @@ std::vector<Mapping> FMDIndex::mapBoth(const std::string& query, int64_t genome,
 }
 
 std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
-    const std::string& query, BitVector* mask, int start, int length) const {
+    const std::string& query, const BitVector* mask, int start,
+    int length) const {
     
     // RIGHT-map to a range.
     
