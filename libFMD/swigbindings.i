@@ -38,27 +38,6 @@
 
 %include "CSA/BitVectorBase.hpp"
 %include "CSA/BitVector.hpp"
-// If we don't have this, it somehow manages to think that BitVector doesn't
-// mean CSA::BitVector;
-%include "BitVector.hpp"
-
-%include "Mapping.hpp"
-%include "TextPosition.hpp"
-%{
-  #include "FMDIndex.hpp"
-%}
-%include "FMDIndex.hpp"
-%include "FMDIndexIterator.hpp"
-%{
-  #include "FMDIndexBuilder.hpp"
-%}
-%include "FMDIndexBuilder.hpp"
-
-%{
-  using namespace CSA;
-%}
-
-
 
 // We need to use the inner vector iterator classes to look at vectors. Give a
 // partial definition under a new name.
@@ -84,6 +63,29 @@ public:
 
   size_t countRuns();
 };
+
+// If we don't have this, it somehow manages to think that BitVector doesn't
+// mean CSA::BitVector;
+using CSA::BitVector;
+using CSA::BitVectorEncoder;
+
+
+%include "Mapping.hpp"
+%include "TextPosition.hpp"
+%{
+  #include "FMDIndex.hpp"
+%}
+%include "FMDIndex.hpp"
+%include "FMDIndexIterator.hpp"
+%{
+  #include "FMDIndexBuilder.hpp"
+%}
+%include "FMDIndexBuilder.hpp"
+
+%{
+  using namespace CSA;
+%}
+
 
 // Since we will need to load and save range vectors to files, we need to expose
 // a minimal C FILE API.
