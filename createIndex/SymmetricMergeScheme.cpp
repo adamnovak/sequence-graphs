@@ -113,8 +113,10 @@ void SymmetricMergeScheme::generateMerges(size_t targetGenome,
         // Grab each contig as a string
         std::string contig = index.displayContig(i);
         
-        // Map it to the target genome in both orientations, and disambiguate.
-        std::vector<Mapping> mappings = index.mapBoth(contig, targetGenome);
+        // Map it to the target genome in both orientations, with a minimum
+        // context of 20, and disambiguate.
+        // TODO: Make this a tunable parameter.
+        std::vector<Mapping> mappings = index.mapBoth(contig, targetGenome, 20);
         
         for(size_t base = 0; base < mappings.size(); base++) {
             // For each base that we tried to map

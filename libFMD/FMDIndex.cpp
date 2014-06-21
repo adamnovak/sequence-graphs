@@ -602,7 +602,7 @@ int64_t FMDIndex::getLF(int64_t index) const {
 }
 
 std::vector<Mapping> FMDIndex::map(const std::string& query,
-    const BitVector* mask, int start, int length) const {
+    const BitVector* mask, int minContext, int start, int length) const {
 
     if(length == -1) {
         // Fix up the length parameter if it is -1: that means the whole rest of
@@ -653,11 +653,12 @@ std::vector<Mapping> FMDIndex::map(const std::string& query,
             location.characters++;
         }
 
-        if(location.is_mapped && 
+        if(location.is_mapped && location.characters >= minContext &&
             location.position.getLength(maskIterator) == 1) {
             
-            // It mapped. We didn't do a re-start and fail, and there's exactly
-            // one thing in our interval.
+            // It mapped. We didn't do a re-start and fail, we have enough
+            // context to be confident, and there's exactly one thing in our
+            // interval.
 
             // Take the first (only) thing in the bi-interval's forward strand
             // side, not accounting for the mask.
@@ -741,16 +742,17 @@ std::vector<Mapping> FMDIndex::map(const std::string& query,
 }
 
 std::vector<Mapping> FMDIndex::map(const std::string& query, int64_t genome, 
-    int start, int length) const {
+    int minContext, int start, int length) const {
     
     // Get the appropriate mask, or NULL if given the special all-genomes value.
-    return map(query, genome == -1 ? NULL : genomeMasks[genome], start, length);    
+    return map(query, genome == -1 ? NULL : genomeMasks[genome], minContext, 
+        start, length);    
 }
 
 char op_increase (char i) { return ++i; }
 
 std::vector<Mapping> FMDIndex::mapBoth(const std::string& query, int64_t genome, 
-    int start, int length) const {
+    int minContext, int start, int length) const {
     
     if(length == -1) {
         // Fix up the length parameter if it is -1: that means the whole rest of
@@ -762,7 +764,8 @@ std::vector<Mapping> FMDIndex::mapBoth(const std::string& query, int64_t genome,
     }
     
     // Map it forward
-    std::vector<Mapping> forward = map(query, genome, start, length);
+    std::vector<Mapping> forward = map(query, genome, minContext, start,
+        length);
     
     // Make a reversed copy of the appropriate region of the query string.
     
@@ -782,7 +785,7 @@ std::vector<Mapping> FMDIndex::mapBoth(const std::string& query, int64_t genome,
         std::back_inserter(reverseComplemented), (char(*)(char))complement);
         
     // Map it backward
-    std::vector<Mapping> reverse = map(reverseComplemented, genome);
+    std::vector<Mapping> reverse = map(reverseComplemented, genome, minContext);
     
     if(forward.size() != reverse.size()) {
         throw std::runtime_error("Forward and reverse region size mismatch!");
@@ -801,7 +804,7 @@ std::vector<Mapping> FMDIndex::mapBoth(const std::string& query, int64_t genome,
 }
 
 std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
-    const std::string& query, const BitVector* mask, int start,
+    const std::string& query, const BitVector* mask, int minContext, int start,
     int length) const {
     
     // RIGHT-map to a range.
@@ -855,11 +858,12 @@ std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
         // moved) correspond to, if any?
         int64_t range = location.position.range(rangeIterator, maskIterator);
 
-        if(location.is_mapped && !location.position.isEmpty(maskIterator) && 
-            range != -1) {
+        if(location.is_mapped && location.characters >= minContext && 
+            !location.position.isEmpty(maskIterator) && range != -1) {
             
-            // It mapped. We didn't do a re-start and fail, and our interval is
-            // nonempty and subsumed by a range.
+            // It mapped. We didn't do a re-start and fail, we have sufficient
+            // context to be confident, and our interval is nonempty and
+            // subsumed by a range.
 
             Log::debug() << "Mapped " << location.characters << 
             " context to range #" << range << " in range vector." << std::endl;
@@ -934,11 +938,12 @@ std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
 }
 
 std::vector<int64_t> FMDIndex::map(const BitVector& ranges, 
-    const std::string& query, int64_t genome, int start, int length) const {
+    const std::string& query, int64_t genome, int minContext, int start,
+    int length) const {
     
     // Get the appropriate mask, or NULL if given the special all-genomes value.
-    return map(ranges, query, genome == -1 ? NULL : genomeMasks[genome], start,
-        length);    
+    return map(ranges, query, genome == -1 ? NULL : genomeMasks[genome], 
+        minContext, start, length);    
 }
 
 FMDIndex::iterator FMDIndex::begin(size_t depth, bool reportDeadEnds) const {

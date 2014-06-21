@@ -226,14 +226,14 @@ public:
      * and is the default.
      */
     std::vector<Mapping> map(const std::string& query, const BitVector* mask, 
-        int start = 0, int length = -1) const;
+        int minContext = 0, int start = 0, int length = -1) const;
         
     /**
      * LEFT-map to a specific genome, or to all genomes if genome is -1. Same
      * semantics as the function above.
      */
     std::vector<Mapping> map(const std::string& query, int64_t genome = -1, 
-        int start = 0, int length = -1) const;
+        int minContext = 0, int start = 0, int length = -1) const;
     
     /**
      * Both left- and right-map the given string to the given genome (or all
@@ -242,7 +242,7 @@ public:
      * start.
      */
     std::vector<Mapping> mapBoth(const std::string& query, int64_t genome = -1, 
-        int start = 0, int length = -1) const;
+        int minContext = 0, int start = 0, int length = -1) const;
       
     /**
      * Try RIGHT-mapping each base in the query to one of the ranges represented
@@ -264,16 +264,16 @@ public:
      * or -1 if the base did not map to a range.
      */
     std::vector<int64_t> map(const BitVector& ranges,
-        const std::string& query, const BitVector* mask, int start = 0,
-        int length = -1) const;
+        const std::string& query, const BitVector* mask, int minContext = 0, 
+        int start = 0, int length = -1) const;
         
     /**
      * RIGHT-map to ranges intersecting a specific genome, or all genomes if
      * genome is -1. Same semantics as the function above.
      */
     std::vector<int64_t> map(const BitVector& ranges,
-        const std::string& query, int64_t genome = -1, int start = 0,
-        int length = -1) const;
+        const std::string& query, int64_t genome = -1, int minContext = 0, 
+        int start = 0, int length = -1) const;
         
     /***************************************************************************
      * Iteration Functions
