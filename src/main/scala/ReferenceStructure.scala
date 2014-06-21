@@ -267,19 +267,11 @@ class MergedReferenceStructure(index: FMDIndex, directory: String)
                 val rangeSeq = new ArrayBuilder.ofLong
                 
                 for(i <- 0L until ranges.size()) {
-                    ranges.set(i.toInt, 1000)
-                    if(ranges.get(i.toInt) != 1000) {
-                        throw new Exception("IntVector Is Wrong!")
-                    }
                     rangeSeq += ranges.get(i.toInt)
                 }
                 
-                val result = rangeSeq.result
-                
-                println(result.mkString(", "))
-                
                 // Convert to Sides in an Array and return.
-                result.map {
+                rangeSeq.result.map {
                     // A range number of -1 means it didn't map 
                     case -1 => None
                     // Otherwise go get the Side for the range it mapped to (or
