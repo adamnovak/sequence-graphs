@@ -33,10 +33,6 @@ BitVector::reportSize() const
   return bytes;
 }
 
-BitVector* BitVector::getAddress() {
-  return this;
-}
-
 //--------------------------------------------------------------------------
 
 BitVector::Iterator::Iterator(const BitVector& par) :

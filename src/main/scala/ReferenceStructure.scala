@@ -171,6 +171,17 @@ class SideArray(filename: String) {
      * Load the record at the given index and return it as a Side.
      */
     def apply(index: Long): Side = {
+        if(index > length) {
+            // Don't let them look past the end.
+            throw new Exception("Index %d beyond file length %d".format(index,
+                length))
+        }
+        
+        if(index < 0) {
+            // Or before the beginning.
+            throw new Exception("Index %d is negative".format(index))
+        }
+        
         // Make a buffer to read into
         val buffer = ByteBuffer.allocate(8)
         
@@ -256,11 +267,19 @@ class MergedReferenceStructure(index: FMDIndex, directory: String)
                 val rangeSeq = new ArrayBuilder.ofLong
                 
                 for(i <- 0L until ranges.size()) {
+                    ranges.set(i.toInt, 1000)
+                    if(ranges.get(i.toInt) != 1000) {
+                        throw new Exception("IntVector Is Wrong!")
+                    }
                     rangeSeq += ranges.get(i.toInt)
                 }
                 
+                val result = rangeSeq.result
+                
+                println(result.mkString(", "))
+                
                 // Convert to Sides in an Array and return.
-                rangeSeq.result.map {
+                result.map {
                     // A range number of -1 means it didn't map 
                     case -1 => None
                     // Otherwise go get the Side for the range it mapped to (or
@@ -270,9 +289,12 @@ class MergedReferenceStructure(index: FMDIndex, directory: String)
                     // left-side ones. Also remember that range indices are
                     // 1-based coming out of the FMD-index.
                     case range => 
+                        println(range)
                         if(range < sideArray.length + 1) {
-                            // We got a range that a Side is defined for. Flip
-                            // the Side.
+                            // We got a range that a Side is defined for.
+                            // Retrieve and flip the Side. Range numbers are
+                            // 1-based, and our sides are 0-based, so we have to
+                            // offset by 1.
                             Some(!(sideArray(range.toInt - 1)))
                         } else {
                             // Complain we're supposed to be mapping to a range

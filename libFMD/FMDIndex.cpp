@@ -923,6 +923,10 @@ std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
         delete maskIterator;
     }
 
+    for(auto i = mappings.begin(); i != mappings.end(); ++i) {
+        Log::debug() << "Mapping: " << *i << std::endl;
+    }
+
     // Give back our answers.
     return mappings;
     

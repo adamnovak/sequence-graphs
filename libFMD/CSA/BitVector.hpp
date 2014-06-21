@@ -64,14 +64,6 @@ class BitVector : public BitVectorBase
 
     size_t reportSize() const;
     
-    /**
-     * We add a method to get the address of a BitVector, hopefully convincing
-     * SWIG to give us a SWIGTYPE_p_BitVector.
-     */
-    BitVector* getAddress();
-    
-    void checkAddress(BitVector* a, const BitVector& b);
-
 //--------------------------------------------------------------------------
 
     class Iterator : public BitVectorBase::Iterator

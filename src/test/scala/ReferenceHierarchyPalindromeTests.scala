@@ -29,7 +29,7 @@ class ReferenceHierarchyPalindromeTests extends HierarchySuite {
         }.sum === 0)
     }
     
-    test("can map on level 1") {
+    test("can't map on level 1 either because merging is now map-based") {
         val pattern = sequences(0)
         val mappings: Seq[Option[Side]] = hierarchy.map(1, pattern)
         
@@ -37,7 +37,7 @@ class ReferenceHierarchyPalindromeTests extends HierarchySuite {
         assert(mappings.map {
             case Some(_) => 1
             case None => 0
-        }.sum === sequences(0).size)
+        }.sum === 0)
     }
     
     test("left-mapping is reverse of right-mapping") {
