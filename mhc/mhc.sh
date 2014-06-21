@@ -53,4 +53,10 @@ echo "Creating HAL..."
 
 rm -f mhc.hal
 halAppendCactusSubtree mhc.c2h mhc.c2h.fasta "${TREE}" mhc.hal
+
+echo "Creating AssemblyHub..."
+
+rm -Rf hub
+rm -Rf tree
+hal2assemblyHub.py --jobTree tree mhc.hal hub --hub=mhc --shortLabel="All MHCs"
     
