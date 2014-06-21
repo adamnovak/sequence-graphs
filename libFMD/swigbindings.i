@@ -97,7 +97,7 @@ void fclose(FILE* file);
 
 // Java also needs to work with vectors of int64_ts coming back from the map
 // method when working on ranges.
-%template(IntVector) std::vector<int64_t>; 
+%template(IntVector) std::vector<long long>; 
 
 // Whenever any of the JNI classes loads, load the native library.
 %pragma(java) jniclasscode=%{
