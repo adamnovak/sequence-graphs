@@ -2,8 +2,9 @@
 
 #include <Log.hpp>
 
-OverlapMergeScheme::OverlapMergeScheme(const FMDIndex& index): 
-    MergeScheme(index), threads(), queue(NULL) {
+OverlapMergeScheme::OverlapMergeScheme(const FMDIndex& index,
+    size_t minContext): MergeScheme(index), threads(), queue(NULL), 
+    minContext(minContext) {
     
     // Nothing to do
     
@@ -114,9 +115,9 @@ void OverlapMergeScheme::generateMerges(size_t targetGenome,
         std::string contig = index.displayContig(i);
         
         // Map it to the target genome in both orientations, with a minimum
-        // context of 20, and disambiguate.
-        // TODO: Make this a tunable parameter.
-        std::vector<Mapping> mappings = index.mapBoth(contig, targetGenome, 20);
+        // context as specified when we were constructed, and disambiguate.
+        std::vector<Mapping> mappings = index.mapBoth(contig, targetGenome,
+            minContext);
         
         for(size_t base = 0; base < mappings.size(); base++) {
             // For each base that we tried to map

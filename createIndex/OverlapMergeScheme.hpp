@@ -16,9 +16,11 @@ class OverlapMergeScheme: public MergeScheme {
 public:
     
     /**
-     * Make a new OverlapMergeScheme to merge the genomes in the given index.
+     * Make a new OverlapMergeScheme to merge the genomes in the given index. If
+     * minContext is specified, ignores merges motivated by fewer than that
+     * number of bases of context, even if there is an unambiguous mapping.
      */
-    OverlapMergeScheme(const FMDIndex& index);
+    OverlapMergeScheme(const FMDIndex& index, size_t minContext = 0);
     
     /**
      * Get rid of a OverlapMergeScheme (and delete its queue, if it has one).
@@ -53,6 +55,9 @@ protected:
     // Holds a pointer to a ConcurrentQueue, so we can create one and then
     // destroy it only when we get destroyed.
     ConcurrentQueue<Merge>* queue;
+    
+    // Minimum amount of context that is allowed to motivate a merge.
+    size_t minContext;
     
     /**
      * Run as a thread. Generates merges by mapping the contigs of the query

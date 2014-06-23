@@ -187,10 +187,14 @@ makeThreadSet(
 /**
  * Create a new thread set from the given FMDIndex, and merge it down by the
  * overlap merging scheme, in parallel. Returns the pinched thread set.
+ * 
+ * If a context is specified, will not merge on fewer than that many bases of
+ * context on a side, whether there is a unique mapping or not.
  */
 stPinchThreadSet*
 mergeOverlap(
-    const FMDIndex& index
+    const FMDIndex& index,
+    size_t context = 0
 ) {
 
     Log::info() << "Creating initial pinch thread set" << std::endl;
@@ -199,7 +203,7 @@ mergeOverlap(
     stPinchThreadSet* threadSet = makeThreadSet(index);
     
     // Make the merge scheme we want to use
-    OverlapMergeScheme scheme(index);
+    OverlapMergeScheme scheme(index, context);
 
     // Set it running and grab the queue where its results come out.
     ConcurrentQueue<Merge>& queue = scheme.run();
@@ -956,6 +960,9 @@ main(
             "File in which to save FASTA records for building HAL from .c2h")
         ("degrees", boost::program_options::value<std::string>(), 
             "File in which to save degrees of pinch graph nodes")
+        ("context", boost::program_options::value<size_t>()
+            ->default_value(0), 
+            "Minimum required context length to merge on")
         ("sampleRate", boost::program_options::value<unsigned int>()
             ->default_value(64), 
             "Set the suffix array sample rate to use")
@@ -1059,8 +1066,10 @@ main(
     // We want to time the merge code.
     Timer* mergeTimer = new Timer("Overlap Merging");
     
-    // Make a thread set that's all merged.
-    stPinchThreadSet* threadSet = mergeOverlap(index);
+    // Make a thread set that's all merged, with the given minimum merge
+    // context.
+    stPinchThreadSet* threadSet = mergeOverlap(index, 
+        options["context"].as<size_t>());
         
     delete mergeTimer;
         
