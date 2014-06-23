@@ -5,7 +5,7 @@ OBJS=
     
 # What objects do we need for our createIndex binary?
 CREATEINDEX_OBJS=createIndex.o MergeApplier.o MergeScheme.o \
-SymmetricMergeScheme.o
+OverlapMergeScheme.o
 
 # What projects do we depend on? We have rules for each of these.
 DEPS=pinchesAndCacti sonLib libsuffixtools libfmd

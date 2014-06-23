@@ -1,15 +1,15 @@
-#include "SymmetricMergeScheme.hpp"
+#include "OverlapMergeScheme.hpp"
 
 #include <Log.hpp>
 
-SymmetricMergeScheme::SymmetricMergeScheme(const FMDIndex& index): 
+OverlapMergeScheme::OverlapMergeScheme(const FMDIndex& index): 
     MergeScheme(index), threads(), queue(NULL) {
     
     // Nothing to do
     
 }
 
-SymmetricMergeScheme::~SymmetricMergeScheme() {
+OverlapMergeScheme::~OverlapMergeScheme() {
     
     join(); // Join our threads
 
@@ -21,12 +21,12 @@ SymmetricMergeScheme::~SymmetricMergeScheme() {
     
 }
 
-ConcurrentQueue<Merge>& SymmetricMergeScheme::run() {
+ConcurrentQueue<Merge>& OverlapMergeScheme::run() {
     
     if(queue != NULL) {
         // Don't let people call this twice.
         throw std::runtime_error(
-            "Called run() twice on a SymmetricMergeScheme.");
+            "Called run() twice on a OverlapMergeScheme.");
     }
     
     // Figure out how many threads to run. Let's do one per pair of genomes (not
@@ -38,7 +38,7 @@ ConcurrentQueue<Merge>& SymmetricMergeScheme::run() {
     size_t threadCount = index.getNumberOfGenomes() * 
         (index.getNumberOfGenomes() - 1);
     
-    Log::info() << "Running symmetric merge on " << threadCount << " threads" <<
+    Log::info() << "Running Overlap merge on " << threadCount << " threads" <<
         std::endl;
     
     // Make the queue    
@@ -54,7 +54,7 @@ ConcurrentQueue<Merge>& SymmetricMergeScheme::run() {
             
             // Otherwise, for each pair of genomes in each order, start a thread
             // to map the one to the other.
-            threads.push_back(std::thread(&SymmetricMergeScheme::generateMerges,
+            threads.push_back(std::thread(&OverlapMergeScheme::generateMerges,
                 this, i, j));
         }
     }
@@ -64,7 +64,7 @@ ConcurrentQueue<Merge>& SymmetricMergeScheme::run() {
     
 }
 
-void SymmetricMergeScheme::join() {
+void OverlapMergeScheme::join() {
 
     for(std::vector<std::thread>::iterator i = threads.begin(); 
         i != threads.end(); ++i) {
@@ -79,7 +79,7 @@ void SymmetricMergeScheme::join() {
     
 }
 
-void SymmetricMergeScheme::generateMerges(size_t targetGenome,
+void OverlapMergeScheme::generateMerges(size_t targetGenome,
     size_t queryGenome) {
     
     // What's our thread name?

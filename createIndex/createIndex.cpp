@@ -36,7 +36,7 @@
 
 #include "IDSource.hpp"
 #include "ConcurrentQueue.hpp"
-#include "SymmetricMergeScheme.hpp"
+#include "OverlapMergeScheme.hpp"
 #include "MergeApplier.hpp"
 
 
@@ -186,10 +186,10 @@ makeThreadSet(
 
 /**
  * Create a new thread set from the given FMDIndex, and merge it down by the
- * symmetric merging scheme, in parallel. Returns the pinched thread set.
+ * overlap merging scheme, in parallel. Returns the pinched thread set.
  */
 stPinchThreadSet*
-mergeSymmetric(
+mergeOverlap(
     const FMDIndex& index
 ) {
 
@@ -199,7 +199,7 @@ mergeSymmetric(
     stPinchThreadSet* threadSet = makeThreadSet(index);
     
     // Make the merge scheme we want to use
-    SymmetricMergeScheme scheme(index);
+    OverlapMergeScheme scheme(index);
 
     // Set it running and grab the queue where its results come out.
     ConcurrentQueue<Merge>& queue = scheme.run();
@@ -1057,10 +1057,10 @@ main(
     IDSource<long long int> source(index.getTotalLength());
     
     // We want to time the merge code.
-    Timer* mergeTimer = new Timer("Symmetric Merging");
+    Timer* mergeTimer = new Timer("Overlap Merging");
     
     // Make a thread set that's all merged.
-    stPinchThreadSet* threadSet = mergeSymmetric(index);
+    stPinchThreadSet* threadSet = mergeOverlap(index);
         
     delete mergeTimer;
         

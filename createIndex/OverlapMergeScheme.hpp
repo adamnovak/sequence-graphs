@@ -1,5 +1,5 @@
-#ifndef SYMMETRICMREGESCHEME_HPP
-#define SYMMETRICMERGESCHEME_HPP
+#ifndef OVERLAPMERGESCHEME_HPP
+#define OVERLAPMERGESCHEME_HPP
 
 #include <thread>
 #include <vector>
@@ -8,23 +8,23 @@
 
 
 /**
- * Represents the "Symmetric Merging Scheme": each genome is mapped to each
+ * Represents the "Overlap Merging Scheme": each genome is mapped to each
  * other genome, and bases are merged with the bases they map to.
  */
-class SymmetricMergeScheme: public MergeScheme {
+class OverlapMergeScheme: public MergeScheme {
    
 public:
     
     /**
-     * Make a new SymmetricMergeScheme to merge the genomes in the given index.
+     * Make a new OverlapMergeScheme to merge the genomes in the given index.
      */
-    SymmetricMergeScheme(const FMDIndex& index);
+    OverlapMergeScheme(const FMDIndex& index);
     
     /**
-     * Get rid of a SymmetricMergeScheme (and delete its queue, if it has one).
+     * Get rid of a OverlapMergeScheme (and delete its queue, if it has one).
      * If threads are running, blocks until they finish.
      */
-    virtual ~SymmetricMergeScheme();
+    virtual ~OverlapMergeScheme();
     
     /**
      * Create and return a queue of merges, and start feeding merges into it
