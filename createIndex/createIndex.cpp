@@ -37,6 +37,7 @@
 #include "IDSource.hpp"
 #include "ConcurrentQueue.hpp"
 #include "OverlapMergeScheme.hpp"
+#include "MappingMergeScheme.hpp"
 #include "MergeApplier.hpp"
 
 
@@ -746,8 +747,7 @@ writeAlignmentFasta(
  * vector of canonicalized positions. Each anonicalized position is a contig
  * number, a base number, and a face flag.
  *
- * BWT positions not represented in the thread set will be rolled into the
- * preceding range.
+ * All BWT positions must be represented in the pinch set.
  *
  * Scans through the entire BWT.
  */
@@ -933,6 +933,97 @@ void saveLevelIndex(
     
     }
     sideStream.close();
+}
+
+/**
+ * Create a new thread set from the given FMDIndex, and merge it down by the
+ * greedy merging scheme, in parallel. Returns the pinched thread set.
+ *
+ * The greedy merging scheme is to take one genome, map the next genome to it,
+ * merge at the mappings, compute the upper-level index, map the next genome to
+ * that, merge at the mappings, compute the upper level index, and so on.
+ * 
+ * If a context is specified, will not merge on fewer than that many bases of
+ * context on a side, whether there is a unique mapping or not.
+ */
+stPinchThreadSet*
+mergeGreedy(
+    const FMDIndex& index,
+    size_t context = 0
+) {
+
+    Log::info() << "Creating initial pinch thread set" << std::endl;
+    
+    // Make a thread set from our index.
+    stPinchThreadSet* threadSet = makeThreadSet(index);
+    
+    if(index.getNumberOfGenomes() == 0) {
+        // Make sure we have at least 1 genome.
+        throw std::runtime_error("Can't merge 0 genomes greedily!");
+    }
+    
+    // Keep around a bit vector of all the positions that are in. This will
+    // start with the very first genome, which we know exists.
+    const BitVector* includedPositions = &index.getGenomeMask(0);
+    
+    // Canonicalize everything, yielding a bitvector (pointer) of ranges and a
+    // vector of canonicalized positions.
+    auto mergedRuns = identifyMergedRuns(threadSet, index);
+    
+    for(size_t genome = 1; genome < index.getNumberOfGenomes(); genome++) {
+        // For each genome that we have to merge in...
+        
+        // Make the merge scheme we want to use. We choose a mapping-to-second-
+        // level-based merge scheme, to which we need to feed the details of the
+        // second level (range vector, representative positions to merge into)
+        // and also the bitmask of what bottom-level things to count. We also
+        // need to tell it what genome to map the contigs of.
+        MappingMergeScheme scheme(index, *mergedRuns.first, mergedRuns.second,
+            *includedPositions, genome, context);
+
+        // Set it running and grab the queue where its results come out.
+        ConcurrentQueue<Merge>& queue = scheme.run();
+        
+        // Make a merge applier to apply all those merges, and plug it in.
+        MergeApplier applier(index, queue, threadSet);
+        
+        // Wait for these things to be done.
+        scheme.join();
+        applier.join();
+        
+        // Join any trivial boundaries.
+        stPinchThreadSet_joinTrivialBoundaries(threadSet);
+        
+        // Delete the old merged runs bit vector and recalculate merged runs on
+        // the newly updated thread set.
+        delete mergedRuns.first;
+        mergedRuns = identifyMergedRuns(threadSet, index);
+        
+        // Merge the new genome into includedPositions, replacing the old
+        // bitvector.
+        BitVector* newIncludedPositions = includedPositions->createUnion(
+            index.getGenomeMask(genome));
+        if(genome > 1) {
+            // If we already alocated a new BitVector that wasn't the one that
+            // came when we loaded in the genomes, we need to delete it.
+            delete includedPositions;
+        }
+        includedPositions = newIncludedPositions;
+        
+    }
+    
+    // Delete the final merged run vector
+    delete mergedRuns.first;
+    
+    if(index.getNumberOfGenomes() > 1) {
+        // And, if we had to make any additional included position BitVectors,
+        // get the last one of those too.
+        delete includedPositions;
+    }
+    
+    // Let the caller rebuild that from this pinch graph which we
+    // return.
+    return threadSet;
 }
 
 /**

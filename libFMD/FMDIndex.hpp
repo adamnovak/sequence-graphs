@@ -131,6 +131,11 @@ public:
      */
     bool isInGenome(int64_t bwtIndex, size_t genome) const;
     
+    /**
+     * Get the mask for the positions in the given genome.
+     */
+    const BitVector& getGenomeMask(size_t genome) const;
+    
     /***************************************************************************
      * Search Functions
      **************************************************************************/

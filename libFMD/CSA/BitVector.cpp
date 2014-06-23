@@ -33,8 +33,8 @@ BitVector::reportSize() const
   return bytes;
 }
 
-BitVector 
-BitVector::operator|(const BitVector& other) const
+BitVector* 
+BitVector::createUnion(const BitVector& other) const
 {
   // Make iterators to actually look at the vectors
   BitVectorIterator us(*this);
@@ -57,8 +57,8 @@ BitVector::operator|(const BitVector& other) const
   // Finish encoding.
   encoder.flush();
   
-  // Make the actual BitVector and return it.
-  return BitVector(encoder, newSize);
+  // Make the actual BitVector and return it. Caller is responsible for it.
+  return new BitVector(encoder, newSize);
   
 }
 

@@ -65,9 +65,11 @@ class BitVector : public BitVectorBase
     size_t reportSize() const;
     
     /**
-     * Union all the 1s in this bit vector with those in that one (bitwise OR).
+     * Union all the 1s in this bit vector with those in that one (bitwise OR),
+     * allocating a new BitVector on the heap. The caller is responsible for
+     * deleting it.
      */
-    BitVector operator|(const BitVector& other) const;
+    BitVector* createUnion(const BitVector& other) const;
     
 //--------------------------------------------------------------------------
 
@@ -116,6 +118,11 @@ class BitVector : public BitVectorBase
     };
 
 //--------------------------------------------------------------------------
+  
+    /**
+     * We can move BitVectors in the ordinary way.
+     */
+    BitVector& operator = (BitVector&& other) = default;
   
   protected:
 
