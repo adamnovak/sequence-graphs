@@ -737,51 +737,51 @@ writeAlignmentFasta(
 }
 
 /**
- * Make the range vector and list of matching Sides for the hierarchy level
- * implied by the given thread set in the given index. Gets IDs for created
- * positions from the given source.
- * 
- * Manages this by scanning the BWT from left to right, seeing what cannonical
- * position and orientation each base belongs to, and putting 1s in the range
- * vector every time a new one starts.
+ * Canonicalize each contigous run of positions mapping to the same canonical
+ * base and face.
  *
- * Don't forget to delete the bit vector when done!
+ * Takes a pinched thread set, and the index on which it is defined.
+ *
+ * Returns a BitVector marking each such range with a 1 at the start, and a
+ * vector of canonicalized positions. Each anonicalized position is a contig
+ * number, a base number, and a face flag.
+ *
+ * BWT positions not represented in the thread set will be rolled into the
+ * preceding range.
+ *
+ * Scans through the entire BWT.
  */
-std::pair<BitVector*, std::vector<SmallSide> > 
-makeLevelIndexScanning(
+std::pair<BitVector*, std::vector<std::pair<std::pair<size_t, size_t>, bool> > > 
+identifyMergedRuns(
     stPinchThreadSet* threadSet, 
-    const FMDIndex& index, 
-    IDSource<long long int>& source
+    const FMDIndex& index
 ) {
     
     // We need to make bit vector denoting ranges, which we encode with this
     // encoder, which has 32 byte blocks.
     BitVectorEncoder encoder(32);
     
-    // We also need to make a vector of SmallSides, which are the things that
-    // get matched to by the corresponding ranges in the bit vector.
-    std::vector<SmallSide> mappings;
+    // We also need to make a vector of canonical positions.
+    std::vector<std::pair<std::pair<size_t, size_t>, bool> > mappings;
     
-    // We also need this map of position IDs (long long ints) by canonical
-    // contig name (a size_t) and base index (also a size_t)
-    std::map<std::pair<size_t, size_t>, long long int>
-        idReservations;
-
-    Log::info() << "Building mapping data structure by scan..." << std::endl;
-    
+    Log::info() << "Building merged run index by scan..." << std::endl;
     
     // Do the thing where we locate each base and, when the canonical position
     // changes, add a 1 to start a new range and add a mapping.
 
     // Keep track of the ID and relative orientation for the last position we
     // canonicalized.
+    // TODO: typedef this! It is getting silly.
     std::pair<std::pair<size_t, size_t>, bool> lastCanonicalized;
     
     for(int64_t j = index.getNumberOfContigs() * 2; j < index.getBWTLength();
         j++) {
         
         // For each base in the BWT (skipping over the 2*contigs stop
-        // characters)...
+        // characters)... 
+        
+        // Note: stop characters aren't at the front in the last column, only
+        // the first.
         
         // Where is it located?
         TextPosition base = index.locate(j);
@@ -795,23 +795,8 @@ makeLevelIndexScanning(
             // We need to start a new range here, because this BWT base maps to
             // a different position than the last one.
             
-            // What position is that?
-            long long int positionCoordinate;
-            if(idReservations.count(canonicalized.first) > 0) {
-                // Load the previously chosen ID
-                positionCoordinate = 
-                    idReservations[canonicalized.first];
-            } else {
-                // Allocate and remember a new ID.
-                positionCoordinate = 
-                    idReservations[canonicalized.first] = 
-                    source.next();
-            }
-            
-            // Say this range is going to belong to the ID we just looked up, on
-            // the appropriate face.
-            mappings.push_back(
-                SmallSide(positionCoordinate, canonicalized.second));
+            // Say this range is going to belong to the canonical base.
+            mappings.push_back(canonicalized);
             
             if(j != index.getNumberOfContigs() * 2) {
                 // Record a 1 in the vector at the start of every range except
@@ -843,6 +828,76 @@ makeLevelIndexScanning(
     
     // Return the bit vector and the Side vector
     return std::make_pair(bitVector, mappings);
+}
+
+/**
+ * Make the range vector and list of matching Sides for the hierarchy level
+ * implied by the given thread set in the given index. Gets IDs for created
+ * positions from the given source.
+ * 
+ * Manages this by scanning the BWT from left to right, seeing what cannonical
+ * position and orientation each base belongs to, and putting 1s in the range
+ * vector every time a new one starts.
+ *
+ * Don't forget to delete the bit vector when done!
+ */
+std::pair<BitVector*, std::vector<SmallSide> > 
+makeLevelIndexScanning(
+    stPinchThreadSet* threadSet, 
+    const FMDIndex& index, 
+    IDSource<long long int>& source
+) {
+    
+    // First, canonicalize everything, yielding a bitvector of ranges and a
+    // vector of canonicalized positions.
+    auto mergedRuns = identifyMergedRuns(threadSet, index);
+    
+    // We also need to make a vector of SmallSides, which are the things that
+    // get matched to by the corresponding ranges in the bit vector.
+    std::vector<SmallSide> mappings;
+    
+    // We also need this map of position IDs (long long ints) by canonical
+    // contig name (a size_t) and base index (also a size_t). Relative
+    // orientation is always forward.
+    std::map<std::pair<size_t, size_t>, long long int>
+        idReservations;
+
+    // We need to keep track of what run we're on
+    size_t runNumber = 0;
+
+    Log::info() << "Building mapping data structure..." << std::endl;
+    
+    for(int64_t j = index.getNumberOfContigs() * 2; j < index.getBWTLength();
+        j++) {
+        
+        // For each base in the BWT (skipping over the 2*contigs stop
+        // characters)...
+        
+        // Grab the canonicalization
+        std::pair<std::pair<size_t, size_t>, bool> canonicalized =
+            mergedRuns.second[runNumber];
+            
+        // What position is that?
+        long long int positionCoordinate;
+        if(idReservations.count(canonicalized.first) > 0) {
+            // Load the previously chosen ID
+            positionCoordinate = 
+                idReservations[canonicalized.first];
+        } else {
+            // Allocate and remember a new ID.
+            positionCoordinate = 
+                idReservations[canonicalized.first] = 
+                source.next();
+        }
+            
+        // Say this range is going to belong to the ID we just looked up, on
+        // the appropriate face.
+        mappings.push_back(
+            SmallSide(positionCoordinate, canonicalized.second));
+    }
+            
+    // Return the bit vector and the Side vector
+    return std::make_pair(mergedRuns.first, mappings);
 }
 
 /**
