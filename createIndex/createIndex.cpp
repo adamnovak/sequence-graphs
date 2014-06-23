@@ -1101,6 +1101,9 @@ main(
         ("help", "Print help messages") 
         ("test", "Run a mapping speed test")
         ("noMerge", "Don't compute merged level, only make lowest-level index")
+        ("scheme", boost::program_options::value<std::string>()
+            ->default_value("overlap"),
+            "Merging scheme (\"overlap\" or \"greedy\")")
         ("alignment", boost::program_options::value<std::string>(), 
             "File to save .c2h-format alignment in")
         ("alignmentFasta", boost::program_options::value<std::string>(), 
@@ -1207,17 +1210,30 @@ main(
         return 0;
     }
     
-    // Make an IDSource to produce IDs not already claimed by contigs.
-    IDSource<long long int> source(index.getTotalLength());
+    // Grab the merging scheme we are going to use to merge.
+    std::string mergeScheme = options["scheme"].as<std::string>();
+    
+    // Make a pointer to hold the threadset pointer it will create.
+    stPinchThreadSet* threadSet;
     
     // We want to time the merge code.
-    Timer* mergeTimer = new Timer("Overlap Merging");
+    Timer* mergeTimer = new Timer("Merging");
     
-    // Make a thread set that's all merged, with the given minimum merge
-    // context.
-    stPinchThreadSet* threadSet = mergeOverlap(index, 
-        options["context"].as<size_t>());
-        
+    if(mergeScheme == "overlap") {
+        // Make a thread set that's all merged, with the given minimum merge
+        // context.
+        threadSet = mergeOverlap(index, options["context"].as<size_t>());
+    } else if(mergeScheme == "greedy") {
+        // Use the greedy merge instead.
+        threadSet = mergeGreedy(index, options["context"].as<size_t>());
+    } else {
+        // Complain that's not a real merge scheme. TODO: Can we make the
+        // options parser parse an enum or something instead of this?
+        throw std::runtime_error(mergeScheme + 
+            " is not an implemented merge scheme.");
+    }
+    
+    // Now the merge is done. Stop timing.
     delete mergeTimer;
         
     if(options.count("degrees")) {
@@ -1241,7 +1257,10 @@ main(
         }
     }
     
-    // Index it so we have a bit vector and SmallSides to write out.
+    // Make an IDSource to produce IDs not already claimed by contigs.
+    IDSource<long long int> source(index.getTotalLength());
+    
+    // This will hold the computed level index of the merged level.
     std::pair<BitVector*, std::vector<SmallSide> > levelIndex;
     
     // We also want to time the merged level index building code
