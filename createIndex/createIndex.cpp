@@ -540,6 +540,11 @@ writeAlignment(
         
     }
     
+    // Keep a mapping from scaffold name to event name. Event name will be
+    // either the contig scaffold name if all the contigs are from a single
+    // scaffold, or "genome-<number>" if there are multiple scaffolds involved.
+    std::map<std::string, std::string> eventNames;
+    
     // Keep track of the original source sequence
     std::string sourceSequence;
     
@@ -549,8 +554,11 @@ writeAlignment(
         // Grab the sequence name that the contig is on
         std::string contigName = index.getContigName(contig);
         
-        if(contigName != sourceSequence || contig == 0) {
-            // This is a new sequence
+        if(eventNames.count(contigName) == 0) {
+            // We need to figure out the event name for this contig.
+            
+            // Start by naming the event after the contig.
+            eventNames[contigName] = contigName;
             
             // What genome does it belong to?
             size_t genomeNumber = index.getContigGenome(contig);
@@ -558,21 +566,29 @@ writeAlignment(
             // What contigs are in that genome?
             auto genomeRange = index.getGenomeContigs(genomeNumber);
             
-            // Generate a name for the genome.
-            std::string genomeName;
-            
-            if(genomeRange.second - genomeRange.first > 1) {
-                // Genome has multiple contigs. Generate a procedural name.
-                genomeName = "genome-" + std::to_string(genomeNumber);
-            } else {
-                // Genome has exactly one contig. Name it after that.
-                genomeName = contigName;
+            for(size_t i = genomeRange.first; i < genomeRange.second; i++) {
+                // For every contig in that genome
+                if(index.getContigName(i) != contigName) {
+                    // One of them doesn't match this contig's name; they are
+                    // not all from the same scaffold. Re-name the event with a
+                    // new generic name.
+                    
+                    eventNames[contigName] = "genome-" + 
+                        std::to_string(index.getContigGenome(contig));
+                        
+                    // Now we're done
+                    break;
+                }
             }
+        }
+        
+        if(contigName != sourceSequence || contig == 0) {
+            // This is a new scaffold, not the same as the one we were on last.
             
             // Start a new sequence with a sequence line. The sequence is a top
             // sequence, since it is only connected up.
-            c2h << "s\t'" << genomeName << "'\t'" << contigName << "'\t0" <<
-                std::endl;
+            c2h << "s\t'" << eventNames[contigName] << "'\t'" << contigName <<
+                "'\t0" << std::endl;
             
             // Remember that we are on this sequence
             sourceSequence = contigName;
