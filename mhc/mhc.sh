@@ -33,7 +33,7 @@ fi
 
 echo "Indexing..."
 
-time ../createIndex/createIndex --alignment mhc.c2h --alignmentFasta mhc.c2h.fasta --degrees degrees.txt mhc-index *.fa
+time ../createIndex/createIndex --context 100 --alignment mhc.c2h --alignmentFasta mhc.c2h.fasta --degrees degrees.txt mhc-index *.fa
 
 echo "Making tree..."
 

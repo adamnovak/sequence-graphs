@@ -268,8 +268,8 @@ public:
         int start = 0, int length = -1) const;
         
     /**
-     * RIGHT-map to ranges intersecting a specific genome, or all genomes if
-     * genome is -1. Same semantics as the function above.
+     * RIGHT-map to ranges using contexts from a specific genome, or all genomes
+     * if genome is -1. Same semantics as the function above.
      */
     std::vector<int64_t> map(const BitVector& ranges,
         const std::string& query, int64_t genome = -1, int minContext = 0, 

@@ -358,7 +358,8 @@ canonicalize(
 
 /**
  * Given a pinch thread set and a filename, write the degree of each pinch block
- * or segment without a block (always degree 2) to the file, one per line.
+ * or segment without a block (always degree 2, except at the ends) to the file,
+ * one per line.
  *
  * TODO: Maybe restructure as one pass through all blocks, and one scan through
  * threads ignoring any blocks? Then we could eliminate the seen set for blocks.

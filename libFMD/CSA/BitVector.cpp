@@ -33,6 +33,35 @@ BitVector::reportSize() const
   return bytes;
 }
 
+BitVector 
+BitVector::operator|(const BitVector& other) const
+{
+  // Make iterators to actually look at the vectors
+  BitVectorIterator us(*this);
+  BitVectorIterator them(other);
+
+  // How many bits are in the longer BitVector? That's how long we will need to
+  // make the union.
+  size_t newSize = std::max(getSize(), other.getSize());
+  
+  // We need an encoder to encode it.
+  BitVectorEncoder encoder(block_size);
+  
+  for(size_t i = 0; i < newSize; i++)
+  {
+    // OR each bit and save it.
+    // TODO: Is there a more efficient way to do this?
+    encoder.addBit(us.isSet(i) || them.isSet(i));
+  }
+  
+  // Finish encoding.
+  encoder.flush();
+  
+  // Make the actual BitVector and return it.
+  return BitVector(encoder, newSize);
+  
+}
+
 //--------------------------------------------------------------------------
 
 BitVector::Iterator::Iterator(const BitVector& par) :

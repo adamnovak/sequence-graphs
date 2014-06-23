@@ -64,6 +64,11 @@ class BitVector : public BitVectorBase
 
     size_t reportSize() const;
     
+    /**
+     * Union all the 1s in this bit vector with those in that one (bitwise OR).
+     */
+    BitVector operator|(const BitVector& other) const;
+    
 //--------------------------------------------------------------------------
 
     class Iterator : public BitVectorBase::Iterator
