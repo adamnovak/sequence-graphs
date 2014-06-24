@@ -31,7 +31,8 @@ the C++03 ABI in some cases.
 
 ####Install Google Sparse Hash
 
-The indexing code borrowed from SGA uses the (Google) Sparsehash library. To install it, you can use:
+The indexing code borrowed from SGA uses the (Google) Sparsehash library. To
+install it, you can use:
 
 ```
 wget https://sparsehash.googlecode.com/files/sparsehash-2.0.2.tar.gz
