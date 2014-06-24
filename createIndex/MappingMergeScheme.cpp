@@ -146,7 +146,9 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
     std::string contig = index.displayContig(queryContig);
     
     // How many positions are available to map to?
-    Log::info() << "Mapping " << contig.size() << " bases via " << BitVectorIterator(includedPositions).rank(includedPositions.getSize()) << " bottom-level positions" << std::endl;
+    Log::info() << << threadName << "Mapping " << contig.size() << 
+        " bases via " << BitVectorIterator(includedPositions).rank(
+        includedPositions.getSize()) << " bottom-level positions" << std::endl;
     
     // Map it on the right
     std::vector<int64_t> rightMappings = index.map(rangeVector, contig, 
@@ -171,6 +173,8 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
                 // We have a right mapping. Grab its base too.
                 auto rightBase = rangeBases[rightMappings[i]];
                 
+                // Compare the position (contig, base) pairs (first) and the
+                // orientation flags (second)
                 if(leftBase.first == rightBase.first && 
                     leftBase.second != rightBase.second) {
                     

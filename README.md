@@ -133,7 +133,7 @@ make
 
 ####Satisfying the Scala->C++ Dependency
 
-In order for the scala code to work, you need to install the `libFMD` wrapper
+In order for the Scala code to work, you need to install the `libFMD` wrapper
 JAR file into your local Maven repository, where Scala can find it:
 
 ```

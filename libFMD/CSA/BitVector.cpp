@@ -65,20 +65,8 @@ BitVector::createUnion(const BitVector& other) const
   // Finish encoding.
   encoder.flush();
   
-  // Build the BitVector
-  BitVector* toReturn = new BitVector(encoder, newSize);
-  
-  // Check its bits
-  BitVectorIterator iterator(*toReturn);
-  
-  if(iterator.rank(newSize) != ones) {
-    // Check the number of 1s to make sure we did it right.
-    throw std::runtime_error("Expected " + std::to_string(ones) + 
-        " ones in union but found " + std::to_string(iterator.rank(newSize)));
-  }
-  
-  // Return the BitVector. Caller is responsible for it.
-  return toReturn;
+  // Build and return the BitVector. Caller is responsible for it.
+  return new BitVector(encoder, newSize);;
   
 }
 

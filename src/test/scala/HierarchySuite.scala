@@ -21,7 +21,7 @@ abstract class HierarchySuite extends FunSuite with BeforeAndAfterAll {
     /**
      * This can be overridden to specify the sequences to index.
      */
-    def sequences = Seq("ACTAGT")
+    def sequences = Seq("GATTACA", "GATTACAT")
     
     override def beforeAll = {
         // Make a new temp directory

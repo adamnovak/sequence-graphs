@@ -281,7 +281,6 @@ class MergedReferenceStructure(index: FMDIndex, directory: String)
                     // left-side ones. Also remember that range indices are
                     // 1-based coming out of the FMD-index.
                     case range => 
-                        println(range)
                         if(range < sideArray.length + 1) {
                             // We got a range that a Side is defined for.
                             // Retrieve and flip the Side. Range numbers are
