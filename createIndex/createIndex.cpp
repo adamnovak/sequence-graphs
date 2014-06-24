@@ -252,7 +252,7 @@ canonicalize(
     
     Log::debug() << "Canonicalizing " << contigNumber << ":" << offset << 
         "." << strand << std::endl;
-    
+        
     // Now we need to look up what the pinch set says is the canonical
     // position for this base, and what orientation it should be in. All the
     // bases in this range have the same context and should thus all be
@@ -326,15 +326,26 @@ canonicalize(
             std::endl;
     Log::debug() << "Strand: " << strand << std::endl;
 
+    if(canonicalOffset <= 0 || 
+        canonicalOffset > stPinchThread_getLength(
+        stPinchSegment_getThread(firstSegment))) {
+        
+        // The answer is supposed to be a 1-based offset. Make sure that is
+        // true.
+        throw std::runtime_error("Canonical offset " + 
+            std::to_string(canonicalOffset) + 
+            " out of range for 1-based position");
+    }
+
     return std::make_pair(std::make_pair(canonicalContig, canonicalOffset),
         canonicalOrientation != segmentOrientation != strand);
 }
 
 /**
- * Turn the given (text, offset) pair into a canonical (contig number, 1-based
- * offset from contig start, orientation), using the given FMDIndex and the
- * given thread set. The orientation is which face of the canonical base this
- * (text, offset) pair means.
+ * Turn the given (text, 0-based offset offset) pair into a canonical (contig
+ * number, 1-based offset from contig start, orientation), using the given
+ * FMDIndex and the given thread set. The orientation is which face of the
+ * canonical base this (text, offset) pair means.
  */
 std::pair<std::pair<size_t, size_t>, bool>
 canonicalize(
@@ -342,6 +353,8 @@ canonicalize(
     stPinchThreadSet* threadSet, 
     TextPosition base
 ) {
+    
+    Log::debug() << "Canonicalizing 0-based " << base << std::endl;
     
     // What contig corresponds to that text?
     size_t contigNumber = index.getContigNumber(base);
@@ -351,6 +364,13 @@ canonicalize(
     // And what base position is that from the front of the contig? This is
     // 1-based.
     size_t offset = index.getOffset(base);
+    
+    if(offset <= 0 || offset > index.getContigLength(contigNumber)) {
+        // Complain that we got an out of bounds offset from this thing.
+        throw std::runtime_error("Tried to canonicalize text" +
+            std::to_string(base.getText()) + " offset " + 
+            std::to_string(base.getOffset()) + " which is out of bounds");
+    }
     
     // Canonicalize that pinch thread set position.
     return canonicalize(threadSet, contigNumber, offset, strand);
@@ -826,7 +846,7 @@ identifyMergedRuns(
     BitVector* bitVector = new BitVector(encoder,
         index.getTotalLength() + 1);
     
-    // Return the bit vector and the Side vector
+    // Return the bit vector and the canonicalized base vector
     return std::make_pair(bitVector, mappings);
 }
 

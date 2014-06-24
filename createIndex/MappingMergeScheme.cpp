@@ -1,7 +1,11 @@
-#include "MappingMergeScheme.hpp"
+#include <stdexcept>
 
 #include <Log.hpp>
 #include <Util.h> // From libsuffixtools, for reverse_complement
+
+#include "MappingMergeScheme.hpp"
+
+
 
 MappingMergeScheme::MappingMergeScheme(const FMDIndex& index, 
     const BitVector& rangeVector, 
@@ -79,10 +83,31 @@ void MappingMergeScheme::join() {
 void MappingMergeScheme::generateMerge(size_t queryContig, size_t queryBase, 
     size_t referenceContig, size_t referenceBase, bool orientation) const {
     
+    if(referenceBase > index.getContigLength(referenceContig) || 
+        referenceBase == 0) {
+        
+        // Complain that we're trying to talk about an off-the-contig position.
+        throw std::runtime_error("Reference base " + 
+            std::to_string(referenceBase) + 
+            " on contig " + std::to_string(referenceContig) + 
+            " is beyond 1-based bounds of length " + 
+            std::to_string(index.getContigLength(referenceContig)));
+    }
+    
+    if(queryBase > index.getContigLength(queryContig) || 
+        queryBase == 0) {
+        
+        // Complain that we're trying to talk about an off-the-contig position.
+        throw std::runtime_error("Query base " + std::to_string(queryBase) + 
+            " on contig " + std::to_string(queryContig) + 
+            " is beyond 1-based bounds of length " + 
+            std::to_string(index.getContigLength(queryContig)));
+    }
+    
     // Make a Merge between the specified query base and the specified reference
-    // base. Account for orientation.
-    Merge merge(TextPosition(queryContig * 2, queryBase), 
-        TextPosition(referenceContig * 2 + orientation, referenceBase));
+    // base. Account for orientation and change to 0-based coordinates.
+    Merge merge(TextPosition(queryContig * 2, queryBase - 1), 
+        TextPosition(referenceContig * 2 + orientation, referenceBase - 1));
         
     // Send that merge to the queue.
     // Lock the queue.
@@ -93,6 +118,21 @@ void MappingMergeScheme::generateMerge(size_t queryContig, size_t queryBase,
 }
 
 void MappingMergeScheme::generateMerges(size_t queryContig) const {
+    
+    // Spot check all of the ranges
+    for(auto i : rangeBases) {
+        // Grab the contig number
+        size_t rangeContig = i.first.first;
+        // And the 1-based offset into it
+        size_t rangeOffset = i.first.second;
+        
+        if(rangeOffset == 0 || 
+            rangeOffset > index.getContigLength(rangeContig)) {
+            
+            // We found a bad one. Complain.
+            throw std::runtime_error("Out of bounds canonical base!");
+        }
+    }
     
     // What's our thread name?
     std::string threadName = "T" + std::to_string(queryContig) + "->" + 
@@ -134,14 +174,18 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
                     // and strand in the merged genome, accounting for
                     // orientation. TODO: Just set everything up on
                     // TextPositions or something.
-                    generateMerge(queryContig, i, leftBase.first.first, 
+                    
+                    // These positions being sent are 1-based, so we have to
+                    // correct i to i + 1 to get the offset of that base in the
+                    // query string.
+                    generateMerge(queryContig, i + 1, leftBase.first.first, 
                         leftBase.first.second, leftBase.second);                    
                 }
             } else {
                 // Left mapped and right didn't.
                 
                 // Do the same thing, taking the left base and merging into it.
-                generateMerge(queryContig, i, leftBase.first.first, 
+                generateMerge(queryContig, i + 1, leftBase.first.first, 
                         leftBase.first.second, leftBase.second);  
             }
         } else if(rightMappings[i] != -1) {
@@ -152,7 +196,7 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
             
             // Merge with the same contig and base, but flip the orientation,
             // since we want left=false=default semantics.
-            generateMerge(queryContig, i, rightBase.first.first, 
+            generateMerge(queryContig, i + 1, rightBase.first.first, 
                         rightBase.first.second, !rightBase.second);  
         }
         

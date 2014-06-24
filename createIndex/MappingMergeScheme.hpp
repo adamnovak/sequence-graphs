@@ -18,8 +18,8 @@ public:
     
     /**
      * Make a new MappingMergeScheme, which takes the index defined by the given
-     * range vector and vector of per-position canonicalized bases to merge
-     * with, and maps each contig in the given genome to it. Only maps on
+     * range vector and vector of per-position 1-based canonicalized bases to
+     * merge with, and maps each contig in the given genome to it. Only maps on
      * contexts provided by the positions marked in includedPositions, and
      * requires at least the given minimum number of bases of context to map.
      *
@@ -69,7 +69,7 @@ protected:
     const BitVector& rangeVector;
     
     // Holds the canonicalized position to merge into for a forward mapping to
-    // each range.
+    // each range. Positions are 1-based.
     const std::vector<std::pair<std::pair<size_t, size_t>, bool> >& rangeBases; 
         
     // Holds a mask; we should only consider positions with 1s here as actually
@@ -83,7 +83,8 @@ protected:
     size_t minContext;
     
     /**
-     * Create a Merge between two positions and enqueue it.
+     * Create a Merge between two positions and enqueue it. Positions are
+     * 1-based.
      */
     void generateMerge(size_t queryContig, size_t queryBase, 
         size_t referenceContig, size_t referenceBase, bool orientation) const;
