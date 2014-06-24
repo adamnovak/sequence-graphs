@@ -135,11 +135,18 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
     }
     
     // What's our thread name?
-    std::string threadName = "T" + std::to_string(queryContig) + "->" + 
-        std::to_string(genome);
+    std::string threadName = "T" + std::to_string(genome) + "." + 
+        std::to_string(queryContig);
+        
+    // How many bases have we mapped or not mapped
+    size_t mappedBases = 0;
+    size_t unmappedBases = 0;
     
     // Grab the contig as a string
     std::string contig = index.displayContig(queryContig);
+    
+    // How many positions are available to map to?
+    Log::info() << "Mapping " << contig.size() << " bases via " << BitVectorIterator(includedPositions).rank(includedPositions.getSize()) << " bottom-level positions" << std::endl;
     
     // Map it on the right
     std::vector<int64_t> rightMappings = index.map(rangeVector, contig, 
@@ -180,7 +187,12 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
                     // query string. Orientation is backwards to start with from
                     // our backwards right-semantics, so flip it.
                     generateMerge(queryContig, i + 1, leftBase.first.first, 
-                        leftBase.first.second, !leftBase.second);                    
+                        leftBase.first.second, !leftBase.second); 
+                        
+                    mappedBases++;                   
+                } else {
+                    // Didn't map this one
+                    unmappedBases++;
                 }
             } else {
                 // Left mapped and right didn't.
@@ -190,6 +202,8 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
                 // right-semantics, so flip it.
                 generateMerge(queryContig, i + 1, leftBase.first.first, 
                         leftBase.first.second, !leftBase.second);  
+                        
+                mappedBases++;
             }
         } else if(rightMappings[i] != -1) {
             // Right mapped and left didn't.
@@ -200,7 +214,12 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
             // Merge with the same contig and base. Leave the orientation alone
             // (since it's backwards to start with).
             generateMerge(queryContig, i + 1, rightBase.first.first, 
-                        rightBase.first.second, rightBase.second);  
+                        rightBase.first.second, rightBase.second); 
+            
+            mappedBases++; 
+        } else {
+            // Didn't map this one
+            unmappedBases++;
         }
         
     }
@@ -210,7 +229,8 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
     queue->close(lock);
     
     // Report that we're done.
-    Log::info() << threadName << " finished" << std::endl;
+    Log::info() << threadName << " finished (" << mappedBases << "|" << 
+        unmappedBases << ")" << std::endl;
 }
 
 

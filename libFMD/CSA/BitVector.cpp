@@ -1,5 +1,7 @@
 #include <cstdlib>
 
+#include <stdexcept>
+
 #include "BitVector.hpp"
 
 namespace CSA {
@@ -47,18 +49,36 @@ BitVector::createUnion(const BitVector& other) const
   // We need an encoder to encode it.
   BitVectorEncoder encoder(block_size);
   
+  // How many ones are we putting in?
+  size_t ones = 0;
+  
   for(size_t i = 0; i < newSize; i++)
   {
-    // OR each bit and save it.
-    // TODO: Is there a more efficient way to do this?
-    encoder.addBit(us.isSet(i) || them.isSet(i));
+    // OR each bit
+    if(us.isSet(i) || them.isSet(i)) {
+        // If the bit is true, add a bit at this position.
+        encoder.addBit(i);
+        ones++;
+    }
   }
   
   // Finish encoding.
   encoder.flush();
   
-  // Make the actual BitVector and return it. Caller is responsible for it.
-  return new BitVector(encoder, newSize);
+  // Build the BitVector
+  BitVector* toReturn = new BitVector(encoder, newSize);
+  
+  // Check its bits
+  BitVectorIterator iterator(*toReturn);
+  
+  if(iterator.rank(newSize) != ones) {
+    // Check the number of 1s to make sure we did it right.
+    throw std::runtime_error("Expected " + std::to_string(ones) + 
+        " ones in union but found " + std::to_string(iterator.rank(newSize)));
+  }
+  
+  // Return the BitVector. Caller is responsible for it.
+  return toReturn;
   
 }
 
