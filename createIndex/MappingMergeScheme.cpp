@@ -146,7 +146,7 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
     std::string contig = index.displayContig(queryContig);
     
     // How many positions are available to map to?
-    Log::info() << << threadName << "Mapping " << contig.size() << 
+    Log::info() << threadName << "Mapping " << contig.size() << 
         " bases via " << BitVectorIterator(includedPositions).rank(
         includedPositions.getSize()) << " bottom-level positions" << std::endl;
     

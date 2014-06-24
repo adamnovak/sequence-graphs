@@ -882,21 +882,16 @@ makeLevelIndexScanning(
     std::map<std::pair<size_t, size_t>, long long int>
         idReservations;
 
-    // We need to keep track of what run we're on
+    
     size_t runNumber = 0;
 
     Log::info() << "Building mapping data structure..." << std::endl;
     
-    for(int64_t j = index.getNumberOfContigs() * 2; j < index.getBWTLength();
-        j++) {
+    for(auto canonicalized : mergedRuns.second) {
         
-        // For each base in the BWT (skipping over the 2*contigs stop
-        // characters)...
+        // For each canonical 1-based ((contig, base), face) corresponding to a
+        // merged range...
         
-        // Grab the canonicalization
-        std::pair<std::pair<size_t, size_t>, bool> canonicalized =
-            mergedRuns.second[runNumber];
-            
         // What position is that?
         long long int positionCoordinate;
         if(idReservations.count(canonicalized.first) > 0) {
