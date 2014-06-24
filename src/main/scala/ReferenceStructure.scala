@@ -167,6 +167,25 @@ class SideArray(filename: String) {
      */
     def length = file.size / 8
     
+    def dump = {
+        // Make a 1-byte buffer to read into
+        val buffer = ByteBuffer.allocate(1)
+        
+        (0L until length * 8).foreach { i =>
+            // Grab each byte in turn
+            file.read(buffer, i)
+            
+            // Rewind to start of buffer
+            buffer.flip
+            
+            // Grab the byte as the first byte in the buffer
+            val byteVal = buffer.get(0)
+            
+            // Dump the byte as hex
+            println("%d: %02x".format(i, byteVal))
+        }
+    }
+    
     /**
      * Load the record at the given index and return it as a Side.
      */
@@ -188,11 +207,14 @@ class SideArray(filename: String) {
         // Pop it into little endian mode
         buffer.order(ByteOrder.LITTLE_ENDIAN)
         
-        // Seek to the right place
-        file.position(index * 8)
+        // Read the bytes diurectly from the correct position in the file
+        val bytesRead = file.read(buffer, index * 8)
         
-        // Read the bytes
-        file.read(buffer)
+        if(bytesRead != 8) {
+            // Complain if we can't get all the bytes
+            throw new Exception("Only managed to read " + bytesRead +
+                " of 8 bytes")
+        }
         
         // Rewind to start of buffer
         buffer.flip
@@ -246,6 +268,8 @@ class MergedReferenceStructure(index: FMDIndex, directory: String)
     
     // Open (and wrap) the array of Sides that correspond to the ranges
     val sideArray = new SideArray(directory + "/mappings.bin")
+    
+    sideArray.dump
         
     // We map using the range-based mapping mode on the index.
     def map(pattern: String, face: Face): Seq[Option[Side]] = {
@@ -286,7 +310,9 @@ class MergedReferenceStructure(index: FMDIndex, directory: String)
                             // Retrieve and flip the Side. Range numbers are
                             // 1-based, and our sides are 0-based, so we have to
                             // offset by 1.
-                            Some(!(sideArray(range.toInt - 1)))
+                            val toReturn = Some(!(sideArray(range.toInt - 1)))
+                            println("Range " + range + " is side " + toReturn)
+                            toReturn
                         } else {
                             // Complain we're supposed to be mapping to a range
                             // that doesn't exist.
