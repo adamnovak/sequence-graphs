@@ -177,16 +177,19 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
                     
                     // These positions being sent are 1-based, so we have to
                     // correct i to i + 1 to get the offset of that base in the
-                    // query string.
+                    // query string. Orientation is backwards to start with from
+                    // our backwards right-semantics, so flip it.
                     generateMerge(queryContig, i + 1, leftBase.first.first, 
-                        leftBase.first.second, leftBase.second);                    
+                        leftBase.first.second, !leftBase.second);                    
                 }
             } else {
                 // Left mapped and right didn't.
                 
                 // Do the same thing, taking the left base and merging into it.
+                // Orientation is backwards to start with from our backwards
+                // right-semantics, so flip it.
                 generateMerge(queryContig, i + 1, leftBase.first.first, 
-                        leftBase.first.second, leftBase.second);  
+                        leftBase.first.second, !leftBase.second);  
             }
         } else if(rightMappings[i] != -1) {
             // Right mapped and left didn't.
@@ -194,10 +197,10 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
             // We have a right mapping. Grab its base too.
             auto rightBase = rangeBases[rightMappings[i]];
             
-            // Merge with the same contig and base, but flip the orientation,
-            // since we want left=false=default semantics.
+            // Merge with the same contig and base. Leave the orientation alone
+            // (since it's backwards to start with).
             generateMerge(queryContig, i + 1, rightBase.first.first, 
-                        rightBase.first.second, !rightBase.second);  
+                        rightBase.first.second, rightBase.second);  
         }
         
     }
