@@ -18,7 +18,8 @@ To build it, you need:
 
 * Maven, for installing Scala and Java JARs into the local Maven cache.
 
-* SWIG, for generating Java bindings for C++. You need a SWIG version that understands C++11 syntax (SWIG 3.0+ will work).
+* SWIG, for generating Java bindings for C++. You need a SWIG version that 
+understands C++11 syntax (SWIG 3.0+ will work).
 
 All these should probably come from your distribution, but everything except the
 JDK can be fairly easily installed in your home directory with a `--prefix`.
