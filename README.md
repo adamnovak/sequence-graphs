@@ -18,6 +18,8 @@ To build it, you need:
 
 * Maven, for installing Scala and Java JARs into the local Maven cache.
 
+* SWIG, for generating Java bindings for C++. You need a SWIG version that understands C++11 syntax (SWIG 3.0+ will work).
+
 All these should probably come from your distribution, but everything except the
 JDK can be fairly easily installed in your home directory with a `--prefix`.
 
@@ -26,6 +28,22 @@ JDK can be fairly easily installed in your home directory with a `--prefix`.
 The code in this repository uses a few libraries at the C++ level. These need to
 be built in C++11 mode, because the C++11 ABI (in GCC) is not compatible with
 the C++03 ABI in some cases.
+
+####Install Google Sparse Hash
+
+The indexing code borrowed from SGA uses the (Google) Sparsehash library. To install it, you can use:
+
+```
+wget https://sparsehash.googlecode.com/files/sparsehash-2.0.2.tar.gz
+tar -xvzf sparsehash-2.0.2.tar.gz
+cd sparsehash-2.0.2
+./configure --prefix=$HOME/.local
+make
+make install
+```
+
+Make sure that `$HOME/.local/include` is in your `CPLUS_INCLUDE_PATH`, so that
+the compiler can find your newly installed headers.
 
 ####Install Boost
 
