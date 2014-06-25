@@ -75,13 +75,4 @@ class ReferenceHierarchyTests extends HierarchySuite {
         }.sum === 7)
     }
     
-    test("left-mapping is reverse of right-mapping") {
-        val pattern = sequences(0)
-        val mappings: Seq[Option[Side]] = hierarchy.map(1, pattern, Face.LEFT)
-        
-        val mappings2: Seq[Option[Side]] = hierarchy.map(1, pattern, Face.RIGHT)
-        
-        assert(mappings === mappings2.reverse)
-        
-    }
 }
