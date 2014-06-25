@@ -33,7 +33,10 @@ fi
 
 echo "Indexing..."
 
-time ../createIndex/createIndex --context 20 --scheme greedy --alignment mhc.c2h --alignmentFasta mhc.c2h.fasta --degrees degrees.txt mhc-index *.fa
+# Make sure to put refmhc.fa first so it becomes the reference against which
+# everything maps.
+
+time ../createIndex/createIndex --context 20 --scheme greedy --alignment mhc.c2h --alignmentFasta mhc.c2h.fasta --degrees degrees.txt mhc-index refmhc.fa GI*.fa
 
 echo "Making tree..."
 
