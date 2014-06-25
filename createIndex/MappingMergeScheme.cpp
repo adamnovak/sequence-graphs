@@ -104,10 +104,19 @@ void MappingMergeScheme::generateMerge(size_t queryContig, size_t queryBase,
             std::to_string(index.getContigLength(queryContig)));
     }
     
-    // Make a Merge between the specified query base and the specified reference
-    // base. Account for orientation and change to 0-based coordinates.
-    Merge merge(TextPosition(queryContig * 2, queryBase - 1), 
-        TextPosition(referenceContig * 2 + orientation, referenceBase - 1));
+    // Where in the query do we want to come from? Always on the forward strand.
+    // Correct offset to 0-based.
+    TextPosition queryPos(queryContig * 2, queryBase - 1);
+    
+    // Where in the reference do we want to go to? May b e on the forward or
+    // reverse strand. Correct text and offset for orientation, and correct
+    // offset to 0-based (at the same time).
+    TextPosition referencePos(referenceContig * 2 + orientation, 
+        orientation ? (index.getContigLength(referenceContig) - referenceBase) :
+        (referenceBase - 1));
+    
+    // Make a Merge between these positions.
+    Merge merge(queryPos, referencePos);
         
     // Send that merge to the queue.
     // Lock the queue.
@@ -146,7 +155,7 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
     std::string contig = index.displayContig(queryContig);
     
     // How many positions are available to map to?
-    Log::info() << threadName << "Mapping " << contig.size() << 
+    Log::info() << threadName << " mapping " << contig.size() << 
         " bases via " << BitVectorIterator(includedPositions).rank(
         includedPositions.getSize()) << " bottom-level positions" << std::endl;
     
@@ -155,22 +164,13 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
         &includedPositions, minContext);
     
     // Map it on the left
-    //std::vector<int64_t> leftMappings = index.map(rangeVector, 
-    //    reverseComplement(contig), &includedPositions, minContext);
+    std::vector<int64_t> leftMappings = index.map(rangeVector, 
+        reverseComplement(contig), &includedPositions, minContext);
     
     // Flip the left mappings back into the original order. They should stay as
     // other-side ranges.
-    //std::reverse(leftMappings.begin(), leftMappings.end());
+    std::reverse(leftMappings.begin(), leftMappings.end());
       
-    // Pretend nothing left-mapped
-    std::vector<int64_t> leftMappings;
-    for(int64_t i = 0; i < rightMappings.size(); i++) {
-        leftMappings.push_back(-1);
-    }
-    
-        
-    
-    
     for(size_t i = 0; i < leftMappings.size(); i++) {
         // For each position, look at the mappings.
         
