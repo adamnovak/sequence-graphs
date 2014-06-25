@@ -876,23 +876,6 @@ std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
             // Remember that this base mapped to this range
             mappings.push_back(range);
             
-            for(int64_t j = 0; j <= location.position.getEndOffset(); j++) {
-                // Dump all the options. Need a signed index since endOffset can
-                // be negative.
-                bool maskedIn = true;
-                if(maskIterator != NULL && !maskIterator->isSet(
-                    location.position.getForwardStart() + j)) {
-                    // This one is masked out.
-                    maskedIn = false;
-                }
-                Log::debug() << "\tRepresentative: " <<
-                    locate(location.position.getForwardStart() + j) << " R=" << 
-                    rangeIterator.isSet(
-                    location.position.getForwardStart() + j) << " M=" << 
-                    maskedIn << std::endl;
-            }
-            
-
             // We definitely have a non-empty FMDPosition to continue from
 
         } else {
@@ -902,22 +885,6 @@ std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
                 " options for " << location.characters << " context)." << 
                 std::endl;
                 
-            for(int64_t j = 0; j <= location.position.getEndOffset(); j++) {
-                // Dump all the options. Need a signed index since endOffset can
-                // be negative.
-                bool maskedIn = true;
-                if(maskIterator != NULL && !maskIterator->isSet(
-                    location.position.getForwardStart() + j)) {
-                    // This one is masked out.
-                    maskedIn = false;
-                }
-                Log::debug() << "\tRepresentative: " <<
-                    locate(location.position.getForwardStart() + j) << " R=" << 
-                    rangeIterator.isSet(
-                    location.position.getForwardStart() + j) << " M=" << 
-                    maskedIn << std::endl;
-            }
-
             if(location.is_mapped && location.position.isEmpty(maskIterator)) {
                 // We extended right until we got no results. We need to try
                 // this base again, in case we tried with a too-long left
