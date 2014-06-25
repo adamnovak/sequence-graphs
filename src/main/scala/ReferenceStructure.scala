@@ -311,10 +311,8 @@ class MergedReferenceStructure(index: FMDIndex, directory: String)
                     case range => 
                         if(range < sideArray.length + 1) {
                             // We got a range that a Side is defined for.
-                            // Retrieve and flip the Side. Range numbers are
-                            // 1-based, and our sides are 0-based, so we have to
-                            // offset by 1.
-                            val toReturn = Some(!(sideArray(range.toInt - 1)))
+                            // Retrieve and flip the Side.
+                            val toReturn = Some(!(sideArray(range.toInt)))
                             println("Range " + range + " is side " + toReturn)
                             toReturn
                         } else {
