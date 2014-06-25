@@ -66,4 +66,32 @@ class ReferenceHierarchyTests extends HierarchySuite {
         }.sum === 7)
     }
     
+    test("can map reverse complement on level 1") {
+        val pattern = sequences(0).reverseComplement
+        val mappings: Seq[Option[Side]] = hierarchy.map(1, pattern)
+        
+        // All characters ought to map.
+        assert(mappings.map {
+            case Some(_) => 1
+            case None => 0
+        }.sum === 7)
+    }
+    
+    test("maps sequence consistently forwards and backwards to level 1") {
+        // Map forwards
+        val pattern = sequences(0)
+        val mappings: Seq[Option[Side]] = hierarchy.map(1, pattern)
+        
+        // Map backwarss
+        val reversePattern = pattern.reverseComplement
+        val reverseMappings: Seq[Option[Side]] = hierarchy.map(1, 
+            reversePattern)
+            
+        (mappings, reverseMappings.reverse).zipped.map { (left, right) =>
+            // Put in the same order and compare to make sure we have properly
+            // opposite mappings (opposite faces in opposite orders)
+            assert(left === right.map(side => !side))
+        }
+    }
+    
 }
