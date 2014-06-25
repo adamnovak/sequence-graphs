@@ -11,7 +11,7 @@ class ReferenceHierarchyTests extends HierarchySuite {
     var hierarchy: ReferenceHierarchy = null
 
     // Demand a palindrome.
-    override def sequences = Seq("GATTACA", "GATTACAT")
+    override def sequences = Seq("GATTACA", "GATTACA")
 
     test("can be created") {
         // Load the hierarchy from the filename HierarchySuite feeds us.
@@ -36,11 +36,13 @@ class ReferenceHierarchyTests extends HierarchySuite {
         println("Left Mappings:")
         println(mappings.mkString("\n"))
         
-        // All characters ought to map.
+        // All characters ought to map, except the leftmost.
         assert(mappings.map {
             case Some(_) => 1
             case None => 0
-        }.sum === 7)
+        }.sum === 6)
+        
+        assert(mappings(0) === None)
     }
     
     test("can right map on level 1 after merge") {
@@ -50,11 +52,13 @@ class ReferenceHierarchyTests extends HierarchySuite {
         println("Right Mappings:")
         println(mappings.mkString("\n"))
         
-        // All characters ought to map.
+        // All characters ought to map, except the rightmost.
         assert(mappings.map {
             case Some(_) => 1
             case None => 0
-        }.sum === 7)
+        }.sum === 6)
+        
+        assert(mappings(6) === None)
     }
     
     test("can map on level 1 after merge") {

@@ -78,6 +78,8 @@ int64_t FMDPosition::range(BitVectorIterator& ranges, BitVectorIterator* mask)
 
     // And the range the forward end is in
     int64_t end_range = ranges.rank(interval_end);
+    
+    Log::debug() << "Ranks: " << start_range << ", " << end_range << std::endl; 
 
     if(start_range == end_range) {
         // Both ends of the interval are in the same range.
@@ -137,6 +139,8 @@ int64_t FMDPosition::ranges(BitVectorIterator& ranges, BitVectorIterator* mask)
 
     // And the range the end is in
     int64_t end_range = ranges.rank(interval_end);
+    
+    Log::debug() << "Ranks: " << start_range << ", " << end_range << std::endl; 
 
     // Return the number of ranges we intersect (1s hit plus 1)
     return(end_range - start_range + 1);

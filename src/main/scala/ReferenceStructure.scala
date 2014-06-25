@@ -167,6 +167,9 @@ class SideArray(filename: String) {
      */
     def length = file.size / 8
     
+    /**
+     * Dump the entire file in hex to the console, for debugging.
+     */
     def dump = {
         // Make a 1-byte buffer to read into
         val buffer = ByteBuffer.allocate(1)
@@ -268,10 +271,11 @@ class MergedReferenceStructure(index: FMDIndex, directory: String)
     
     // Open (and wrap) the array of Sides that correspond to the ranges
     val sideArray = new SideArray(directory + "/mappings.bin")
-    
-    sideArray.dump
         
-    // We map using the range-based mapping mode on the index.
+    /**
+     * Map the given string on the given side to all levels of the reference
+     * structure.
+     */
     def map(pattern: String, face: Face): Seq[Option[Side]] = {
         face match {
             case Face.LEFT =>

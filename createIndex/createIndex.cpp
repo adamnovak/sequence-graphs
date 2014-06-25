@@ -836,15 +836,14 @@ identifyMergedRuns(
         // range we already started.
     }
             
-    // Set a bit after the end of the last range.
-    encoder.addBit(index.getTotalLength());
+    // Set a bit after the end of the last range (i.e. at the end of the BWT).
+    encoder.addBit(index.getBWTLength());
     
-    // Finish the vector encoder into a vector of the right length.
-    // This should always end in a 1!
-    // Make sure to flush first.
+    // Finish the vector encoder into a vector of the right length, leaving room
+    // for that trailing bit. Make sure to flush first.
     encoder.flush();
     BitVector* bitVector = new BitVector(encoder,
-        index.getTotalLength() + 1);
+        index.getBWTLength() + 1);
     
     // Return the bit vector and the canonicalized base vector
     return std::make_pair(bitVector, mappings);
