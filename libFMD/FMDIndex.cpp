@@ -872,19 +872,6 @@ std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
             Log::debug() << "Mapped " << location.characters << 
                 " context to " << location.position << " in range #" << range <<
                 std::endl;
-            for(size_t j = 0; j <= location.position.getEndOffset(); j++) {
-                // Dump all the options
-                if(maskIterator != NULL && !maskIterator->isSet(
-                    location.position.getForwardStart() + j)) {
-                    // This one is masked out.
-                    continue;
-                }
-                Log::debug() << "\tRepresentative: " <<
-                    locate(location.position.getForwardStart() + j) << " R=" << 
-                    rangeIterator.isSet(
-                    location.position.getForwardStart() + j) <<
-                    std::endl;
-            }
 
             // Remember that this base mapped to this range
             mappings.push_back(range);
@@ -897,19 +884,6 @@ std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
                 location.position.ranges(rangeIterator, maskIterator) <<
                 " options for " << location.characters << " context)." << 
                 std::endl;
-            for(size_t j = 0; j <= location.position.getEndOffset(); j++) {
-                // Dump all the options
-                if(maskIterator != NULL && !maskIterator->isSet(
-                    location.position.getForwardStart() + j)) {
-                    // This one is masked out.
-                    continue;
-                }
-                Log::debug() << "\tRepresentative: " <<
-                    locate(location.position.getForwardStart() + j) << " R=" << 
-                    rangeIterator.isSet(
-                    location.position.getForwardStart() + j) <<
-                    std::endl;
-            }
 
             if(location.is_mapped && location.position.isEmpty(maskIterator)) {
                 // We extended right until we got no results. We need to try

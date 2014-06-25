@@ -33,9 +33,6 @@ class ReferenceHierarchyTests extends HierarchySuite {
         val pattern = sequences(0)
         val mappings: Seq[Option[Side]] = hierarchy.map(1, pattern, Face.LEFT)
         
-        println("Left Mappings:")
-        println(mappings.mkString("\n"))
-        
         // All characters ought to map, except the leftmost.
         assert(mappings.map {
             case Some(_) => 1
@@ -49,9 +46,6 @@ class ReferenceHierarchyTests extends HierarchySuite {
         val pattern = sequences(0)
         val mappings: Seq[Option[Side]] = hierarchy.map(1, pattern, Face.RIGHT)
         
-        println("Right Mappings:")
-        println(mappings.mkString("\n"))
-        
         // All characters ought to map, except the rightmost.
         assert(mappings.map {
             case Some(_) => 1
@@ -64,9 +58,6 @@ class ReferenceHierarchyTests extends HierarchySuite {
     test("can map on level 1 after merge") {
         val pattern = sequences(0)
         val mappings: Seq[Option[Side]] = hierarchy.map(1, pattern)
-        
-        println("Mappings:")
-        println(mappings.mkString("\n"))
         
         // All characters ought to map.
         assert(mappings.map {
