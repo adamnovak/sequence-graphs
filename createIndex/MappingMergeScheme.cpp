@@ -165,6 +165,8 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
     for(size_t i = 0; i < leftMappings.size(); i++) {
         // For each position, look at the mappings.
         
+        Log::info() << leftMappings[i] << ", " << rightMappings[i] << std::endl;
+        
         if(leftMappings[i] != -1) {
             // We have a left mapping. Grab its base.
             auto leftBase = rangeBases[leftMappings[i]];
