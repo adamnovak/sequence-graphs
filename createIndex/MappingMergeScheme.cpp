@@ -128,21 +128,6 @@ void MappingMergeScheme::generateMerge(size_t queryContig, size_t queryBase,
 
 void MappingMergeScheme::generateMerges(size_t queryContig) const {
     
-    // Spot check all of the ranges
-    for(auto i : rangeBases) {
-        // Grab the contig number
-        size_t rangeContig = i.first.first;
-        // And the 1-based offset into it
-        size_t rangeOffset = i.first.second;
-        
-        if(rangeOffset == 0 || 
-            rangeOffset > index.getContigLength(rangeContig)) {
-            
-            // We found a bad one. Complain.
-            throw std::runtime_error("Out of bounds canonical base!");
-        }
-    }
-    
     // What's our thread name?
     std::string threadName = "T" + std::to_string(genome) + "." + 
         std::to_string(queryContig);
