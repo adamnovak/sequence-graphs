@@ -884,6 +884,21 @@ std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
                 location.position.ranges(rangeIterator, maskIterator) <<
                 " options for " << location.characters << " context)." << 
                 std::endl;
+                
+            for(int64_t j = 0; j <= location.position.getEndOffset(); j++) {
+                // Dump all the options. Need a signed index since endOffset can
+                // be negative.
+                if(maskIterator != NULL && !maskIterator->isSet(
+                    location.position.getForwardStart() + j)) {
+                    // This one is masked out.
+                    continue;
+                }
+                Log::debug() << "\tRepresentative: " <<
+                    locate(location.position.getForwardStart() + j) << " R=" << 
+                    rangeIterator.isSet(
+                    location.position.getForwardStart() + j) <<
+                    std::endl;
+            }
 
             if(location.is_mapped && location.position.isEmpty(maskIterator)) {
                 // We extended right until we got no results. We need to try

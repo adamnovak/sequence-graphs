@@ -155,12 +155,21 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
         &includedPositions, minContext);
     
     // Map it on the left
-    std::vector<int64_t> leftMappings = index.map(rangeVector, 
-        reverseComplement(contig), &includedPositions, minContext);
-        
+    //std::vector<int64_t> leftMappings = index.map(rangeVector, 
+    //    reverseComplement(contig), &includedPositions, minContext);
+    
     // Flip the left mappings back into the original order. They should stay as
     // other-side ranges.
-    std::reverse(leftMappings.begin(), leftMappings.end());
+    //std::reverse(leftMappings.begin(), leftMappings.end());
+      
+    // Pretend nothing left-mapped
+    std::vector<int64_t> leftMappings;
+    for(int64_t i = 0; i < rightMappings.size(); i++) {
+        leftMappings.push_back(-1);
+    }
+    
+        
+    
     
     for(size_t i = 0; i < leftMappings.size(); i++) {
         // For each position, look at the mappings.
