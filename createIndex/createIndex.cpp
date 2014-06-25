@@ -763,6 +763,9 @@ writeAlignmentFasta(
  *
  * Takes a pinched thread set, and the index on which it is defined.
  *
+ * If a mask bit vector is specified, only positions which have a 1 in the mask
+ * will be able to break up ranges.
+ *
  * Returns a BitVector marking each such range with a 1 at the start, and a
  * vector of canonicalized positions. Each anonicalized position is a contig
  * number, a base number, and a face flag.
@@ -774,8 +777,13 @@ writeAlignmentFasta(
 std::pair<BitVector*, std::vector<std::pair<std::pair<size_t, size_t>, bool> > > 
 identifyMergedRuns(
     stPinchThreadSet* threadSet, 
-    const FMDIndex& index
+    const FMDIndex& index,
+    const BitVector* mask = NULL
 ) {
+    
+    // We need an iterator over the mask, if applicable.
+    BitVectorIterator* maskIterator = (mask != NULL ? 
+        new BitVectorIterator(*mask) : NULL);
     
     // We need to make bit vector denoting ranges, which we encode with this
     // encoder, which has 32 byte blocks.
@@ -802,6 +810,13 @@ identifyMergedRuns(
         
         // Note: stop characters aren't at the front in the last column, only
         // the first.
+        
+        if(maskIterator != NULL && !maskIterator->isSet(j)) {
+            // This position is masked out. We don't allow it to break up
+            // ranges, so no range needs to start here. Skip it and pretend it
+            // doesn't exist.
+            continue;
+        }
         
         // Where is it located?
         TextPosition base = index.locate(j);
@@ -844,6 +859,11 @@ identifyMergedRuns(
     encoder.flush();
     BitVector* bitVector = new BitVector(encoder,
         index.getBWTLength() + 1);
+    
+    // If we made a mask iterator, get rid of it.
+    if(maskIterator != NULL) {
+        delete maskIterator;
+    }
     
     // Return the bit vector and the canonicalized base vector
     return std::make_pair(bitVector, mappings);
@@ -1008,11 +1028,6 @@ mergeGreedy(
         // Join any trivial boundaries.
         stPinchThreadSet_joinTrivialBoundaries(threadSet);
         
-        // Delete the old merged runs bit vector and recalculate merged runs on
-        // the newly updated thread set.
-        delete mergedRuns.first;
-        mergedRuns = identifyMergedRuns(threadSet, index);
-        
         // Merge the new genome into includedPositions, replacing the old
         // bitvector.
         BitVector* newIncludedPositions = includedPositions->createUnion(
@@ -1023,6 +1038,13 @@ mergeGreedy(
             delete includedPositions;
         }
         includedPositions = newIncludedPositions;
+        
+        // Delete the old merged runs bit vector and recalculate merged runs on
+        // the newly updated thread set. Make sure to specify the new mask of
+        // included positions, so that masked-out positions don't break ranges
+        // that would otherwise be merged.
+        delete mergedRuns.first;
+        mergedRuns = identifyMergedRuns(threadSet, index, includedPositions);
         
     }
     
