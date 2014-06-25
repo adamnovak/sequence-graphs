@@ -875,6 +875,23 @@ std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
 
             // Remember that this base mapped to this range
             mappings.push_back(range);
+            
+            for(int64_t j = 0; j <= location.position.getEndOffset(); j++) {
+                // Dump all the options. Need a signed index since endOffset can
+                // be negative.
+                bool maskedIn = true;
+                if(maskIterator != NULL && !maskIterator->isSet(
+                    location.position.getForwardStart() + j)) {
+                    // This one is masked out.
+                    maskedIn = false;
+                }
+                Log::debug() << "\tRepresentative: " <<
+                    locate(location.position.getForwardStart() + j) << " R=" << 
+                    rangeIterator.isSet(
+                    location.position.getForwardStart() + j) << " M=" << 
+                    maskedIn << std::endl;
+            }
+            
 
             // We definitely have a non-empty FMDPosition to continue from
 
@@ -888,16 +905,17 @@ std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
             for(int64_t j = 0; j <= location.position.getEndOffset(); j++) {
                 // Dump all the options. Need a signed index since endOffset can
                 // be negative.
+                bool maskedIn = true;
                 if(maskIterator != NULL && !maskIterator->isSet(
                     location.position.getForwardStart() + j)) {
                     // This one is masked out.
-                    continue;
+                    maskedIn = false;
                 }
                 Log::debug() << "\tRepresentative: " <<
                     locate(location.position.getForwardStart() + j) << " R=" << 
                     rangeIterator.isSet(
-                    location.position.getForwardStart() + j) <<
-                    std::endl;
+                    location.position.getForwardStart() + j) << " M=" << 
+                    maskedIn << std::endl;
             }
 
             if(location.is_mapped && location.position.isEmpty(maskIterator)) {
