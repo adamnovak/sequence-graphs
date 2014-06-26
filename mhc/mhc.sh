@@ -36,7 +36,7 @@ echo "Indexing..."
 # Make sure to put refmhc.fa first so it becomes the reference against which
 # everything maps.
 
-time ../createIndex/createIndex --context 20 --scheme greedy --alignment mhc.c2h --alignmentFasta mhc.c2h.fasta --degrees degrees.txt mhc-index refmhc.fa GI*.fa
+time ../createIndex/createIndex --context 100 --scheme greedy --alignment mhc.c2h --alignmentFasta mhc.c2h.fasta --degrees degrees.txt mhc-index refmhc.fa GI*.fa
 
 echo "Making tree..."
 
@@ -61,5 +61,5 @@ echo "Creating AssemblyHub..."
 
 rm -Rf hub
 rm -Rf tree
-hal2assemblyHub.py --jobTree tree mhc.hal hub --hub=mhc --shortLabel="All MHCs"
+hal2assemblyHub.py --jobTree tree mhc.hal hub --hub=mhc --shortLabel="All MHCs" --lod --bedDirs genes --tabBed
     
