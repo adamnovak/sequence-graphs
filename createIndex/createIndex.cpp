@@ -1025,6 +1025,29 @@ mergeGreedy(
         scheme.join();
         applier.join();
         
+        // Compute and log some statistics about the coverage of the alignments
+        // used in the merge.
+        
+        // How many bases were aligned?
+        auto lock = queue.lock();
+        size_t basesAligned = queue.getThroughput(lock);
+        
+        // How many bases were alignable?
+        size_t basesAlignable = 0;
+        for(size_t i = index.getGenomeContigs(genome).first; 
+            i < index.getGenomeContigs(genome).second; i++) {
+                
+            // Sum up the bases in every contig in the genome. Anything outside
+            // a contig (i.e. Ns) could never be aligned adn should not have
+            // been counted.
+            basesAlignable += index.getContigLength(i);
+        }
+        
+        // Print out the coverage obtained from this.
+        Log::output() << "Coverage from alignment of genome " << genome << 
+            ": " << basesAligned << " / " << basesAlignable << " = " <<
+            ((double)basesAligned) / basesAlignable << std::endl;
+        
         // Join any trivial boundaries.
         stPinchThreadSet_joinTrivialBoundaries(threadSet);
         

@@ -27,7 +27,8 @@ public:
      * Construct a ConcurrentQueue that doesn't track writers (i.e. a normal
      * one).
      */
-    ConcurrentQueue(): queue(), mutex(), nonempty(), numWriters() {
+    ConcurrentQueue(): queue(), mutex(), nonempty(), numWriters(0),
+        totalThroughput(0) {
     }
     
     /**
@@ -37,7 +38,7 @@ public:
      * out and not block on data from a queue that nobody will ever write to.
      */
     ConcurrentQueue(size_t numWriters): queue(), mutex(), nonempty(), 
-        numWriters(numWriters) {
+        numWriters(numWriters), totalThroughput(0) {
     
     }
     
@@ -62,6 +63,9 @@ public:
         
         // Remove it form our queue.
         queue.pop();
+        
+        // Count that an item has passed through the queue.
+        totalThroughput++;
         
         // Unlock the caller's lock.
         callerLock.unlock();
@@ -160,6 +164,15 @@ public:
     }
     
     /**
+     * Get the total throughput of the queue, which is the total number of items
+     * that have been dequeued. Requires a lock from the caller, which is
+     * released.
+     */
+    size_t getThroughput(Lock& callerLock) {
+        return totalThroughput;
+    }
+    
+    /**
      * Ask for the default move assignment operator.
      */
     ConcurrentQueue<T>& operator=(ConcurrentQueue<T>&& other) = default;
@@ -187,6 +200,10 @@ protected:
     // How many writers are writing to the queue still (if writer counting is
     // enabled).
     size_t numWriters;
+    
+    // How many items have passed through the queue (i.e. been dequeued) since
+    // it was created?
+    size_t totalThroughput;
     
 private:
     
