@@ -900,9 +900,9 @@ std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
 
             } else {
                 // It didn't map for some other reason:
-                // - It was an initial mapping with too little left context to 
+                // - It was an initial mapping with too little right context to 
                 //   be unique to a range.
-                // - It was an initial mapping with a nonexistent left context
+                // - It was an initial mapping with a nonexistent right context
                 // - It was an extension that was multimapped and still is
 
                 // In none of these cases will re-starting from this base help
