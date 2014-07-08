@@ -56,6 +56,9 @@ object MapToIndex {
             
             val repeat = opt[Int](noshort = true, default=Some(1),
                 descr = "number of times to repeat the mapping")
+                
+            val minContext = opt[Int](noshort = true, default=Some(0),
+                descr = "minimum context to map on")
             
             val version = opt[Boolean](noshort = true, 
                 descr = "Print version")
@@ -102,16 +105,18 @@ object MapToIndex {
         
         for(i <- 0 until opts.repeat.get.get) {
             // Repeat the mapping several times for benchmarking purposes.
-            mappings = hierarchy.map(pattern)
+            mappings = hierarchy.map(pattern, opts.minContext.get.get)
         }
         
         // Stop the timer
         val endTime = System.currentTimeMillis
         
         // Get the left and right mappings
-        val leftMappings = hierarchy.map(pattern, Face.LEFT)
+        val leftMappings = hierarchy.mapFace(pattern, Face.LEFT,
+            opts.minContext.get.get)
         
-        val rightMappings = hierarchy.map(pattern, Face.RIGHT)
+        val rightMappings = hierarchy.mapFace(pattern, Face.RIGHT, 
+            opts.minContext.get.get)
         
         // Have a little function to format the sides
         def mappingToString(m: Option[Side]): String = {

@@ -29,49 +29,46 @@ class ReferenceHierarchy(index: FMDIndex) {
     }
     
     /**
-     * Map the given string on the given level. Discards ambiguous mappings.
+     * Map the given string on the given level. Only keeps mappings with the
+     * given minimum context or longer. Discards ambiguous mappings.
      */
-    def map(level: Int, context: String): Seq[Option[Side]] = {
-        levels(level).map(context)
+    def mapLevel(level: Int, context: String, minContext: Int = 0): 
+        Seq[Option[Side]] = {
+        
+        levels(level).map(context, minContext)
     }
     
     /**
      * Map the given string on the given level, on the given face of each base.
      */
-    def map(level: Int, context: String, face: Face): Seq[Option[Side]] = {
-        levels(level).map(context, face)
+    def mapFaceLevel(level: Int, context: String, face: Face,
+        minContext: Int = 0): Seq[Option[Side]] = {
+
+        levels(level).mapFace(context, face, minContext)
     }
     
     /**
      * Map the given string to all levels. Discards ambiguous mappings. Returns
-     * a sequence of sequences of mappings (Side or None).
+     * a sequence of sequences of mappings (Side or None). Only keeps mappings
+     * with the given minimum context or longer.
      */
-    def map(context: String): Seq[Seq[Option[Side]]] = {
+    def map(context: String, minContext: Int = 0): Seq[Seq[Option[Side]]] = {
         // Run the normal map for every level.
-        (0 until levels.size).map(this.map(_, context))
+        (0 until levels.size).map(this.mapLevel(_, context, minContext))
     }
     
     /**
      * Map the given string to all levels, on the given face of each base.
-     * Returns a sequence of sequences of mappings (Side or None).
+     * Returns a sequence of sequences of mappings (Side or None). Only keeps
+     * mappings with the given minimum context or longer.
      */
-    def map(context: String, face: Face): Seq[Seq[Option[Side]]] = {
+    def mapFace(context: String, face: Face, minContext: Int = 0):
+        Seq[Seq[Option[Side]]] = {
+        
         // Run the normal map for every level.
-        (0 until levels.size).map(this.map(_, context, face))
+        (0 until levels.size).map(this.mapFaceLevel(_, context, face, 
+            minContext))
     }
-    
-    /**
-     * Save this ReferenceHierarchy to the specified directory.
-     */
-    def save(path: String) = {
-        
-        
-    }
-    
-    
-    
-    
-    
 }
 
 

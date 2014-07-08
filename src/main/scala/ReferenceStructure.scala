@@ -65,11 +65,13 @@ trait ReferenceStructure extends Serializable {
      * 
      * This is implemented by left-mapping and right-mapping the
      * base, and aggregating the results.
+     *
+     * Ignores mappings on contexts shorter than the given minimum.
      */
-    def map(context: String): Seq[Option[Side]] = {
+    def map(context: String, minContext: Int = 0): Seq[Option[Side]] = {
         // Map on each side
-        val leftMappings = map(context, Face.LEFT)
-        val rightMappings = map(context, Face.RIGHT)
+        val leftMappings = mapFace(context, Face.LEFT, minContext)
+        val rightMappings = mapFace(context, Face.RIGHT, minContext)
     
         // Zip them together and disambiguate each pair. Note that (a, b).zipped
         // is of a type that provides a map that takes binary functions, while
@@ -88,8 +90,11 @@ trait ReferenceStructure extends Serializable {
     /**
      * Map all bases in the given string to Sides using the context on the
      * given face.
+     *
+     * Ignores mappings on contexts shorter than the given minimum.
      */
-    def map(context: String, face: Face): Seq[Option[Side]]
+    def mapFace(context: String, face: Face, minContext: Int = 0):
+        Seq[Option[Side]]
 }
 
 /**
@@ -107,14 +112,17 @@ class StringReferenceStructure(index: FMDIndex) extends ReferenceStructure {
     def this(basename: String) = this(new FMDIndex(basename))
 
     // Map with our index
-    def map(pattern: String, face: Face): Seq[Option[Side]] = {
+    def mapFace(pattern: String, face: Face, minContext: Int = 0):
+        Seq[Option[Side]] = {
+        
         face match {
             case Face.RIGHT =>
                 // Do right-mapping as left-mapping flipped around.
-                map(pattern.reverseComplement, Face.LEFT).reverse
+                mapFace(pattern.reverseComplement, Face.LEFT).reverse
             case Face.LEFT =>
-                // Get the MappingVector
-                val mappings = getIndex.map(pattern)
+                // Get the MappingVector for mapping to all genomes with the
+                // given minimum context.
+                val mappings = getIndex.map(pattern, -1, minContext)
                 
                 // Make an ArrayBuffer of all the mappings, to which we can
                 // efficiently append
@@ -274,19 +282,22 @@ class MergedReferenceStructure(index: FMDIndex, directory: String)
         
     /**
      * Map the given string on the given side to all levels of the reference
-     * structure.
+     * structure. Ignore any mappings on less context than the specified minimum
+     * context limit.
      */
-    def map(pattern: String, face: Face): Seq[Option[Side]] = {
+    def mapFace(pattern: String, face: Face, minContext: Int = 0):
+        Seq[Option[Side]] = {
+        
         face match {
             case Face.LEFT =>
                 // Try again on the right side.
-                map(pattern.reverseComplement, Face.RIGHT).reverse
+                mapFace(pattern.reverseComplement, Face.RIGHT).reverse
             case Face.RIGHT => 
                 // Mapping to ranges is right-mapping.
                 
                 // Map to range numbers, or -1 for no mapping. This comes as a
                 // SWIG- wrapped IntVector.
-                val ranges = getIndex.map(rangeVector, pattern)
+                val ranges = getIndex.map(rangeVector, pattern, minContext)
                 
                 // Make an ArrayBuilder of all the mappings (which are Longs).
                 // We use an ArrayBuilder instead of an ArrayBuffer since it's

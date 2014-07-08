@@ -18,8 +18,8 @@ class ReferenceStructureTests extends FMDSuite {
     
         val pattern = "AATCTACTGC"
         
-        val leftMappings = stringReference.map(pattern, Face.LEFT)
-        val rightMappings = stringReference.map(pattern, Face.RIGHT)
+        val leftMappings = stringReference.mapFace(pattern, Face.LEFT)
+        val rightMappings = stringReference.mapFace(pattern, Face.RIGHT)
         
         // Zip them together and disambiguate each pair. Note that (a, b).zipped
         // is of a type that provides a map that takes binary functions, while

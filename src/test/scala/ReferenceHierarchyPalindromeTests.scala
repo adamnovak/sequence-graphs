@@ -20,7 +20,7 @@ class ReferenceHierarchyPalindromeTests extends HierarchySuite {
     
     test("can't map on level 0 due to palindrome") {
         val pattern = sequences(0)
-        val mappings: Seq[Option[Side]] = hierarchy.map(0, pattern)
+        val mappings: Seq[Option[Side]] = hierarchy.mapLevel(0, pattern)
         
         // Nothing should map because it's an ambiguous palindrome.
         assert(mappings.map {
@@ -31,7 +31,7 @@ class ReferenceHierarchyPalindromeTests extends HierarchySuite {
     
     test("can't map on level 1 either because merging is now map-based") {
         val pattern = sequences(0)
-        val mappings: Seq[Option[Side]] = hierarchy.map(1, pattern)
+        val mappings: Seq[Option[Side]] = hierarchy.mapLevel(1, pattern)
         
         // All characters ought to map.
         assert(mappings.map {
@@ -42,9 +42,11 @@ class ReferenceHierarchyPalindromeTests extends HierarchySuite {
     
     test("left-mapping is reverse of right-mapping") {
         val pattern = sequences(0)
-        val mappings: Seq[Option[Side]] = hierarchy.map(1, pattern, Face.LEFT)
+        val mappings: Seq[Option[Side]] = hierarchy.mapFaceLevel(1, pattern, 
+            Face.LEFT)
         
-        val mappings2: Seq[Option[Side]] = hierarchy.map(1, pattern, Face.RIGHT)
+        val mappings2: Seq[Option[Side]] = hierarchy.mapFaceLevel(1, pattern, 
+            Face.RIGHT)
         
         assert(mappings === mappings2.reverse)
         

@@ -20,7 +20,7 @@ class ReferenceHierarchyTests extends HierarchySuite {
     
     test("can't map on level 0 due to duplication") {
         val pattern = sequences(0)
-        val mappings: Seq[Option[Side]] = hierarchy.map(0, pattern)
+        val mappings: Seq[Option[Side]] = hierarchy.mapLevel(0, pattern)
         
         // Nothing should map because it's in there twice.
         assert(mappings.map {
@@ -31,7 +31,8 @@ class ReferenceHierarchyTests extends HierarchySuite {
     
     test("can left map on level 1 after merge") {
         val pattern = sequences(0)
-        val mappings: Seq[Option[Side]] = hierarchy.map(1, pattern, Face.LEFT)
+        val mappings: Seq[Option[Side]] = hierarchy.mapFaceLevel(1, pattern,
+            Face.LEFT)
         
         // All characters ought to map, except the leftmost.
         assert(mappings.map {
@@ -44,7 +45,8 @@ class ReferenceHierarchyTests extends HierarchySuite {
     
     test("can right map on level 1 after merge") {
         val pattern = sequences(0)
-        val mappings: Seq[Option[Side]] = hierarchy.map(1, pattern, Face.RIGHT)
+        val mappings: Seq[Option[Side]] = hierarchy.mapFaceLevel(1, pattern,
+            Face.RIGHT)
         
         // All characters ought to map, except the rightmost.
         assert(mappings.map {
@@ -57,7 +59,7 @@ class ReferenceHierarchyTests extends HierarchySuite {
     
     test("can map on level 1 after merge") {
         val pattern = sequences(0)
-        val mappings: Seq[Option[Side]] = hierarchy.map(1, pattern)
+        val mappings: Seq[Option[Side]] = hierarchy.mapLevel(1, pattern)
         
         // All characters ought to map.
         assert(mappings.map {
@@ -68,7 +70,7 @@ class ReferenceHierarchyTests extends HierarchySuite {
     
     test("can map reverse complement on level 1") {
         val pattern = sequences(0).reverseComplement
-        val mappings: Seq[Option[Side]] = hierarchy.map(1, pattern)
+        val mappings: Seq[Option[Side]] = hierarchy.mapLevel(1, pattern)
         
         // All characters ought to map.
         assert(mappings.map {
@@ -80,11 +82,11 @@ class ReferenceHierarchyTests extends HierarchySuite {
     test("maps sequence consistently forwards and backwards to level 1") {
         // Map forwards
         val pattern = sequences(0)
-        val mappings: Seq[Option[Side]] = hierarchy.map(1, pattern)
+        val mappings: Seq[Option[Side]] = hierarchy.mapLevel(1, pattern)
         
         // Map backwarss
         val reversePattern = pattern.reverseComplement
-        val reverseMappings: Seq[Option[Side]] = hierarchy.map(1, 
+        val reverseMappings: Seq[Option[Side]] = hierarchy.mapLevel(1, 
             reversePattern)
             
         (mappings, reverseMappings.reverse).zipped.map { (left, right) =>
