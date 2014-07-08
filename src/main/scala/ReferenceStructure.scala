@@ -296,8 +296,8 @@ class MergedReferenceStructure(index: FMDIndex, directory: String)
                 // Mapping to ranges is right-mapping.
                 
                 // Map to range numbers, or -1 for no mapping. This comes as a
-                // SWIG- wrapped IntVector.
-                val ranges = getIndex.map(rangeVector, pattern, minContext)
+                // SWIG- wrapped IntVector. Make sure to map to genome -1.
+                val ranges = getIndex.map(rangeVector, pattern, -1, minContext)
                 
                 // Make an ArrayBuilder of all the mappings (which are Longs).
                 // We use an ArrayBuilder instead of an ArrayBuffer since it's
