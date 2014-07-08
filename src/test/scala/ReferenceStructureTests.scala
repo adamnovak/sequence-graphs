@@ -48,6 +48,30 @@ class ReferenceStructureTests extends FMDSuite {
         
     }
     
+    test("maps nothing with overly long context requirement") {
+    
+        val pattern = "AATCTACTGC"
+        
+        val leftMappings = stringReference.mapFace(pattern, Face.LEFT, 100)
+        
+        // Nothing should left-map
+        val leftMapped = leftMappings.map {
+            case Some(_) => 1
+            case None => 0
+        }.sum
+        assert(leftMapped === 0)
+        
+        val rightMappings = stringReference.mapFace(pattern, Face.RIGHT, 100)
+        
+        // Nothing should right-map either
+        val rightMapped = rightMappings.map {
+            case Some(_) => 1
+            case None => 0
+        }.sum
+        assert(rightMapped === 0)
+        
+    }
+    
     test("maps all bases in reverse complement") {
     
         // This is the second contig.

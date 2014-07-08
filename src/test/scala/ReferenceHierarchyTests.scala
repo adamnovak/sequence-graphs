@@ -68,6 +68,17 @@ class ReferenceHierarchyTests extends HierarchySuite {
         }.sum === 7)
     }
     
+    test("can't map with overly long context requirement") {
+        val pattern = sequences(0)
+        val mappings: Seq[Option[Side]] = hierarchy.mapLevel(1, pattern, 100)
+        
+        // All characters ought to map.
+        assert(mappings.map {
+            case Some(_) => 1
+            case None => 0
+        }.sum === 0)
+    }
+    
     test("can map reverse complement on level 1") {
         val pattern = sequences(0).reverseComplement
         val mappings: Seq[Option[Side]] = hierarchy.mapLevel(1, pattern)

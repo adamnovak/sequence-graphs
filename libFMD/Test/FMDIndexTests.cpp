@@ -302,6 +302,42 @@ void FMDIndexTests::testMap() {
     }
 }
 
+/**
+ * Make sure minimum context length is respected.
+ */
+void FMDIndexTests::testContextLimit() {
+    
+    // Grab all of the first contig.
+    std::string query = "CATGCTTCGGCGATTCGACGCTCATCTGCGACTCT";
+    
+    // Map all of the first contig.
+    std::vector<Mapping> mappings = index->mapBoth(query, -1, 100);
+    
+    for(size_t i = 0; i < query.size(); i++ ) {
+        // Make sure no base maps
+        CPPUNIT_ASSERT(mappings[i].is_mapped == false);
+    }
+    
+    // Grab all of the first contig's reverse strand.
+    std::string query2 = "AGAGTCGCAGATGAGCGTCGAATCGCCGAAGCATG";
+    
+    // Map it
+    mappings = index->mapBoth(query2, -1, 100);
+    
+    for(size_t i = 0; i < query2.size(); i++ ) {
+        // Make sure no base maps this way either
+        CPPUNIT_ASSERT(mappings[i].is_mapped == false);
+    }
+    
+    // Test again with the genome restriction on
+    mappings = index->mapBoth(query, 0, 100);
+    
+    for(size_t i = 0; i < query2.size(); i++ ) {
+        // Make sure no base maps this way either.
+        CPPUNIT_ASSERT(mappings[i].is_mapped == false);
+    }
+}
+
 
 
 

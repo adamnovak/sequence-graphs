@@ -118,7 +118,8 @@ class StringReferenceStructure(index: FMDIndex) extends ReferenceStructure {
         face match {
             case Face.RIGHT =>
                 // Do right-mapping as left-mapping flipped around.
-                mapFace(pattern.reverseComplement, Face.LEFT).reverse
+                mapFace(pattern.reverseComplement, Face.LEFT, 
+                    minContext).reverse
             case Face.LEFT =>
                 // Get the MappingVector for mapping to all genomes with the
                 // given minimum context.
@@ -291,7 +292,8 @@ class MergedReferenceStructure(index: FMDIndex, directory: String)
         face match {
             case Face.LEFT =>
                 // Try again on the right side.
-                mapFace(pattern.reverseComplement, Face.RIGHT).reverse
+                mapFace(pattern.reverseComplement, Face.RIGHT,
+                    minContext).reverse
             case Face.RIGHT => 
                 // Mapping to ranges is right-mapping.
                 

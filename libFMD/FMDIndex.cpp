@@ -625,6 +625,9 @@ std::vector<Mapping> FMDIndex::map(const std::string& query,
         Log::debug() << "Mapping " << length << " bases to one genome only." <<
             std::endl;
     }
+    
+    Log::debug() << "Mapping with minimum " << minContext << " context." <<
+        std::endl;
 
     // We need a vector to return.
     std::vector<Mapping> mappings;
@@ -681,9 +684,9 @@ std::vector<Mapping> FMDIndex::map(const std::string& query,
             // which lets us infer the position of the last base in the pattern.
             TextPosition textPosition = locate(start);
 
-            Log::debug() << "Mapped " << location.characters << 
-                " context to text " << textPosition.getText() << " position " << 
-                textPosition.getOffset() << std::endl;
+            Log::debug() << "Mapped " << location.characters << "/" << 
+                minContext << " context to text " << textPosition.getText() << 
+                " position " << textPosition.getOffset() << std::endl;
 
             // Correct to the position of the last base in the pattern, by
             // offsetting by the length of the pattern that was used. A
@@ -818,6 +821,9 @@ std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
         // the string.
         length = query.length() - start;
     }
+    
+    Log::debug() << "Mapping with minimum " << minContext << " context." <<
+        std::endl;
 
     // Make an iterator for ranges, so we can query it.
     BitVectorIterator rangeIterator(ranges);
