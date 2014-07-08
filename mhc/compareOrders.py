@@ -5,7 +5,7 @@ different orders and compare statistics gathered about each.
 
 """
 
-import argparse, sys, random, subprocess
+import argparse, sys, random, subprocess, shutil
 import tsv
 
 import jobTree.scriptTree.target
@@ -31,7 +31,7 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         """
         
         # Make the base Target. Ask for 2gb of memory since this is easy.
-        super(CompareManyTarget, self).__init__(memory=2147483648)
+        super(ReferenceStructureTarget, self).__init__(memory=2147483648)
         
         # Save the FASTAs
         self.fasta_list = fasta_list
@@ -69,11 +69,13 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
             stdout=subprocess.PIPE)
 
         # Make a writer for the statistics
-        writer = tsv.TsvWriter(open(self.output_filename))
+        writer = tsv.TsvWriter(open(self.output_filename, "w"))
     
         for line in process.stdout:            
             # Collect and parse the log output, and get the coverage vs. genome
             # number data.
+            
+            self.logToMaster(line)
             
             if "Coverage from alignment of genome" in line:
                 # Grab the genome number
@@ -86,6 +88,10 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
                
         # Close up the output file. 
         writer.close()
+        
+        # Clean up temporary data
+        shutil.rmtree(indexDir)
+        
                 
         self.logToMaster("ReferenceStructureTarget Finished")
 
@@ -144,6 +150,8 @@ def main(args):
     # Make a stack of jobs to run
     stack = jobTree.scriptTree.stack.Stack(ReferenceStructureTarget(
         options.fastas, options.seed, options.outputFile))
+    
+    print "Starting stack"
     
     # Run it and see how many jobs fail
     failed_jobs = stack.startJobTree(options)
