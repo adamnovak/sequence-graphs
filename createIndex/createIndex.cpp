@@ -1349,6 +1349,9 @@ main(
     // Get rid of the index itself. Invalidates the index reference.
     delete indexPointer;
 
+    Log::output() << "Final memory usage:" << std::endl;
+    logMemory();
+
     // Now we're done!
     return 0;
 }
