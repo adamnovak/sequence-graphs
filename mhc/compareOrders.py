@@ -5,12 +5,45 @@ different orders and compare statistics gathered about each.
 
 """
 
-import argparse, sys, os, random, subprocess, shutil
+import argparse, sys, os, os.path, random, subprocess, shutil, itertools
 import tsv
 
 import jobTree.scriptTree.target
 import jobTree.scriptTree.stack
 import sonLib.bioio
+
+class RunTarget(jobTree.scriptTree.target.Target):
+    """
+    A target that runs other targets as its children.
+    
+    """
+    
+    def __init__(self, targets):
+        """
+        Make a new Target which, when run, adds all the targets in the given
+        list as children.
+        
+        """
+        
+        # Make the base Target. Ask for 2gb of memory since this is easy.
+        super(RunTarget, self).__init__(memory=2147483648)
+        
+        # Save the list of targets
+        self.targets = targets
+        
+        
+    def run(self):
+        """
+        Send off all the child targets we were given on construction.
+        """
+        
+        self.logToMaster("Starting RunTarget")
+        
+        for target in self.targets:
+            # Make each child a child.
+            self.addChildTarget(target)
+                
+        self.logToMaster("RunTarget Finished")
 
 class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
     """
@@ -18,21 +51,25 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
     
     """
     
-    def __init__(self, fasta_list, seed, output_filename):
+    def __init__(self, fasta_list, seed, coverage_filename, alignment_filename):
         """
         Make a new Target for building a reference structure from the given
-        FASTAs, using the specified RNG seed, and writing statistics to the
-        specified file.
+        FASTAs, using the specified RNG seed, and writing coverage statistics to
+        the specified file, and the alignment MAF to the other specified file.
         
-        Those statistics are, specifically, alignment coverage of a genome vs.
-        the order number at which the genome is added, and they are saved in a
-        <genome number>\t<coverage fraction> TSV.
+        Each FASTA file must contain exactly one contig, named after the FASTA
+        without the extension.
+        
+        Those coverage statistics are, specifically, alignment coverage of a
+        genome vs. the order number at which the genome is added, and they are
+        saved in a <genome number>\t<coverage fraction> TSV.
         
         """
         
-        # Make the base Target. Ask for 4gb of memory since this is kinda hard.
+        # Make the base Target. Ask for 20gb of memory since this is kinda hard.
         # Also ask for 4 CPUs because we can probably use as many as we can get.
-        super(ReferenceStructureTarget, self).__init__(memory=4294967296, cpu=4)
+        super(ReferenceStructureTarget, self).__init__(memory=(1024 ** 3) * 20,
+            cpu=4)
         
         # Save the FASTAs
         self.fasta_list = fasta_list
@@ -40,8 +77,11 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         # Save the random seed
         self.seed = seed
         
-        # Save the output file name to use
-        self.output_filename = output_filename
+        # Save the coverage file name to use
+        self.coverage_filename = coverage_filename
+        
+        # And the alignemnt filename to use
+        self.alignment_filename = alignment_filename
         
         self.logToMaster(
             "Creating ReferenceStructureTarget with seed {}".format(seed))
@@ -53,6 +93,7 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         """
         
         self.logToMaster("Starting ReferenceStructureTarget")
+        self.logToMaster("Running in {}".format(os.getcwd()))
         
         # Seed the RNG after sonLib does whatever it wants with temp file names
         random.seed(self.seed)
@@ -61,20 +102,45 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         random.shuffle(self.fasta_list)
         
         # Make a temp directory for the index
-        indexDir = sonLib.bioio.getTempFile(rootDir=self.getLocalTempDir())
+        index_dir = sonLib.bioio.getTempFile(rootDir=self.getLocalTempDir())
+        
+        # Make a file for the cactus2hal
+        c2h_filename = sonLib.bioio.getTempFile(rootDir=self.getLocalTempDir())
+        
+        # Make a file for the FASTA that we need to use the cactus2hal
+        fasta_filename = sonLib.bioio.getTempFile(
+            rootDir=self.getLocalTempDir())
+        
+        # Put together the arguments to invoke
+        args = ["../createIndex/createIndex", "--context", 
+            "100", "--scheme", "greedy", "--alignment", c2h_filename, 
+            "--alignmentFasta", fasta_filename, index_dir] + self.fasta_list
+            
+        # Announce our command we're going to run
+        self.logToMaster("Invoking {}".format(" ".join(args)))
         
         # Make an index with the FASTAs in that order, so we can read all the
         # logging output.
-        process = subprocess.Popen(["../createIndex/createIndex", "--context", 
-            "100", "--scheme", "greedy", indexDir] + self.fasta_list,
+        process = subprocess.Popen(args,
             stdout=subprocess.PIPE)
 
         # Make a writer for the statistics
-        writer = tsv.TsvWriter(open(self.output_filename, "w"))
+        writer = tsv.TsvWriter(open(self.coverage_filename, "w"))
+    
+        # Track how many lines of indexer output we process
+        lines = 0
     
         for line in process.stdout:            
             # Collect and parse the log output, and get the coverage vs. genome
             # number data.
+            
+            if "WARNING" in line or "ERROR" in line:
+                # Log things that came out at high logging priorities (TODO: or
+                # are false positives) to our own log.
+                print line
+            
+            # Record that we processed a line
+            lines += 1
             
             if "Coverage from alignment of genome" in line:
                 # Grab the genome number
@@ -84,36 +150,82 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
             
                 # Save the coverage vs. genome number data as a reasonable TSV.
                 writer.line(genome, coverage)
-               
+                
         # Close up the output file. 
         writer.close()
         
-        # Clean up temporary data
-        shutil.rmtree(indexDir)
+        # Clean up temporary index
+        shutil.rmtree(index_dir)
+        
+        # Say how much info we got out of the indexer.
+        self.logToMaster("Processed {} lines of indexer output".format(lines))
+        
+        if(process.wait() != 0):
+            # If the indexing process died, complain.
+            raise Exception("createIndex failed with code {}".format(
+                process.returncode))
                 
+        # Now build the HAL file
+        
+        # What tree should we use? Assume the genome names are the same as the
+        # FASTA names without their extensions. TODO: This tightly couples us to
+        # both the genome name choosing logic and the particular test case we
+        # are working on. Fix that.
+        tree = "(" + (os.path.splitext(os.path.split(fasta)[1])[0] 
+            for fasta in self.fasta_list).join(",") + ")rootSeq;"
+        
+        # Where should we save it?
+        hal_filename = sonLib.bioio.getTempFile(rootDir=self.getLocalTempDir())
+        
+        self.logToMaster("Creating HAL with tree: {}".format(tree))
+        
+        # Turn the c2h into a HAL with the given tree.
+        subprocess.check_call(["halAppendCactusSubtree", c2h_filename, 
+            fasta_filename, tree, hal_filename])
+            
+        # Clean up the temp files we needed to make the HAL
+        os.unlink(c2h_filename)
+        os.unlink(fasta_filename)
+            
+        self.logToMaster("Creating MAF")
+            
+        # Now we need to make that HAL into a MAF, saving to the file where
+        # we're supposed to send out output
+        subprocess.check_call(["hal2maf", hal_filename,
+            self.alignment_filename])
+            
+        # Get rid of the intermediate HAL
+        os.unlink(hal_filename)
+        
         self.logToMaster("ReferenceStructureTarget Finished")
         
-class CoverageAssessmentTarget(jobTree.scriptTree.target.Target):
+class StructureAssessmentTarget(jobTree.scriptTree.target.Target):
     """
-    A target that builds several reference structures and collates their index
-    vs. coverage results.
+    A target that builds several reference structures, collates their index
+    vs. coverage results, and compares their MAF alignments.
     
     """
     
-    def __init__(self, fasta_list, seed, output_filename, num_children):
+    def __init__(self, fasta_list, seed, coverage_filename, agreement_filename,
+        num_children):
         """
         Make a new Target for building a several reference structures from the
-        given FASTAs, using the specified RNG seed, and writing statistics to
-        the specified file.
+        given FASTAs, using the specified RNG seed, and writing coverage
+        statistics to the specified file, and alignment agreement statistics to
+        the other specicied file.
         
-        Those statistics are, specifically, alignment coverage of a genome vs.
-        the order number at which the genome is added for all the child targets,
-        and they are saved in a <genome number>\t<coverage fraction> TSV.
+        The coverage statistics are, specifically, alignment coverage of a
+        genome vs. the order number at which the genome is added for all the
+        child targets, and they are saved in a <genome number>\t<coverage
+        fraction> TSV.
+        
+        The alignment styatistics are just a bunch of concatenated mafComparator
+        XML files.
         
         """
         
         # Make the base Target. Ask for 2gb of memory since this is easy.
-        super(CoverageAssessmentTarget, self).__init__(memory=2147483648)
+        super(StructureAssessmentTarget, self).__init__(memory=2147483648)
         
         # Save the FASTAs
         self.fasta_list = fasta_list
@@ -121,14 +233,17 @@ class CoverageAssessmentTarget(jobTree.scriptTree.target.Target):
         # Save the random seed
         self.seed = seed
         
-        # Save the output file name to use
-        self.output_filename = output_filename
+        # Save the concatenated coverage stats file name to use
+        self.coverage_filename = coverage_filename
+        
+        # And the alignment agreement stats filename
+        self.agreement_filename = agreement_filename
         
         # Save the number of child targets to run
         self.num_children = num_children
         
         self.logToMaster(
-            "Creating CoverageAssessmentTarget with seed {}".format(seed))
+            "Creating StructureAssessmentTarget with seed {}".format(seed))
         
         
     def run(self):
@@ -136,28 +251,143 @@ class CoverageAssessmentTarget(jobTree.scriptTree.target.Target):
         Send off all the child targets to do comparisons.
         """
         
-        self.logToMaster("Starting CoverageAssessmentTarget")
+        self.logToMaster("Starting StructureAssessmentTarget")
+        
+        # Make a temp file for each of the children to write stats to
+        stats_filenames = [sonLib.bioio.getTempFile(
+            rootDir=self.getGlobalTempDir()) for i in xrange(self.num_children)]
+            
+        # And another one to hold each child's MAF alignment
+        maf_filenames = [sonLib.bioio.getTempFile(
+            rootDir=self.getGlobalTempDir()) for i in xrange(self.num_children)]
+            
+        # Seed the RNG after sonLib does whatever it wants with temp file names
+        random.seed(self.seed)
+        
+        for stats_filename, maf_filename in zip(stats_filenames, maf_filenames):
+            # Make a child to produce this reference structure, giving it a
+            # 256-bit seed.
+            self.addChildTarget(ReferenceStructureTarget(self.fasta_list,
+                random.getrandbits(256), stats_filename, maf_filename))
+                
+        # Make a follow-on job to merge all the child coverage outputs and
+        # produce our coverage output file.
+        coverageFollowOn = ConcatenateTarget(stat_files, 
+            self.coverage_filename)
+        
+        # But we also need a follow-on job to analyze all those alignments.
+        alignmentFollowOn = AlignmentSetComparisonTarget(maf_files, 
+            random.getrandbits(256), self.agreement_filename)
+            
+        # So we need to run both of those in parallel after this job
+        self.setFollowOnTarget(RunTarget([coverageFollowOn, alignmentFollowOn]))
+                
+        self.logToMaster("StructureAssessmentTarget Finished")
+        
+class AlignmentComparisonTarget(jobTree.scriptTree.target.Target):
+    """
+    A target that compares two MAF alignments.
+    
+    """
+    
+    def __init__(self, maf_a, maf_b, seed, output_filename):
+        """
+        Compare the two MAFs referred to by the given input filenames, and write
+        mafComparator results to the given output filename. Uses a random seed
+        to generate the mafComparator seed.
+        
+        """
+        
+        # Make the base Target. Ask for 2gb of memory since this is easy.
+        super(AlignmentComparisonTarget, self).__init__(memory=2147483648)
+        
+        # Save the parameters
+        self.maf_a = maf_a
+        self.maf_b = maf_b
+        self.seed = seed
+        self.output_filename = output_filename
+        
+        self.logToMaster("Creating AlignmentComparisonTarget")
+        
+        
+    def run(self):
+        """
+        Run mafComparator and grab its results.
+        """
+        
+        self.logToMaster("Starting AlignmentComparisonTarget")
         
         # Seed the RNG after sonLib does whatever it wants with temp file names
         random.seed(self.seed)
         
-        # Make a temp file for each of the children to write stats to
-        stat_files = [sonLib.bioio.getTempFile(rootDir=self.getGlobalTempDir())
-            for i in xrange(self.num_children)]
+        # Generate a seed for mafComparator that's a C-ish integer (not 256
+        # bits)
+        seed = random.getrandbits(32)
         
-        # Start up all the children
-        for child_filename in stat_files:
-            # Make a child to produce this output file, giving it a 256-bit
-            # seed.
-            self.addChildTarget(ReferenceStructureTarget(self.fasta_list,
-                random.getrandbits(256), child_filename))
-                
-        # Make a follow-on job to merge all the child outputs and produce our
-        # output file.
-        self.setFollowOnTarget(ConcatenateTarget(stat_files,
+        # Run mafComparator and generate the output XML
+        subprocess.check_call(["mafComparator", "--maf1", self.maf_a, "--maf2",
+            self.maf_b, "--out", self.output_filename, "--seed", seed])
+        
+        # Nothing else to do, really.
+        
+        self.logToMaster("AlignmentComparisonTarget Finished")
+
+class AlignmentSetComparisonTarget(jobTree.scriptTree.target.Target):
+    """
+    A target that compares a set of MAF alignments.
+    
+    """
+    
+    def __init__(self, maf_filenames, seed, output_filename):
+        """
+        Compare the MAFs referred to by the given input filenames, and write
+        collated results to the given output filename. Uses a random seed
+        to generate mafComparator seeds.
+        
+        """
+        
+        # Make the base Target. Ask for 2gb of memory since this is easy.
+        super(AlignmentSetComparisonTarget, self).__init__(memory=2147483648)
+        
+        # Save the parameters
+        self.maf_filenames = maf_filenames
+        self.seed = seed
+        self.output_filename = output_filename
+        
+        self.logToMaster("Creating AlignmentSetComparisonTarget")
+        
+        
+    def run(self):
+        """
+        Send off all the child targets to do alignment comparisons, and
+        integrate their results.
+        
+        """
+        
+        self.logToMaster("Starting AlignmentSetComparisonTarget")
+        
+        # What pairs do we compare? TODO: This could get kinda big
+        pairs = list(itertools.combinations(self.maf_filenames, 2))
+        
+        # Make a temp file for each of the children to write stats to
+        comparison_filenames = [sonLib.bioio.getTempFile(
+            rootDir=self.getGlobalTempDir()) for p in pairs]
+        
+        # Seed the RNG after sonLib does whatever it wants with temp file names
+        random.seed(self.seed)
+        
+        for pair, comparison_filename in zip(pairs, comparison_filenames):
+            # Make a child to compare these two MAF files and produce this
+            # output file, giving it a 256-bit seed.
+            self.addChildTarget(AlignmentComparisonTarget(pair[0], pair[1], 
+                random.getrandbits(256), comparison_filename))
+            
+        # When we're done, concatenate all those comparison files together into
+        # our output file.
+        self.setFollowOnTarget(ConcatenateTarget(comparison_filenames,
             self.output_filename))
-                
-        self.logToMaster("CoverageAssessmentTarget Finished")
+        
+        self.logToMaster("AlignmentSetComparisonTarget Finished")
         
 class ConcatenateTarget(jobTree.scriptTree.target.Target):
     """
@@ -199,10 +429,6 @@ class ConcatenateTarget(jobTree.scriptTree.target.Target):
             
         output.close()
         
-        for input_filename in self.input_filenames:
-            # Delete the input file
-            os.unlink(input_filename)
-                
         self.logToMaster("ConcatenateTarget Finished")
 
 def parse_args(args):
@@ -224,8 +450,10 @@ def parse_args(args):
         formatter_class=argparse.RawDescriptionHelpFormatter)
     
     # General options
-    parser.add_argument("outputFile", 
-        help="filename to save the output to")
+    parser.add_argument("coverageFile", 
+        help="filename to save the coverage stats output to")
+    parser.add_argument("agreementFile",
+        help="filename to save the alignment agreement stats output to")
     parser.add_argument("fastas", nargs="+",
         help="FASTA files to index")
     parser.add_argument("--seed", default=random.getrandbits(256),
@@ -258,11 +486,12 @@ def main(args):
     # Don't try to import * because that's illegal.
     if __name__ == "__main__":
         from compareOrders import ReferenceStructureTarget, \
-            CoverageAssessmentTarget, ConcatenateTarget
+            StructureAssessmentTarget, ConcatenateTarget
         
     # Make a stack of jobs to run
-    stack = jobTree.scriptTree.stack.Stack(CoverageAssessmentTarget(
-        options.fastas, options.seed, options.outputFile, options.samples))
+    stack = jobTree.scriptTree.stack.Stack(StructureAssessmentTarget(
+        options.fastas, options.seed, options.coverageFile, 
+        options.agreementFile, options.samples))
     
     print "Starting stack"
     
