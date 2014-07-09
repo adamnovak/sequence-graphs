@@ -340,7 +340,7 @@ class AlignmentComparisonTarget(jobTree.scriptTree.target.Target):
         
         # Grab the nodes with the aggregate results for each direction
         stats = tree.findall(
-            "./alignmentComparisons/homologyTests/aggregateResults/all")
+            "./homologyTests/aggregateResults/all")
             
         # Grab the averages
         averages = (stat.attrib["average"] for stat in stats)
