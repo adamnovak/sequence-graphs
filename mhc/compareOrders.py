@@ -6,6 +6,7 @@ different orders and compare statistics gathered about each.
 """
 
 import argparse, sys, os, os.path, random, subprocess, shutil, itertools
+from xml.etree import ElementTree
 import tsv
 
 import jobTree.scriptTree.target
@@ -171,13 +172,16 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         # FASTA names without their extensions. TODO: This tightly couples us to
         # both the genome name choosing logic and the particular test case we
         # are working on. Fix that.
-        tree = "(" + (os.path.splitext(os.path.split(fasta)[1])[0] 
-            for fasta in self.fasta_list).join(",") + ")rootSeq;"
+        tree = "(" + ",".join([os.path.splitext(os.path.split(fasta)[1])[0] 
+            for fasta in self.fasta_list]) + ")rootSeq;"
         
         # Where should we save it?
         hal_filename = sonLib.bioio.getTempFile(rootDir=self.getLocalTempDir())
         
         self.logToMaster("Creating HAL with tree: {}".format(tree))
+        
+        # Make sure HAL doesn't exist when we try to make it
+        os.unlink(hal_filename)
         
         # Turn the c2h into a HAL with the given tree.
         subprocess.check_call(["halAppendCactusSubtree", c2h_filename, 
@@ -253,7 +257,7 @@ class StructureAssessmentTarget(jobTree.scriptTree.target.Target):
         
         self.logToMaster("Starting StructureAssessmentTarget")
         
-        # Make a temp file for each of the children to write stats to
+        # Make a temp file for each of the children to write coverage stats to
         stats_filenames = [sonLib.bioio.getTempFile(
             rootDir=self.getGlobalTempDir()) for i in xrange(self.num_children)]
             
@@ -272,11 +276,11 @@ class StructureAssessmentTarget(jobTree.scriptTree.target.Target):
                 
         # Make a follow-on job to merge all the child coverage outputs and
         # produce our coverage output file.
-        coverageFollowOn = ConcatenateTarget(stat_files, 
+        coverageFollowOn = ConcatenateTarget(stats_filenames, 
             self.coverage_filename)
         
         # But we also need a follow-on job to analyze all those alignments.
-        alignmentFollowOn = AlignmentSetComparisonTarget(maf_files, 
+        alignmentFollowOn = AlignmentSetComparisonTarget(maf_filenames, 
             random.getrandbits(256), self.agreement_filename)
             
         # So we need to run both of those in parallel after this job
@@ -293,8 +297,8 @@ class AlignmentComparisonTarget(jobTree.scriptTree.target.Target):
     def __init__(self, maf_a, maf_b, seed, output_filename):
         """
         Compare the two MAFs referred to by the given input filenames, and write
-        mafComparator results to the given output filename. Uses a random seed
-        to generate the mafComparator seed.
+        a digest of mafComparator results to the given output filename. Uses a
+        random seed to generate the mafComparator seed.
         
         """
         
@@ -317,6 +321,9 @@ class AlignmentComparisonTarget(jobTree.scriptTree.target.Target):
         
         self.logToMaster("Starting AlignmentComparisonTarget")
         
+        # Make a temp file for the XML output
+        xml_filename = sonLib.bioio.getTempFile(rootDir=self.getLocalTempDir())
+        
         # Seed the RNG after sonLib does whatever it wants with temp file names
         random.seed(self.seed)
         
@@ -326,9 +333,30 @@ class AlignmentComparisonTarget(jobTree.scriptTree.target.Target):
         
         # Run mafComparator and generate the output XML
         subprocess.check_call(["mafComparator", "--maf1", self.maf_a, "--maf2",
-            self.maf_b, "--out", self.output_filename, "--seed", seed])
+            self.maf_b, "--out", xml_filename, "--seed", str(seed)])
         
-        # Nothing else to do, really.
+        # Now parse the XML output down to the statistics we actually want.
+        tree = ElementTree.parse(xml_filename)
+        
+        # Grab the nodes with the aggregate results for each direction
+        stats = tree.findall(
+            "./alignmentComparisons/homologyTests/aggregateResults/all")
+            
+        # Grab the averages
+        averages = (stat.attrib["average"] for stat in stats)
+        
+        # Open the output file to save them to.
+        writer = tsv.TsvWriter(open(self.output_filename, "w"))
+        
+        for average in averages:
+            # Dump averages as a 1-column TSV.
+            # TODO: Get more stuff to justify TSV-nes
+            writer.line(average)
+            
+        writer.close()
+        
+        # Clean up our raw XML
+        os.unlink(xml_filename)
         
         self.logToMaster("AlignmentComparisonTarget Finished")
 
@@ -486,7 +514,8 @@ def main(args):
     # Don't try to import * because that's illegal.
     if __name__ == "__main__":
         from compareOrders import ReferenceStructureTarget, \
-            StructureAssessmentTarget, ConcatenateTarget
+            StructureAssessmentTarget, ConcatenateTarget, \
+            AlignmentSetComparisonTarget, AlignmentComparisonTarget, RunTarget
         
     # Make a stack of jobs to run
     stack = jobTree.scriptTree.stack.Stack(StructureAssessmentTarget(
