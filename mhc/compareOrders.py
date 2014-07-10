@@ -168,12 +168,15 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
                 
         # Now build the HAL file
         
+        # What genomes do we have? Make a list of them in the order they were
+        # added. TODO: This tightly couples us to both the genome name choosing
+        # logic and the particular test case we are working on. Fix that.
+        genomes = [os.path.splitext(os.path.split(fasta)[1])[0] 
+            for fasta in self.fasta_list]
+        
         # What tree should we use? Assume the genome names are the same as the
-        # FASTA names without their extensions. TODO: This tightly couples us to
-        # both the genome name choosing logic and the particular test case we
-        # are working on. Fix that.
-        tree = "(" + ",".join([os.path.splitext(os.path.split(fasta)[1])[0] 
-            for fasta in self.fasta_list]) + ")rootSeq;"
+        # FASTA names without their extensions. 
+        tree = "(" + ",".join(genomes) + ")rootSeq;"
         
         # Where should we save it?
         hal_filename = sonLib.bioio.getTempFile(rootDir=self.getLocalTempDir())
@@ -194,8 +197,13 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         self.logToMaster("Creating MAF")
             
         # Now we need to make that HAL into a MAF, saving to the file where
-        # we're supposed to send out output
-        subprocess.check_call(["hal2maf", hal_filename,
+        # we're supposed to send out output. Use the first genome that we added
+        # as the reference (since MAF can't represent a duplication in the
+        # reference, and we will never call a duplication relative to this first
+        # genome), and don't include rootSeq (since it is just an artifact of
+        # the HAL format and not a real genome).
+        subprocess.check_call(["hal2maf", "--refGenome", genomes[0], 
+            "--targetGenomes", ",".join(genomes[1:]), hal_filename,
             self.alignment_filename])
             
         # Get rid of the intermediate HAL
