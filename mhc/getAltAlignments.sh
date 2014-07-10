@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# getAltAlignments.sh: Download all the alt alignments and convert them to PSL with the sequence names I am using.
+# getAltAlignments.sh: Download all the alt alignments and convert them to PSL 
+# with the GI sequence names.
 
 set -e
 
