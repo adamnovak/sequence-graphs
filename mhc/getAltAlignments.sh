@@ -21,6 +21,15 @@ GI_IDS[5]=GI568335989
 GI_IDS[6]=GI568335992
 GI_IDS[7]=GI568335994
 
+# Also the UCSC chrom.sizes names
+UCSC_NAMES[1]=chr6_GL000250v2_alt
+UCSC_NAMES[2]=chr6_GL000251v2_alt
+UCSC_NAMES[3]=chr6_GL000252v2_alt
+UCSC_NAMES[4]=chr6_GL000253v2_alt
+UCSC_NAMES[5]=chr6_GL000254v2_alt
+UCSC_NAMES[6]=chr6_GL000255v2_alt
+UCSC_NAMES[7]=chr6_GL000256v2_alt
+
 
 for ALT_INDEX in {1..7}
 do
@@ -35,8 +44,15 @@ do
     # <http://stackoverflow.com/a/2705678/402891> for the sed pattern.
     ACCESSION_PATTERN=$(echo ${ACCESSION_VERSIONS[ALT_INDEX]} | sed -e 's/[]\/$*.^|[]/\\&/g')
     
-    # Rename the alt to what we call it (the GI ID)
-    sed -i "s/${ACCESSION_PATTERN}/${GI_IDS[ALT_INDEX]}/g" ${GI_IDS[ALT_INDEX]}.gff3
+    # Rename the alt to the UCSC name (chr6_GL000250v2_alt or whatever)
+    sed -i "s/${ACCESSION_PATTERN}/${UCSC_NAMES[ALT_INDEX]}/g" ${GI_IDS[ALT_INDEX]}.gff3
+    
+    # Convert it to PSL
+    gff3ToPsl hg38.chrom.sizes ${GI_IDS[ALT_INDEX]}.gff3 ${GI_IDS[ALT_INDEX]}.psl
+    
+    # Fix up the PSL to have our GIwhatever name instead of the UCSC name for
+    # the alt.
+    sed -i "s/${UCSC_NAMES[ALT_INDEX]}/${GI_IDS[ALT_INDEX]}/g" ${GI_IDS[ALT_INDEX]}.psl
     
 done
 
