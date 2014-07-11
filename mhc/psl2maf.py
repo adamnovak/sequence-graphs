@@ -33,12 +33,11 @@ def parse_args(args):
         formatter_class=argparse.RawDescriptionHelpFormatter)
     
     # General options
-    parser.add_argument("--psl", type=str, required=True, 
-        action="append",
+    parser.add_argument("--psls", nargs="+", required=True, 
         help="PSL file(s) to convert")
     parser.add_argument("--maf", type=argparse.FileType("w"), 
         help="MAF file to save output to")
-    parser.add_argument("--fasta", required=True, action="append",
+    parser.add_argument("--fastas", nargs="+", required=True,
         help=".fasta file(s) to obtain sequence from")
     parser.add_argument("--referenceOffset", type=int, default=0,
         help="offset all reference coordinates by the given amount")
@@ -78,11 +77,15 @@ def mergeMSAs(msa1, msa2):
     msa1Pos = 0
     msa2Pos = 0
     
+    # How many reference characters have been used?
+    refChars = 0
+    
     while msa1Pos < len(msa1[0]) and msa2Pos < len(msa2[0]):
         # Until we hit the end of both sequences
         
-        print("Now at {} in alignment 1 and {} in alignment 2".format(msa1Pos,
-            msa2Pos))
+        if refChars % 10000 == 0:
+            print("Now at {} in alignment 1, {} in alignment 2, {} in reference"
+                .format(msa1Pos, msa2Pos, refChars))
         
         if(msa1[0, msa1Pos] == "-"):
             # We have a gap in the first reference. Put this column from the
@@ -102,8 +105,6 @@ def mergeMSAs(msa1, msa2):
             # Advance in msa1. We'll keep doing this until it doesn't have a gap
             # in its reference.
             msa1Pos += 1
-            
-            print("Gapped alignment 2 rows")
             
         elif(msa2[0, msa2Pos] == "-"):
             # We have a letter in the first reference but a gap in the second.
@@ -126,8 +127,6 @@ def mergeMSAs(msa1, msa2):
             # invariant that this will always be the same character.
             msa2Pos += 1
             
-            print("Gapped alignment 1 rows")
-            
         else:
             # Neither has a gap. They both have real characters.
             
@@ -148,9 +147,8 @@ def mergeMSAs(msa1, msa2):
             msa1Pos += 1
             msa2Pos += 1
             
-            print("Joined alignments on column")
-            
-        print([mergedList[-1] for mergedList in merged])
+            # Say we used a reference character
+            refChars += 1
             
     # Now we have finished populating these aligned lists. We need to make a
     # MultipleSeqAlignment from them.
@@ -179,7 +177,7 @@ def main(args):
     options = parse_args(args) # This holds the nicely-parsed options object
     
     # Load all the FASTAs, indexed
-    fastaDicts = [SeqIO.index(fasta, "fasta") for fasta in options.fasta]
+    fastaDicts = [SeqIO.index(fasta, "fasta") for fasta in options.fastas]
     
     def getSequence(name):
         """
@@ -195,7 +193,7 @@ def main(args):
     # Make a multiple alignment that will align all the sequences.
     totalMSA = None
         
-    for psl in options.psl:
+    for psl in options.psls:
         # For each PSL we want in out MAF
         for result in SearchIO.parse(psl, "blat-psl"):
             # Parse the PSL and go through the results
@@ -264,9 +262,6 @@ def main(args):
                     queryPaddingNeeded = queryStart - hitMSAQueryPos
                     hitPaddingNeeded = hitStart - hitMSAHitPos
                     
-                    print("Padding {} in query and {} in hit".format(
-                        queryPaddingNeeded, hitPaddingNeeded))
-                    
                     # Grab the sequence from the query to go opposite the
                     # hit gap
                     queryActualSequence = querySeqRecord[hitMSAQueryPos:
@@ -301,8 +296,12 @@ def main(args):
                         hitMSAHitPos = hitStart + len(newMSA[0])
                         hitMSAQueryPos = queryStart + len(newMSA[1])
                     
-                    print("Now at {} in hit and {} in query".format(
-                        hitMSAHitPos, hitMSAQueryPos))
+                    if  queryPaddingNeeded > 0 or hitPaddingNeeded > 0:
+                        print("Padding {} in query and {} in hit".format(
+                            queryPaddingNeeded, hitPaddingNeeded))
+                        
+                        print("Now at {} in hit and {} in query".format(
+                            hitMSAHitPos, hitMSAQueryPos))
                         
                     
                         
