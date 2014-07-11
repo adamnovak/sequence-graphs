@@ -218,13 +218,14 @@ class StructureAssessmentTarget(jobTree.scriptTree.target.Target):
     
     """
     
-    def __init__(self, fasta_list, seed, coverage_filename, agreement_filename,
-        num_children):
+    def __init__(self, fasta_list, true_maf, seed, coverage_filename, 
+        agreement_filename, truth_filename, num_children):
         """
         Make a new Target for building a several reference structures from the
-        given FASTAs, using the specified RNG seed, and writing coverage
-        statistics to the specified file, and alignment agreement statistics to
-        the other specicied file.
+        given FASTAs, and comparing against the given truth MAF, using the
+        specified RNG seed, and writing coverage statistics to the specified
+        file, and alignment agreement statistics to the other specicied file,
+        and a comparison against the true MAF to the other other specified file.
         
         The coverage statistics are, specifically, alignment coverage of a
         genome vs. the order number at which the genome is added for all the
@@ -233,6 +234,13 @@ class StructureAssessmentTarget(jobTree.scriptTree.target.Target):
         
         The alignment styatistics are just a bunch of concatenated mafComparator
         XML files.
+        
+        TODO: This target is getting a bit unweildy and probably should be
+        broken up to use an output directory and a configuration object or
+        something.
+        
+        true_maf and truth_filename may be None, but if one is None then both
+        need to be None.
         
         """
         
@@ -253,6 +261,13 @@ class StructureAssessmentTarget(jobTree.scriptTree.target.Target):
         
         # Save the number of child targets to run
         self.num_children = num_children
+        
+        # Save the filename of a MAF to compare all our MAFs against (or None)
+        self.true_maf = true_maf
+        
+        # And the filename to send the results of that comparison to (which also
+        # may be None)
+        self.truth_filename = truth_filename
         
         self.logToMaster(
             "Creating StructureAssessmentTarget with seed {}".format(seed))
@@ -281,18 +296,29 @@ class StructureAssessmentTarget(jobTree.scriptTree.target.Target):
             # 256-bit seed.
             self.addChildTarget(ReferenceStructureTarget(self.fasta_list,
                 random.getrandbits(256), stats_filename, maf_filename))
+        
+        # We need a few different follow-on jobs.
+        followOns = []
                 
         # Make a follow-on job to merge all the child coverage outputs and
         # produce our coverage output file.
-        coverageFollowOn = ConcatenateTarget(stats_filenames, 
-            self.coverage_filename)
+        followOns.append(ConcatenateTarget(stats_filenames, 
+            self.coverage_filename))
         
-        # But we also need a follow-on job to analyze all those alignments.
-        alignmentFollowOn = AlignmentSetComparisonTarget(maf_filenames, 
-            random.getrandbits(256), self.agreement_filename)
+        # But we also need a follow-on job to analyze all those alignments
+        # against each other.
+        followOns.append(AlignmentSetComparisonTarget(maf_filenames, 
+            random.getrandbits(256), self.agreement_filename))
+            
+        if self.true_maf is not None:
+            # We also need another target for comparing all these MAFs against
+            # the truth, which we have been given.
+            followOns.append(AlignmentTruthComparisonTarget(self.true_maf, 
+            maf_filenames, random.getrandbits(256), self.truth_filename))
+            
             
         # So we need to run both of those in parallel after this job
-        self.setFollowOnTarget(RunTarget([coverageFollowOn, alignmentFollowOn]))
+        self.setFollowOnTarget(RunTarget(followOns))
                 
         self.logToMaster("StructureAssessmentTarget Finished")
         
@@ -302,11 +328,14 @@ class AlignmentComparisonTarget(jobTree.scriptTree.target.Target):
     
     """
     
-    def __init__(self, maf_a, maf_b, seed, output_filename):
+    def __init__(self, maf_a, maf_b, seed, output_filename, is_correct=False):
         """
         Compare the two MAFs referred to by the given input filenames, and write
         a digest of mafComparator results to the given output filename. Uses a
         random seed to generate the mafComparator seed.
+        
+        If is_correct is true, the first alignment is considered ground truth,
+        and a two column <precision>\t<recall> output file is produced.
         
         """
         
@@ -318,6 +347,7 @@ class AlignmentComparisonTarget(jobTree.scriptTree.target.Target):
         self.maf_b = maf_b
         self.seed = seed
         self.output_filename = output_filename
+        self.is_correct = is_correct
         
         self.logToMaster("Creating AlignmentComparisonTarget")
         
@@ -350,16 +380,23 @@ class AlignmentComparisonTarget(jobTree.scriptTree.target.Target):
         stats = tree.findall(
             "./homologyTests/aggregateResults/all")
             
-        # Grab the averages
+        # Grab the averages. There should be two.
         averages = (stat.attrib["average"] for stat in stats)
         
         # Open the output file to save them to.
         writer = tsv.TsvWriter(open(self.output_filename, "w"))
         
-        for average in averages:
-            # Dump averages as a 1-column TSV.
-            # TODO: Get more stuff to justify TSV-nes
-            writer.line(average)
+        if self.is_correct:
+            # Save precision and recall. The first average is for recall
+            # (homologies in the first file that appear in the second), and the
+            # second average is for precision (homologies in the second file
+            # that appear in the first).
+            writer.line(averages[1], averages[0])
+        else:
+            for average in averages:
+                # Dump averages as a 1-column TSV.
+                # TODO: Get more stuff to justify TSV-nes
+                writer.line(average)
             
         writer.close()
         
@@ -424,6 +461,65 @@ class AlignmentSetComparisonTarget(jobTree.scriptTree.target.Target):
             self.output_filename))
         
         self.logToMaster("AlignmentSetComparisonTarget Finished")
+        
+class AlignmentTruthComparisonTarget(jobTree.scriptTree.target.Target):
+    """
+    A target that compares a set of MAF alignments against a single MAF
+    alignment truth.
+    
+    """
+    
+    def __init__(self, truth_maf, maf_filenames, seed, output_filename):
+        """
+        Compare the given truth MAF filename to the MAFs referred to by the
+        given input filenames, and write collated results to the given output
+        filename. Uses a random seed to generate mafComparator seeds.
+        
+        """
+        
+        # Make the base Target. Ask for 2gb of memory since this is easy.
+        super(AlignmentTruthComparisonTarget, self).__init__(memory=2147483648)
+        
+        # Save the parameters
+        self.truth_maf = truth_maf
+        self.maf_filenames = maf_filenames
+        self.seed = seed
+        self.output_filename = output_filename
+        
+        self.logToMaster("Creating AlignmentTruthComparisonTarget")
+        
+        
+    def run(self):
+        """
+        Send off all the child targets to do alignment comparisons, and
+        integrate their results.
+        
+        """
+        
+        self.logToMaster("Starting AlignmentTruthComparisonTarget")
+        
+        # Make a temp file for each of the children to write stats to
+        comparison_filenames = [sonLib.bioio.getTempFile(
+            rootDir=self.getGlobalTempDir()) for other in self.maf_filenames]
+        
+        # Seed the RNG after sonLib does whatever it wants with temp file names
+        random.seed(self.seed)
+        
+        for maf_filename, comparison_filename in zip(self.maf_filenames,
+            comparison_filenames):
+            
+            # Make a child to compare this MAF against the truth, and produce
+            # this output file, giving it a 256-bit seed.
+            self.addChildTarget(AlignmentComparisonTarget(self.truth_maf, 
+                maf_filename, random.getrandbits(256), comparison_filename, 
+                is_correct=True))
+            
+        # When we're done, concatenate all those comparison files together into
+        # our output file.
+        self.setFollowOnTarget(ConcatenateTarget(comparison_filenames,
+            self.output_filename))
+        
+        self.logToMaster("AlignmentTruthComparisonTarget Finished")
         
 class ConcatenateTarget(jobTree.scriptTree.target.Target):
     """
@@ -496,6 +592,10 @@ def parse_args(args):
         help="seed for a particular deterministic run")
     parser.add_argument("--samples", type=int, default=1,
         help="number of samples to take")
+    parser.add_argument("--trueMaf", default=None,
+        help="filename of a MAF to compare all generated MAFs against")
+    parser.add_argument("--truthFile", default=None,
+        help="filename to output comparison against the truth to")
         
     
     
@@ -518,17 +618,23 @@ def main(args):
     
     options = parse_args(args) # This holds the nicely-parsed options object
     
+    if options.trueMaf is not None and options.truthFile is None:
+        # Make sure they gave us a place to put it if they want a truth
+        # comparison.
+        raise Exception("--truthFile is required if --trueMaf is used.")
+    
     # Make sure we've given everything an absolute module name.
     # Don't try to import * because that's illegal.
     if __name__ == "__main__":
         from compareOrders import ReferenceStructureTarget, \
             StructureAssessmentTarget, ConcatenateTarget, \
-            AlignmentSetComparisonTarget, AlignmentComparisonTarget, RunTarget
+            AlignmentSetComparisonTarget, AlignmentTruthComparisonTarget, \
+            AlignmentComparisonTarget, RunTarget
         
     # Make a stack of jobs to run
     stack = jobTree.scriptTree.stack.Stack(StructureAssessmentTarget(
-        options.fastas, options.seed, options.coverageFile, 
-        options.agreementFile, options.samples))
+        options.fastas, options.trueMaf, options.seed, options.coverageFile, 
+        options.agreementFile, options.truthFile, options.samples))
     
     print "Starting stack"
     
