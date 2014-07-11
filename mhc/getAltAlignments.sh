@@ -38,7 +38,7 @@ do
     # Download the alignment in GFF3 format
     wget ftp://ftp.ncbi.nlm.nih.gov/genbank/genomes/Eukaryotes/vertebrates_mammals/Homo_sapiens/GRCh38/ALT_REF_LOCI_${ALT_INDEX}/alt_scaffolds/alignments/${ACCESSION_VERSIONS[ALT_INDEX]}_CM000668.2.gff -O ${GI_IDS[ALT_INDEX]}.gff3
     
-    # Rename the reference to what we call it (chr6)
+    # Rename the reference to what we call it (refmhc)
     sed -i "s/CM000668\.2/chr6/g" ${GI_IDS[ALT_INDEX]}.gff3
     
     # Escape the period in the accession.version name. See

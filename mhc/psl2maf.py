@@ -1,14 +1,18 @@
 #!/usr/bin/env python2.7
 """
 psl2maf.py: Convert a series of PSLs to a single multiple alignment MAF, pulling
-sequence from FASTA files.
+sequence from FASTA files. The PSLs must all be against the same reference
+sequence, and the alignment to that reference is used to induce the multiple
+alignment (i.e. nothing in the other sequences will align except as mediated by
+alignment to the reference).
 
 """
 
-from Bio import SearchIO, AlignIO, SeqIO, Align
-
 import argparse, sys, os, os.path, random, subprocess, shutil, itertools
 
+from Bio import SearchIO, AlignIO, SeqIO, Align
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
 
 def parse_args(args):
     """
@@ -36,14 +40,135 @@ def parse_args(args):
         help="MAF file to save output to")
     parser.add_argument("--fasta", required=True, action="append",
         help=".fasta file(s) to obtain sequence from")
+    parser.add_argument("--referenceOffset", type=int, default=0,
+        help="offset all reference coordinates by the given amount")
+    parser.add_argument("--referenceSequence", type=str, default=None,
+        help="override reference sequence nemae with this one")
     
     # The command line arguments start with the program name, which we don't
     # want to treat as an argument for argparse. So we remove it.
     args = args[1:]
         
     return parser.parse_args(args)
-   
     
+def mergeMSAs(msa1, msa2):
+    """
+    Given two MultipleSeqAlignment objects sharing a first (reference) sequence,
+    merge them on the reference. Returns a MultipleSeqAlignment containing all
+    the sequences from each alignment, in the alignment induced by the shared
+    reference sequence.
+    
+    Either MSA may be None, in which case the other MSA is returned.
+    
+    """
+    
+    if msa1 is None:
+        # No merging to do.
+        return msa2
+    
+    if msa2 is None:
+        # No merging to do this way either.
+        return msa1
+    
+    # Make lists for each sequence we are going to build: those in msa1, and
+    # then those in msa2 (except the duplicate reference).
+    merged = [list() for i in xrange(len(msa1) + len(msa2) - 1)]
+    
+    # Start at the beginning in each alignment
+    msa1Pos = 0
+    msa2Pos = 0
+    
+    while msa1Pos < len(msa1[0]) and msa2Pos < len(msa2[0]):
+        # Until we hit the end of both sequences
+        
+        print("Now at {} in alignment 1 and {} in alignment 2".format(msa1Pos,
+            msa2Pos))
+        
+        if(msa1[0, msa1Pos] == "-"):
+            # We have a gap in the first reference. Put this column from the
+            # first alignment alongside a gap for every sequence in the second
+            # alignment.
+            for i, character in enumerate(msa1[:, msa1Pos]):
+                # For each character in the first alignment in this column
+                
+                # Put that character as the character for the appropriate
+                # sequence.
+                merged[i].append(character)
+                
+            for i in xrange(len(msa1), len(msa1) + len(msa2) - 1):
+                # For each of the alignment rows that come from msa2, put a gap.
+                merged[i].append("-")
+                
+            # Advance in msa1. We'll keep doing this until it doesn't have a gap
+            # in its reference.
+            msa1Pos += 1
+            
+            print("Gapped alignment 2 rows")
+            
+        elif(msa2[0, msa2Pos] == "-"):
+            # We have a letter in the first reference but a gap in the second.
+            # Gap out the merged reference and all the columns from alignment 1,
+            # and take the non-reference characters from alignment 2.
+            
+            for i in xrange(len(msa1)):
+                # For the reference and all the sequences in msa1, add gaps
+                merged[i].append("-")
+           
+            for i, character in zip(xrange(len(msa1),
+                len(msa1) + len(msa2) - 1), msa2[1:, msa2Pos]):
+                
+                # For each of the alignment rows that come from msa2, put the
+                # character from that row.
+                merged[i].append(character)
+                
+            # Advance in msa2. We'll keep doing this until both msa1 and msa2
+            # have a non-gap character in their references. We make it an
+            # invariant that this will always be the same character.
+            msa2Pos += 1
+            
+            print("Gapped alignment 1 rows")
+            
+        else:
+            # Neither has a gap. They both have real characters.
+            
+            # Make sure the characters match.
+            assert(msa1[0, msa1Pos] == msa2[0, msa2Pos])
+            
+            for i, character in enumerate(msa1[:, msa1Pos]):
+                # Copy all the characters from msa1's column
+                merged[i].append(character)
+                
+            for character, i in zip(msa2[1:, msa2Pos], xrange(len(msa1), 
+                len(msa1) + len(msa2) - 1)):
+                # Copy all the characters from msa2's column, except its
+                # reference
+                merged[i].append(character)
+                
+            # Advance both alignments
+            msa1Pos += 1
+            msa2Pos += 1
+            
+            print("Joined alignments on column")
+            
+        print([mergedList[-1] for mergedList in merged])
+            
+    # Now we have finished populating these aligned lists. We need to make a
+    # MultipleSeqAlignment from them.
+    
+    # What names do the sequences in this alignment have? All the ones from
+    # msa1, and then all the ones from msa2 except the first (which is the
+    # reference)
+    seqNames = [record.id for record in msa1] + [record.id 
+        for record in msa2[1:]]
+    
+    # Make a SeqRecord for each list of properly gapped-out characters, with the
+    # appropriate name.
+    seqRecords = [SeqRecord(Seq("".join(alignedList)), name) 
+        for alignedList, name in zip(merged, seqNames)]
+        
+    # Make the records into a proper MSA and return it.
+    return Align.MultipleSeqAlignment(seqRecords)
+                
 def main(args):
     """
     Parses command line arguments and do the work of the program.
@@ -79,6 +204,13 @@ def main(args):
             
             for hit in result:
                 # For every hit in the result
+                
+                if options.referenceSequence is not None:
+                    # Override the reference (i.e. query) sequence first. 
+                    
+                    # TODO: why is reference actually query and query actually
+                    # hit???
+                    hit.query_id = options.referenceSequence
                 
                 # Grab the query that matched in this hit (ends up being the
                 # thing we hit with the alignment somehow)
@@ -184,6 +316,10 @@ def main(args):
                         # For every HSP fragment in the HSP (actual alignment
                         # bit. Why is it so insanely nested?)
                         
+                        # Offset the reference (i.e. query) coordinates
+                        fragment.query_start += options.referenceOffset
+                        fragment.query_end += options.referenceOffset
+                        
                         # Fix up the fragment by going and fetching its hit
                         # sequence piece from the appropriate SeqRecord.
                         hitFragment = hitSeqRecord[fragment.hit_start:
@@ -231,9 +367,10 @@ def main(args):
                 print(hitMSA)
                         
                 # Now we have completed an MSA for just this hit
-                # TODO: Merge it into the master MSA keying on the reference.
-                # For now just take the last one
-                totalMSA = hitMSA
+                # Merge it into the master MSA keying on the reference.
+                totalMSA = mergeMSAs(totalMSA, hitMSA)
+                
+    print(totalMSA)
                 
     # Save the multiple alignment as a MAF.
     AlignIO.write(totalMSA, options.maf, "maf")
