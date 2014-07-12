@@ -67,9 +67,9 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         
         """
         
-        # Make the base Target. Ask for 20gb of memory since this is kinda hard.
+        # Make the base Target. Ask for 40gb of memory since this is kinda hard.
         # Also ask for 4 CPUs because we can probably use as many as we can get.
-        super(ReferenceStructureTarget, self).__init__(memory=(1024 ** 3) * 20,
+        super(ReferenceStructureTarget, self).__init__(memory=(1024 ** 3) * 40,
             cpu=4)
         
         # Save the FASTAs

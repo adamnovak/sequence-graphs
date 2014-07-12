@@ -368,6 +368,22 @@ def main(args):
                 # Now we have completed an MSA for just this hit
                 # Merge it into the master MSA keying on the reference.
                 totalMSA = mergeMSAs(totalMSA, hitMSA)
+    
+    for record in totalMSA:
+        # Annotate each sequence with a "srcSize" that matches its size in the
+        # database. This is necessary for valid MAF output.
+        
+        # What is the name of this aligned record?
+        recordName = record.id
+        
+        # And what is the size of that sequence in the database?
+        recordSize = len(getSequence(recordName))
+        
+        print("Alignment component {} comes from sequence of size {}"
+            .format(recordName, recordSize))
+            
+        # Apply the annotation
+        record.annotations["srcSize"] = recordSize
                 
     print(totalMSA)
                 
