@@ -381,7 +381,7 @@ class AlignmentComparisonTarget(jobTree.scriptTree.target.Target):
             "./homologyTests/aggregateResults/all")
             
         # Grab the averages. There should be two.
-        averages = (stat.attrib["average"] for stat in stats)
+        averages = [stat.attrib["average"] for stat in stats]
         
         # Open the output file to save them to.
         writer = tsv.TsvWriter(open(self.output_filename, "w"))
