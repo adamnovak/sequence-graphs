@@ -814,7 +814,7 @@ std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
     const std::string& query, const BitVector* mask, int minContext, int start,
     int length) const {
     
-    // RIGHT-map to a range.
+    // Map to a range.
     
     if(length == -1) {
         // Fix up the length parameter if it is -1: that means the whole rest of
@@ -822,7 +822,7 @@ std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
         length = query.length() - start;
     }
     
-    Log::debug() << "Mapping with minimum " << minContext << " context." <<
+    Log::debug() << "Mapping with (two-sided) minimum " << minContext << " context." <<
         std::endl;
 
     // Make an iterator for ranges, so we can query it.
@@ -860,7 +860,8 @@ std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
             // The last base either mapped successfully or failed due to multi-
             // mapping. Try to extend the FMDPosition we have to the left
             // (backwards) with the next base.
-            location.position = this->extend(location.position, query[i], true);
+            location.position = this->extend(location.position, query[i - location.characters + 1], true);
+	    location.position = this->extend(location.position, query[i - location.characters], true);
             location.characters++;
         }
 
@@ -1058,7 +1059,7 @@ MapAttemptResult FMDIndex::mapPosition(BitVectorIterator& ranges,
     // Do a forward search.
     // Start at the given index, and get the starting range for that character.
     result.is_mapped = false;
-    result.position = this->getCharPosition(pattern[index]);
+    result.position = this->getCharPosition(pattern[index]);    
     result.characters = 1;
     if(result.position.isEmpty(mask)) {
         // This character isn't even in it. Just return the result with an empty
@@ -1074,13 +1075,13 @@ MapAttemptResult FMDIndex::mapPosition(BitVectorIterator& ranges,
 
     Log::trace() << "Starting with " << result.position << std::endl;
 
-    for(index++; index < pattern.size(); index++) {
-        // Forwards extend with subsequent characters.
+    for(size_t i = 1; index + i < pattern.size() && index - i > 0; i++) {
+        // Dual extend with subsequent characters.
         FMDPosition next_position = this->extend(result.position,
-            pattern[index], false);
+            pattern[index + i], false);
+	next_position = this->extend(next_position,pattern[index - i], true);
 
-        Log::trace() << "Now at " << next_position << " after " << 
-            pattern[index] << std::endl;
+        Log::trace() << "Now at " << next_position << " after " << pattern[index] << std::endl;
         if(next_position.isEmpty(mask)) {
             // The next place we would go is empty, so return the result holding
             // the last position.
