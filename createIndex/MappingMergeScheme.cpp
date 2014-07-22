@@ -158,7 +158,8 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
             generateMerge(queryContig, i + 1, Base.first.first, 
                         Base.first.second, !Base.second); 
                         
-            mappedBases++;   
+            mappedBases++;
+	    Log::info() << "Mapped " << i << ", base " << contig[i] << std::endl;
 	    
 	} else {
             // Didn't map this one

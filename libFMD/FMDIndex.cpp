@@ -845,19 +845,21 @@ std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
 
     for(int i = start + length - 1; i >= start; i--) {
         // Go from the end of our selected region to the beginning.
-
+	
         Log::trace() << "On position " << i << " from " <<
             start + length - 1 << " to " << start << std::endl;
-
-        if(location.position.isEmpty()) {
-            Log::debug() << "Starting over by mapping position " << i <<
-                std::endl;
+	    
+	// Need to prevent an extension from overrunning the query contig, if
+	// this will happen, also trigger a restart
+	    	    
+        if(location.position.isEmpty() || i < location.characters) {
+            Log::debug() << "Starting over by mapping position " << i << std::endl;
             // We do not currently have a non-empty FMDPosition to extend. Start
             // over by mapping this character by itself.
             location = this->mapPosition(rangeIterator, query, i, maskIterator);
         } else {
-            Log::debug() << "Extending with position " << i << std::endl;
-            // The last base either mapped successfully or failed due to multi-
+            Log::debug() << "Extending with position " << i << " with characters = " << location.characters << std::endl;
+	    // The last base either mapped successfully or failed due to multi-
             // mapping. Try to extend the FMDPosition we have to the left
             // (backwards) with the next base.
             location.position = this->extend(location.position, query[i - location.characters + 1], true);
@@ -897,7 +899,7 @@ std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
                 // this base again, in case we tried with a too-long left
                 // context.
 
-                Log::debug() << "Restarting from here..." << std::endl;
+                Log::info() << "Restarting from here..." << std::endl;
 
                 // Move the loop index towards the end we started from (right)
                 i++;
@@ -1075,13 +1077,14 @@ MapAttemptResult FMDIndex::mapPosition(BitVectorIterator& ranges,
 
     Log::trace() << "Starting with " << result.position << std::endl;
 
-    for(size_t i = 1; index + i < pattern.size() && index - i > 0; i++) {
+    for(size_t i = 1; index + i < pattern.size() && 1 + index > i; i++) {
+		
         // Dual extend with subsequent characters.
         FMDPosition next_position = this->extend(result.position,
             pattern[index + i], false);
 	next_position = this->extend(next_position,pattern[index - i], true);
 
-        Log::trace() << "Now at " << next_position << " after " << pattern[index] << std::endl;
+        Log::trace() << "Now at " << next_position << " after " << pattern[i] << std::endl;
         if(next_position.isEmpty(mask)) {
             // The next place we would go is empty, so return the result holding
             // the last position.
@@ -1164,6 +1167,8 @@ Mapping FMDIndex::disambiguate(const Mapping& left,
 }
 
 
+// TODO: To do full extension for credit mapping, just don't break out of loop
+// TODO: what if we map by extension? Both in this case and in the left-right case
 
 
 
