@@ -810,7 +810,7 @@ std::vector<Mapping> FMDIndex::mapBoth(const std::string& query, int64_t genome,
     
 }
 
-std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
+std::vector<std::pair<int64_t,size_t>> FMDIndex::Cmap(const BitVector& ranges,
     const std::string& query, const BitVector* mask, int minContext, int start,
     int length) const {
     
@@ -833,7 +833,7 @@ std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
         new BitVectorIterator(*mask);
 
     // We need a vector to return.
-    std::vector<int64_t> mappings;
+    std::vector<std::pair<int64_t,size_t>> mappings;
 
     // Keep around the result that we get from the single-character mapping
     // function. We use it as our working state to trackour FMDPosition and how
@@ -856,7 +856,7 @@ std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
             Log::debug() << "Starting over by mapping position " << i << std::endl;
             // We do not currently have a non-empty FMDPosition to extend. Start
             // over by mapping this character by itself.
-            location = this->mapPosition(rangeIterator, query, i, maskIterator);
+            location = this->CmapPosition(rangeIterator, query, i, maskIterator);
         } else {
             Log::debug() << "Extending with position " << i << " with characters = " << location.characters << std::endl;
 	    // The last base either mapped successfully or failed due to multi-
@@ -883,7 +883,7 @@ std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
                 std::endl;
 
             // Remember that this base mapped to this range
-            mappings.push_back(range);
+            mappings.push_back(std::pair<int64_t,size_t>(range,location.characters - 1));
             
             // We definitely have a non-empty FMDPosition to continue from
 
@@ -921,7 +921,7 @@ std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
                 // getting no results.
 
                 // It didn't map. Say it corresponds to no range.
-                mappings.push_back(-1);
+                mappings.push_back(std::pair<int64_t,size_t>(-1,0));
 
                 // Mark that the next iteration will be an extension (if we had
                 // any results this iteration; if not it will just restart)
@@ -947,7 +947,151 @@ std::vector<int64_t> FMDIndex::map(const BitVector& ranges,
     
 }
 
-std::vector<int64_t> FMDIndex::map(const BitVector& ranges, 
+std::vector<std::pair<int64_t,size_t>> FMDIndex::Cmap(const BitVector& ranges, 
+    const std::string& query, int64_t genome, int minContext, int start,
+    int length) const {
+    
+    // Get the appropriate mask, or NULL if given the special all-genomes value.
+    return Cmap(ranges, query, genome == -1 ? NULL : genomeMasks[genome], 
+        minContext, start, length);    
+}
+
+std::vector<std::pair<int64_t,size_t>> FMDIndex::map(const BitVector& ranges,
+    const std::string& query, const BitVector* mask, int minContext, int start,
+    int length) const {
+    
+    // RIGHT-map to a range.
+    
+    if(length == -1) {
+        // Fix up the length parameter if it is -1: that means the whole rest of
+        // the string.
+        length = query.length() - start;
+    }
+    
+    Log::debug() << "Mapping with minimum " << minContext << " context." <<
+        std::endl;
+
+    // Make an iterator for ranges, so we can query it.
+    BitVectorIterator rangeIterator(ranges);
+    
+    // And one for the mask, if needed
+    BitVectorIterator* maskIterator = (mask == NULL) ? NULL : 
+        new BitVectorIterator(*mask);
+
+    // We need a vector to return.
+    std::vector<std::pair<int64_t,size_t>> mappings;
+
+    // Keep around the result that we get from the single-character mapping
+    // function. We use it as our working state to trackour FMDPosition and how
+    // many characters we've extended by. We use the is_mapped flag to indicate
+    // whether the current iteration is an extension or a restart.
+    MapAttemptResult location;
+    // Make sure the scratch position is empty so we re-start on the first base
+    location.position = EMPTY_FMD_POSITION;
+
+    for(int i = start + length - 1; i >= start; i--) {
+        // Go from the end of our selected region to the beginning.
+
+        Log::trace() << "On position " << i << " from " <<
+            start + length - 1 << " to " << start << std::endl;
+
+        if(location.position.isEmpty()) {
+            Log::debug() << "Starting over by mapping position " << i <<
+                std::endl;
+            // We do not currently have a non-empty FMDPosition to extend. Start
+            // over by mapping this character by itself.
+            location = this->mapPosition(rangeIterator, query, i, maskIterator);
+        } else {
+            Log::debug() << "Extending with position " << i << std::endl;
+            // The last base either mapped successfully or failed due to multi-
+            // mapping. Try to extend the FMDPosition we have to the left
+            // (backwards) with the next base.
+            location.position = this->extend(location.position, query[i], true);
+            location.characters++;
+        }
+
+        // What range index does our current left-side position (the one we just
+        // moved) correspond to, if any?
+        int64_t range = location.position.range(rangeIterator, maskIterator);
+
+        if(location.is_mapped && location.characters >= minContext && 
+            !location.position.isEmpty(maskIterator) && range != -1) {
+            
+            // It mapped. We didn't do a re-start and fail, we have sufficient
+            // context to be confident, and our interval is nonempty and
+            // subsumed by a range.
+
+            Log::debug() << "Mapped " << location.characters << 
+                " context to " << location.position << " in range #" << range <<
+                std::endl;
+
+            // Remember that this base mapped to this range
+            mappings.push_back(std::pair<int64_t,size_t>(range,location.characters - 1));
+	    
+            
+            // We definitely have a non-empty FMDPosition to continue from
+
+        } else {
+
+            Log::debug() << "Failed at " << location.position << " (" << 
+                location.position.ranges(rangeIterator, maskIterator) <<
+                " options for " << location.characters << " context)." << 
+                std::endl;
+                
+            if(location.is_mapped && location.position.isEmpty(maskIterator)) {
+                // We extended right until we got no results. We need to try
+                // this base again, in case we tried with a too-long left
+                // context.
+
+                Log::debug() << "Restarting from here..." << std::endl;
+
+                // Move the loop index towards the end we started from (right)
+                i++;
+
+                // Since the FMDPosition is empty, on the next iteration we will
+                // retry this base.
+
+            } else {
+                // It didn't map for some other reason:
+                // - It was an initial mapping with too little right context to 
+                //   be unique to a range.
+                // - It was an initial mapping with a nonexistent right context
+                // - It was an extension that was multimapped and still is
+
+                // In none of these cases will re-starting from this base help
+                // at all. If we just restarted here, we don't want to do it
+                // again. If it was multimapped before, it had as much left
+                // context as it could take without running out of string or
+                // getting no results.
+
+                // It didn't map. Say it corresponds to no range.
+                mappings.push_back(std::pair<int64_t,size_t>(-1,0));
+
+                // Mark that the next iteration will be an extension (if we had
+                // any results this iteration; if not it will just restart)
+                location.is_mapped = true;
+
+            }
+        }
+    }
+
+    // We've gone through and attempted the whole string. Put our results in the
+    // same order as the string, instead of the backwards order we got them in.
+    // See <http://www.cplusplus.com/reference/algorithm/reverse/>
+    std::reverse(mappings.begin(), mappings.end());
+
+    // Get rid of the mask iterator if needed
+    if(maskIterator != NULL) {
+        delete maskIterator;
+    }
+
+    // Give back our answers.
+    return mappings;
+    
+    
+}
+
+std::vector<std::pair<int64_t,size_t>> FMDIndex::map(const BitVector& ranges, 
     const std::string& query, int64_t genome, int minContext, int start,
     int length) const {
     
@@ -1046,9 +1190,8 @@ MapAttemptResult FMDIndex::mapPosition(const std::string& pattern,
     return result;
 }
 
-MapAttemptResult FMDIndex::mapPosition(BitVectorIterator& ranges, 
+MapAttemptResult FMDIndex::CmapPosition(BitVectorIterator& ranges, 
     const std::string& pattern, size_t index, BitVectorIterator* mask) const {
-    
     
     // We're going to right-map so ranges match up with the things we can map to
     // (downstream contexts)
@@ -1077,6 +1220,8 @@ MapAttemptResult FMDIndex::mapPosition(BitVectorIterator& ranges,
 
     Log::trace() << "Starting with " << result.position << std::endl;
 
+    FMDPosition found_position;
+    
     for(size_t i = 1; index + i < pattern.size() && 1 + index > i; i++) {
 		
         // Dual extend with subsequent characters.
@@ -1095,16 +1240,24 @@ MapAttemptResult FMDIndex::mapPosition(BitVectorIterator& ranges,
             // We have successfully mapped to exactly one range. Update our
             // result to reflect the additional extension and our success, and
             // return it.
-            result.position = next_position;
-            result.characters++;
-            result.is_mapped = true;
-            return result;      
-        }
-
-        // Otherwise, we still map to a plurality of ranges. Record the
-        // extension and loop again.
-        result.position = next_position;
-        result.characters++;
+    
+    	    result.position = next_position;
+	    result.characters++;
+	    result.is_mapped = true;
+	    found_position = result.position;
+	    
+        } else {
+	    // Otherwise, we still map to a plurality of ranges. Record the
+	    // extension and loop again.
+	
+	    result.position = next_position;
+	    result.characters++;
+	
+	}
+    }
+    
+    if(result.is_mapped) {
+	result.position = found_position;
     }
 
     // If we get here, we ran out of downstream context and still map to
@@ -1112,6 +1265,80 @@ MapAttemptResult FMDIndex::mapPosition(BitVectorIterator& ranges,
     // result.
     return result;
 
+
+}
+
+MapAttemptResult FMDIndex::mapPosition(BitVectorIterator& ranges, 
+    const std::string& pattern, size_t index, BitVectorIterator* mask) const {
+    
+    
+    // We're going to right-map so ranges match up with the things we can map to
+    // (downstream contexts)
+
+    // Initialize the struct we will use to return our somewhat complex result.
+    // Contains the FMDPosition (which we work in), an is_mapped flag, and a
+    // variable counting the number of extensions made to the FMDPosition.
+    MapAttemptResult result;
+
+    // Do a forward search.
+    // Start at the given index, and get the starting range for that character.
+    result.is_mapped = false;
+    result.position = this->getCharPosition(pattern[index]);
+    result.characters = 1;
+    if(result.position.isEmpty(mask)) {
+        // This character isn't even in it. Just return the result with an empty
+        // FMDPosition; the next character we want to map is going to have to
+        // deal with having some never-before-seen character right upstream of
+        // it.
+        return result;
+    } else if (result.position.range(ranges, mask) != -1) {
+        // We've already mapped.
+        result.is_mapped = true;
+        return result;
+    }
+
+    Log::trace() << "Starting with " << result.position << std::endl;
+    
+    FMDPosition found_position;
+
+    for(index++; index < pattern.size(); index++) {
+        // Forwards extend with subsequent characters.
+        FMDPosition next_position = this->extend(result.position,
+            pattern[index], false);
+
+        Log::trace() << "Now at " << next_position << " after " << 
+            pattern[index] << std::endl;
+        if(next_position.isEmpty(mask)) {
+            // The next place we would go is empty, so return the result holding
+            // the last position.
+            return result;
+        }
+
+        if(next_position.range(ranges, mask) != -1) {
+            // We have successfully mapped to exactly one range. Update our
+            // result to reflect the additional extension and our success, 
+            // but continue the search
+	  
+	    result.position = next_position;
+	    result.characters++;
+	    result.is_mapped = true;
+	    found_position = result.position;
+	    
+        } else {
+	    // Otherwise, we still map to a plurality of ranges. Record the
+	    // extension and loop again.
+	
+	    result.position = next_position;
+	    result.characters++;
+	
+	}
+    }
+    
+    if(result.is_mapped) {
+	result.position = found_position;
+    }
+    
+    return result;
 
 }
 

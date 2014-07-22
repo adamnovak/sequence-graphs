@@ -983,7 +983,9 @@ void saveLevelIndex(
 stPinchThreadSet*
 mergeGreedy(
     const FMDIndex& index,
-    size_t context = 0
+    size_t context = 0,
+    bool credit = false,
+    std::string mapType = "LRexact"
 ) {
 
     Log::info() << "Creating initial pinch thread set" << std::endl;
@@ -1013,7 +1015,7 @@ mergeGreedy(
         // and also the bitmask of what bottom-level things to count. We also
         // need to tell it what genome to map the contigs of.
         MappingMergeScheme scheme(index, *mergedRuns.first, mergedRuns.second,
-            *includedPositions, genome, context);
+            *includedPositions, genome, context, credit, mapType);
 
         // Set it running and grab the queue where its results come out.
         ConcurrentQueue<Merge>& queue = scheme.run();
@@ -1182,7 +1184,11 @@ main(
             "Directory to make the index in; will be deleted and replaced!")
         ("fastas", boost::program_options::value<std::vector<std::string> >()
             ->multitoken(),
-            "FASTA files to load");
+            "FASTA files to load")
+	("credit", "Mapping on credit for greedy scheme")
+	("mapType", boost::program_options::value<std::string>()
+            ->default_value("LRexact"),
+            "Merging scheme (\"centered\" or \"LRexact\")") ;
         
     // And set up our positional arguments
     boost::program_options::positional_options_description positionals;
@@ -1269,6 +1275,15 @@ main(
         return 0;
     }
     
+    // Grab a bool for whether we'll map on credit    
+    bool creditBool = false;
+    if(options.count("credit")) {
+	creditBool = true;
+    }
+    
+    // Grab the context types we are going to use to merge
+    std::string mapType = options["mapType"].as<std::string>();
+    
     // Grab the merging scheme we are going to use to merge.
     std::string mergeScheme = options["scheme"].as<std::string>();
     
@@ -1284,7 +1299,7 @@ main(
         threadSet = mergeOverlap(index, options["context"].as<size_t>());
     } else if(mergeScheme == "greedy") {
         // Use the greedy merge instead.
-        threadSet = mergeGreedy(index, options["context"].as<size_t>());
+        threadSet = mergeGreedy(index, options["context"].as<size_t>(), creditBool, mapType);
     } else {
         // Complain that's not a real merge scheme. TODO: Can we make the
         // options parser parse an enum or something instead of this?
