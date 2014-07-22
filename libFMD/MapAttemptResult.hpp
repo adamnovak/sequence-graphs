@@ -15,4 +15,12 @@ struct MapAttemptResult
     size_t characters;
 };
 
+struct DualMapAttemptResult
+{
+    bool is_mapped;
+    FMDPosition R_position;
+    FMDPosition L_position;
+    size_t characters;
+};
+
 #endif

@@ -28,7 +28,7 @@ public:
     MappingMergeScheme(const FMDIndex& index, const BitVector& rangeVector, 
         const std::vector<std::pair<std::pair<size_t, size_t>, bool> >&
         rangeBases, const BitVector& includedPositions, size_t genome,
-        size_t minContext = 0);
+        size_t minContext = 0, bool credit = false, std::string mapType = "LRexact");
     
     /**
      * Get rid of a MappingMergeScheme (and delete its queue, if it has one).
@@ -82,6 +82,12 @@ protected:
     // Minimum amount of context that is allowed to motivate a merge.
     size_t minContext;
     
+    // Flag whether to use mapping on credit scheme   
+    bool credit;
+    
+    // Type of context used
+    std::string mapType;
+    
     /**
      * Create a Merge between two positions and enqueue it. Positions are
      * 1-based.
@@ -91,9 +97,15 @@ protected:
     
     /**
      * Run as a thread. Generates merges by mapping a query contig to the target
-     * genome.
+     * genome; left-right exact contexts
      */
     virtual void generateMerges(size_t queryContig) const;
+    
+    /**
+     * Run as a thread. Generates merges by mapping a query contig to the target
+     * genome; centered contexts
+     */
+    virtual void CgenerateMerges(size_t queryContig) const;
     
 };
 
