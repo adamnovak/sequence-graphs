@@ -883,7 +883,7 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::Cmap(const BitVector& ranges,
                 std::endl;
 
             // Remember that this base mapped to this range
-            mappings.push_back(std::pair<int64_t,size_t>(range,location.characters - 1));
+            mappings.push_back(std::pair<int64_t,size_t>(range,location.characters));
             
             // We definitely have a non-empty FMDPosition to continue from
 
@@ -1244,7 +1244,7 @@ MapAttemptResult FMDIndex::CmapPosition(BitVectorIterator& ranges,
     	    result.position = next_position;
 	    result.characters++;
 	    result.is_mapped = true;
-	    found_position = result.position;
+	    // found_position = result.position;
 	    
         } else {
 	    // Otherwise, we still map to a plurality of ranges. Record the
@@ -1256,9 +1256,9 @@ MapAttemptResult FMDIndex::CmapPosition(BitVectorIterator& ranges,
 	}
     }
     
-    if(result.is_mapped) {
+    /* if(result.is_mapped) {
 	result.position = found_position;
-    }
+    }*/
 
     // If we get here, we ran out of downstream context and still map to
     // multiple ranges. Just give our multi-mapping FMDPosition and unmapped
