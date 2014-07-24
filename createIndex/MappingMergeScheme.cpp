@@ -173,13 +173,13 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
 	    if(MappingBases[i].second == 0) {
 		MappingBases[i].first.second = MappingBases[i].first.second + Mappings[i].second - 2;
 	    } else {
-		MappingBases[i].first.second = MappingBases[i].first.second - Mappings[i].second + 2;
+ 		MappingBases[i].first.second = MappingBases[i].first.second - Mappings[i].second + 2;
 	    }
 	}	    
     }
     
-    for(size_t i = 0; i < Mappings.size(); i++) {
-	//Log::info() << i << " | " << rangeBases[Mappings[i].first].first.second << std::endl;
+    for(int64_t i = 0; i < Mappings.size(); i++) {
+	Log::info() << i << " || " << rangeBases[Mappings[i].first].first.second << std::endl;
 	Log::info() << i << " | " << MappingBases[i].first.second << std::endl;
     }
 
@@ -234,6 +234,7 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
     bool contextMappedR;
     int64_t firstL = -1;
     bool contextMappedL;
+    int64_t centeredOffset;
         
     
     size_t maxContext = 0;
@@ -279,11 +280,16 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
 		
 	    } else {
 		if(Mappings[j].second > creditCandidates[i] - j) {
-		    Log::info() << MappingBases[j].first.second << " " << firstBaseR.first.second + j - firstR << " " <<
+		    if(!MappingBases[j].second) {
+			centeredOffset = j - firstR;
+		    } else {
+			centeredOffset = firstR - j;
+		    }
+		    Log::info() << MappingBases[j].first.second << " " << firstBaseR.first.second + centeredOffset << " " <<
 			    MappingBases[j].second << " " << firstBaseR.second << " " <<
 			    MappingBases[j].first.first << " " << firstBaseR.first.first << std::endl;
 		    
-		    if(MappingBases[j].first.second != firstBaseR.first.second + j - firstR ||
+		    if(MappingBases[j].first.second != firstBaseR.first.second + centeredOffset ||
 			    MappingBases[j].second != firstBaseR.second ||
 			    MappingBases[j].first.first != firstBaseR.first.first) {
 			contextMappedR = false;
@@ -305,11 +311,16 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
 		}
 	    } else {
 		if(Mappings[j].second > j - creditCandidates[i]) {
-		  Log::info() << MappingBases[j].first.second << " " << firstBaseL.first.second + j - firstL << " " <<
+		  if(!MappingBases[j].second) {
+			centeredOffset = j - firstL;
+		  } else {
+			centeredOffset = firstL - j;
+		  }
+		  Log::info() << MappingBases[j].first.second << " " << firstBaseL.first.second + centeredOffset << " " <<
 			    MappingBases[j].second << " " << firstBaseL.second << " " <<
 			    MappingBases[j].first.first << " " << firstBaseL.first.first << std::endl;
 		  
-		    if(MappingBases[j].first.second != firstBaseL.first.second  + j - firstL ||
+		    if(MappingBases[j].first.second != firstBaseL.first.second + centeredOffset ||
 			    MappingBases[j].second != firstBaseL.second ||
 			    MappingBases[j].first.first != firstBaseL.first.first) {
 			contextMappedL = false;
@@ -536,6 +547,7 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
     bool contextMappedL;
     std::pair<std::pair<size_t,size_t>,bool> firstBaseR;
     std::pair<std::pair<size_t,size_t>,bool> firstBaseL;    
+    int64_t LROffset;
     
     size_t maxRContext = 0;
     size_t maxLContext = 0;
@@ -587,7 +599,8 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
 	    }
 	}
 	
-	for(size_t j = creditCandidates[i] + 1; j < creditCandidates.size() && j - creditCandidates[i] < maxLContext; j++) {
+	Log::info() << "Checking iterator: " << creditCandidates[i] + 1 << " " << leftMappings.size() << std::endl;
+	for(size_t j = creditCandidates[i] + 1; j < leftMappings.size() && j - creditCandidates[i] < maxLContext; j++) {
 	    if(firstL == -1) {
 		if(leftMappings[j].second > j - creditCandidates[i]) {
 		    firstBaseL = rangeBases[leftMappings[j].first];
@@ -605,14 +618,27 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
 	    }
 	}
 	
-	Log::info() << "Checking " << creditCandidates[i] << " and got back " << contextMappedR << " R | L " << contextMappedL << std::endl;		    
+	Log::info() << "Checking " << creditCandidates[i] << " and got back " << contextMappedR << " " << firstR << " R | L " << firstL << " " << contextMappedL << std::endl;		    
 		    
 	if(firstR != -1 && contextMappedR) {
-	    firstBaseR.first.first++;
+	    if(firstBaseR.second) {
+		LROffset = firstR - creditCandidates[i];
+	    } else {
+		LROffset = creditCandidates[i] - firstR;
+	    }
+	    firstBaseR.first.second = firstBaseR.first.second + LROffset - 1;
+	    Log::info() << "We merged due to right context " << firstBaseR.first.second << " to " << creditCandidates[i] << std::endl;
 
 	    if(firstL != -1 && contextMappedL) {
-		firstBaseL.first.first--;
+		if(!firstBaseL.second) {
+		    LROffset = firstL - creditCandidates[i];
+		} else {
+		    LROffset = creditCandidates[i] - firstL;
+		}
+		firstBaseL.first.second = firstBaseL.first.second + LROffset - 1;
 		
+		Log::info() << "Checking agreement: " << firstBaseR.first.second << " " << firstBaseL.first.second 
+			<< " | " << firstBaseR.second << " " << firstBaseL.second << std::endl;
 		if(firstBaseR.first == firstBaseL.first &&
 			  firstBaseR.second != firstBaseL.second) {
 		  generateMerge(queryContig, creditCandidates[i], firstBaseR.first.first, 
@@ -633,7 +659,12 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
 		  
 	    }
 	} else if (firstL != -1 && contextMappedL) {
-	    firstBaseL.first.first--;
+	    if(!firstBaseL.second) {
+		LROffset = firstL - creditCandidates[i];
+	    } else {
+		LROffset = creditCandidates[i] - firstL;
+	    }
+	    firstBaseL.first.second = firstBaseL.first.second + LROffset - 1;
 	    generateMerge(queryContig, creditCandidates[i], firstBaseL.first.first, 
                         firstBaseL.first.second, !firstBaseL.second);
 	    mappedBases++;
@@ -642,7 +673,6 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
 	    Log::info() << "Credit Merged " << creditCandidates[i] << std::endl;
 	  
 	}
-		
     }
     }
     
@@ -657,8 +687,8 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
     if(credit) {
 	Log::info() << mappedBases - creditBases << " anchor mapped; " << creditBases << " extension mapped" <<  std::endl;
 	}
-}
 
+}
 
 
 
