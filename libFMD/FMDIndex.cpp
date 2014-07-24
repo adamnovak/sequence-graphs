@@ -858,7 +858,7 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::Cmap(const BitVector& ranges,
             // over by mapping this character by itself.
             location = this->CmapPosition(rangeIterator, query, i, maskIterator);
         } else {
-            Log::debug() << "Extending with position " << i << " with characters = " << location.characters << std::endl;
+            Log::debug() << location.position.isEmpty() << " " << location.position.ranges(rangeIterator, maskIterator)<< " " << "Extending with position " << i << " with characters = " << location.characters << std::endl;
 	    // The last base either mapped successfully or failed due to multi-
             // mapping. Try to extend the FMDPosition we have to the left
             // (backwards) with the next base.
@@ -889,7 +889,7 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::Cmap(const BitVector& ranges,
 
         } else {
 
-            Log::debug() << "Failed at " << location.position << " (" << 
+            Log::debug() << "Failed at " << i << " " << location.position << " (" << 
                 location.position.ranges(rangeIterator, maskIterator) <<
                 " options for " << location.characters << " context)." << 
                 std::endl;
@@ -899,11 +899,11 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::Cmap(const BitVector& ranges,
                 // this base again, in case we tried with a too-long left
                 // context.
 
-                Log::info() << "Restarting from here..." << std::endl;
+                Log::debug() << "Restarting from here..." << std::endl;
 
                 // Move the loop index towards the end we started from (right)
                 i++;
-
+		
                 // Since the FMDPosition is empty, on the next iteration we will
                 // retry this base.
 
@@ -1221,18 +1221,20 @@ MapAttemptResult FMDIndex::CmapPosition(BitVectorIterator& ranges,
     Log::trace() << "Starting with " << result.position << std::endl;
 
     FMDPosition found_position;
+    FMDPosition next_position;
     
     for(size_t i = 1; index + i < pattern.size() && 1 + index > i; i++) {
 		
         // Dual extend with subsequent characters.
-        FMDPosition next_position = this->extend(result.position,
+        next_position = this->extend(result.position,
             pattern[index + i], false);
 	next_position = this->extend(next_position,pattern[index - i], true);
 
-        Log::trace() << "Now at " << next_position << " after " << pattern[i] << std::endl;
+        Log::info() << "Now at " << next_position << " after " << pattern[i] << std::endl;
         if(next_position.isEmpty(mask)) {
             // The next place we would go is empty, so return the result holding
             // the last position.
+	    Log::info() << "Couldn't find more context" << std::endl;
             return result;
         }
 
@@ -1243,6 +1245,7 @@ MapAttemptResult FMDIndex::CmapPosition(BitVectorIterator& ranges,
     
     	    result.position = next_position;
 	    result.characters++;
+	    Log::info() << "Extended " << i << " times" << std::endl;
 	    result.is_mapped = true;
 	    // found_position = result.position;
 	    
