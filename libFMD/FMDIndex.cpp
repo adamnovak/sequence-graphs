@@ -883,7 +883,7 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::Cmap(const BitVector& ranges,
                 std::endl;
 
             // Remember that this base mapped to this range
-            mappings.push_back(std::pair<int64_t,size_t>(range,location.characters));
+            mappings.push_back(std::make_pair(range,location.characters));
             
             // We definitely have a non-empty FMDPosition to continue from
 
@@ -921,7 +921,7 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::Cmap(const BitVector& ranges,
                 // getting no results.
 
                 // It didn't map. Say it corresponds to no range.
-                mappings.push_back(std::pair<int64_t,size_t>(-1,0));
+                mappings.push_back(std::make_pair(-1,0));
 
                 // Mark that the next iteration will be an extension (if we had
                 // any results this iteration; if not it will just restart)
@@ -1026,7 +1026,7 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(const BitVector& ranges,
                 std::endl;
 
             // Remember that this base mapped to this range
-            mappings.push_back(std::pair<int64_t,size_t>(range,location.characters - 1));
+            mappings.push_back(std::make_pair(range,location.characters - 1));
 	    
             
             // We definitely have a non-empty FMDPosition to continue from
@@ -1065,7 +1065,7 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(const BitVector& ranges,
                 // getting no results.
 
                 // It didn't map. Say it corresponds to no range.
-                mappings.push_back(std::pair<int64_t,size_t>(-1,0));
+                mappings.push_back(std::make_pair(-1,0));
 
                 // Mark that the next iteration will be an extension (if we had
                 // any results this iteration; if not it will just restart)

@@ -7,6 +7,7 @@
 // Set up STL compatibility
 %include "std_string.i"
 %include "std_vector.i"
+%include "std_pair.i"
 
 // Set up int types (int64_t)
 %include "stdint.i"
@@ -97,7 +98,10 @@ void fclose(FILE* file);
 
 // Java also needs to work with vectors of int64_ts coming back from the map
 // method when working on ranges.
-%template(IntVector) std::vector<long long>; 
+%template(IntVector) std::vector<long long>;
+
+%template(IntPair) std::pair<int64_t, size_t>;
+%template(IntPairVector) std::vector<std::pair<int64_t, size_t>>;
 
 // Whenever any of the JNI classes loads, load the native library.
 %pragma(java) jniclasscode=%{
