@@ -101,7 +101,10 @@ void fclose(FILE* file);
 %template(IntVector) std::vector<long long>;
 
 %template(IntPair) std::pair<int64_t, size_t>;
+%template(sizePair) std::pair<size_t, size_t>;
+%template(building) std::pair<int64_t, std::pair<size_t, size_t>>;
 %template(IntPairVector) std::vector<std::pair<int64_t, size_t>>;
+%template(IntPairPairVector) std::vector<std::pair<int64_t, std::pair<size_t, size_t>>>;
 
 // Whenever any of the JNI classes loads, load the native library.
 %pragma(java) jniclasscode=%{

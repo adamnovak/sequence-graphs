@@ -158,7 +158,7 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
         includedPositions.getSize()) << " bottom-level positions" << std::endl;
     
     // Map it
-    std::vector<std::pair<int64_t,size_t>> Mappings = index.Cmap(rangeVector, contig, 
+    std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> Mappings = index.Cmap(rangeVector, contig, 
         &includedPositions, minContext);
     
     size_t leftSentinel;
@@ -171,9 +171,9 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
 	if(Mappings[i].first != -1) {
 	    MappingBases[i] = rangeBases[Mappings[i].first];
 	    if(MappingBases[i].second == 0) {
-		MappingBases[i].first.second = MappingBases[i].first.second + Mappings[i].second - 2;
+		MappingBases[i].first.second = MappingBases[i].first.second + Mappings[i].second.first - 2;
 	    } else {
- 		MappingBases[i].first.second = MappingBases[i].first.second - Mappings[i].second + 2;
+ 		MappingBases[i].first.second = MappingBases[i].first.second - Mappings[i].second.first + 2;
 	    }
 	}	    
     }
@@ -217,7 +217,7 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
                         Base.first.second, !Base.second); 
                         
             mappedBases++;
-	    Log::info() << "Mapped " << i << ", base " << contig[i] << ", two-sided context " << Mappings[i].second << std::endl;
+	    Log::info() << "Mapped " << i << ", base " << contig[i] << ", two-sided context " << Mappings[i].second.second << std::endl;
 	    
 	} else {
             // Didn't map this one
@@ -242,8 +242,8 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
     Log::info() << "Checking " << creditCandidates.size() << " unmapped positions \"in the middle\"" << std::endl;
     
     for(size_t i; i < Mappings.size(); i++) {
-	if(Mappings[i].second > maxContext) {
-	    maxContext = Mappings[i].second;
+	if(Mappings[i].second.second > maxContext) {
+	    maxContext = Mappings[i].second.second;
 	}
     }
     
@@ -263,7 +263,7 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
 	    Log::info() << "Searching right contexts " << j << " | " << creditCandidates[i] << std::endl;
 	  
 	    if(firstR == -1) {
-		if(Mappings[j].second > creditCandidates[i] - j) {
+		if(Mappings[j].second.second > creditCandidates[i] - j) {
 		    firstBaseR = MappingBases[j];
 		    firstR = j;
 		    Log::info() << creditCandidates[i] << " is within a R context" << std::endl;
@@ -279,7 +279,7 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
 	    // to map to the same place as before
 		
 	    } else {
-		if(Mappings[j].second > creditCandidates[i] - j) {
+		if(Mappings[j].second.second > creditCandidates[i] - j) {
 		    if(!MappingBases[j].second) {
 			centeredOffset = j - firstR;
 		    } else {
@@ -304,13 +304,13 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
 	    
 	  Log::info() << "Searching left contexts " << j << " | " << creditCandidates[i] << std::endl;
 	  if(firstL == -1) {
-		if(Mappings[j].second > j - creditCandidates[i]) {
+		if(Mappings[j].second.second > j - creditCandidates[i]) {
 		    firstBaseL = MappingBases[j];
 		    firstL = j;
 		    Log::info() << creditCandidates[i] << " is within a L context" << std::endl;
 		}
 	    } else {
-		if(Mappings[j].second > j - creditCandidates[i]) {
+		if(Mappings[j].second.second > j - creditCandidates[i]) {
 		  if(!MappingBases[j].second) {
 			centeredOffset = j - firstL;
 		  } else {

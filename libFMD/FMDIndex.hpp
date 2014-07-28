@@ -269,7 +269,7 @@ public:
      * Returns a vector of one-based range numbers for left-mapping each base,
      * or -1 if the base did not map to a range.
      */
-    std::vector<std::pair<int64_t,size_t>> Cmap(const BitVector& ranges,
+    std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> Cmap(const BitVector& ranges,
         const std::string& query, const BitVector* mask, int minContext = 0, 
         int start = 0, int length = -1) const;
     
@@ -277,7 +277,7 @@ public:
      * RIGHT-map to ranges using contexts from a specific genome, or all genomes
      * if genome is -1. Same semantics as the function above.
      */
-    std::vector<std::pair<int64_t,size_t>> Cmap(const BitVector& ranges,
+    std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> Cmap(const BitVector& ranges,
         const std::string& query, int64_t genome = -1, int minContext = 0, 
         int start = 0, int length = -1) const;
         
@@ -432,7 +432,7 @@ protected:
      * If a mask is specified, only positions in the index with a 1 in the mask
      * will be counted for mapping purposes.
      */
-    MapAttemptResult CmapPosition(BitVectorIterator& ranges, 
+    creditMapAttemptResult CmapPosition(BitVectorIterator& ranges, 
         const std::string& pattern, size_t index, 
         BitVectorIterator* mask = NULL) const;
         

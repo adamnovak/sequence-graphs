@@ -15,12 +15,12 @@ struct MapAttemptResult
     size_t characters;
 };
 
-struct DualMapAttemptResult
+struct creditMapAttemptResult
 {
     bool is_mapped;
-    FMDPosition R_position;
-    FMDPosition L_position;
+    FMDPosition position;
     size_t characters;
+    size_t maxCharacters;
 };
 
 #endif
