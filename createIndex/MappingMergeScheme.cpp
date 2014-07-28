@@ -568,7 +568,7 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
 	firstL = -1;
 	contextMappedR = true;
 	contextMappedL = true;
-	for(size_t j = creditCandidates[i] - 1; j + 1 > 0 && creditCandidates[i] - j < maxRContext; j--) {
+	for(size_t j = creditCandidates[i] - 1; j > 0 && creditCandidates[i] - j < maxRContext; j--) {
 	    // Search leftward from each position until you find a position
 	    // whose context includes creditCandidates[i]
 	  
@@ -664,6 +664,8 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
 	    } else {
 		LROffset = creditCandidates[i] - firstL;
 	    }
+	    Log::info() << "Checking agreement: " << firstBaseR.first.second << " " << firstBaseL.first.second 
+			<< " | " << firstBaseR.second << " " << firstBaseL.second << std::endl;
 	    firstBaseL.first.second = firstBaseL.first.second + LROffset - 1;
 	    generateMerge(queryContig, creditCandidates[i], firstBaseL.first.first, 
                         firstBaseL.first.second, !firstBaseL.second);
