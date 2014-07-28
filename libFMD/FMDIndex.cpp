@@ -865,6 +865,9 @@ std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> FMDIndex::Cmap(const Bi
             location.position = this->extend(location.position, query[i - location.characters + 1], true);
 	    location.position = this->extend(location.position, query[i - location.characters], true);
             location.characters++;
+	    if(location.characters > location.maxCharacters) {
+		location.maxCharacters++;
+	    }
         }
 
         // What range index does our current left-side position (the one we just
