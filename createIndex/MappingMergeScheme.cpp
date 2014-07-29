@@ -328,7 +328,7 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
 		if(firstBaseR.first == firstBaseL.first &&
 			  firstBaseR.second != firstBaseL.second) {
 		  generateMerge(queryContig, creditCandidates[i] + 1, firstBaseR.first.first, 
-                        firstBaseR.first.second, firstBaseR.second);
+                        firstBaseR.first.second, !firstBaseR.second);
 		  Log::info() << "Left-Right Credit Merged pos " << creditCandidates[i] << ", a(n) " << contig[creditCandidates[i]] << " on contig " << queryContig << " to " << firstBaseR.first.second << " on contig " << firstBaseR.first.first << " with orientation " << firstBaseR.second << std::endl;
 	    	  mappedBases++;
 		  unmappedBases--;
@@ -337,7 +337,7 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
 		}
 	    } else {
 		  generateMerge(queryContig, creditCandidates[i] + 1, firstBaseR.first.first, 
-                        firstBaseR.first.second, firstBaseR.second);
+                        firstBaseR.first.second, !firstBaseR.second);
 		  Log::info() << "Right Credit Merged pos " << creditCandidates[i] << ", a(n) " << contig[creditCandidates[i]] << " on contig " << queryContig << " to " << firstBaseR.first.second << " on contig " << firstBaseR.first.first << " with orientation " << firstBaseR.second << std::endl;
 		  mappedBases++;
 		  unmappedBases--;
@@ -347,7 +347,7 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
 	} else if (firstL != -1 && contextMappedL) {
 	    firstBaseL.first.second = firstBaseL.first.second + creditCandidates[i] - firstL;
 	    generateMerge(queryContig, creditCandidates[i] + 1, firstBaseL.first.first, 
-                        firstBaseL.first.second, !firstBaseL.second);
+                        firstBaseL.first.second, firstBaseL.second);
 	    Log::info() << "Left Credit Merged pos " << creditCandidates[i] << ", a(n) " << contig[creditCandidates[i]] << " on contig " << queryContig << " to " << firstBaseL.first.second << " on contig " << firstBaseL.first.first << " with orientation " << firstBaseL.second << std::endl;
 	    mappedBases++;
 	    unmappedBases--;
@@ -629,7 +629,7 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
 		if(firstBaseR.first == firstBaseL.first &&
 			  firstBaseR.second != firstBaseL.second) {
 		    generateMerge(queryContig, creditCandidates[i], firstBaseR.first.first, 
-                        firstBaseR.first.second, firstBaseR.second);
+                        firstBaseR.first.second, !firstBaseR.second);
 		    Log::info() << "Credit Merged pos " << creditCandidates[i] << ", a(n) " << contig[creditCandidates[i]] << " on contig " << queryContig << " to " << firstBaseR.first.second << " on contig " << firstBaseR.first.first << " with orientation " << firstBaseR.second << std::endl;
 		    mappedBases++;
 		    unmappedBases--;
@@ -638,7 +638,7 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
 		}
 	    } else {
 		  generateMerge(queryContig, creditCandidates[i], firstBaseR.first.first, 
-                        firstBaseR.first.second, firstBaseR.second);
+                        firstBaseR.first.second, !firstBaseR.second);
 		  Log::info() << "Credit Merged pos " << creditCandidates[i] << ", a(n) " << contig[creditCandidates[i]] << " on contig " << queryContig << " to " << firstBaseR.first.second << " on contig " << firstBaseR.first.first << " with orientation " << firstBaseR.second << std::endl;
 		  mappedBases++;
 		  unmappedBases--;
@@ -653,7 +653,7 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
 	    }
 	    firstBaseL.first.second = firstBaseL.first.second + LROffset;
 	    generateMerge(queryContig, creditCandidates[i] + 1, firstBaseL.first.first, 
-                        firstBaseL.first.second, !firstBaseL.second);
+                        firstBaseL.first.second, firstBaseL.second);
 	    Log::info() << "Credit Merged pos " << creditCandidates[i] << ", a(n) " << contig[creditCandidates[i]] << " on contig " << queryContig << " to " << firstBaseL.first.second << " on contig " << firstBaseL.first.first << " with orientation " << firstBaseL.second << std::endl;
 	    mappedBases++;
 	    unmappedBases--;
