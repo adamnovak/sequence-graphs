@@ -858,7 +858,7 @@ std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> FMDIndex::Cmap(const Bi
             // over by mapping this character by itself.
             location = this->CmapPosition(rangeIterator, query, i, maskIterator);
         } else {
-            Log::debug() << location.position.isEmpty() << " " << location.position.ranges(rangeIterator, maskIterator)<< " " << "Extending with position " << i << " with characters = " << location.characters << std::endl;
+            Log::debug() << "Extending with position " << i << " with characters = " << location.characters << std::endl;
 	    // The last base either mapped successfully or failed due to multi-
             // mapping. Try to extend the FMDPosition we have to the left
             // (backwards) with the next base.
@@ -873,6 +873,10 @@ std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> FMDIndex::Cmap(const Bi
         // What range index does our current left-side position (the one we just
         // moved) correspond to, if any?
         int64_t range = location.position.range(rangeIterator, maskIterator);
+	
+	if(location.characters < minContext && location.maxCharacters >=minContext) {
+	    location.characters = minContext;
+	}
 
         if(location.is_mapped && location.characters >= minContext && 
             !location.position.isEmpty(maskIterator) && range != -1) {
@@ -881,7 +885,7 @@ std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> FMDIndex::Cmap(const Bi
             // context to be confident, and our interval is nonempty and
             // subsumed by a range.
 
-            Log::debug() << "Mapped " << location.characters << 
+            Log::debug() << i << " Mapped " << location.characters << 
                 " context to " << location.position << " in range #" << range <<
                 std::endl;
 
@@ -1219,7 +1223,6 @@ creditMapAttemptResult FMDIndex::CmapPosition(BitVectorIterator& ranges,
     } else if (result.position.range(ranges, mask) != -1) {
         // We've already mapped.
         result.is_mapped = true;
-        return result;
     }
 
     Log::trace() << "Starting with " << result.position << std::endl;
@@ -1233,7 +1236,7 @@ creditMapAttemptResult FMDIndex::CmapPosition(BitVectorIterator& ranges,
         next_position = this->extend(result.position,
             pattern[index + i], false);
 	next_position = this->extend(next_position,pattern[index - i], true);
-
+	
         Log::debug() << "Now at " << next_position << " after " << pattern[i] << std::endl;
         if(next_position.isEmpty(mask)) {
             // The next place we would go is empty, so return the result holding
@@ -1258,6 +1261,8 @@ creditMapAttemptResult FMDIndex::CmapPosition(BitVectorIterator& ranges,
         } else if(result.is_mapped && next_position.range(ranges, mask) != -1) {
 	    result.position = next_position;
 	    result.maxCharacters++;
+	    Log::debug() << "Restart continue " << i << std::endl;
+
 	} else {
 	    // Otherwise, we still map to a plurality of ranges. Record the
 	    // extension and loop again.

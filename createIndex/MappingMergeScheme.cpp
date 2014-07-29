@@ -175,14 +175,8 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
 	    } else {
  		MappingBases[i].first.second = MappingBases[i].first.second - Mappings[i].second.first + 2;
 	    }
-	}	    
+	}
     }
-    
-    for(int64_t i = 0; i < Mappings.size(); i++) {
-	Log::info() << i << " || " << rangeBases[Mappings[i].first].first.second << std::endl;
-	Log::info() << i << " | " << MappingBases[i].first.second << std::endl;
-    }
-
     
     for(size_t i = 0; i < Mappings.size(); i++) {
 	// Scan for the first mapped position in this contig
@@ -417,7 +411,7 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
     // other-side ranges.
     std::reverse(leftMappings.begin(), leftMappings.end());
     
-     size_t leftSentinel;
+    size_t leftSentinel;
     size_t rightSentinel;
     std::vector<size_t> creditCandidates;
     
@@ -568,6 +562,9 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
 	firstL = -1;
 	contextMappedR = true;
 	contextMappedL = true;
+	firstBaseL = std::make_pair(std::make_pair(0,0),0);
+	firstBaseR = std::make_pair(std::make_pair(0,0),0);
+	
 	for(size_t j = creditCandidates[i] - 1; j > 0 && creditCandidates[i] - j < maxRContext; j--) {
 	    // Search leftward from each position until you find a position
 	    // whose context includes creditCandidates[i]
@@ -659,7 +656,7 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
 		  
 	    }
 	} else if (firstL != -1 && contextMappedL) {
-	    if(!firstBaseL.second) {
+	    if(firstBaseL.second) {
 		LROffset = firstL - creditCandidates[i];
 	    } else {
 		LROffset = creditCandidates[i] - firstL;
@@ -667,6 +664,8 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
 	    Log::info() << "Checking agreement: " << firstBaseR.first.second << " " << firstBaseL.first.second 
 			<< " | " << firstBaseR.second << " " << firstBaseL.second << std::endl;
 	    firstBaseL.first.second = firstBaseL.first.second + LROffset - 1;
+	    	    Log::info() << "Checking agreement: " << firstBaseR.first.second << " " << firstBaseL.first.second 
+			<< " | " << firstBaseR.second << " " << firstBaseL.second << std::endl;
 	    generateMerge(queryContig, creditCandidates[i], firstBaseL.first.first, 
                         firstBaseL.first.second, !firstBaseL.second);
 	    mappedBases++;
