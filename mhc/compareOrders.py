@@ -113,7 +113,7 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
             rootDir=self.getLocalTempDir())
         
         # Put together the arguments to invoke
-        args = ["../createIndex/createIndex", "--context", 
+        args = ["../createIndex/createIndex", "--credit", "--context", 
             "100", "--scheme", "greedy", "--alignment", c2h_filename, 
             "--alignmentFasta", fasta_filename, index_dir] + self.fasta_list
             
@@ -232,7 +232,7 @@ class StructureAssessmentTarget(jobTree.scriptTree.target.Target):
         child targets, and they are saved in a <genome number>\t<coverage
         fraction> TSV.
         
-        The alignment styatistics are just a bunch of concatenated mafComparator
+        The alignment statistics are just a bunch of concatenated mafComparator
         XML files.
         
         TODO: This target is getting a bit unweildy and probably should be
