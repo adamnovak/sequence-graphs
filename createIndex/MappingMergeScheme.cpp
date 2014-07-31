@@ -212,7 +212,6 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
                         Base.first.second, Base.second);
                         
             mappedBases++;
-	    Log::info() << "Anchor Merged pos " << i << ", a(n) " << contig[i] << " on contig " << queryContig << " to " << Base.first.second << " on contig " << Base.first.first << " with orientation " << Base.second << std::endl;
 	} else {
             // Didn't map this one
             unmappedBases++;
@@ -276,9 +275,6 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
 		    } else {
 			centeredOffset = firstR - j;
 		    }
-		    Log::info() << MappingBases[j].first.second << " " << firstBaseR.first.second + centeredOffset << " " <<
-			    MappingBases[j].second << " " << firstBaseR.second << " " <<
-			    MappingBases[j].first.first << " " << firstBaseR.first.first << std::endl;
 		    
 		    if(MappingBases[j].first.second != firstBaseR.first.second + centeredOffset ||
 			    MappingBases[j].second != firstBaseR.second ||
@@ -304,9 +300,6 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
 		  } else {
 			centeredOffset = firstL - j;
 		  }
-		  Log::info() << MappingBases[j].first.second << " " << firstBaseL.first.second + centeredOffset << " " <<
-			    MappingBases[j].second << " " << firstBaseL.second << " " <<
-			    MappingBases[j].first.first << " " << firstBaseL.first.first << std::endl;
 		  
 		    if(MappingBases[j].first.second != firstBaseL.first.second + centeredOffset ||
 			    MappingBases[j].second != firstBaseL.second ||
@@ -347,7 +340,7 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
 	} else if (firstL != -1 && contextMappedL) {
 	    firstBaseL.first.second = firstBaseL.first.second + creditCandidates[i] - firstL;
 	    generateMerge(queryContig, creditCandidates[i] + 1, firstBaseL.first.first, 
-                        firstBaseL.first.second, !firstBaseL.second);
+                        firstBaseL.first.second, firstBaseL.second);
 	    Log::info() << "Left Credit Merged pos " << creditCandidates[i] << ", a(n) " << contig[creditCandidates[i]] << " on contig " << queryContig << " to " << firstBaseL.first.second << " on contig " << firstBaseL.first.first << " with orientation " << firstBaseL.second << std::endl;
 	    mappedBases++;
 	    unmappedBases--;
@@ -625,8 +618,8 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
 		} else {
 		    LROffset = (int64_t)creditCandidates[i] - firstL;
 		}
-		int64_t temp = (int64_t)firstBaseR.first.second + LROffset;
-		firstBaseR.first.second = (size_t)temp;
+		int64_t temp = (int64_t)firstBaseL.first.second + LROffset;
+		firstBaseL.first.second = (size_t)temp;
 				
 		if(firstBaseR.first == firstBaseL.first &&
 			  firstBaseR.second != firstBaseL.second) {
