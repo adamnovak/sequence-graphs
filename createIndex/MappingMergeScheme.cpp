@@ -97,7 +97,7 @@ void MappingMergeScheme::join() {
 void MappingMergeScheme::generateMerge(size_t queryContig, size_t queryBase, 
     size_t referenceContig, size_t referenceBase, bool orientation) const {
     
-    if(referenceBase > index.getContigLength(referenceContig) || 
+    /*if(referenceBase > index.getContigLength(referenceContig) || 
         referenceBase == 0) {
         
         // Complain that we're trying to talk about an off-the-contig position.
@@ -116,7 +116,7 @@ void MappingMergeScheme::generateMerge(size_t queryContig, size_t queryBase,
             " on contig " + std::to_string(queryContig) + 
             " is beyond 1-based bounds of length " + 
             std::to_string(index.getContigLength(queryContig)));
-    }
+    }*/
     
     // Where in the query do we want to come from? Always on the forward strand.
     // Correct offset to 0-based.
@@ -130,6 +130,14 @@ void MappingMergeScheme::generateMerge(size_t queryContig, size_t queryBase,
         (referenceBase - 1));
     
     // Make a Merge between these positions.
+    
+    if(queryBase > index.getContigLength(queryContig) || queryBase == 0 ||
+	referenceBase > index.getContigLength(referenceContig) || referenceBase == 0) {
+	
+	Log::info() << "****WARNING: tried to merge (to) an off-contig position!****" << std::endl;
+    
+    } else {
+    
     Merge merge(queryPos, referencePos);
         
     // Send that merge to the queue.
@@ -137,6 +145,8 @@ void MappingMergeScheme::generateMerge(size_t queryContig, size_t queryBase,
     auto lock = queue->lock();
     // Spend our lock to add something to it.
     queue->enqueue(merge, lock);
+    
+    }
     
 }
 
