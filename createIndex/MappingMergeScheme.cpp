@@ -158,7 +158,7 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
         includedPositions.getSize()) << " bottom-level positions" << std::endl;
     
     // Map it
-    std::vector<std::pair<int64_t,size_t>> Mappings = index.Cmap(rangeVector, contig, 
+    std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> Mappings = index.Cmap(rangeVector, contig, 
         &includedPositions, minContext);
     
     size_t leftSentinel;
@@ -171,18 +171,12 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
 	if(Mappings[i].first != -1) {
 	    MappingBases[i] = rangeBases[Mappings[i].first];
 	    if(MappingBases[i].second == 0) {
-		MappingBases[i].first.second = MappingBases[i].first.second + Mappings[i].second - 2;
+		MappingBases[i].first.second = MappingBases[i].first.second + Mappings[i].second.first - 1;
 	    } else {
- 		MappingBases[i].first.second = MappingBases[i].first.second - Mappings[i].second + 2;
+ 		MappingBases[i].first.second = MappingBases[i].first.second - Mappings[i].second.first + 1;
 	    }
-	}	    
+	}
     }
-    
-    for(int64_t i = 0; i < Mappings.size(); i++) {
-	Log::info() << i << " || " << rangeBases[Mappings[i].first].first.second << std::endl;
-	Log::info() << i << " | " << MappingBases[i].first.second << std::endl;
-    }
-
     
     for(size_t i = 0; i < Mappings.size(); i++) {
 	// Scan for the first mapped position in this contig
@@ -209,16 +203,15 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
       
     for(size_t i = 0; i < Mappings.size(); i++) {
         // For each position, look at the mappings.
-        
+              
         if(Mappings[i].first != -1) {
             // We have a mapping. Grab its base.
+	    
             auto Base = MappingBases[i];
             generateMerge(queryContig, i + 1, Base.first.first, 
-                        Base.first.second, !Base.second); 
+                        Base.first.second, Base.second);
                         
             mappedBases++;
-	    Log::info() << "Mapped " << i << ", base " << contig[i] << ", two-sided context " << Mappings[i].second << std::endl;
-	    
 	} else {
             // Didn't map this one
             unmappedBases++;
@@ -242,8 +235,8 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
     Log::info() << "Checking " << creditCandidates.size() << " unmapped positions \"in the middle\"" << std::endl;
     
     for(size_t i; i < Mappings.size(); i++) {
-	if(Mappings[i].second > maxContext) {
-	    maxContext = Mappings[i].second;
+	if(Mappings[i].second.second > maxContext) {
+	    maxContext = Mappings[i].second.second;
 	}
     }
     
@@ -259,14 +252,11 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
 	for(size_t j = creditCandidates[i] - 1; j + 1 > 1 && creditCandidates[i] - j < maxContext; j--) {
 	    // Search leftward from each position until you find a position
 	    // whose context includes creditCandidates[i]
-	    
-	    Log::info() << "Searching right contexts " << j << " | " << creditCandidates[i] << std::endl;
-	  
+	    	  
 	    if(firstR == -1) {
-		if(Mappings[j].second > creditCandidates[i] - j) {
+		if(Mappings[j].second.second > creditCandidates[i] - j) {
 		    firstBaseR = MappingBases[j];
 		    firstR = j;
-		    Log::info() << creditCandidates[i] << " is within a R context" << std::endl;
 		}
 		
 	    // Then continue to search left. If a position has creditCandidates[i]
@@ -279,21 +269,17 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
 	    // to map to the same place as before
 		
 	    } else {
-		if(Mappings[j].second > creditCandidates[i] - j) {
+		if(Mappings[j].second.second > creditCandidates[i] - j) {
 		    if(!MappingBases[j].second) {
 			centeredOffset = j - firstR;
 		    } else {
 			centeredOffset = firstR - j;
 		    }
-		    Log::info() << MappingBases[j].first.second << " " << firstBaseR.first.second + centeredOffset << " " <<
-			    MappingBases[j].second << " " << firstBaseR.second << " " <<
-			    MappingBases[j].first.first << " " << firstBaseR.first.first << std::endl;
 		    
 		    if(MappingBases[j].first.second != firstBaseR.first.second + centeredOffset ||
 			    MappingBases[j].second != firstBaseR.second ||
 			    MappingBases[j].first.first != firstBaseR.first.first) {
 			contextMappedR = false;
-		    	Log::info() << "No consistent right context for " << creditCandidates[i] << "; failed at " << j << std::endl;
 			break;
 		    }
 		}
@@ -302,29 +288,23 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
 	
 	for(size_t j = creditCandidates[i] + 1; j < Mappings.size() && j - creditCandidates[i] < maxContext; j++) {
 	    
-	  Log::info() << "Searching left contexts " << j << " | " << creditCandidates[i] << std::endl;
 	  if(firstL == -1) {
-		if(Mappings[j].second > j - creditCandidates[i]) {
+		if(Mappings[j].second.second > j - creditCandidates[i]) {
 		    firstBaseL = MappingBases[j];
 		    firstL = j;
-		    Log::info() << creditCandidates[i] << " is within a L context" << std::endl;
 		}
 	    } else {
-		if(Mappings[j].second > j - creditCandidates[i]) {
+		if(Mappings[j].second.second > j - creditCandidates[i]) {
 		  if(!MappingBases[j].second) {
 			centeredOffset = j - firstL;
 		  } else {
 			centeredOffset = firstL - j;
 		  }
-		  Log::info() << MappingBases[j].first.second << " " << firstBaseL.first.second + centeredOffset << " " <<
-			    MappingBases[j].second << " " << firstBaseL.second << " " <<
-			    MappingBases[j].first.first << " " << firstBaseL.first.first << std::endl;
 		  
 		    if(MappingBases[j].first.second != firstBaseL.first.second + centeredOffset ||
 			    MappingBases[j].second != firstBaseL.second ||
 			    MappingBases[j].first.first != firstBaseL.first.first) {
 			contextMappedL = false;
-		    	Log::info() << "No consistent left context for " << creditCandidates[i] << "; failed at " << j << std::endl;
 			break;
 		    }
 		}
@@ -334,38 +314,37 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
 		    
 	if(firstR != -1 && contextMappedR) {
 	    firstBaseR.first.second = firstBaseR.first.second + creditCandidates[i] - firstR;
-	    Log::info() << "We merged due to right context " << firstBaseR.first.second << " to " << creditCandidates[i] << std::endl;
 
 	    if(firstL != -1 && contextMappedL) {
-		firstBaseL.first.second = firstBaseL.first.second - creditCandidates[i] + firstL;
+		firstBaseL.first.second = firstBaseL.first.second + creditCandidates[i] - firstL;
 		
 		if(firstBaseR.first == firstBaseL.first &&
 			  firstBaseR.second != firstBaseL.second) {
-		  generateMerge(queryContig, creditCandidates[i], firstBaseR.first.first, 
+		  generateMerge(queryContig, creditCandidates[i] + 1, firstBaseR.first.first, 
                         firstBaseR.first.second, firstBaseR.second);
-		  Log::info() << "Credit Merged " << creditCandidates[i] << std::endl;
-		  mappedBases++;
+		  Log::info() << "Left-Right Credit Merged pos " << creditCandidates[i] << ", a(n) " << contig[creditCandidates[i]] << " on contig " << queryContig << " to " << firstBaseR.first.second << " on contig " << firstBaseR.first.first << " with orientation " << firstBaseR.second << std::endl;
+	    	  mappedBases++;
 		  unmappedBases--;
 		  creditBases++;
 		  
 		}
 	    } else {
-		  generateMerge(queryContig, creditCandidates[i], firstBaseR.first.first, 
+		  generateMerge(queryContig, creditCandidates[i] + 1, firstBaseR.first.first, 
                         firstBaseR.first.second, firstBaseR.second);
-		  Log::info() << "Credit Merged " << creditCandidates[i] << std::endl;
+		  Log::info() << "Right Credit Merged pos " << creditCandidates[i] << ", a(n) " << contig[creditCandidates[i]] << " on contig " << queryContig << " to " << firstBaseR.first.second << " on contig " << firstBaseR.first.first << " with orientation " << firstBaseR.second << std::endl;
 		  mappedBases++;
 		  unmappedBases--;
 		  creditBases++;
 		  
 	    }
 	} else if (firstL != -1 && contextMappedL) {
-	    firstBaseL.first.second = firstBaseL.first.second - creditCandidates[i] + firstL;
-	    generateMerge(queryContig, creditCandidates[i], firstBaseL.first.first, 
-                        firstBaseL.first.second, !firstBaseL.second);
+	    firstBaseL.first.second = firstBaseL.first.second + creditCandidates[i] - firstL;
+	    generateMerge(queryContig, creditCandidates[i] + 1, firstBaseL.first.first, 
+                        firstBaseL.first.second, firstBaseL.second);
+	    Log::info() << "Left Credit Merged pos " << creditCandidates[i] << ", a(n) " << contig[creditCandidates[i]] << " on contig " << queryContig << " to " << firstBaseL.first.second << " on contig " << firstBaseL.first.first << " with orientation " << firstBaseL.second << std::endl;
 	    mappedBases++;
 	    unmappedBases--;
 	    creditBases++;
-	    Log::info() << "Credit Merged " << creditCandidates[i] << std::endl;
 	  
 	}
 	
@@ -417,7 +396,7 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
     // other-side ranges.
     std::reverse(leftMappings.begin(), leftMappings.end());
     
-     size_t leftSentinel;
+    size_t leftSentinel;
     size_t rightSentinel;
     std::vector<size_t> creditCandidates;
     
@@ -492,7 +471,8 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
                     // query string. Orientation is backwards to start with from
                     // our backwards right-semantics, so flip it.
                     generateMerge(queryContig, i + 1, leftBase.first.first, 
-                        leftBase.first.second, !leftBase.second); 
+                        leftBase.first.second, !leftBase.second);
+		    //Log::info() << "Anchor Merged pos " << i << ", a(n) " << contig[i] << " on contig " << queryContig << " to " << leftBase.first.second << " on contig " << leftBase.first.first << " with orientation " << leftBase.second << std::endl;
                         
                     mappedBases++;                   
                 } else {
@@ -510,7 +490,9 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
                 // Orientation is backwards to start with from our backwards
                 // right-semantics, so flip it.
                 generateMerge(queryContig, i + 1, leftBase.first.first, 
-                        leftBase.first.second, !leftBase.second);  
+                        leftBase.first.second, !leftBase.second);
+		//Log::info() << "Anchor Merged pos " << i << ", a(n) " << contig[i] << " on contig " << queryContig << " to " << leftBase.first.second << " on contig " << leftBase.first.first << " with orientation " << leftBase.second << std::endl;
+
                         
                 mappedBases++;
             }
@@ -524,7 +506,8 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
             // Merge with the same contig and base. Leave the orientation alone
             // (since it's backwards to start with).
             generateMerge(queryContig, i + 1, rightBase.first.first, 
-                        rightBase.first.second, rightBase.second); 
+                        rightBase.first.second, rightBase.second);
+	    //Log::info() << "Anchor Merged pos " << i << ", a(n) " << contig[i] << " on contig " << queryContig << " to " << rightBase.first.second << " on contig " << rightBase.first.first << " with orientation " << rightBase.second << std::endl;
             
             mappedBases++; 
         } else {
@@ -568,7 +551,10 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
 	firstL = -1;
 	contextMappedR = true;
 	contextMappedL = true;
-	for(size_t j = creditCandidates[i] - 1; j + 1 > 0 && creditCandidates[i] - j < maxRContext; j--) {
+	firstBaseL = std::make_pair(std::make_pair(0,0),0);
+	firstBaseR = std::make_pair(std::make_pair(0,0),0);
+	
+	for(size_t j = creditCandidates[i] - 1; j > 0 && creditCandidates[i] - j < maxRContext; j--) {
 	    // Search leftward from each position until you find a position
 	    // whose context includes creditCandidates[i]
 	  
@@ -599,7 +585,6 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
 	    }
 	}
 	
-	Log::info() << "Checking iterator: " << creditCandidates[i] + 1 << " " << leftMappings.size() << std::endl;
 	for(size_t j = creditCandidates[i] + 1; j < leftMappings.size() && j - creditCandidates[i] < maxLContext; j++) {
 	    if(firstL == -1) {
 		if(leftMappings[j].second > j - creditCandidates[i]) {
@@ -617,66 +602,65 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
 		}
 	    }
 	}
-	
-	Log::info() << "Checking " << creditCandidates[i] << " and got back " << contextMappedR << " " << firstR << " R | L " << firstL << " " << contextMappedL << std::endl;		    
-		    
+			    
 	if(firstR != -1 && contextMappedR) {
 	    if(firstBaseR.second) {
-		LROffset = firstR - creditCandidates[i];
+		LROffset = firstR - (int64_t)creditCandidates[i];
 	    } else {
-		LROffset = creditCandidates[i] - firstR;
+		LROffset = (int64_t)creditCandidates[i] - firstR;
 	    }
-	    firstBaseR.first.second = firstBaseR.first.second + LROffset - 1;
-	    Log::info() << "We merged due to right context " << firstBaseR.first.second << " to " << creditCandidates[i] << std::endl;
+	    int64_t temp = (int64_t)firstBaseR.first.second + LROffset;
+	    firstBaseR.first.second = (size_t)temp;
 
 	    if(firstL != -1 && contextMappedL) {
 		if(!firstBaseL.second) {
-		    LROffset = firstL - creditCandidates[i];
+		    LROffset = firstL - (int64_t)creditCandidates[i];
 		} else {
-		    LROffset = creditCandidates[i] - firstL;
+		    LROffset = (int64_t)creditCandidates[i] - firstL;
 		}
-		firstBaseL.first.second = firstBaseL.first.second + LROffset - 1;
-		
-		Log::info() << "Checking agreement: " << firstBaseR.first.second << " " << firstBaseL.first.second 
-			<< " | " << firstBaseR.second << " " << firstBaseL.second << std::endl;
+		int64_t temp = (int64_t)firstBaseL.first.second + LROffset;
+		firstBaseL.first.second = (size_t)temp;
+				
 		if(firstBaseR.first == firstBaseL.first &&
 			  firstBaseR.second != firstBaseL.second) {
-		  generateMerge(queryContig, creditCandidates[i], firstBaseR.first.first, 
-                        firstBaseR.first.second, firstBaseR.second);
-		  Log::info() << "Credit Merged " << creditCandidates[i] << std::endl;
-		  mappedBases++;
-		  unmappedBases--;
-		  creditBases++;
+		    generateMerge(queryContig, creditCandidates[i] + 1, firstBaseL.first.first, 
+                        firstBaseL.first.second, !firstBaseL.second);
+		    //Log::info() << "LR Credit Merged pos " << creditCandidates[i] << ", a(n) " << contig[creditCandidates[i]] << " on contig " << queryContig << " to " << firstBaseR.first.second << " on contig " << firstBaseR.first.first << " with orientation " << firstBaseR.second << std::endl;
+		    mappedBases++;
+		    unmappedBases--;
+		    creditBases++;
 		  
 		}
 	    } else {
-		  generateMerge(queryContig, creditCandidates[i], firstBaseR.first.first, 
+		  generateMerge(queryContig, creditCandidates[i] + 1, firstBaseR.first.first, 
                         firstBaseR.first.second, firstBaseR.second);
-		  Log::info() << "Credit Merged " << creditCandidates[i] << std::endl;
+		  //Log::info() << "R Credit Merged pos " << creditCandidates[i] << ", a(n) " << contig[creditCandidates[i]] << " on contig " << queryContig << " to " << firstBaseR.first.second << " on contig " << firstBaseR.first.first << " with orientation " << firstBaseR.second << std::endl;
 		  mappedBases++;
 		  unmappedBases--;
 		  creditBases++;
 		  
 	    }
 	} else if (firstL != -1 && contextMappedL) {
+	    //Log::info() << "Before " << firstBaseL.first.second << std::endl;
 	    if(!firstBaseL.second) {
-		LROffset = firstL - creditCandidates[i];
+		LROffset = firstL - (int64_t)creditCandidates[i];
 	    } else {
-		LROffset = creditCandidates[i] - firstL;
+		LROffset = (int64_t)creditCandidates[i] - firstL;
 	    }
-	    firstBaseL.first.second = firstBaseL.first.second + LROffset - 1;
-	    generateMerge(queryContig, creditCandidates[i], firstBaseL.first.first, 
+	    int64_t temp = (int64_t)firstBaseL.first.second + LROffset;
+	    firstBaseL.first.second = (size_t)temp;
+	    //Log::info() << "After " << firstBaseL.first.second << ", moved by " << LROffset << std::endl;
+	    generateMerge(queryContig, creditCandidates[i] + 1, firstBaseL.first.first, 
                         firstBaseL.first.second, !firstBaseL.second);
+	    //Log::info() << "L Credit Merged pos " << creditCandidates[i] << ", a(n) " << contig[creditCandidates[i]] << " on contig " << queryContig << " to " << firstBaseL.first.second << " on contig " << firstBaseL.first.first << " with orientation " << firstBaseL.second << std::endl;
 	    mappedBases++;
 	    unmappedBases--;
 	    creditBases++;
-	    Log::info() << "Credit Merged " << creditCandidates[i] << std::endl;
-	  
 	}
     }
     }
     
-    // Close the queue to say we're done.
+    // Close the queue to saygm we're done.
     auto lock = queue->lock();
     queue->close(lock);
     
