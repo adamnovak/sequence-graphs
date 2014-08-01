@@ -1197,9 +1197,7 @@ main(
 	("mismatches", boost::program_options::value<size_t>()
             ->default_value(0), 
             "Maximum allowed number of mismatches")
-	("mismatch", boost::program_options::value<std::string>()
-	    ->default_value("mismatch"),
-	    "Allowance for mismatches (\"exact\" or \"mismatch\")")
+	("mismatch", "Allow for mismatches")
 	("seed", boost::program_options::value<size_t>()
 	    ->default_value(0),
 	    "Length of seed context in mismatch mapping")
@@ -1311,8 +1309,11 @@ main(
     Timer* mergeTimer = new Timer("Merging");
     
     // We want to flag whether we want mismatches
-    std::string mismatchOption = options["mismatch"].as<std::string>();
-    bool mismatchb = mismatchOption == "mismatch";
+    
+    bool mismatchb = false;
+    if(options.count("mismatch")) {
+	mismatchb = true;
+    }
     
     if(mergeScheme == "overlap") {
         // Make a thread set that's all merged, with the given minimum merge
