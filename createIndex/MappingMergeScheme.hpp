@@ -28,7 +28,8 @@ public:
     MappingMergeScheme(const FMDIndex& index, const BitVector& rangeVector, 
         const std::vector<std::pair<std::pair<size_t, size_t>, bool> >&
         rangeBases, const BitVector& includedPositions, size_t genome,
-        size_t minContext = 0, bool credit = false, std::string mapType = "LRexact");
+        size_t minContext = 0, bool credit = false, std::string mapType = "LRexact",
+	bool mismatch = false, size_t z_max = 0, size_t seed = 0, size_t z_seed = 0);
     
     /**
      * Get rid of a MappingMergeScheme (and delete its queue, if it has one).
@@ -87,6 +88,14 @@ protected:
     
     // Type of context used
     std::string mapType;
+    
+    bool mismatch;
+    
+    size_t z_max;
+    
+    size_t seed;
+    
+    size_t z_seed;
     
     /**
      * Create a Merge between two positions and enqueue it. Positions are

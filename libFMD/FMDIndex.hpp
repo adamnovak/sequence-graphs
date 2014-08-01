@@ -291,6 +291,48 @@ public:
     std::vector<std::pair<int64_t,size_t>> map(const BitVector& ranges,
         const std::string& query, const BitVector* mask, int minContext = 0, 
         int start = 0, int length = -1) const;
+	
+    /***************************************************************************
+     * Mismatch
+     **************************************************************************/
+	
+    MisMatchAttemptResults misMatchExtend(MisMatchAttemptResults& prevMisMatches,
+	char c, bool backward, size_t z_max, BitVectorIterator* mask) const;
+    
+    void processMisMatchPositions(
+		MisMatchAttemptResults& nextMisMatches,
+		std::vector<std::pair<FMDPosition,size_t>>& waitingMatches,
+		std::vector<std::pair<FMDPosition,size_t>>& waitingMisMatches,
+		BitVectorIterator* mask) const;
+		
+    // Implementing mismatch search for Left-Right exact contexts
+		 
+    std::vector<std::pair<int64_t,size_t>> misMatchMap(const BitVector& ranges,
+	const std::string& query, const BitVector* mask, int minContext = 0, size_t z_max = 0,
+	size_t seed = 0, size_t z_seed = 0, int start = 0, int length = -1) const;
+	
+    std::vector<std::pair<int64_t,size_t>> misMatchMap(const BitVector& ranges, 
+	const std::string& query, int64_t genome = -1, int minContext = 0, size_t z_max = 0,
+	size_t seed = 0, size_t z_seed = 0, int start = 0, int length = -1) const;
+	
+    MisMatchAttemptResults misMatchMapPosition(BitVectorIterator& ranges, 
+    const std::string& pattern, size_t index, size_t z_max, size_t minContext, BitVectorIterator* mask = NULL,
+    size_t seed = 0, size_t z_seed = 0) const;
+    
+    // We also need centered search versions of all the mismatch mapping functions
+    
+    std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> CmisMap(const BitVector& ranges,
+	const std::string& query, const BitVector* mask, int minContext = 0, size_t z_max = 0,
+	size_t seed = 0, size_t z_seed = 0, int start = 0, int length = -1) const;
+	
+    std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> CmisMap(const BitVector& ranges, 
+	const std::string& query, int64_t genome = -1, int minContext = 0, size_t z_max = 0,
+	size_t seed = 0, size_t z_seed = 0, int start = 0, int length = -1) const;
+	
+    MisMatchAttemptResults CmisMatchMapPosition(BitVectorIterator& ranges, 
+	const std::string& pattern, size_t index, size_t minContext, size_t z_max, size_t seed, size_t z_seed,
+	int start, int length, BitVectorIterator* mask) const;
+
         
     /***************************************************************************
      * Iteration Functions

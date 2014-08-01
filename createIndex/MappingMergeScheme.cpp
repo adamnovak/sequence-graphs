@@ -10,10 +10,12 @@
 MappingMergeScheme::MappingMergeScheme(const FMDIndex& index, 
     const BitVector& rangeVector, 
     const std::vector<std::pair<std::pair<size_t, size_t>, bool> >& rangeBases, 
-    const BitVector& includedPositions, size_t genome, size_t minContext, bool credit, std::string mapType) : 
+    const BitVector& includedPositions, size_t genome, size_t minContext, bool credit,
+    std::string mapType, bool mismatch, size_t z_max, size_t seed, size_t z_seed) :
     MergeScheme(index), threads(), queue(NULL), rangeVector(rangeVector), 
     rangeBases(rangeBases), includedPositions(includedPositions), 
-    genome(genome), minContext(minContext), credit(credit), mapType(mapType) {
+    genome(genome), minContext(minContext), credit(credit), mapType(mapType),
+    mismatch(mismatch), z_max(z_max), seed(seed), z_seed(z_seed) {
     
     // Nothing to do
     
@@ -156,10 +158,20 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
     Log::info() << threadName << " mapping " << contig.size() << 
         " bases via " << BitVectorIterator(includedPositions).rank(
         includedPositions.getSize()) << " bottom-level positions" << std::endl;
+	
+    std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> Mappings;
+	
+    if (mismatch) {
+	Log::info() << "Using mismatch mapping with z_max " << z_max << std::endl;
+
+	Mappings = index.CmisMap(rangeVector, contig, &includedPositions, minContext, z_max, seed, z_seed);
+	
+    } else {
     
-    // Map it
-    std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> Mappings = index.Cmap(rangeVector, contig, 
-        &includedPositions, minContext);
+	// Map it
+	Mappings = index.Cmap(rangeVector, contig, &includedPositions, minContext);
+    
+    }
     
     size_t leftSentinel;
     size_t rightSentinel;
@@ -384,13 +396,30 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
         " bases via " << BitVectorIterator(includedPositions).rank(
         includedPositions.getSize()) << " bottom-level positions" << std::endl;
     
-    // Map it on the right
-    std::vector<std::pair<int64_t,size_t>> rightMappings = index.map(rangeVector, contig, 
-        &includedPositions, minContext);
+    std::vector<std::pair<int64_t,size_t>> rightMappings;
+    std::vector<std::pair<int64_t,size_t>> leftMappings;    
+	
+    if (mismatch) {
+      
+	Log::info() << "Using mismatch mapping with z_max " << z_max << std::endl;
+	
+	// Map it on the right
+	rightMappings = index.misMatchMap(rangeVector, contig,
+	    &includedPositions, minContext, z_max, seed, z_seed);
+	
+	// Map it on the left
+	leftMappings = index.misMatchMap(rangeVector, 
+	    reverseComplement(contig), &includedPositions, minContext, z_max, seed, z_seed);  
+	
+    } else {
+		
+	// Map it on the right
+	rightMappings = index.map(rangeVector, contig, &includedPositions, minContext);
     
-    // Map it on the left
-    std::vector<std::pair<int64_t,size_t>> leftMappings = index.map(rangeVector, 
-        reverseComplement(contig), &includedPositions, minContext);
+	// Map it on the left
+	leftMappings = index.map(rangeVector, reverseComplement(contig), &includedPositions, minContext);
+    
+    }
     
     // Flip the left mappings back into the original order. They should stay as
     // other-side ranges.
