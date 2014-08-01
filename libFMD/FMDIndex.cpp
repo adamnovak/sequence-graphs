@@ -1805,41 +1805,36 @@ std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> FMDIndex::CmisMap(const
     std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> mappings;
 
     // Keep around the result that we get from the single-character mapping
-    // function. We use it as our working state to trackour FMDPosition and how
+    // function. We use it as our working state to track our FMDPosition and how
     // many characters we've extended by. We use the is_mapped flag to indicate
     // whether the current iteration is an extension or a restart.
-    creditMapAttemptResult location;
+
+    MisMatchAttemptResults location;
+    
     // Make sure the scratch position is empty so we re-start on the first base
-    location.position = EMPTY_FMD_POSITION;
+    
+    location.positions.clear();
+    location.positions.push_back(std::pair<FMDPosition,size_t>(EMPTY_FMD_POSITION,0));
+    location.characters = 1;
+    
 
     for(int i = start + length - 1; i >= start; i--) {
         // Go from the end of our selected region to the beginning.
 	
-        Log::trace() << "On position " << i << " from " <<
+        Log::debug() << "On position " << i << " from " <<
             start + length - 1 << " to " << start << std::endl;
 	    
-	// Need to prevent an extension from overrunning the query contig, if
-	// this will happen, also trigger a restart
-	    	    
-        Log::debug() << "Starting over by mapping position " << i << std::endl;
-        // We do not currently have a non-empty FMDPosition to extend. Start
-        // over by mapping this character by itself.
-        location = this->CmapPosition(rangeIterator, query, i, maskIterator);
+        location = this->CmisMatchMapPosition(rangeIterator, query, i, minContext, z_max, maskIterator, seed, z_seed);
 
         // What range index does our current left-side position (the one we just
         // moved) correspond to, if any?
-        int64_t range = location.position.range(rangeIterator, maskIterator);
+        int64_t range = location.positions.front().first.range(rangeIterator, maskIterator);
 
-        if(location.is_mapped && location.characters >= minContext && 
-            !location.position.isEmpty(maskIterator) && range != -1) {
+        if(location.is_mapped) {
             
             // It mapped. We didn't do a re-start and fail, we have sufficient
             // context to be confident, and our interval is nonempty and
             // subsumed by a range.
-
-            Log::debug() << i << " Mapped " << location.characters << 
-                " context to " << location.position << " in range #" << range <<
-                std::endl;
 
             // Remember that this base mapped to this range
             mappings.push_back(std::make_pair(range,std::make_pair(location.characters,location.maxCharacters)));
@@ -1848,45 +1843,8 @@ std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> FMDIndex::CmisMap(const
 
         } else {
 
-            Log::debug() << "Failed at " << i << " " << location.position << " (" << 
-                location.position.ranges(rangeIterator, maskIterator) <<
-                " options for " << location.characters << " context)." << 
-                std::endl;
-                
-            if(location.is_mapped && location.position.isEmpty(maskIterator)) {
-                // We extended right until we got no results. We need to try
-                // this base again, in case we tried with a too-long left
-                // context.
-
-                Log::debug() << "Restarting from here..." << std::endl;
-
-                // Move the loop index towards the end we started from (right)
-                i++;
-		
-                // Since the FMDPosition is empty, on the next iteration we will
-                // retry this base.
-
-            } else {
-                // It didn't map for some other reason:
-                // - It was an initial mapping with too little right context to 
-                //   be unique to a range.
-                // - It was an initial mapping with a nonexistent right context
-                // - It was an extension that was multimapped and still is
-
-                // In none of these cases will re-starting from this base help
-                // at all. If we just restarted here, we don't want to do it
-                // again. If it was multimapped before, it had as much left
-                // context as it could take without running out of string or
-                // getting no results.
-
-                // It didn't map. Say it corresponds to no range.
                 mappings.push_back(std::make_pair(-1,std::make_pair(0,0)));
 
-                // Mark that the next iteration will be an extension (if we had
-                // any results this iteration; if not it will just restart)
-                location.is_mapped = true;
-
-            }
         }
     }
 
@@ -1916,8 +1874,8 @@ std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> FMDIndex::CmisMap(const
 }
 
 MisMatchAttemptResults FMDIndex::CmisMatchMapPosition(BitVectorIterator& ranges, 
-    const std::string& pattern, size_t index, size_t minContext, size_t z_max, size_t seed, size_t z_seed,
-    int start, int length, BitVectorIterator* mask) const {
+	const std::string& pattern, size_t index, size_t z_max, size_t minContext, BitVectorIterator* mask,
+	size_t seed, size_t z_seed) const {
     
     // We're going to right-map so ranges match up with the things we can map to
     // (downstream contexts)
@@ -1950,6 +1908,7 @@ MisMatchAttemptResults FMDIndex::CmisMatchMapPosition(BitVectorIterator& ranges,
     
     std::vector<std::pair<FMDPosition,size_t>> found_positions;
     MisMatchAttemptResults new_result;
+    MisMatchAttemptResults new_result2;
     MisMatchAttemptResults rightFirstResults;
     MisMatchAttemptResults leftFirstResults;
     
@@ -1963,11 +1922,27 @@ MisMatchAttemptResults FMDIndex::CmisMatchMapPosition(BitVectorIterator& ranges,
 	    z_switch = z_max;
 	}
       
-	new_result = this->misMatchExtend(result, pattern[index + i], false, z_switch, mask);
-	new_result = this->misMatchExtend(new_result, pattern[index - i], true, z_switch, mask);
+	new_result2 = this->misMatchExtend(result, pattern[index + i], false, z_switch, mask);
+	
+	if(new_result2.positions.front().first.isEmpty(mask)) {
+	    if(result.positions.size() == 1 && result.maxCharacters >= minContext) {
+		result.is_mapped = true;
+		result.characters = result.maxCharacters;
+		return result;
+	    } else {
+		result.positions.clear();
+		result.positions.push_back(std::pair<FMDPosition,size_t>(EMPTY_FMD_POSITION,0));
+		result.is_mapped = false;
+		result.characters = 1;
+		result.maxCharacters = 1;
+		return result;
+	    }
+        }
+	
+	new_result = this->misMatchExtend(new_result2, pattern[index - i], true, z_switch, mask);
 	
         if(new_result.positions.front().first.isEmpty(mask)) {
-	    if(result.positions.size() == 1 && result.characters >= minContext) {
+	    if(result.positions.size() == 1 && result.maxCharacters >= minContext) {
 		result.is_mapped = true;
 		result.characters = result.maxCharacters;
 		return result;
@@ -1982,7 +1957,8 @@ MisMatchAttemptResults FMDIndex::CmisMatchMapPosition(BitVectorIterator& ranges,
         }
 
         if(!result.is_mapped && new_result.positions.size() == 1 &&
-	    new_result.positions.front().first.range(ranges, mask) != -1) {
+	    new_result.positions.front().first.range(ranges, mask) != -1
+	    && result.maxCharacters >= minContext) {
             // We have successfully mapped to exactly one range. Update our
             // result to reflect the additional extension and our success
     

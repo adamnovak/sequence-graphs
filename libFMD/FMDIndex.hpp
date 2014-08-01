@@ -330,8 +330,8 @@ public:
 	size_t seed = 0, size_t z_seed = 0, int start = 0, int length = -1) const;
 	
     MisMatchAttemptResults CmisMatchMapPosition(BitVectorIterator& ranges, 
-	const std::string& pattern, size_t index, size_t minContext, size_t z_max, size_t seed, size_t z_seed,
-	int start, int length, BitVectorIterator* mask) const;
+	const std::string& pattern, size_t index, size_t z_max, size_t minContext, BitVectorIterator* mask = NULL,
+	size_t seed = 0, size_t z_seed = 0) const;
 
         
     /***************************************************************************
