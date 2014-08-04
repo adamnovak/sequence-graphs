@@ -183,8 +183,8 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
     
     }
     
-    size_t leftSentinel;
-    size_t rightSentinel;
+    size_t leftSentinel = Mappings.size() - 1;
+    size_t rightSentinel = 0;
     std::vector<size_t> creditCandidates;
     
     std::pair<std::pair<size_t, size_t>, bool> MappingBases [Mappings.size()];
@@ -193,9 +193,9 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
 	if(Mappings[i].first != -1) {
 	    MappingBases[i] = rangeBases[Mappings[i].first];
 	    if(MappingBases[i].second == 0) {
-		MappingBases[i].first.second = MappingBases[i].first.second + Mappings[i].second.first - 1;
+		MappingBases[i].first.second = MappingBases[i].first.second + (size_t)Mappings[i].second.first - 1;
 	    } else {
- 		MappingBases[i].first.second = MappingBases[i].first.second - Mappings[i].second.first + 1;
+ 		MappingBases[i].first.second = MappingBases[i].first.second - (size_t)Mappings[i].second.first + 1;
 	    }
 	}
     }
@@ -435,8 +435,8 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
     // other-side ranges.
     std::reverse(leftMappings.begin(), leftMappings.end());
     
-    size_t leftSentinel;
-    size_t rightSentinel;
+    int64_t leftSentinel;
+    int64_t rightSentinel;
     std::vector<size_t> creditCandidates;
     
     for(size_t i = 0; i < leftMappings.size(); i++) {
