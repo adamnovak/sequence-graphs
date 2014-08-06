@@ -30,12 +30,14 @@ public:
     LCPArray(const SuffixArray& suffixArray, const ReadTable& strings);
     
     /**
-     * Load an LCPArray from the given file.
+     * Load an LCPArray from the given file. Uses platform-dependent byte
+     * order and size_t size.
      */
     LCPArray(const std::string& filename);
     
     /**
-     * Save an LCPArray to the given file.
+     * Save an LCPArray to the given file. Uses platform-dependent byte order
+     * and size_t size.
      */
     void save(const std::string& filename) const;
     

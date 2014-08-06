@@ -3,6 +3,8 @@
 // We need SAElems, so we might as well explicitly include their file.
 #include <STCommon.h>
 
+#include <Log.hpp>
+
 #include <iterator>
 #include <iostream>
 #include <fstream>
@@ -30,12 +32,19 @@ LCPArray::LCPArray(const SuffixArray& suffixArray, const ReadTable& strings): va
         
         SAElem next = suffixArray.get(i);
         
+        Log::trace() << "Suffix " << next << " length " << 
+            getSuffixLength(next, strings) << " vs. " << last << " length " << 
+            getSuffixLength(last, strings) << std::endl;
+        
         // lcp will hold the longest common prefix for this pair.
         size_t lcp;
         for(lcp = 0; lcp < getSuffixLength(last, strings) && 
             lcp < getSuffixLength(next, strings); lcp++) {
             
             // For every character that the two suffixes have
+            
+            Log::trace() << "Char " << getFromSuffix(next, lcp, strings) << 
+                " vs. " << getFromSuffix(last, lcp, strings) << std::endl;
             
             if(getFromSuffix(last, lcp, strings) != 
                 getFromSuffix(next, lcp, strings)) {
@@ -47,6 +56,9 @@ LCPArray::LCPArray(const SuffixArray& suffixArray, const ReadTable& strings): va
         
         // Now save that prefix length
         values.push_back(lcp);
+        
+        // Now advance to the next suffix.
+        last = next;
     }
     
     // OK, now we need to construct the PSV/NSV indexes. The easiest way is with
@@ -101,25 +113,44 @@ LCPArray::LCPArray(const SuffixArray& suffixArray, const ReadTable& strings): va
     
 }
 
-void LCPArray::save(const std::string& filename) const {
-    // Make a binary output stream. See
-    // <http://stackoverflow.com/a/12372783/402891>
-    std::ofstream file(filename, std::ios::out | std::ofstream::binary);
+LCPArray::LCPArray(const std::string& filename) : values(), psvs(), nsvs() {
+    // Make a binary input stream.
+    std::ifstream file(filename, std::ifstream::binary);
     
+    // This is going to hold how many items should be in each vector.
+    size_t arrayLength;
+    
+    // Read the number of items in platform-native byte order.
+    file.read((char*) &arrayLength, sizeof(size_t));
+    
+    // Resize all the vectors
+    values.resize(arrayLength);
+    psvs.resize(arrayLength);
+    nsvs.resize(arrayLength);
+    
+    // Read in that many elements for each vector
+    file.read((char*) &values[0], arrayLength * sizeof(size_t));
+    file.read((char*) &psvs[0], arrayLength * sizeof(size_t));
+    file.read((char*) &nsvs[0], arrayLength * sizeof(size_t));
+    
+    // Close up the file.
+    file.close();
+}
+
+void LCPArray::save(const std::string& filename) const {
+    // Make a binary output stream.
+    std::ofstream file(filename, std::ios::out | std::ofstream::binary);
     
     // Grab the array length as a local
     size_t arrayLength = values.size();
     
-    // Save the array length
-    file.write((char*)&arrayLength, sizeof(size_t));
+    // Save the array length in platform-native byte order.
+    file.write((char*) &arrayLength, sizeof(size_t));
     
-    // Make an iterator to copy all the vector values to
-    auto outIterator = std::ostreambuf_iterator<char>(file);
-    
-    // Save all three vectors, each of the written length.
-    std::copy(values.begin(), values.end(), outIterator);
-    std::copy(psvs.begin(), psvs.end(), outIterator);
-    std::copy(nsvs.begin(), nsvs.end(), outIterator);
+    // Read in that many elements for each vector
+    file.write((char*) &values[0], arrayLength * sizeof(size_t));
+    file.write((char*) &psvs[0], arrayLength * sizeof(size_t));
+    file.write((char*) &nsvs[0], arrayLength * sizeof(size_t));
     
     // Close up the file
     file.close();
