@@ -158,7 +158,7 @@ FMDIndex* FMDIndexBuilder::build() {
     // Write the BWT to disk
     suffixArray->writeBWT(bwtFile, readTable);
     
-    // Delete the read table since we no lonfger need it. Keep the suffix array
+    // Delete the read table since we no longer need it. Keep the suffix array
     // around because the FMDIndex we return can cheat off it.
     delete readTable;
     
