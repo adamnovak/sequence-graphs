@@ -3,10 +3,14 @@
 // We need SAElems, so we might as well explicitly include their file.
 #include <STCommon.h>
 
+#include <iterator>
+#include <iostream>
+#include <fstream>
+
 LCPArray::LCPArray(const SuffixArray& suffixArray, const ReadTable& strings): values(), 
     psvs(), nsvs() {
 
-    if(suffixArray.size() == 0) {
+    if(suffixArray.getSize() == 0) {
         // Just have a 0-length LCP if there are absolutely no suffixes.
         return;    
     }
@@ -21,7 +25,7 @@ LCPArray::LCPArray(const SuffixArray& suffixArray, const ReadTable& strings): va
     // This holds the last suffix that we need to compare the next one to.
     SAElem last = suffixArray.get(0);
     
-    for(size_t i = 1; i < suffixArray.size(); i++) {
+    for(size_t i = 1; i < suffixArray.getSize(); i++) {
         // For each subsequent suffix
         
         SAElem next = suffixArray.get(i);
@@ -34,7 +38,7 @@ LCPArray::LCPArray(const SuffixArray& suffixArray, const ReadTable& strings): va
             // For every character that the two suffixes have
             
             if(getFromSuffix(last, lcp, strings) != 
-                getFormSuffix(next, lcp, strings)) {
+                getFromSuffix(next, lcp, strings)) {
                 // They don't match here, so end the longest common prefix.
                 break;
             }
@@ -96,3 +100,37 @@ LCPArray::LCPArray(const SuffixArray& suffixArray, const ReadTable& strings): va
     }
     
 }
+
+void LCPArray::save(const std::string& filename) const {
+    // Make a binary output stream. See
+    // <http://stackoverflow.com/a/12372783/402891>
+    std::ofstream file(filename, std::ios::out | std::ofstream::binary);
+    
+    
+    // Grab the array length as a local
+    size_t arrayLength = values.size();
+    
+    // Save the array length
+    file.write((char*)&arrayLength, sizeof(size_t));
+    
+    // Make an iterator to copy all the vector values to
+    auto outIterator = std::ostreambuf_iterator<char>(file);
+    
+    // Save all three vectors, each of the written length.
+    std::copy(values.begin(), values.end(), outIterator);
+    std::copy(psvs.begin(), psvs.end(), outIterator);
+    std::copy(nsvs.begin(), nsvs.end(), outIterator);
+    
+    // Close up the file
+    file.close();
+    
+}
+
+
+
+
+
+
+
+
+

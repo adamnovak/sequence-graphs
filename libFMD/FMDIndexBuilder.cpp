@@ -20,6 +20,7 @@
 #include "kseq.h"
 #include "util.hpp"
 #include "Log.hpp"
+#include "LCPArray.hpp"
 
 #include "FMDIndexBuilder.hpp"
 
@@ -137,11 +138,12 @@ FMDIndex* FMDIndexBuilder::build() {
     // And the contig sizes file
     contigFile.close();
     
-    // Compute what we want to save: BWT, sampled suffix array, and per-genome
-    // BitVector masks.
+    // Compute what we want to save: BWT, sampled suffix array, per-genome
+    // BitVector masks, and longest common prefix array.
     std::string bwtFile = basename + ".bwt";
     std::string ssaFile = basename + ".ssa";
     std::string bitmaskFile = basename + ".msk";
+    std::string lcpFile = basename + ".lcp";
 
     // Produce the index of the temp file
     // Load all the sequences into memory (again).
@@ -158,9 +160,25 @@ FMDIndex* FMDIndexBuilder::build() {
     // Write the BWT to disk
     suffixArray->writeBWT(bwtFile, readTable);
     
+    Log::info() << "Indexing Longest Common Prefixes..." << std::endl;
+    
+    // Build an LCP array from the suffix array and the read table.
+    LCPArray* lcpArray = new LCPArray(*suffixArray, *readTable);
+    
     // Delete the read table since we no longer need it. Keep the suffix array
     // around because the FMDIndex we return can cheat off it.
     delete readTable;
+    
+    // Save the LCP
+    Log::info() << "Saving LCP to " << lcpFile << std::endl;
+    lcpArray->save(lcpFile);
+    
+    // Delete it so we don't need to keep two copies of it when we create the
+    // actual FMDIndex.
+    delete lcpArray;
+    
+    
+    
     
     // How many genomes are there?
     size_t numGenomes = (genomeAssignments.size() == 0) ? 0 :

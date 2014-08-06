@@ -12,8 +12,6 @@
 #include "ReadTable.h"
 #include "Match.h"
 
-class LCPArray;
-
 class SuffixArray
 {
     public:

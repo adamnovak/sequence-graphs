@@ -23,6 +23,9 @@ public:
     /**
      * Create a new LCPArray by building it from the given suffix array, using
      * the given collection of strings to get the actual characters.
+     *
+     * Neither the suffix array nor the read table are needed after the
+     * constructor returns.
      */
     LCPArray(const SuffixArray& suffixArray, const ReadTable& strings);
     
