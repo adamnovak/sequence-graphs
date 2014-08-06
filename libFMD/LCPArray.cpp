@@ -58,7 +58,7 @@ LCPArray::LCPArray(const SuffixArray& suffixArray, const ReadTable& strings): va
         // found, we'll just use 0.
         size_t psv = 0;
         
-        for(size_t j = i - 1; j != (size_t) -1; j++) {
+        for(size_t j = i - 1; j != (size_t) -1; j--) {
             // For each position before i in descending order (stopping on
             // underflow)...
             
