@@ -547,18 +547,27 @@ void FMDIndex::retractRightOnly(FMDPosition& range,
     size_t rangeStart = range.getForwardStart();
     size_t rangeEnd = range.getForwardStart() + range.getEndOffset() + 1;
     
+    Log::debug() << "Retracting from [" << rangeStart << ", " << rangeEnd << 
+        ")" << std::endl;
+    
     // rangeEnd may be actually past the end of the LCP array now. That is OK,
     // we just get 0 and an LCP NSV of the same position in that case.
         
     // Get the LCP value at each end
     size_t startLCP = getLCP(rangeStart);
-    size_t endLCP = getLCP(rangeEnd);
+    // Don't try looking off the end. Fill in an imaginary 0 to bound the root.
+    size_t endLCP = rangeEnd < getBWTLength() ? getLCP(rangeEnd) : 0;
     
     // Figure out which end has the greater value, and what that value is, and
-    // where in the LCP that value is.
-    bool startBigger = startLCP > endLCP;
-    size_t lcp = startBigger ? startLCP : endLCP;
-    size_t lcpIndex = startBigger ? rangeStart : rangeEnd;
+    // where in the LCP that value is. Default to using the start in ties,
+    // because the start will always be at a real location, while the end can be
+    // past the end of the LCP array.
+    bool useStart = startLCP >= endLCP;
+    size_t lcp = useStart ? startLCP : endLCP;
+    size_t lcpIndex = useStart ? rangeStart : rangeEnd;
+    
+    // Now lcpIndex is guaranteed to be a real index in the LCP array, not off
+    // the end.
     
     Log::debug() << "Parent node string depth: " << lcp << " at " << lcpIndex <<
         std::endl;
@@ -574,30 +583,24 @@ void FMDIndex::retractRightOnly(FMDPosition& range,
         // The parent node string depth meets or excedes our new pattern length.
         // We need to be at that parent node or higher.
         
-        if(lcp > 0) {
             
-            // We'll update rangeStart and rangeEnd to the LCP array indices that
-            // cut out the parent.
-            rangeStart = getLCPPSV(lcpIndex);
-            rangeEnd = getLCPNSV(lcpIndex);
-        } else {
-            // The parent is the root and we just special-case take the whole
-            // thing, because you'll never find a smaller value.
-            rangeStart = 0;
-            rangeEnd = getBWTLength();
-        }
+        // We'll update rangeStart and rangeEnd to the LCP array indices that
+        // cut out the parent.
+        rangeStart = getLCPPSV(lcpIndex);
+        // Note that rangeEnd can be off the end of the LCP array now, if we
+        // have moved up to the root node.
+        rangeEnd = getLCPNSV(lcpIndex);
         
         Log::debug() << "PSV is " << getLCP(rangeStart) << " at " << 
             rangeStart << std::endl;
         
-        
-        
-        Log::debug() << "NSV is " << getLCP(rangeEnd) << " at " << 
+        Log::debug() << "NSV is " << 
+            ((rangeEnd < getBWTLength()) ? getLCP(rangeEnd) : -1) << " at " << 
             rangeEnd << std::endl;
             
         // Dump the LCP between these bounds.
-        Log::debug() << "LCP snippet:";
-        Log::debug() << "Index\tLCP\tPSV\tNSV";
+        Log::debug() << "LCP snippet:" << std::endl;
+        Log::debug() << "Index\tLCP\tPSV\tNSV" << std::endl;
         for(size_t i = 0; i < getBWTLength(); i++) {
             Log::debug() << i << "\t" << getLCP(i) << "\t" << getLCPPSV(i) <<
                 "\t" << getLCPNSV(i) << std::endl;
@@ -639,8 +642,7 @@ FMDPosition FMDIndex::count(std::string pattern) const {
 
 size_t FMDIndex::getLCP(size_t index) const {
     if(index >= getBWTLength()) {
-        // Trying to look out of range.
-        return 0;
+        throw std::runtime_error("Looking at out-of-bounds LCP value!");
     }
 
     // Go get the longest common prefix length from the array.
@@ -650,8 +652,7 @@ size_t FMDIndex::getLCP(size_t index) const {
 size_t FMDIndex::getLCPPSV(size_t index) const {
     
     if(index >= getBWTLength()) {
-        // Trying to look out of range.
-        return index;
+        throw std::runtime_error("Looking at out-of-bounds LCP PSV!");
     }
     
     // Go get the previous smaller value's index in the LCP array. Will
@@ -662,8 +663,7 @@ size_t FMDIndex::getLCPPSV(size_t index) const {
 size_t FMDIndex::getLCPNSV(size_t index) const {
 
     if(index >= getBWTLength()) {
-        // Trying to look out of range.
-        return index;
+        throw std::runtime_error("Looking at out-of-bounds LCP NSV!");
     }
 
     // Go get the next smaller value's index in the LCP array. Will
