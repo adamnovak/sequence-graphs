@@ -26,6 +26,10 @@ void MergeApplier::run() {
         
         if(source.isEmpty(lock)) {
             // We've finished our job.
+            
+            // Unlock the queue, even though nobody will use it again.
+            lock.unlock();
+            
             return;
         }
         

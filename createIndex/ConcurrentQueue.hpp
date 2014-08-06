@@ -76,7 +76,7 @@ public:
     
     /**
      * Add something to the end of the queue. Caller must hold a lock on the
-     * queue.
+     * queue. This takes a reference to a lock in the caller's scope.
      *
      * The lock passed is released, and a waiting thread, if any, is notified
      * that data is available.
@@ -124,6 +124,8 @@ public:
      * writer must call close() exactly once if the writer counting feature is
      * being used at all. After calling this function, a thread my not write to
      * the queue anymore.
+     *
+     * This uses a lock in the caller's scope.
      *
      * The lock passed is released.
      */
