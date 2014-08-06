@@ -49,11 +49,15 @@ ConcurrentQueue<Merge>& MappingMergeScheme::run() {
     // Grab the limits of the contig range belonging to this genome.
     auto genomeContigs = index.getGenomeContigs(genome);
     
-    Log::info() << "Running Mapping merge on " << NUM_THREADS << " threads" <<
+    // Don't start more threads than we have contigs.
+    size_t numThreads = std::min(MAX_THREADS, genomeContigs.second - 
+        genomeContigs.first);
+    
+    Log::info() << "Running Mapping merge on " << numThreads << " threads" <<
         std::endl;
     
     // Make the queue of merges    
-    queue = new ConcurrentQueue<Merge>(NUM_THREADS);
+    queue = new ConcurrentQueue<Merge>(numThreads);
     
     // And one for the contigs to merge
     contigsToMerge = new ConcurrentQueue<size_t>(1);
@@ -73,7 +77,7 @@ ConcurrentQueue<Merge>& MappingMergeScheme::run() {
     contigsToMerge->close(lock);
 
     // Start up a reasonable number of threads to do the work.
-    for(size_t threadID = 0; threadID < NUM_THREADS; threadID++) {
+    for(size_t threadID = 0; threadID < numThreads; threadID++) {
         threads.push_back(std::thread(&MappingMergeScheme::generateMerges,
                 this, contigsToMerge));
     }
@@ -250,10 +254,6 @@ void MappingMergeScheme::generateMerges(
             
         }
         
-        // Close the queue to say we're done.
-        auto lock = queue->lock();
-        queue->close(lock);
-        
         // Report that we're done.
         Log::info() << taskName << " finished (" << mappedBases << "|" << 
             unmappedBases << ")" << std::endl;
@@ -266,6 +266,10 @@ void MappingMergeScheme::generateMerges(
     // writing. Unlock it and finish the thread.
     // TODO: Should the queue just unlock if it happens to be empty?
     contigLock.unlock();
+    
+    // Close the output queue to say we're done.
+    auto lock = queue->lock();
+    queue->close(lock);
     
 }
 
