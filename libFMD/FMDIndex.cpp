@@ -558,7 +558,10 @@ void FMDIndex::retractRightOnly(FMDPosition& range,
     // where in the LCP that value is.
     bool startBigger = startLCP > endLCP;
     size_t lcp = startBigger ? startLCP : endLCP;
-    size_t lcpIndex = startBigger ? startLCP : endLCP;
+    size_t lcpIndex = startBigger ? rangeStart : rangeEnd;
+    
+    Log::debug() << "Parent node string depth: " << lcp << " at " << lcpIndex <<
+        std::endl;
     
     // The larger LCP value cuts down to the string depth of the parent.
     
@@ -571,10 +574,35 @@ void FMDIndex::retractRightOnly(FMDPosition& range,
         // The parent node string depth meets or excedes our new pattern length.
         // We need to be at that parent node or higher.
         
-        // We'll update rangeStart and rangeEnd to the LCP array indices that
-        // cut out the parent.
-        rangeStart = getLCPPSV(lcpIndex);
-        rangeEnd = getLCPNSV(lcpIndex);
+        if(lcp > 0) {
+            
+            // We'll update rangeStart and rangeEnd to the LCP array indices that
+            // cut out the parent.
+            rangeStart = getLCPPSV(lcpIndex);
+            rangeEnd = getLCPNSV(lcpIndex);
+        } else {
+            // The parent is the root and we just special-case take the whole
+            // thing, because you'll never find a smaller value.
+            rangeStart = 0;
+            rangeEnd = getBWTLength();
+        }
+        
+        Log::debug() << "PSV is " << getLCP(rangeStart) << " at " << 
+            rangeStart << std::endl;
+        
+        
+        
+        Log::debug() << "NSV is " << getLCP(rangeEnd) << " at " << 
+            rangeEnd << std::endl;
+            
+        // Dump the LCP between these bounds.
+        Log::debug() << "LCP snippet:";
+        Log::debug() << "Index\tLCP\tPSV\tNSV";
+        for(size_t i = 0; i < getBWTLength(); i++) {
+            Log::debug() << i << "\t" << getLCP(i) << "\t" << getLCPPSV(i) <<
+                "\t" << getLCPNSV(i) << std::endl;
+        } 
+        
         
         // Update the Range object to describe this range, converting end
         // indices around. The range will never be empty so we don't have to
@@ -582,8 +610,10 @@ void FMDIndex::retractRightOnly(FMDPosition& range,
         range.setForwardStart(rangeStart);
         range.setEndOffset(rangeEnd - rangeStart - 1);
         
-        // See if we need to retract more to meet that depth target.
-        retractRightOnly(range, newPatternLength);
+        if(lcp > newPatternLength) {
+            // We need to retract more to meet that depth target.
+            retractRightOnly(range, newPatternLength);
+        }
     }
 }
 
