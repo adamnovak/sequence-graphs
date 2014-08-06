@@ -1411,22 +1411,12 @@ Mapping FMDIndex::disambiguate(const Mapping& left,
     }
 }
 
-
-// TODO: To do full extension for credit mapping, just don't break out of loop
-// TODO: what if we map by extension? Both in this case and in the left-right case
-
-
-
-
-
-
 MisMatchAttemptResults FMDIndex::misMatchExtend(MisMatchAttemptResults& prevMisMatches,
 	char c, bool backward, size_t z_max, BitVectorIterator* mask) const {
     MisMatchAttemptResults nextMisMatches;
     nextMisMatches.is_mapped = false;
     nextMisMatches.characters = prevMisMatches.characters;
     
-
     // Note that we do not flip parameters when !backward since
     // FMDIndex::misMatchExtend uses FMDIndex::extend which performs
     // this step itself
@@ -1450,9 +1440,9 @@ MisMatchAttemptResults FMDIndex::misMatchExtend(MisMatchAttemptResults& prevMisM
         throw std::runtime_error(errorMessage);
     }
     
-    // To track how many mismatches we have in order to build our
-    // next priority queue in the correct order. We start with
-    // the minimum number of mismatches which generated a hit in
+    // z tracks how many mismatches each range has in order to
+    // sort our range-holding data structure. We initialize z with
+    // the minimum number of mismatches for which a context existed
     // the previous extension
         
     size_t z = prevMisMatches.positions.front().second;
@@ -1482,7 +1472,6 @@ MisMatchAttemptResults FMDIndex::misMatchExtend(MisMatchAttemptResults& prevMisM
 	m_position.first = it->first;
 	m_position.second = it->second;
 	
-	
 	// Check if we exhausted the search over all sequences in the
 	// queue with z mismatches. If so, search all exact-base
 	// extensions of level-z sequences to see if there is a single unique
@@ -1491,9 +1480,15 @@ MisMatchAttemptResults FMDIndex::misMatchExtend(MisMatchAttemptResults& prevMisM
 	
 	if(m_position.second != z) {
 	  
+	    // Built-in check to make sure our data structure holding all extended
+	    // context ranges has actually been arranged in mismatch number order
+	    // by the previous iteration of processMisMatchPositions
+	  
 	    if(m_position.second < z) {
 		throw std::runtime_error("Generated misordered mismatch list");
 	    }
+	    
+	    // Evaluate and search all extensions 
 	  	  	    
 	    processMisMatchPositions(nextMisMatches, waitingMatches, waitingMisMatches, mask);
 	    

@@ -54,10 +54,16 @@ ConcurrentQueue<Merge>& MappingMergeScheme::run() {
     // Make the queue    
     queue = new ConcurrentQueue<Merge>(threadCount);
     
+    // Start up a thread for every contig in this genome.
+    
     for(size_t contig = genomeContigs.first; contig < genomeContigs.second; 
         contig++) {
+      
+	// We require different contig merge generation methods for left-right
+	// schemes and for the centered schemes. Specification of mapping on
+	// credit and/or allowance for inexact matching are handled within
+	// these methods
         
-        // Start up a thread for every contig in this genome.
 	if(mapType == "LRexact") {
 	    Log::info() << "Using Left-Right exact contexts" << std::endl;
 	    threads.push_back(std::thread(&MappingMergeScheme::generateMerges,
@@ -96,6 +102,10 @@ void MappingMergeScheme::join() {
 
 void MappingMergeScheme::generateMerge(size_t queryContig, size_t queryBase, 
     size_t referenceContig, size_t referenceBase, bool orientation) const {
+      
+    // Right now credit merging schemes are attempting to merge off-contig
+    // positions but are otherwise behaving as expected. Throw warning and
+    // don't merge rather than runtime error until this is worked out.
     
     /*if(referenceBase > index.getContigLength(referenceContig) || 
         referenceBase == 0) {
@@ -131,6 +141,11 @@ void MappingMergeScheme::generateMerge(size_t queryContig, size_t queryBase,
     
     // Make a Merge between these positions.
     
+    // Right now credit merging schemes are attempting to merge off-contig
+    // positions but are otherwise behaving as expected. Throw warning and
+    // don't merge rather than runtime error until this is worked out.
+
+    
     if(queryBase > index.getContigLength(queryContig) || queryBase == 0 ||
 	referenceBase > index.getContigLength(referenceContig) || referenceBase == 0) {
 	
@@ -150,6 +165,9 @@ void MappingMergeScheme::generateMerge(size_t queryContig, size_t queryBase,
     
 }
 
+// Generate merges per-contig based on the centered family of
+// context schemes
+
 void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
     
     // What's our thread name?
@@ -159,6 +177,8 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
     // How many bases have we mapped or not mapped
     size_t mappedBases = 0;
     size_t unmappedBases = 0;
+    
+    // What fraction of the mapped bases map on credit?
     size_t creditBases = 0;
     
     // Grab the contig as a string
@@ -170,7 +190,8 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
         includedPositions.getSize()) << " bottom-level positions" << std::endl;
 	
     std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> Mappings;
-	
+    
+    // How do we want to perform the mapping?    
     if (mismatch) {
 	Log::info() << "Using mismatch mapping with z_max " << z_max << std::endl;
 
@@ -183,9 +204,10 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
     
     }
     
-    size_t leftSentinel = Mappings.size() - 1;
-    size_t rightSentinel = 0;
-    std::vector<size_t> creditCandidates;
+    // index::C(mis)map methods currently match ranges to leftmost positions in
+    // the context corresponding to the range. Correct this to the center position.
+    // We note that the matched contexts returned are guaranteed to have an odd
+    // number of bases
     
     std::pair<std::pair<size_t, size_t>, bool> MappingBases [Mappings.size()];
     
@@ -199,6 +221,15 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
 	    }
 	}
     }
+    
+    // Find the left and right sentinel positions: the leftmost and rightmost
+    // mapped positions in the contig. To ensure stability of credit mapping
+    // against elsewhere-mapping under extension of the input genome we will
+    // only credit map between these positions
+    
+    size_t leftSentinel = Mappings.size() - 1;
+    size_t rightSentinel = 0;
+    std::vector<size_t> creditCandidates;
     
     for(size_t i = 0; i < Mappings.size(); i++) {
 	// Scan for the first mapped position in this contig
@@ -236,25 +267,33 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
             mappedBases++;
 	} else {
             // Didn't map this one
+	  
+	    // Enqueue it in a left-to-right position-ordered vector of
+	    // unmapped positions to be checked for credit
+	  
             unmappedBases++;
 	    if(i > leftSentinel && i < rightSentinel) {
 		creditCandidates.push_back(i);
 	    }
 	}
     }
-    
+        
     if(credit) {
+      
+    // Perform mapping on credit on unmapped positions between the sentinel nodes
     
     int64_t firstR = -1;
     bool contextMappedR;
     int64_t firstL = -1;
     bool contextMappedL;
     int64_t centeredOffset;
-        
-    
+            
     size_t maxContext = 0;
     
     Log::info() << "Checking " << creditCandidates.size() << " unmapped positions \"in the middle\"" << std::endl;
+    
+    // What is the maximum context length of any base in the contig? We will not
+    // search beyond this bound for neighbouring bases to provide credit
     
     for(size_t i; i < Mappings.size(); i++) {
 	if(Mappings[i].second.second > maxContext) {
@@ -262,19 +301,26 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
 	}
     }
     
-    Log::info() << "Max context is " << maxContext << std::endl;
+    Log::debug() << "Max context is " << maxContext << std::endl;
         
+    // We search the unmapped positions between the sentinel nodes, scanning
+    // left-to-right.
+    
     for(size_t i = 0; i < creditCandidates.size(); i++) {
 	std::pair<std::pair<size_t,size_t>,bool> firstBaseR;
 	std::pair<std::pair<size_t,size_t>,bool> firstBaseL;
 	
-	
 	contextMappedR = true;
-	contextMappedL = true;	
+	contextMappedL = true;
+
+	// Starting at the unmapped position under consideration, scan leftward
+	// for contexts containing it
+	  
 	for(size_t j = creditCandidates[i] - 1; j + 1 > 1 && creditCandidates[i] - j < maxContext; j--) {
-	    // Search leftward from each position until you find a position
-	    // whose context includes creditCandidates[i]
-	    	  
+	    
+	    // Find the first position containing creditCandidates[i] in its maximal
+	    // context
+	  
 	    if(firstR == -1) {
 		if(Mappings[j].second.second > creditCandidates[i] - j) {
 		    firstBaseR = MappingBases[j];
@@ -285,10 +331,12 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
 	    // in its right context we want to see if subsequent positions map to
 	    // the same place
 	    
-	    // Terminate the search at the first base you come to which no longer
+	    // Terminate the search at the first base found which no longer
 	    // has our base in its right context. It is not possible that a position
 	    // farther to the left has our base in its right context and continues
 	    // to map to the same place as before
+	    
+	    // TODO: prove rigorously that this is true
 		
 	    } else {
 		if(Mappings[j].second.second > creditCandidates[i] - j) {
@@ -297,6 +345,10 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
 		    } else {
 			centeredOffset = firstR - j;
 		    }
+		    
+		    // Check if this other credit-providing position matches our "credit candidate"
+		    // to another position in the reference. If so terminate the search and don't
+		    // merge
 		    
 		    if(MappingBases[j].first.second != firstBaseR.first.second + centeredOffset ||
 			    MappingBases[j].second != firstBaseR.second ||
@@ -308,31 +360,41 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
 	    }
 	}
 	
+	// Search rightward for left context
+	
 	for(size_t j = creditCandidates[i] + 1; j < Mappings.size() && j - creditCandidates[i] < maxContext; j++) {
 	    
-	  if(firstL == -1) {
+	    // What's the nearest position containing our candidate in its context?
+	  
+	    if(firstL == -1) {
 		if(Mappings[j].second.second > j - creditCandidates[i]) {
 		    firstBaseL = MappingBases[j];
 		    firstL = j;
 		}
 	    } else {
+	      
+		// Make sure our credit mapping is consistent
+		
 		if(Mappings[j].second.second > j - creditCandidates[i]) {
-		  if(!MappingBases[j].second) {
+		    if(!MappingBases[j].second) {
 			centeredOffset = j - firstL;
-		  } else {
+		    } else {
 			centeredOffset = firstL - j;
-		  }
+		    }
 		  
 		    if(MappingBases[j].first.second != firstBaseL.first.second + centeredOffset ||
-			    MappingBases[j].second != firstBaseL.second ||
-			    MappingBases[j].first.first != firstBaseL.first.first) {
+			  MappingBases[j].second != firstBaseL.second ||
+			  MappingBases[j].first.first != firstBaseL.first.first) {
+		    
 			contextMappedL = false;
 			break;
 		    }
 		}
 	    }
 	}
-		    
+	
+	// Check if our position was credit mapped on the left, and if this mapping
+	// was furthermore consistent
 		    
 	if(firstR != -1 && contextMappedR) {
 	    firstBaseR.first.second = firstBaseR.first.second + creditCandidates[i] - firstR;
