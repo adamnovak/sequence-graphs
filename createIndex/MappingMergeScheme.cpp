@@ -101,6 +101,21 @@ void MappingMergeScheme::join() {
     // Probably not a good idea to join the same threads twice.
     threads.clear();
     
+    if(contigsToMerge != NULL) {
+        auto lock = contigsToMerge->lock();
+        if(!contigsToMerge->isEmpty(lock)) {
+            // Don't hold a lock and throw an exception.
+            lock.unlock();
+        
+            // Complain our thread pool somehow broke.
+            throw std::runtime_error(
+                "Jobs left in queue after threads have terminated.");
+        } else {
+            // Everything is fine, but we still need to unlock.
+            lock.unlock();
+        }
+    }
+    
 }
 
 void MappingMergeScheme::generateMerge(size_t queryContig, size_t queryBase, 
