@@ -547,7 +547,7 @@ void FMDIndex::retractRightOnly(FMDPosition& range,
     size_t rangeStart = range.getForwardStart();
     size_t rangeEnd = range.getForwardStart() + range.getEndOffset() + 1;
     
-    Log::debug() << "Retracting from [" << rangeStart << ", " << rangeEnd << 
+    Log::trace() << "Retracting from [" << rangeStart << ", " << rangeEnd << 
         ")" << std::endl;
     
     // rangeEnd may be actually past the end of the LCP array now. That is OK,
@@ -569,7 +569,7 @@ void FMDIndex::retractRightOnly(FMDPosition& range,
     // Now lcpIndex is guaranteed to be a real index in the LCP array, not off
     // the end.
     
-    Log::debug() << "Parent node string depth: " << lcp << " at " << lcpIndex <<
+    Log::trace() << "Parent node string depth: " << lcp << " at " << lcpIndex <<
         std::endl;
     
     // The larger LCP value cuts down to the string depth of the parent.
@@ -590,22 +590,6 @@ void FMDIndex::retractRightOnly(FMDPosition& range,
         // Note that rangeEnd can be off the end of the LCP array now, if we
         // have moved up to the root node.
         rangeEnd = getLCPNSV(lcpIndex);
-        
-        Log::debug() << "PSV is " << getLCP(rangeStart) << " at " << 
-            rangeStart << std::endl;
-        
-        Log::debug() << "NSV is " << 
-            ((rangeEnd < getBWTLength()) ? getLCP(rangeEnd) : -1) << " at " << 
-            rangeEnd << std::endl;
-            
-        // Dump the LCP between these bounds.
-        Log::debug() << "LCP snippet:" << std::endl;
-        Log::debug() << "Index\tLCP\tPSV\tNSV" << std::endl;
-        for(size_t i = 0; i < getBWTLength(); i++) {
-            Log::debug() << i << "\t" << getLCP(i) << "\t" << getLCPPSV(i) <<
-                "\t" << getLCPNSV(i) << std::endl;
-        } 
-        
         
         // Update the Range object to describe this range, converting end
         // indices around. The range will never be empty so we don't have to
