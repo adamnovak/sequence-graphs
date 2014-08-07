@@ -192,11 +192,11 @@ void MappingMergeScheme::generateMerges(
             std::endl;
         
         // Map it on the right
-        std::vector<int64_t> rightMappings = index.map(rangeVector, contig, 
+        std::vector<int64_t> rightMappings = index.mapRight(rangeVector, contig, 
             &includedPositions, minContext);
         
         // Map it on the left
-        std::vector<int64_t> leftMappings = index.map(rangeVector, 
+        std::vector<int64_t> leftMappings = index.mapRight(rangeVector, 
             reverseComplement(contig), &includedPositions, minContext);
         
         // Flip the left mappings back into the original order. They should stay
