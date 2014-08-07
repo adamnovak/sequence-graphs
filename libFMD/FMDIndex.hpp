@@ -264,36 +264,41 @@ public:
      **************************************************************************/
       
     /**
-     * Attempt to LEFT-map each base in the query string to a (text, position)
+     * Attempt to RIGHT-map each base in the query string to a (text, position)
      * pair. The vector returned will have one entry for each character in the
-     * selected range.
+     * selected range. Things that right-map to forward strands are on even
+     * texts.
      * 
      * If a mask is non-NULL, only positions in the index with a 1 in the mask
      * will be counted for mapping purposes.
      *
-     * Optionally a start and length for the region to map can be specified. The
-     * whole string will be used as context, but only that region will actually
-     * be mapped. A length of -1 means to use the entire string after the start,
-     * and is the default.
      */
-    std::vector<Mapping> map(const std::string& query, const BitVector* mask, 
-        int minContext = 0, int start = 0, int length = -1) const;
+    std::vector<Mapping> mapRight(const std::string& query, 
+        const BitVector* mask, int minContext = 0) const;
         
     /**
-     * LEFT-map to a specific genome, or to all genomes if genome is -1. Same
+     * RIGHT-map to a specific genome, or to all genomes if genome is -1. Same
      * semantics as the function above.
      */
-    std::vector<Mapping> map(const std::string& query, int64_t genome = -1, 
-        int minContext = 0, int start = 0, int length = -1) const;
+    std::vector<Mapping> mapRight(const std::string& query, int64_t genome = -1, 
+        int minContext = 0) const;
+     
+    /**
+     * LEFT-map to a specific genome, or to all genomes if genome is -1. Same
+     * semantics as the function above. Things that left-map to forward strands
+     * are on even texts.
+     */    
+    std::vector<Mapping> mapLeft(const std::string& query,
+        int64_t genome = -1, int minContext = 0) const;
     
     /**
      * Both left- and right-map the given string to the given genome (or all
-     * genomes if genome is -1). Start and length can optionally be used to
-     * select a region; a length of -1 means to use the entire string after the
-     * start.
+     * genomes if genome is -1). Things that map to forward strands are on even
+     * texts.
      */
     std::vector<Mapping> mapBoth(const std::string& query, int64_t genome = -1, 
-        int minContext = 0, int start = 0, int length = -1) const;
+        int minContext = 0) const;
+        
       
     /**
      * Try RIGHT-mapping each base in the query to one of the ranges represented
@@ -302,8 +307,6 @@ public:
      * gives the one-based number of the range containing position k, and we can
      * easily check if both the start and end of our (backwards) search interval
      * are in the same range.
-     *
-     * TODO: Unify semantics!
      *
      * The range starting points must be such that the ranges described are "bi-
      * ranges": each range has its reverse-complement range also present.
@@ -314,17 +317,17 @@ public:
      * Returns a vector of one-based range numbers for left-mapping each base,
      * or -1 if the base did not map to a range.
      */
-    std::vector<int64_t> map(const BitVector& ranges,
-        const std::string& query, const BitVector* mask, int minContext = 0, 
-        int start = 0, int length = -1) const;
+    std::vector<int64_t> mapRight(const BitVector& ranges,
+        const std::string& query, const BitVector* mask,
+        int minContext = 0) const;
         
     /**
      * RIGHT-map to ranges using contexts from a specific genome, or all genomes
      * if genome is -1. Same semantics as the function above.
      */
-    std::vector<int64_t> map(const BitVector& ranges,
-        const std::string& query, int64_t genome = -1, int minContext = 0, 
-        int start = 0, int length = -1) const;
+    std::vector<int64_t> mapRight(const BitVector& ranges,
+        const std::string& query, int64_t genome = -1,
+        int minContext = 0) const;
         
     /***************************************************************************
      * Iteration Functions
@@ -335,6 +338,7 @@ public:
      * tree easily.
      */
     typedef FMDIndexIterator iterator;
+    
     /**
      * const_iterator is the same as the normal iterator, since it would be
      * silly to try and modify the suffix tree we're iterating over.
@@ -477,10 +481,8 @@ protected:
         
     /**
      * Given a left mapping and a right mapping for a base, disambiguate them to
-     * produce one left mapping. If only one of them is actually mapped, returns
-     * that converted to a left mapping. If they are both mapped to opposite
-     * sides of the same base, returns the left one. Otherwise, returns an
-     * unmapped Mapping.
+     * produce one mapping. Things that consistently left and right-mapped to a
+     * forward strand will be on an even text.
      */
     Mapping disambiguate(const Mapping& left, const Mapping& right) const;
       

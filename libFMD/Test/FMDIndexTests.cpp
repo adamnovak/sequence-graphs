@@ -252,10 +252,11 @@ void FMDIndexTests::testDisambiguate() {
     Mapping elsewhere(TextPosition(2, 10));
     
     // Make sure disambiguate does the right things
-    CPPUNIT_ASSERT(index->disambiguate(mapped, otherSide) == mapped);
-    CPPUNIT_ASSERT(index->disambiguate(otherSide, mapped) == otherSide);
+    CPPUNIT_ASSERT(index->disambiguate(mapped, otherSide).is_mapped == false);
+    CPPUNIT_ASSERT(index->disambiguate(otherSide, mapped).is_mapped == false);
     CPPUNIT_ASSERT(index->disambiguate(mapped, unmapped) == mapped);
-    CPPUNIT_ASSERT(index->disambiguate(unmapped, mapped) == otherSide);
+    CPPUNIT_ASSERT(index->disambiguate(unmapped, mapped) == mapped);
+    CPPUNIT_ASSERT(index->disambiguate(mapped, mapped) == mapped);
     CPPUNIT_ASSERT(index->disambiguate(unmapped, unmapped).is_mapped == false);
     CPPUNIT_ASSERT(index->disambiguate(elsewhere, mapped).is_mapped == false);
 }
@@ -268,11 +269,27 @@ void FMDIndexTests::testMap() {
     // Grab all of the first contig.
     std::string query = "CATGCTTCGGCGATTCGACGCTCATCTGCGACTCT";
     
-    // Map all of the first contig.
+    // Map all of the first contig left, right, and both
+    std::vector<Mapping> leftMappings = index->mapLeft(query);
+    std::vector<Mapping> rightMappings = index->mapRight(query);
     std::vector<Mapping> mappings = index->mapBoth(query);
     
     for(size_t i = 0; i < query.size(); i++ ) {
+        Log::output() << leftMappings[i] << "\t" << mappings[i] << "\t" << rightMappings[i] << std::endl;
+    }
+    
+    for(size_t i = 0; i < query.size(); i++ ) {
         // Make sure each base maps in order
+        if(leftMappings[i].is_mapped) {
+            CPPUNIT_ASSERT(leftMappings[i].location.getText() == 0);
+            CPPUNIT_ASSERT(leftMappings[i].location.getOffset() == i);
+        }
+        
+        if(rightMappings[i].is_mapped) {
+            CPPUNIT_ASSERT(rightMappings[i].location.getText() == 0);
+            CPPUNIT_ASSERT(rightMappings[i].location.getOffset() == i);
+        }
+        
         CPPUNIT_ASSERT(mappings[i].is_mapped == true);
         CPPUNIT_ASSERT(mappings[i].location.getText() == 0);
         CPPUNIT_ASSERT(mappings[i].location.getOffset() == i);

@@ -75,7 +75,7 @@ jar-install: libfmd.jar
 	swig -c++ -java -outdir java -package $(JAVA_PACKAGE) $(SIZE_FLAGS) $(VECTOR_FLAGS) $<
 
 clean:
-	rm -Rf *.o testRunner libfmd.a libfmd.so libfmd.jar java/ jar/ *_wrap.cxx
+	rm -Rf $(TEST_OBJS) $(OBJS) testRunner libfmd.a libfmd.so libfmd.jar java/ jar/ *_wrap.cxx
 	
 test: check
 

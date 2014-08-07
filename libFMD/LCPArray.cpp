@@ -3,7 +3,7 @@
 // We need SAElems, so we might as well explicitly include their file.
 #include <STCommon.h>
 
-#include <Log.hpp>
+#include "Log.hpp"
 
 #include <iterator>
 #include <iostream>
