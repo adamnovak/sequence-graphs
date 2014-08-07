@@ -275,7 +275,8 @@ void FMDIndexTests::testMap() {
     std::vector<Mapping> mappings = index->mapBoth(query);
     
     for(size_t i = 0; i < query.size(); i++ ) {
-        Log::output() << leftMappings[i] << "\t" << mappings[i] << "\t" << rightMappings[i] << std::endl;
+        Log::output() << leftMappings[i] << "\t" << mappings[i] << "\t" << 
+            rightMappings[i] << std::endl;
     }
     
     for(size_t i = 0; i < query.size(); i++ ) {
@@ -316,6 +317,41 @@ void FMDIndexTests::testMap() {
         CPPUNIT_ASSERT(mappings[i].is_mapped == true);
         CPPUNIT_ASSERT(mappings[i].location.getText() == 0);
         CPPUNIT_ASSERT(mappings[i].location.getOffset() == i);
+    }
+    
+    // Concatenate them together
+    std::string query3 = ("CATGCTTCGGCGATTCGACGCTCATCTGCGACTCTAGAGTCGCAGATGAGCG"
+        "TCGAATCGCCGAAGCATG");
+    
+    // Map all of the concatenated result
+    leftMappings = index->mapLeft(query3);
+    rightMappings = index->mapRight(query3);
+    mappings = index->mapBoth(query3);
+    
+    Log::output() << "Concatenated:" << std::endl;
+    
+    for(size_t i = 0; i < query3.size(); i++ ) {
+        Log::output() << query3[i] << "\t" << leftMappings[i] << "\t" << 
+            mappings[i] << "\t" << rightMappings[i] << std::endl;
+    }
+    
+    for(size_t i = 0; i < query3.size(); i++ ) {
+        // Make sure each part of the mapping is right
+        if(i < 33) {
+            // Should be text 0 (but last 2 are unmapped)
+            CPPUNIT_ASSERT(mappings[i].is_mapped == true);
+            CPPUNIT_ASSERT(mappings[i].location.getText() == 0);
+            CPPUNIT_ASSERT(mappings[i].location.getOffset() == i);
+        } else if(i >= 37){
+            // Should be text 1 (but first two are unmapped)
+            CPPUNIT_ASSERT(mappings[i].is_mapped == true);
+            CPPUNIT_ASSERT(mappings[i].location.getText() == 1);
+            CPPUNIT_ASSERT(mappings[i].location.getOffset() == i - 35);
+        } else {
+            // There's a bubble between them
+            CPPUNIT_ASSERT(mappings[i].is_mapped == false);
+        }
+        
     }
 }
 
