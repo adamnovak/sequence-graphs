@@ -70,10 +70,16 @@ protected:
 
     /**
      * Get the character at the given offset into the given suffix in the given
-     * collection of strings.
+     * collection of strings. Returns the end-of-text character when
+     * appropriate.
      */
     static inline char getFromSuffix(const SAElem& suffix, size_t offset,
         const ReadTable& strings) {
+    
+        if(strings.getReadLength(suffix.getID()) == suffix.getPos() + offset) {
+            // This is the end of the suffix.
+            return '$';
+        }
     
         // Split out the text and offset from the suffix, and offset the offset.
         return strings.getChar(suffix.getID(), suffix.getPos() + offset);    
@@ -98,17 +104,24 @@ protected:
     static inline void increment(SAElem& target, const ReadTable& strings) {
         Log::trace() << "Incrementing" << std::endl;
         
-        // How much of this suffix is left?
-        size_t suffixLength = getSuffixLength(target, strings);
-        
-        if(suffixLength > 0) {
-            // There's room to advance in the string
-            target.setPos(target.getPos() + 1);
-        } else {
-            // We need to advance to the start of the next string
+        if(strings.getReadLength(target.getID()) == target.getPos()) {
+            // Wrap to the start of the next string from the end-of-text
+            // character of this one.
             target.setID(target.getID() + 1);
             target.setPos(0);
+        
+            if(target.getID() == strings.getCount()) {
+                // Wrap from the last string to the first one.
+                target.setID(0);
+            }
+            
+            Log::trace() << "Wrapped to " << target << std::endl;
+        
+        } else {
+            // Just go to the next position.
+            target.setPos(target.getPos() + 1);
         }
+        
     }
     
     /**
@@ -119,23 +132,25 @@ protected:
         
         Log::trace() << "Incrementing by " << offset << std::endl;
         
-        while(offset > 0) {
-            
-            Log::trace() << "Offset: " << offset << std::endl;
+        // Offset the position in the string
+        target.setPos(target.getPos() + offset);
         
-            // How much of this suffix is left?
-            size_t suffixLength = getSuffixLength(target, strings);
+        while(target.getPos() > strings.getReadLength(target.getID())) {
+            // Figure out what string that is really on.
             
-            if(suffixLength > offset) {
-                // There's room to advance in the string. Just do that.
-                target.setPos(target.getPos() + offset);
-                offset = 0;
-            } else {
-                // Go to the next string and see how much room that buys us.
-                offset -= suffixLength;
-                target.setID(target.getID() + 1);
-                target.setPos(0);
+            // Take off the length of the string plus the end-of-text character.
+            target.setPos(target.getPos() - 
+                strings.getReadLength(target.getID()) - 1);
+                
+            // Up the ID.
+            target.setID(target.getID() + 1);
+            
+            if(target.getID() == strings.getCount()) {
+                // Wrap from the last string to the first one.
+                target.setID(0);
             }
+            
+            Log::trace() << "Wrapped to " << target << std::endl;
         }
         
     }

@@ -26,8 +26,8 @@ LCPArray::LCPArray(const SuffixArray& suffixArray, const ReadTable& strings): va
     
     // We need to iterate through suffix array positions in order by text
     // position. We make a map from SAElem to rank, exploiting the fact that
-    // std::map is sorted in ascending order.
-    std::map<SAElem, size_t> ranks;
+    // std::map is sorted. But we need to tell it a better sort order.
+    std::map<SAElem, size_t, std::greater<SAElem>> ranks;
     
     Log::info() << "Calculating ranks" << std::endl;
     
@@ -60,48 +60,46 @@ LCPArray::LCPArray(const SuffixArray& suffixArray, const ReadTable& strings): va
         // Get the suffix before this one
         SAElem prevSuffix = suffixArray.get(entry.second - 1);
         
-        Log::info() << "LCP of " << currentSuffix << " and " << prevSuffix << 
-            " is: " << std::endl;
-        
-        Log::debug() << "Current: " << currentSuffix << " Prev: " <<
-            prevSuffix << std::endl;
+        Log::info() << "LCP of " << currentSuffix << " @ " << entry.second << 
+            " and " << prevSuffix <<  " @ " << entry.second - 1 << " is: " <<
+            std::endl;
         
         // Budge each suffix up to the height we're supposed to use. May break
         // runtime bound...
         incrementBy(currentSuffix, height, strings);
         incrementBy(prevSuffix, height, strings);
         
-        Log::trace() << currentSuffix << " vs. " << prevSuffix << std::endl;
+        Log::info() << currentSuffix << " vs. " << prevSuffix << std::endl;
         
-        if(inRange(currentSuffix, strings) && inRange(prevSuffix, strings)) {
-            Log::trace() << getFromSuffix(currentSuffix, 0, strings) << 
-                " vs. " << getFromSuffix(prevSuffix, 0, strings) << std::endl;
-        }
+        Log::info() << getFromSuffix(currentSuffix, 0, strings) << 
+            " vs. " << getFromSuffix(prevSuffix, 0, strings) << std::endl;
         
-        while(inRange(currentSuffix, strings) && 
-            inRange(prevSuffix, strings) && 
-            getFromSuffix(currentSuffix, 0, strings) == 
-            getFromSuffix(prevSuffix, 0, strings)) {
+        while(getFromSuffix(currentSuffix, 0, strings) == 
+            getFromSuffix(prevSuffix, 0, strings) && 
+            getFromSuffix(prevSuffix, 0, strings) != '$') {
             
-            // While this suffix and the previous one match, keep scanning.
+            // While this suffix and the previous one match, keep scanning. We
+            // automatically define end-of-text characters to be distinct for
+            // each text, and since you can't have the same suffix of *the same
+            // text* twice, we can just say they never match anything.
+
+            // Advance the height by 1 since we matched.
             height++;
             increment(currentSuffix, strings);
             increment(prevSuffix, strings);
             
-            Log::trace() << currentSuffix << " vs. " << prevSuffix << std::endl;
+            Log::info() << currentSuffix << " vs. " << prevSuffix << std::endl;
                 
-            if(inRange(currentSuffix, strings) && inRange(prevSuffix, strings)) {
-                Log::trace() << getFromSuffix(currentSuffix, 0, strings) << 
-                    " vs. " << getFromSuffix(prevSuffix, 0, strings) << 
-                    std::endl;
-            }
+            Log::info() << getFromSuffix(currentSuffix, 0, strings) << 
+                " vs. " << getFromSuffix(prevSuffix, 0, strings) << 
+                std::endl;
             
         }
         
         // Store the LCP value
         values[entry.second] = height;
         
-        Log::info() << height << " at " << entry.second << std::endl;
+        Log::info() << "LCP[" << entry.second << "]=" << height << std::endl;
         
         if(height > 0) {
             // If height isn't 0, dial it back. Not really sure how that
@@ -109,6 +107,8 @@ LCPArray::LCPArray(const SuffixArray& suffixArray, const ReadTable& strings): va
             // mixing up their variables), so it ought to work in practice.
             height--;
         }
+        
+        //throw std::runtime_error("Stop!");
         
     }
     
