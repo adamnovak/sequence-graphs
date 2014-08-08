@@ -88,7 +88,7 @@ protected:
         return strings.getReadLength(suffix.getID()) - suffix.getPos();
         
     }
-
+    
     // Store all the LCP array entries.
     std::vector<size_t> values;
     
@@ -97,6 +97,27 @@ protected:
     
     // Store the index of the next smaller value for each position.
     std::vector<size_t> nsvs;
+    
+private:
+    
+    /**
+     * Helper method for the constructor. Visit the suffix tree node at the
+     * given interval (start inclusive, end exclusive), find all its internal
+     * nodes, fill in the LCP array and PSV/NSV indices for the boumdaries of
+     * those internal nodes, and then recurse into each.
+     */
+    void exploreSuffixTreeNode(const SuffixArray& suffixArray, 
+        const ReadTable& strings, size_t depth, size_t start, size_t end);
+    
+    /**
+     * Binary-search the suffix array at the given depth for the given
+     * character. Returns the first index of that character between start
+     * (inclusive) and end (exclusive), or the position of the next larger
+     * character (or end) if it is not present.
+     */
+    size_t binarySearch(const SuffixArray& suffixArray, 
+        const ReadTable& strings, size_t depth, size_t start, size_t end,
+        char value) const; 
     
 };
 

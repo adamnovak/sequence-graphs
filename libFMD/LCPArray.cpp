@@ -16,6 +16,18 @@ LCPArray::LCPArray(const SuffixArray& suffixArray, const ReadTable& strings): va
         // Just have a 0-length LCP if there are absolutely no suffixes.
         return;    
     }
+    
+    // We shall traverse the suffix tree, and fill in the LCP, PSV, and NSV
+    // arrays.
+    
+    // First make the arrays big enough
+    values.resize(suffixArray.getSize());
+    psvs.resize(suffixArray.getSize());
+    nsvs.resize(suffixArray.getSize());
+
+    exploreSuffixTreeNode(0, 0, siffixArray.getSize() - 1);
+    
+    return;
 
     // We need to scan the suffix array and fill in the values vector.
     
@@ -155,6 +167,72 @@ void LCPArray::save(const std::string& filename) const {
     // Close up the file
     file.close();
     
+}
+
+void LCPArray::exploreSuffixTreeNode(const SuffixArray& suffixArray, 
+    const ReadTable& strings, size_t depth, size_t start, size_t end) {
+
+    // Find all of the child nodes: one for each DNA base
+    
+    // For each child node, for each boundary that isn't also our boundary, set
+    // the LCP to our depth.
+    
+    // Set the NSV and PSV to our boundaries.
+    
+    
+
+}
+
+size_t LCPArray::binarySearch(const SuffixArray& suffixArray, 
+    const ReadTable& strings, size_t depth, size_t start, size_t end,
+    char value) const {
+    
+    // Where is the middle? This will be start for a 1-element range.
+    size_t middle = start + (end - start) / 2;
+    char middleChar = getFromSuffix(suffixArray.get(middle), depth, strings);
+    
+    if(end - start == 1) {
+        // This is a 1-element range
+        
+        if(middleChar == value) {
+            // The middle character (which is going to be at the start position)
+            // is the first instance of our value.
+            return middle;
+        } else {
+            // Our search target doesn't appear.
+            return end;
+        }
+    }
+    
+    size_t nextStart = start;
+    size_t nextEnd = end;
+    
+    // Test the middle
+    if(middleChar < value) {
+        // The character we found is too small.
+        // Recurse right.
+        nextStart = middle + 1;
+    } else if(middleChar > value) {
+        // The character is too large.
+        // Recurse left, throwing out this character.
+        nextEnd = middle;
+    } else {
+        // The character we found is just right.
+        // Recurse left, but keep this character in.
+        nextEnd = middle + 1;
+    }
+    
+    // Recurse
+    size_t found = binarySearch(suffixArray, strings, depth, nextStart, nextEnd,
+        value);
+        
+    if(found == nextEnd) {
+        // Our recusrion couldn't find it, so we can't either.
+        return end;
+    }
+    
+    return found;
+
 }
 
 
