@@ -140,7 +140,7 @@ void FMDIndexTests::testDump() {
     
         std::cout << i << ": " << index->displayFirst(i) << " " << 
             forwardReconstruction << " " << index->display(i) << " " << 
-            index->isInGenome(i, 0) << std::endl;
+            index->isInGenome(i, 0) << " " << index->getLCP(i) << std::endl;
     }
     
 }

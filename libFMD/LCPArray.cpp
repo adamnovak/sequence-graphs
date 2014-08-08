@@ -17,61 +17,105 @@ LCPArray::LCPArray(const SuffixArray& suffixArray, const ReadTable& strings): va
         return;    
     }
     
-    // We shall traverse the suffix tree, and fill in the LCP, PSV, and NSV
-    // arrays.
+    // We shall use the algorithm of Kasai et al. 2001: "Linear-Time Longest-
+    // Common-Prefix Computation in Suffx Arrays and Its Applications"
+    // See <http://www.cs.iastate.edu/~cs548/references/linear_lcp.pdf>
     
-    // First make the arrays big enough
+    // Make the LCP big enough to hold everything.
     values.resize(suffixArray.getSize());
-    psvs.resize(suffixArray.getSize());
-    nsvs.resize(suffixArray.getSize());
-
-    exploreSuffixTreeNode(0, 0, siffixArray.getSize() - 1);
     
-    return;
-
-    // We need to scan the suffix array and fill in the values vector.
+    // We need to iterate through suffix array positions in order by text
+    // position. We make a map from SAElem to rank, exploiting the fact that
+    // std::map is sorted in ascending order.
+    std::map<SAElem, size_t> ranks;
     
-    // The first value is always 0. Nothing is shared with the before-the-
-    // beginning suffix. But this position (0) is also used as the "no previous
-    // smaller value available" position.
-    values.push_back(0);
+    Log::info() << "Calculating ranks" << std::endl;
     
-    // This holds the last suffix that we need to compare the next one to.
-    SAElem last = suffixArray.get(0);
+    for(size_t i = 0; i < suffixArray.getSize(); i++) {
+        // Fill in all the ranks
+        ranks[suffixArray.get(i)] = i;
+    }
     
-    for(size_t i = 1; i < suffixArray.getSize(); i++) {
-        // For each subsequent suffix
+    Log::info() << "Applying Kasai's Algorithm" << std::endl;
+    
+    // The algorithm keeps this state as it goes through suffixes in rank order.
+    size_t height = 0;
+    
+    for(auto entry : ranks) {
+        // Go through all the element, rank pairs. Entry is a pair of a SAElem
+        // and its rank.
         
-        SAElem next = suffixArray.get(i);
+        // Grab the suffix as a local.
+        SAElem currentSuffix = entry.first;
         
-        Log::trace() << "Suffix " << next << " length " << 
-            getSuffixLength(next, strings) << " vs. " << last << " length " << 
-            getSuffixLength(last, strings) << std::endl;
+        Log::trace() << currentSuffix << " at rank " << entry.second <<
+            std::endl;
         
-        // lcp will hold the longest common prefix for this pair.
-        size_t lcp;
-        for(lcp = 0; lcp < getSuffixLength(last, strings) && 
-            lcp < getSuffixLength(next, strings); lcp++) {
+        if(entry.second == 0) {
+            // Skip the very first because it has no predecessor
+            values[entry.second] = 0;
+            continue;
+        }
+        
+        // Get the suffix before this one
+        SAElem prevSuffix = suffixArray.get(entry.second - 1);
+        
+        Log::info() << "LCP of " << currentSuffix << " and " << prevSuffix << 
+            " is: " << std::endl;
+        
+        Log::debug() << "Current: " << currentSuffix << " Prev: " <<
+            prevSuffix << std::endl;
+        
+        // Budge each suffix up to the height we're supposed to use. May break
+        // runtime bound...
+        incrementBy(currentSuffix, height, strings);
+        incrementBy(prevSuffix, height, strings);
+        
+        Log::trace() << currentSuffix << " vs. " << prevSuffix << std::endl;
+        
+        if(inRange(currentSuffix, strings) && inRange(prevSuffix, strings)) {
+            Log::trace() << getFromSuffix(currentSuffix, 0, strings) << 
+                " vs. " << getFromSuffix(prevSuffix, 0, strings) << std::endl;
+        }
+        
+        while(inRange(currentSuffix, strings) && 
+            inRange(prevSuffix, strings) && 
+            getFromSuffix(currentSuffix, 0, strings) == 
+            getFromSuffix(prevSuffix, 0, strings)) {
             
-            // For every character that the two suffixes have
+            // While this suffix and the previous one match, keep scanning.
+            height++;
+            increment(currentSuffix, strings);
+            increment(prevSuffix, strings);
             
-            Log::trace() << "Char " << getFromSuffix(next, lcp, strings) << 
-                " vs. " << getFromSuffix(last, lcp, strings) << std::endl;
-            
-            if(getFromSuffix(last, lcp, strings) != 
-                getFromSuffix(next, lcp, strings)) {
-                // They don't match here, so end the longest common prefix.
-                break;
+            Log::trace() << currentSuffix << " vs. " << prevSuffix << std::endl;
+                
+            if(inRange(currentSuffix, strings) && inRange(prevSuffix, strings)) {
+                Log::trace() << getFromSuffix(currentSuffix, 0, strings) << 
+                    " vs. " << getFromSuffix(prevSuffix, 0, strings) << 
+                    std::endl;
             }
             
         }
         
-        // Now save that prefix length
-        values.push_back(lcp);
+        // Store the LCP value
+        values[entry.second] = height;
         
-        // Now advance to the next suffix.
-        last = next;
+        Log::info() << height << " at " << entry.second << std::endl;
+        
+        if(height > 0) {
+            // If height isn't 0, dial it back. Not really sure how that
+            // balances out, but they proved this would work with math (despite
+            // mixing up their variables), so it ought to work in practice.
+            height--;
+        }
+        
     }
+    
+    // Now we should have calculated the whole LCP. Reclaim some memory.
+    ranks.clear(); 
+    
+    Log::info() << "Scanning for PSVs" << std::endl;
     
     // OK, now we need to construct the PSV/NSV indexes. The easiest way is with
     // scans.
@@ -98,6 +142,8 @@ LCPArray::LCPArray(const SuffixArray& suffixArray, const ReadTable& strings): va
     }
     
     // TODO: Just 1 scan?
+    
+    Log::info() << "Scanning for NSVs" << std::endl;
     
     // Now the same for the NSV
     for(size_t i = 0; i < values.size(); i++) {
@@ -168,78 +214,3 @@ void LCPArray::save(const std::string& filename) const {
     file.close();
     
 }
-
-void LCPArray::exploreSuffixTreeNode(const SuffixArray& suffixArray, 
-    const ReadTable& strings, size_t depth, size_t start, size_t end) {
-
-    // Find all of the child nodes: one for each DNA base
-    
-    // For each child node, for each boundary that isn't also our boundary, set
-    // the LCP to our depth.
-    
-    // Set the NSV and PSV to our boundaries.
-    
-    
-
-}
-
-size_t LCPArray::binarySearch(const SuffixArray& suffixArray, 
-    const ReadTable& strings, size_t depth, size_t start, size_t end,
-    char value) const {
-    
-    // Where is the middle? This will be start for a 1-element range.
-    size_t middle = start + (end - start) / 2;
-    char middleChar = getFromSuffix(suffixArray.get(middle), depth, strings);
-    
-    if(end - start == 1) {
-        // This is a 1-element range
-        
-        if(middleChar == value) {
-            // The middle character (which is going to be at the start position)
-            // is the first instance of our value.
-            return middle;
-        } else {
-            // Our search target doesn't appear.
-            return end;
-        }
-    }
-    
-    size_t nextStart = start;
-    size_t nextEnd = end;
-    
-    // Test the middle
-    if(middleChar < value) {
-        // The character we found is too small.
-        // Recurse right.
-        nextStart = middle + 1;
-    } else if(middleChar > value) {
-        // The character is too large.
-        // Recurse left, throwing out this character.
-        nextEnd = middle;
-    } else {
-        // The character we found is just right.
-        // Recurse left, but keep this character in.
-        nextEnd = middle + 1;
-    }
-    
-    // Recurse
-    size_t found = binarySearch(suffixArray, strings, depth, nextStart, nextEnd,
-        value);
-        
-    if(found == nextEnd) {
-        // Our recusrion couldn't find it, so we can't either.
-        return end;
-    }
-    
-    return found;
-
-}
-
-
-
-
-
-
-
-
-

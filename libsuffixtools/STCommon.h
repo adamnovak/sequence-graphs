@@ -83,6 +83,27 @@ struct SAElem
             return getPos() == 0;
         }
 
+        // Define a bunch of comparison and ordering operators.
+        inline bool operator<(const SAElem& other) const
+        {
+            return other.m_val < m_val;
+        }
+        
+        inline bool operator>(const SAElem& other) const
+        {
+            return other.m_val > m_val;
+        }
+        
+        inline bool operator==(const SAElem& other) const
+        {
+            return other.m_val == m_val;
+        }
+        
+        inline bool operator!=(const SAElem& other) const
+        {
+            return other.m_val != m_val;
+        }
+
         // Input/Output
         friend std::istream& operator>>(std::istream& in, SAElem& s);
         friend std::ostream& operator<<(std::ostream& out, const SAElem& s);

@@ -8,6 +8,8 @@
 #include <ReadTable.h>
 #include <SuffixArray.h>
 
+#include "Log.hpp"
+
 /**
  * Defines an array suitable for holding Longest Common Prefix information
  * between successive suffixes in a suffix array or FMD-index. Allows efficient
@@ -89,6 +91,64 @@ protected:
         
     }
     
+    /**
+     * Increment the given SAElem to the next valid position in the hypothetical
+     * single string.
+     */
+    static inline void increment(SAElem& target, const ReadTable& strings) {
+        Log::trace() << "Incrementing" << std::endl;
+        
+        // How much of this suffix is left?
+        size_t suffixLength = getSuffixLength(target, strings);
+        
+        if(suffixLength > 0) {
+            // There's room to advance in the string
+            target.setPos(target.getPos() + 1);
+        } else {
+            // We need to advance to the start of the next string
+            target.setID(target.getID() + 1);
+            target.setPos(0);
+        }
+    }
+    
+    /**
+     * Increment the given SAElem by a given amount in the hypothetical string.
+     */
+    static inline void incrementBy(SAElem& target, size_t offset,
+        const ReadTable& strings) {
+        
+        Log::trace() << "Incrementing by " << offset << std::endl;
+        
+        while(offset > 0) {
+            
+            Log::trace() << "Offset: " << offset << std::endl;
+        
+            // How much of this suffix is left?
+            size_t suffixLength = getSuffixLength(target, strings);
+            
+            if(suffixLength > offset) {
+                // There's room to advance in the string. Just do that.
+                target.setPos(target.getPos() + offset);
+                offset = 0;
+            } else {
+                // Go to the next string and see how much room that buys us.
+                offset -= suffixLength;
+                target.setID(target.getID() + 1);
+                target.setPos(0);
+            }
+        }
+        
+    }
+    
+    /**
+     * Returns true if the given suffix has not fallen off the end of the
+     * string, false otherwise.
+     */
+    static inline bool inRange(const SAElem& suffix, const ReadTable& strings) {
+        return suffix.getID() < strings.getCount() && 
+            getSuffixLength(suffix, strings) > 0;
+    }
+    
     // Store all the LCP array entries.
     std::vector<size_t> values;
     
@@ -97,27 +157,6 @@ protected:
     
     // Store the index of the next smaller value for each position.
     std::vector<size_t> nsvs;
-    
-private:
-    
-    /**
-     * Helper method for the constructor. Visit the suffix tree node at the
-     * given interval (start inclusive, end exclusive), find all its internal
-     * nodes, fill in the LCP array and PSV/NSV indices for the boumdaries of
-     * those internal nodes, and then recurse into each.
-     */
-    void exploreSuffixTreeNode(const SuffixArray& suffixArray, 
-        const ReadTable& strings, size_t depth, size_t start, size_t end);
-    
-    /**
-     * Binary-search the suffix array at the given depth for the given
-     * character. Returns the first index of that character between start
-     * (inclusive) and end (exclusive), or the position of the next larger
-     * character (or end) if it is not present.
-     */
-    size_t binarySearch(const SuffixArray& suffixArray, 
-        const ReadTable& strings, size_t depth, size_t start, size_t end,
-        char value) const; 
     
 };
 
