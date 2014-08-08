@@ -70,7 +70,7 @@ protected:
 
     /**
      * Get the character at the given offset into the given suffix in the given
-     * collection of strings. Returns the end-of-text character when
+     * collection of strings. Returns the end-of-text character $ when
      * appropriate.
      */
     static inline char getFromSuffix(const SAElem& suffix, size_t offset,
@@ -95,73 +95,6 @@ protected:
         // Get the length of the "read", minus the offset.
         return strings.getReadLength(suffix.getID()) - suffix.getPos();
         
-    }
-    
-    /**
-     * Increment the given SAElem to the next valid position in the hypothetical
-     * single string.
-     */
-    static inline void increment(SAElem& target, const ReadTable& strings) {
-        Log::trace() << "Incrementing" << std::endl;
-        
-        if(strings.getReadLength(target.getID()) == target.getPos()) {
-            // Wrap to the start of the next string from the end-of-text
-            // character of this one.
-            target.setID(target.getID() + 1);
-            target.setPos(0);
-        
-            if(target.getID() == strings.getCount()) {
-                // Wrap from the last string to the first one.
-                target.setID(0);
-            }
-            
-            Log::trace() << "Wrapped to " << target << std::endl;
-        
-        } else {
-            // Just go to the next position.
-            target.setPos(target.getPos() + 1);
-        }
-        
-    }
-    
-    /**
-     * Increment the given SAElem by a given amount in the hypothetical string.
-     */
-    static inline void incrementBy(SAElem& target, size_t offset,
-        const ReadTable& strings) {
-        
-        Log::trace() << "Incrementing by " << offset << std::endl;
-        
-        // Offset the position in the string
-        target.setPos(target.getPos() + offset);
-        
-        while(target.getPos() > strings.getReadLength(target.getID())) {
-            // Figure out what string that is really on.
-            
-            // Take off the length of the string plus the end-of-text character.
-            target.setPos(target.getPos() - 
-                strings.getReadLength(target.getID()) - 1);
-                
-            // Up the ID.
-            target.setID(target.getID() + 1);
-            
-            if(target.getID() == strings.getCount()) {
-                // Wrap from the last string to the first one.
-                target.setID(0);
-            }
-            
-            Log::trace() << "Wrapped to " << target << std::endl;
-        }
-        
-    }
-    
-    /**
-     * Returns true if the given suffix has not fallen off the end of the
-     * string, false otherwise.
-     */
-    static inline bool inRange(const SAElem& suffix, const ReadTable& strings) {
-        return suffix.getID() < strings.getCount() && 
-            getSuffixLength(suffix, strings) > 0;
     }
     
     // Store all the LCP array entries.

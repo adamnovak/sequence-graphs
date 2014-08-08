@@ -60,23 +60,16 @@ LCPArray::LCPArray(const SuffixArray& suffixArray, const ReadTable& strings): va
         // Get the suffix before this one
         SAElem prevSuffix = suffixArray.get(entry.second - 1);
         
-        Log::info() << "LCP of " << currentSuffix << " @ " << entry.second << 
+        Log::debug() << "LCP of " << currentSuffix << " @ " << entry.second << 
             " and " << prevSuffix <<  " @ " << entry.second - 1 << " is: " <<
             std::endl;
         
-        // Budge each suffix up to the height we're supposed to use. May break
-        // runtime bound...
-        incrementBy(currentSuffix, height, strings);
-        incrementBy(prevSuffix, height, strings);
-        
-        Log::info() << currentSuffix << " vs. " << prevSuffix << std::endl;
-        
-        Log::info() << getFromSuffix(currentSuffix, 0, strings) << 
+        Log::trace() << getFromSuffix(currentSuffix, 0, strings) << 
             " vs. " << getFromSuffix(prevSuffix, 0, strings) << std::endl;
         
-        while(getFromSuffix(currentSuffix, 0, strings) == 
-            getFromSuffix(prevSuffix, 0, strings) && 
-            getFromSuffix(prevSuffix, 0, strings) != '$') {
+        while(getFromSuffix(currentSuffix, height, strings) == 
+            getFromSuffix(prevSuffix, height, strings) && 
+            getFromSuffix(prevSuffix, height, strings) != '$') {
             
             // While this suffix and the previous one match, keep scanning. We
             // automatically define end-of-text characters to be distinct for
@@ -85,13 +78,9 @@ LCPArray::LCPArray(const SuffixArray& suffixArray, const ReadTable& strings): va
 
             // Advance the height by 1 since we matched.
             height++;
-            increment(currentSuffix, strings);
-            increment(prevSuffix, strings);
             
-            Log::info() << currentSuffix << " vs. " << prevSuffix << std::endl;
-                
-            Log::info() << getFromSuffix(currentSuffix, 0, strings) << 
-                " vs. " << getFromSuffix(prevSuffix, 0, strings) << 
+            Log::trace() << getFromSuffix(currentSuffix, height, strings) << 
+                " vs. " << getFromSuffix(prevSuffix, height, strings) << 
                 std::endl;
             
         }
@@ -99,7 +88,7 @@ LCPArray::LCPArray(const SuffixArray& suffixArray, const ReadTable& strings): va
         // Store the LCP value
         values[entry.second] = height;
         
-        Log::info() << "LCP[" << entry.second << "]=" << height << std::endl;
+        Log::debug() << "LCP[" << entry.second << "]=" << height << std::endl;
         
         if(height > 0) {
             // If height isn't 0, dial it back. Not really sure how that
@@ -107,8 +96,6 @@ LCPArray::LCPArray(const SuffixArray& suffixArray, const ReadTable& strings): va
             // mixing up their variables), so it ought to work in practice.
             height--;
         }
-        
-        //throw std::runtime_error("Stop!");
         
     }
     
