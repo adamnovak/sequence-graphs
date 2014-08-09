@@ -1,14 +1,13 @@
 #ifndef MERGEAPPLIER_HPP
 #define MERGEAPPLIER_HPP
 
-#include <thread>
-
 #include <stPinchGraphs.h>
 
 #include <FMDIndex.hpp>
 
 #include "ConcurrentQueue.hpp"
 #include "Merge.hpp"
+#include "Thread.hpp"
 
 /**
  * A class which reads in from a ConcurrentQueue of Merges and applies them all
@@ -42,7 +41,7 @@ protected:
     stPinchThreadSet* target;
     
     // Keep around a thread that runs to do the actual applying.
-    std::thread thread;
+    Thread thread;
     
     /**
      * Thread that does the actual work. Gets to own the target graph while

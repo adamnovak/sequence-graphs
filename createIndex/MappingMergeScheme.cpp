@@ -78,7 +78,7 @@ ConcurrentQueue<Merge>& MappingMergeScheme::run() {
 
     // Start up a reasonable number of threads to do the work.
     for(size_t threadID = 0; threadID < numThreads; threadID++) {
-        threads.push_back(std::thread(&MappingMergeScheme::generateMerges,
+        threads.push_back(Thread(&MappingMergeScheme::generateMerges,
                 this, contigsToMerge));
     }
 
@@ -90,7 +90,7 @@ ConcurrentQueue<Merge>& MappingMergeScheme::run() {
 
 void MappingMergeScheme::join() {
 
-    for(std::vector<std::thread>::iterator i = threads.begin(); 
+    for(auto i = threads.begin(); 
         i != threads.end(); ++i) {
     
         // Join each thread.

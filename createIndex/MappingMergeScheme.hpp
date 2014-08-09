@@ -1,7 +1,7 @@
 #ifndef MAPPINGMERGESCHEME_HPP
 #define MAPPINGMERGESCHEME_HPP
 
-#include <thread>
+#include "Thread.hpp"
 #include <vector>
 
 #include "MergeScheme.hpp"
@@ -62,7 +62,7 @@ protected:
     static const size_t MAX_THREADS = 32;
 
     // Holds all the threads that are generating merges.
-    std::vector<std::thread> threads;
+    std::vector<Thread> threads;
     
     // Holds a pointer to a ConcurrentQueue, so we can create one and then
     // destroy it only when we get destroyed.

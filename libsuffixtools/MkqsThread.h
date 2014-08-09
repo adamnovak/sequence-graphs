@@ -8,6 +8,8 @@
 //
 #include <pthread.h>
 #include <semaphore.h>
+#include <sys/time.h>
+#include <errno.h>
 #include "mkqs.h"
 
 // 
@@ -40,7 +42,17 @@ class MkqsThread
                                                       m_pPrimary(pPrimarySorter), 
                                                       m_pFinal(pFinalSorter),
                                                       m_stopRequested(false),
-                                                      m_numProcessed(0) {}
+                                                      m_numProcessed(0) {
+        
+            // Just need to set the itimer, since it's a C thing that doesn't
+            // construct.
+            if(getitimer(ITIMER_PROF, &m_itimer)) {
+                perror("Can't get itimer!");
+                throw std::runtime_error("Can't get itimer!");
+            }
+                
+            
+        }
         ~MkqsThread();
 
         void start();
@@ -68,6 +80,9 @@ class MkqsThread
         pthread_t m_thread;
         volatile bool m_stopRequested;
         int m_numProcessed;
+        // We need to carry this through from the parent thread to make gprof
+        // work.
+        struct itimerval m_itimer;
 };
 
 //
@@ -111,6 +126,12 @@ void MkqsThread<T, PrimarySorter, FinalSorter>::join()
 template<typename T, class PrimarySorter, class FinalSorter>
 void MkqsThread<T, PrimarySorter, FinalSorter>::run()
 {
+    // Set the itimer
+    if(setitimer(ITIMER_PROF, &m_itimer, NULL)) {
+        perror("Can't set itimer!");
+        throw std::runtime_error("Can't set itimer!");
+    } 
+
     while(1)
     {
         sem_post(m_pDoneSem);
