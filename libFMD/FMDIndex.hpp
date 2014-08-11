@@ -165,11 +165,29 @@ public:
     void extendFast(FMDPosition& range, char c, bool backward) const;
     
     /**
+     * Extend a set of search positions on the left in backwards-search-only
+     * extensions by both correct and incorrect bases. Only makes incorrect-base
+     * extensions on search positions which have less than the maximum specified
+     * number of mismatches.
+     */
+    void misMatchExtendLeftOnly(MisMatchAttemptResults&
+	prevMisMatches, char c, size_t z_max, BitVectorIterator* mask) const;
+    
+    /**
      * Extend a search by a character on the left in a backwards-search-only
      * extension. Compatible with retract. Modifies the range to be extended,
      * replacing it with the extended version.
      */
     void extendLeftOnly(FMDPosition& range, char c) const;
+    
+    /**
+     * Given a set of mismatch search ranges, retract characters on the right
+     * of each range until they correspond to search patterns of a given length.
+     * Modifies the set of ranges in place; deleting those which end up as
+     * empty ranges upon retraction.
+     */
+    void misMatchRetractRightOnly(MisMatchAttemptResults&
+	prevMisMatches, size_t newPatternLength, BitVectorIterator* mask) const;
     
     /**
      * Given a search range, retract characters on the right until it
@@ -298,8 +316,20 @@ public:
      */
     std::vector<Mapping> mapBoth(const std::string& query, int64_t genome = -1, 
         int minContext = 0) const;
-        
+	
+    /**
+     * Mismatch versions of the functions below, with the same functionality. It
+     * also passes a size_t encoding the maximum context size of the position
+     * mapped in order to be used in determining mapping on credit.
+     */
+    std::vector<std::pair<int64_t,size_t>> misMatchMapRight(
+	const BitVector& ranges, const std::string& query, const BitVector* mask,
+	int minContext = 0, size_t z_max = 0) const;
       
+    std::vector<std::pair<int64_t,size_t>> misMatchMapRight(
+	const BitVector& ranges, const std::string& query, int64_t genome = -1,
+	int minContext = 0, size_t z_max = 0) const;
+	
     /**
      * Try RIGHT-mapping each base in the query to one of the ranges represented
      * by the range vector. The range vector is in BWT space, and has a 1 in the
@@ -317,7 +347,7 @@ public:
      * Returns a vector of one-based range numbers for left-mapping each base,
      * or -1 if the base did not map to a range.
      */
-    std::vector<int64_t> mapRight(const BitVector& ranges,
+    std::vector<std::pair<int64_t,size_t>> mapRight(const BitVector& ranges,
         const std::string& query, const BitVector* mask,
         int minContext = 0) const;
         
@@ -325,7 +355,7 @@ public:
      * RIGHT-map to ranges using contexts from a specific genome, or all genomes
      * if genome is -1. Same semantics as the function above.
      */
-    std::vector<int64_t> mapRight(const BitVector& ranges,
+    std::vector<std::pair<int64_t,size_t>> mapRight(const BitVector& ranges,
         const std::string& query, int64_t genome = -1,
         int minContext = 0) const;
         

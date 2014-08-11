@@ -28,7 +28,8 @@ public:
     MappingMergeScheme(const FMDIndex& index, const BitVector& rangeVector, 
         const std::vector<std::pair<std::pair<size_t, size_t>, bool> >&
         rangeBases, const BitVector& includedPositions, size_t genome,
-        size_t minContext = 0);
+	size_t minContext = 0, bool credit = 0, bool mismatch = 0,
+	size_t z_max = 0);
     
     /**
      * Get rid of a MappingMergeScheme (and delete its queue, if it has one).
@@ -92,6 +93,16 @@ protected:
     
     // Minimum amount of context that is allowed to motivate a merge.
     size_t minContext;
+    
+    // Flag whether to use mapping on credit scheme   
+    bool credit;
+    
+    // Flag whether we search for mismatched positions
+    bool mismatch;
+    
+    // Maximum number of mismatches allowed
+    size_t z_max;
+    
     
     /**
      * Create a Merge between two positions and enqueue it. Positions are

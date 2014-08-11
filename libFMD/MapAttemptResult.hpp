@@ -15,4 +15,26 @@ struct MapAttemptResult
     size_t characters;
 };
 
+struct creditMapAttemptResult
+{
+    bool is_mapped;
+    FMDPosition position;
+    size_t characters;
+    size_t maxCharacters;
+};
+
+struct MisMatchAttemptResults
+{
+    bool is_mapped;
+    std::vector<std::pair<FMDPosition,size_t>> positions;
+
+    // Want to carry character counter because we need to check if we've hit
+    // minimum context length from inside the misMatch mapping function, else
+    // we'll funnel down our priority queue too early in the case of a unique
+    // hit below minimum context length
+    size_t characters;
+    size_t maxCharacters;
+
+};
+
 #endif
