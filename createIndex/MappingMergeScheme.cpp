@@ -11,11 +11,11 @@ MappingMergeScheme::MappingMergeScheme(const FMDIndex& index,
     const BitVector& rangeVector, 
     const std::vector<std::pair<std::pair<size_t, size_t>, bool> >& rangeBases, 
     const BitVector& includedPositions, size_t genome, size_t minContext, bool credit,
-    std::string mapType, bool mismatch, size_t z_max, size_t seed, size_t z_seed) :
+    std::string mapType, bool mismatch, size_t z_max) :
     MergeScheme(index), threads(), queue(NULL), rangeVector(rangeVector), 
     rangeBases(rangeBases), includedPositions(includedPositions), 
     genome(genome), minContext(minContext), credit(credit), mapType(mapType),
-    mismatch(mismatch), z_max(z_max), seed(seed), z_seed(z_seed) {
+    mismatch(mismatch), z_max(z_max) {
     
     // Nothing to do
     
@@ -195,7 +195,7 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
     if (mismatch) {
 	Log::info() << "Using mismatch mapping with z_max " << z_max << std::endl;
 
-	Mappings = index.CmisMap(rangeVector, contig, &includedPositions, minContext, z_max, seed, z_seed);
+	Mappings = index.CmisMap(rangeVector, contig, &includedPositions, minContext, z_max);
 	
     } else {
     
@@ -459,6 +459,9 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
     size_t mappedBases = 0;
     size_t unmappedBases = 0;
     size_t creditBases = 0;
+    size_t conflictedBases = 0;
+    
+    //TODO: can conflicted bases be mapped on credit?
     
     // Grab the contig as a string
     std::string contig = index.displayContig(queryContig);
@@ -477,12 +480,12 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
 	
 	// Map it on the right
 	rightMappings = index.misMatchMap(rangeVector, contig,
-	    &includedPositions, minContext, z_max, seed, z_seed);
+	    &includedPositions, minContext, z_max);
 	
 	// Map it on the left
 	leftMappings = index.misMatchMap(rangeVector, 
-	    reverseComplement(contig), &includedPositions, minContext, z_max, seed, z_seed);  
-	
+	    reverseComplement(contig), &includedPositions, minContext, z_max); 
+		
     } else {
 		
 	// Map it on the right
@@ -573,15 +576,21 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
                     // our backwards right-semantics, so flip it.
                     generateMerge(queryContig, i + 1, leftBase.first.first, 
                         leftBase.first.second, !leftBase.second);
-		    //Log::info() << "Anchor Merged pos " << i << ", a(n) " << contig[i] << " on contig " << queryContig << " to " << leftBase.first.second << " on contig " << leftBase.first.first << " with orientation " << leftBase.second << std::endl;
+		    
+		    Log::info() << "Anchor Merged pos " << i << ", a(n) " << contig[i]
+			<< " on contig " << queryContig << " to " << leftBase.first.second
+			<< " on contig " << leftBase.first.first << " with orientation "
+			<< !leftBase.second << std::endl;
                         
                     mappedBases++;                   
                 } else {
                     // Didn't map this one
                     unmappedBases++;
+		    conflictedBases++;
 		    if(i > leftSentinel && rightSentinel > i) {
 			creditCandidates.push_back(i);
 		    }
+		    Log::info() << "Conflicted " << i << " " << contig[i] << std::endl;
                 }
                 
             } else {
@@ -592,7 +601,10 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
                 // right-semantics, so flip it.
                 generateMerge(queryContig, i + 1, leftBase.first.first, 
                         leftBase.first.second, !leftBase.second);
-		//Log::info() << "Anchor Merged pos " << i << ", a(n) " << contig[i] << " on contig " << queryContig << " to " << leftBase.first.second << " on contig " << leftBase.first.first << " with orientation " << leftBase.second << std::endl;
+		Log::info() << "Anchor Merged pos " << i << ", a(n) " << contig[i]
+		    << " on contig " << queryContig << " to " << leftBase.first.second
+		    << " on contig " << leftBase.first.first << " with orientation "
+		    << !leftBase.second << std::endl;
 
                         
                 mappedBases++;
@@ -608,7 +620,7 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
             // (since it's backwards to start with).
             generateMerge(queryContig, i + 1, rightBase.first.first, 
                         rightBase.first.second, rightBase.second);
-	    //Log::info() << "Anchor Merged pos " << i << ", a(n) " << contig[i] << " on contig " << queryContig << " to " << rightBase.first.second << " on contig " << rightBase.first.first << " with orientation " << rightBase.second << std::endl;
+	    Log::info() << "Anchor Merged pos " << i << ", a(n) " << contig[i] << " on contig " << queryContig << " to " << rightBase.first.second << " on contig " << rightBase.first.first << " with orientation " << rightBase.second << std::endl;
             
             mappedBases++; 
         } else {
@@ -637,6 +649,8 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
     size_t maxLContext = 0;
     
     Log::info() << "Checking " << creditCandidates.size() << " unmapped positions \"in the middle\"" << std::endl;
+    
+    // Scan for the maximum 
     
     for(size_t i; i < rightMappings.size(); i++) {
 	if(rightMappings[i].second > maxRContext) {
@@ -761,17 +775,20 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
     }
     }
     
-    // Close the queue to saygm we're done.
+    // Close the queue to say we're done.
     auto lock = queue->lock();
     queue->close(lock);
     
     // Report that we're done.
     Log::info() << threadName << " finished (" << mappedBases << "|" << 
         unmappedBases << ")" << std::endl;
+    if(conflictedBases != 0) {
+	Log::info() << conflictedBases << " unmapped on account of conflicting left and right context matches." << std::endl;
+    }
 	
     if(credit) {
 	Log::info() << mappedBases - creditBases << " anchor mapped; " << creditBases << " extension mapped" <<  std::endl;
-	}
+    }
 
 }
 

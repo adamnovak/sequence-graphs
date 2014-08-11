@@ -987,9 +987,7 @@ mergeGreedy(
     bool credit = false,
     std::string mapType = "LRexact",
     bool mismatch = false,
-    int z_max = 0,
-    size_t seed = 0,
-    size_t z_seed = 0    
+    int z_max = 0
 ) {
 
     Log::info() << "Creating initial pinch thread set" << std::endl;
@@ -1020,7 +1018,7 @@ mergeGreedy(
         // need to tell it what genome to map the contigs of.
         MappingMergeScheme scheme(index, *mergedRuns.first, mergedRuns.second,
             *includedPositions, genome, context, credit, mapType,
-	    mismatch, z_max, seed, z_seed);
+	    mismatch, z_max);
 
         // Set it running and grab the queue where its results come out.
         ConcurrentQueue<Merge>& queue = scheme.run();
@@ -1197,13 +1195,7 @@ main(
 	("mismatches", boost::program_options::value<size_t>()
             ->default_value(0), 
             "Maximum allowed number of mismatches")
-	("mismatch", "Allow for mismatches")
-	("seed", boost::program_options::value<size_t>()
-	    ->default_value(0),
-	    "Length of seed context in mismatch mapping")
-	("seedMismatches", boost::program_options::value<size_t>()
-	    ->default_value(0),
-	    "Number of mismatches allowed in the seed");
+	("mismatch", "Allow for mismatches");
         
     // And set up our positional arguments
     boost::program_options::positional_options_description positionals;
@@ -1322,8 +1314,7 @@ main(
     } else if(mergeScheme == "greedy") {
         // Use the greedy merge instead.
         threadSet = mergeGreedy(index, options["context"].as<size_t>(), creditBool, mapType,
-	    mismatchb, options["mismatches"].as<size_t>(), options["seed"].as<size_t>(),
-	    options["seedMismatches"].as<size_t>());
+	    mismatchb, options["mismatches"].as<size_t>());
     } else {
         // Complain that's not a real merge scheme. TODO: Can we make the
         // options parser parse an enum or something instead of this?
