@@ -184,6 +184,13 @@ public:
     void retractRightOnly(FMDPosition& range, size_t newPatternLength) const;
     
     /**
+     * Retract on the right to the parent suffix tree node. Returns the new
+     * pattern length represented by the search query. Guaranteed to produce
+     * more results, unless you are at the root already.
+     */
+    size_t retractRightOnly(FMDPosition& range) const;
+    
+    /**
      * Select all the occurrences of the given pattern, using FMD backwards
      * search.
      */
