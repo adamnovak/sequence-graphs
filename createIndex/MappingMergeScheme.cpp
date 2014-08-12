@@ -302,7 +302,7 @@ void MappingMergeScheme::generateMerges(
 			// our backwards right-semantics, so flip it.
 			generateMerge(queryContig, i + 1, leftBase.first.first, 
 				      leftBase.first.second, !leftBase.second);
-			Log::info() << "Anchor Merged pos " << i << ", a(n) " << contig[i] << " on contig " << queryContig << " to " << leftBase.first.second << " on contig " << leftBase.first.first << " with orientation " << leftBase.second << std::endl;
+			Log::info() << "Anchor Merged pos " << i << ", a(n) " << contig[i] << " on contig " << queryContig << " to " << leftBase.first.second << " on contig " << leftBase.first.first << " with orientation " << !leftBase.second << std::endl;
 			
 			mappedBases++;                   
 			} else {
@@ -323,7 +323,7 @@ void MappingMergeScheme::generateMerges(
 		    // right-semantics, so flip it.
 		    generateMerge(queryContig, i + 1, leftBase.first.first, 
 				  leftBase.first.second, !leftBase.second);
-		    Log::info() << "Anchor Merged pos " << i << ", a(n) " << contig[i] << " on contig " << queryContig << " to " << leftBase.first.second << " on contig " << leftBase.first.first << " with orientation " << leftBase.second << std::endl;
+		    Log::info() << "Anchor Merged pos " << i << ", a(n) " << contig[i] << " on contig " << queryContig << " to " << leftBase.first.second << " on contig " << leftBase.first.first << " with orientation " << !leftBase.second << std::endl;
 		    
 		    
 		    mappedBases++;

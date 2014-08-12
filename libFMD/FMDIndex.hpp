@@ -171,7 +171,8 @@ public:
      * number of mismatches.
      */
     void misMatchExtendLeftOnly(MisMatchAttemptResults&
-	prevMisMatches, char c, size_t z_max, BitVectorIterator* mask) const;
+	prevMisMatches, char c, size_t z_max, BitVectorIterator* mask,
+	bool startExtension = false, bool finishExtension = false) const;
     
     /**
      * Extend a search by a character on the left in a backwards-search-only

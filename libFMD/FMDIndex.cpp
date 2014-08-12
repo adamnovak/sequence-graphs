@@ -506,7 +506,8 @@ FMDPosition FMDIndex::extend(FMDPosition range, char c, bool backward) const {
 }
     
 void FMDIndex::misMatchExtendLeftOnly(MisMatchAttemptResults& prevMisMatches,
-	char c, size_t z_max, BitVectorIterator* mask) const {
+	char c, size_t z_max, BitVectorIterator* mask, bool startExtension,
+	bool finishExtension) const {
 
     // We want to work directly on the argument positions vector, so we iterate
     // through its entries up to its original size so that we can just push new
@@ -516,43 +517,49 @@ void FMDIndex::misMatchExtendLeftOnly(MisMatchAttemptResults& prevMisMatches,
     
     // Make a scratch position for holding mismatch extend results
     FMDPosition scratch = EMPTY_FMD_POSITION;
-
+    
     for(size_t i = 0; i < prevMisMatchCount; i++) {
 	
 	// Extend our previous position by the proper base
+	if(!finishExtension) {
+	    extendLeftOnly(prevMisMatches.positions[i].first, c);
+	}
 	
-	extendLeftOnly(prevMisMatches.positions[i].first, c);
-	
+	if(finishExtension) {
+	    prevMisMatches.positions[i].first = EMPTY_FMD_POSITION;
+	}
+	    
 	// Try the other three bases
-	
-	if(prevMisMatches.positions[i].second < z_max) {
-	    for(size_t base = 0; base < NUM_BASES; base++) {
-		if(BASES[base] != c) {
-		    scratch = prevMisMatches.positions[i].first;
-		    extendLeftOnly(scratch, BASES[base]);
+	if(!startExtension) {
+	    if(prevMisMatches.positions[i].second < z_max) {
+		for(size_t base = 0; base < NUM_BASES; base++) {
+		    if(BASES[base] != c) {
+			scratch = prevMisMatches.positions[i].first;
+			extendLeftOnly(scratch, BASES[base]);
 		    
-		    // If the mismatches extension matches, add it to the back
-		    // of the vector
+			// If the mismatches extension matches, add it to the back
+			// of the vector
 		    
-		    if(scratch.getLength(mask) > 0) {
-			prevMisMatches.positions.push_back(
-			    std::pair<FMDPosition,size_t>(scratch,
-			    prevMisMatches.positions[i].second + 1));
+			if(scratch.getLength(mask) > 0) {
+			    prevMisMatches.positions.push_back(
+				std::pair<FMDPosition,size_t>(scratch,
+				prevMisMatches.positions[i].second + 1));
+			}
 		    }
 		}
 	    }
 	}
     }
-    
+        
     // Remove all correct-base extensions which returned an empty range
     
-    for(size_t i = prevMisMatchCount - 1; i >= 0; i--) {
-	if(prevMisMatches.positions[i].first.isEmpty(mask)) {
+    for(size_t i = prevMisMatchCount - 1; i < prevMisMatchCount; i--) {
+	if(prevMisMatches.positions[i].first.isEmpty(mask)) {	    
 	    std::swap(prevMisMatches.positions[i], prevMisMatches.positions.back());
 	    prevMisMatches.positions.pop_back();
 	}
     }
-    
+        
     // If no results are found, place an empty FMDPosition in the
     // output vector
         
@@ -1033,9 +1040,12 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMapRight(
 	
 	// Try extending with that character
 	MisMatchAttemptResults extended = search;
-	misMatchExtendLeftOnly(extended, query[i], z_max, maskIterator);
+	misMatchExtendLeftOnly(extended, query[i], z_max,
+	    maskIterator, true, false);
 	
 	while(extended.positions.front().first.isEmpty(maskIterator)) {
+	    Log::info() << "At position " << i << ", retracting to " <<
+		search.characters - 1 << " characters" << std::endl;
 	    // We would have no results if we extended with this character right
 	    // now.
 	    
@@ -1058,42 +1068,54 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMapRight(
 	    
 	    // Try extending again until you do get results.
 	    extended = search;
-	    misMatchExtendLeftOnly(extended, query[i], z_max, maskIterator);
+	    misMatchExtendLeftOnly(extended, query[i], z_max,
+		maskIterator, true, false);
 	    
 	}
 	
 	// Now you have some results. Adopt the new interval as your current
 	// interval.
-	search = extended;
-	search.characters++;
+	extended.characters++;
 	
 	// What range index does our current position correspond to, if any?
-	int64_t range = search.positions.front().first.range(rangeIterator,
+	int64_t range = extended.positions.front().first.range(rangeIterator,
 	    maskIterator);
 	
-	if(search.positions.size() == 1 && range != -1 &&
-	    !search.positions.front().first.isEmpty(maskIterator) &&
-	    range != -1 && search.characters >=minContext) {
+	if(extended.positions.size() == 1 && range != -1 &&
+	    !extended.positions.front().first.isEmpty(maskIterator) &&
+	    range != -1 && extended.characters >=minContext) {
 	    // If you happen to have results in exactly one range with
 	    // sufficient context, record a mapping to it.
 	    
-	    Log::debug() << "Mapped " << search.characters << " context to " << 
-	    search.positions.front().first << " in range #" <<
+	    Log::info() << "Mapped " << extended.characters << " context to " << 
+	    extended.positions.front().first << " in range #" <<
 	    range << std::endl;
 	
 	    // Remember that this base mapped to this range
 	    mappings.push_back(
-		std::pair<int64_t,size_t>(range,search.characters));
+		std::pair<int64_t,size_t>(range,extended.characters));
 	
 	} else {
 	    // Otherwise record that this position is unmapped on the right.
 	
-	    Log::debug() << "Failed at " << search.positions.front().first <<
-	    " (" << search.positions.front().first.ranges(rangeIterator,
-	    maskIterator) << " options for " << search.characters <<
-	    " context)." << 	    std::endl;
+	    Log::info() << "Failed at " << extended.positions.front().first <<
+	    " (" << extended.positions.size() << " mismatch search results for "
+	    << extended.characters << " context)." << std::endl;
 	    
 	    mappings.push_back(std::pair<int64_t,size_t>(-1,0));
+	}
+	
+	misMatchExtendLeftOnly(search, query[i], z_max,
+	    maskIterator, false, true);
+	search.characters++;
+	
+	if(!search.positions.front().first.isEmpty()) {
+	    if(!extended.positions.front().first.isEmpty()) {
+		search.positions.insert(search.positions.end(),
+		    extended.positions.begin(), extended.positions.end());
+	    }
+	} else if(!extended.positions.front().first.isEmpty()) {
+	    search = extended;
 	}
     }
     
