@@ -49,7 +49,11 @@ int main(int argc, char** argv) {
         ("indexDirectory", boost::program_options::value<std::string>(), 
             "Directory to load the index from")
         ("fasta", boost::program_options::value<std::string>(),
-            "FASTA file to map");
+            "FASTA file to map")
+        ("repeat", boost::program_options::value<size_t>()
+            ->default_value(1),
+            "number of times to repeat each mapping");
+            
         
     // And set up our positional arguments
     boost::program_options::positional_options_description positionals;
@@ -107,6 +111,9 @@ int main(int argc, char** argv) {
     // This holds the FASTA we need to read.
     std::string fastaName(options["fasta"].as<std::string>());
     
+    // This holds the number of repetitions to do
+    size_t repetitions(options["repeat"].as<size_t>());
+    
     // Load the index.
     FMDIndex index(indexDirectory + "/index.basename");
     
@@ -136,24 +143,38 @@ int main(int argc, char** argv) {
             recordContigs.end());
     }
     
+    // Get a stream so we can print without a new message every time
+    auto output = Log::output();    
+    
     // We want to time the mapping code.
     Timer* timer = new Timer("Mapping New Way");
-    
     for(auto record : nonemptyContigs) {
-        // Map each record
-        newMappings.push_back(index.mapBoth(record));
+        for(size_t i = 0; i < repetitions; i++) {
+            // Map the record a bunch
+            output << ".";
+            newMappings.push_back(index.mapRight(record));
+        }
     }
+    output << std::endl;
     
     // Stop the timer
     delete timer;
+    
+    
+    // Get a new message
+    output = Log::output();
     
     // And the old mapping code
     timer = new Timer("Mapping Old Way");
     
     for(auto record : nonemptyContigs) {
-        // Map each record
-        //newMappings.push_back(index.mapBothOld(record));
+        for(size_t i = 0; i < repetitions; i++) {
+            // Map the record a bunch
+            output << ".";
+            newMappings.push_back(index.mapRightOld(record));
+        }
     }
+    output << std::endl;
     
     // Stop the timer
     delete timer;

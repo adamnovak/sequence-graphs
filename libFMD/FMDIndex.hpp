@@ -328,6 +328,24 @@ public:
     std::vector<int64_t> mapRight(const BitVector& ranges,
         const std::string& query, int64_t genome = -1,
         int minContext = 0) const;
+    
+    /***************************************************************************
+     * Old Mapping Functions (for comparison)
+     **************************************************************************/
+     
+    /**
+     * Map a certain position on the right.
+     */
+    MapAttemptResult mapPosition(const std::string& pattern, size_t index, 
+        BitVectorIterator* mask) const;
+        
+    /**
+     * Map a string on the right. Lets you pick just a range. Uses restarts
+     * instead of retract.
+     */
+    std::vector<Mapping> mapRightOld(const std::string& query,
+        const BitVector* mask = NULL, int minContext = 0, int start = 0, 
+        int length = -1) const;
         
     /***************************************************************************
      * Iteration Functions
@@ -433,52 +451,6 @@ protected:
      */
     LCPArray lcpArray;
     
-    /**
-     * Try left-mapping the given index in the given string, starting from
-     * scratch. Start a backwards search at that index in the string and extend
-     * left until we map to exactly one or zero places. Returns true or false
-     * depending on whether we map, an FMDPosition (in BWT coordinates) that, if
-     * nonempty, can be extended right to try and map the next base to the
-     * right, and the number of characters in the pattern used to make that
-     * FMDPosition.
-     *
-     * If the mapping succeeded, the FMDPosition returned has one thing in it,
-     * which is the mapping upstream context.
-     *
-     * Index must be a valid character position in the string.
-     *
-     * If a mask is specified, only positions in the index with a 1 in the mask
-     * will be counted for mapping purposes.
-     */
-    MapAttemptResult mapPosition(const std::string& pattern,
-        size_t index, BitVectorIterator* mask = NULL) const;
-      
-    /**
-     * Try RIGHT-mapping the given index in the given string to a unique forward-
-     * strand range according to the bit vector of range start points, starting
-     * from scratch. Start a backwards search at that index in the string and
-     * extend left until we map to exactly one or zero ranges. Returns true or
-     * false depending on whether we map, an FMDPosition (in BWT coordinates)
-     * that, if nonempty, can be extended right to try and map the next base to
-     * the right, and the number of characters in the pattern used to make that
-     * FMDPosition.
-     *
-     * The range starting points must be such that the ranges described are "bi-
-     * ranges": each range has its reverse-complement range also present.
-     *
-     * If the mapping succeeded, the FMDPosition returned is completely
-     * contained within one range, which is the range to which the base has been
-     * mapped.
-     *
-     * Index must be a valid character position in the string.
-     *
-     * If a mask is specified, only positions in the index with a 1 in the mask
-     * will be counted for mapping purposes.
-     */
-    MapAttemptResult mapPosition(BitVectorIterator& ranges, 
-        const std::string& pattern, size_t index, 
-        BitVectorIterator* mask = NULL) const;
-        
     /**
      * Given a left mapping and a right mapping for a base, disambiguate them to
      * produce one mapping. Things that consistently left and right-mapped to a

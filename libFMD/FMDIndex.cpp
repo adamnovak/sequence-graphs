@@ -1066,7 +1066,227 @@ Mapping FMDIndex::disambiguate(const Mapping& left,
     
 }
 
+std::vector<Mapping> FMDIndex::mapRightOld(const std::string& query,
+    const BitVector* mask, int minContext, int start, int length) const {
 
+    if(length == -1) {
+        // Fix up the length parameter if it is -1: that means the whole rest of
+        // the string.
+        length = query.length() - start;
+    }
+
+    // Make an itarator for the mask, if needed, so we can query it.
+    BitVectorIterator* maskIterator = (mask == NULL) ? NULL : 
+        new BitVectorIterator(*mask);
+        
+    if(maskIterator == NULL) {
+        Log::debug() << "Mapping " << length << " bases to all genomes." <<
+            std::endl;
+    } else {
+        Log::debug() << "Mapping " << length << " bases to one genome only." <<
+            std::endl;
+    }
+    
+    Log::debug() << "Mapping with minimum " << minContext << " context." <<
+        std::endl;
+
+    // We need a vector to return.
+    std::vector<Mapping> mappings;
+
+    // Keep around the result that we get from the single-character mapping
+    // function. We use it as our working state to track our FMDPosition and how
+    // many characters we've extended by. We use the is_mapped flag to indicate
+    // whether the current iteration is an extension or a restart.
+    MapAttemptResult location;
+    // Make sure the scratch position is empty so we re-start on the first base.
+    // Other fields get overwritten.
+    location.position = EMPTY_FMD_POSITION;
+
+    for(size_t i = start; i < start + length; i++)
+    {
+        if(location.position.isEmpty(maskIterator))
+        {
+            Log::debug() << "Starting over by mapping position " << i <<
+                std::endl;
+            // We do not currently have a non-empty FMDPosition to extend. Start
+            // over by mapping this character by itself.
+            location = this->mapPosition(query, i, maskIterator);
+        } else {
+            Log::debug() << "Extending with position " << i << std::endl;
+            // The last base either mapped successfully or failed due to multi-
+            // mapping. Try to extend the FMDPosition we have to the right (not
+            // backwards) with the next base.
+            location.position = this->extend(location.position, query[i],
+                false);
+            location.characters++;
+        }
+
+        if(location.is_mapped && location.characters >= minContext &&
+            location.position.getLength(maskIterator) == 1) {
+            
+            // It mapped. We didn't do a re-start and fail, we have enough
+            // context to be confident, and there's exactly one thing in our
+            // interval.
+
+            // Take the first (only) thing in the bi-interval's forward strand
+            // side, not accounting for the mask.
+            int64_t start = location.position.getForwardStart();
+            
+            if(maskIterator != NULL) {
+                // Account for the mask. The start position of the interval may
+                // be masked out. Get the first 1 after (or at) the start,
+                // instead of the start itself. Since the interval is nonempty
+                // under the mask, we know this will exist.
+                start = maskIterator->valueAfter(start).first;
+            }
+
+            // Locate it, and then report position as a (text, offset) pair.
+            // This will give us the position of the first base in the pattern,
+            // which lets us infer the position of the last base in the pattern.
+            TextPosition textPosition = locate(start);
+
+            Log::debug() << "Mapped " << location.characters << "/" << 
+                minContext << " context to text " << textPosition.getText() << 
+                " position " << textPosition.getOffset() << std::endl;
+
+            // Correct to the position of the last base in the pattern, by
+            // offsetting by the length of the pattern that was used. A
+            // 2-character pattern means we need to go 1 further right in the
+            // string it maps to to find where its rightmost character maps.
+            textPosition.setOffset(textPosition.getOffset() + 
+                (location.characters - 1));
+
+            // Add a Mapping for this mapped base.
+            mappings.push_back(Mapping(textPosition));
+
+            // We definitely have a non-empty FMDPosition to continue from
+
+        } else {
+
+            Log::debug() << "Failed (" << 
+                location.position.getLength(maskIterator) << " options for " <<
+                location.characters << " context)." << std::endl;
+
+            if(location.is_mapped && location.position.isEmpty(maskIterator)) {
+                // We extended right until we got no results. We need to try
+                // this base again, in case we tried with a too-long left
+                // context.
+
+                Log::debug() << "Restarting from here..." << std::endl;
+
+                // Move the loop index back
+                i--;
+
+                // Since the FMDPosition is empty, on the next iteration we will
+                // retry this base.
+
+            } else {
+                // It didn't map for some other reason:
+                // - It was an initial mapping with too little left context to 
+                //   be unique
+                // - It was an initial mapping with a nonexistent left context
+                // - It was an extension that was multimapped and still is
+
+                // In none of these cases will re-starting from this base help
+                // at all. If we just restarted here, we don't want to do it
+                // again. If it was multimapped before, it had as much left
+                // context as it could take without running out of string or
+                // getting no results.
+
+                // It didn't map. Add an empty/unmapped Mapping.
+                mappings.push_back(Mapping());
+
+                // Mark that the next iteration will be an extension (if we had
+                // any results this iteration; if not it will just restart)
+                location.is_mapped = true;
+
+            }
+        }
+    }
+
+    // We've gone through and attempted the whole string. Give back our answers.
+    return mappings;
+
+}
+
+MapAttemptResult FMDIndex::mapPosition(const std::string& pattern,
+    size_t index, BitVectorIterator* mask) const {
+
+    Log::debug() << "Mapping " << index << " in " << pattern << std::endl;
+  
+    // Initialize the struct we will use to return our somewhat complex result.
+    // Contains the FMDPosition (which we work in), an is_mapped flag, and a
+    // variable counting the number of extensions made to the FMDPosition.
+    MapAttemptResult result;
+
+    // Do a backward search.
+    // Start at the given index, and get the starting range for that character.
+    result.is_mapped = false;
+    result.position = this->getCharPosition(pattern[index]);
+    result.characters = 1;
+    if(result.position.isEmpty(mask)) {
+        // This character isn't even in it. Just return the result with an empty
+        // FMDPosition; the next character we want to map is going to have to
+        // deal with having some never-before-seen character right upstream of
+        // it.
+        return result;
+    } else if(result.position.getLength(mask) == 1) {
+        // We've already mapped.
+        result.is_mapped = true;
+        return result;
+    }
+
+    if(index == 0) {
+        // The rest of the function deals with characters to the left of the one
+        // we start at. If we start at position 0 there can be none.
+        return result;
+    }
+
+    Log::trace() << "Starting with " << result.position << std::endl;
+
+    do {
+        // Now consider the next character to the left.
+        index--;
+
+        // Grab the character to extend with.
+        char character = pattern[index];
+
+        Log::trace() << "Index " << index << " in " << pattern << " is " << 
+            character << "(" << character << ")" << std::endl;
+
+        // Backwards extend with subsequent characters.
+        FMDPosition next_position = this->extend(result.position, character,
+            true);
+
+        Log::trace() << "Now at " << next_position << " after " << 
+            pattern[index] << std::endl;
+        if(next_position.isEmpty(mask)) {
+            // The next place we would go is empty, so return the result holding
+            // the last position.
+            return result;
+        } else if(next_position.getLength(mask) == 1) {
+            // We have successfully mapped to exactly one place. Update our
+            // result to reflect the additional extension and our success, and
+            // return it.
+            result.position = next_position;
+            result.characters++;
+            result.is_mapped = true;
+            return result;      
+        }
+
+        // Otherwise, we still map to a plurality of places. Record the
+        // extension and loop again.
+        result.position = next_position;
+        result.characters++;
+
+    } while(index > 0);
+    // Continue considering characters to the left until we hit the start of the
+    // string.
+
+    // If we get here, we ran out of upstream context and still map to multiple
+    // places. Just give our multi-mapping FMDPosition and unmapped result.
+    return result;
+}
 
 
 
