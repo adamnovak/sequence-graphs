@@ -1533,134 +1533,194 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(const BitVector& ra
     const std::string& query, const BitVector* mask, int minContext, size_t z_max,
     int start, int length) const {
     
-	// RIGHT-map to a range.
+    if(length == -1) {
+	// Fix up the length parameter if it is -1: that means the whole rest of
+	// the string.
+	length = query.length() - start;
+    }
 	
-	if(length == -1) {
-	    // Fix up the length parameter if it is -1: that means the whole rest of
-	    // the string.
-	    length = query.length() - start;
-	}
-	
-	Log::debug() << "Mapping with minimum " << minContext << " context." <<
+    Log::debug() << "Mapping with minimum " << minContext << " context." <<
 	std::endl;
 	
-	// Make an iterator for ranges, so we can query it.
-	BitVectorIterator rangeIterator(ranges);
-	
-	// And one for the mask, if needed
-	BitVectorIterator* maskIterator = (mask == NULL) ? NULL : 
-	new BitVectorIterator(*mask);
-	
-	// We need a vector to return.
-	std::vector<std::pair<int64_t,size_t>> mappings;
-	
-	// Keep around the result that we get from the single-character mapping
-	// function. We use it as our working state to trackour FMDPosition and how
-	// many characters we've extended by. We use the is_mapped flag to indicate
-	// whether the current iteration is an extension or a restart.
-	MapAttemptResult location;
-	// Make sure the scratch position is empty so we re-start on the first base
-	location.position = EMPTY_FMD_POSITION;
-	
-	for(int i = start + length - 1; i >= start; i--) {
-	    // Go from the end of our selected region to the beginning.
-	    
-	    Log::trace() << "On position " << i << " from " <<
+    // Make an iterator for ranges, so we can query it.
+    BitVectorIterator rangeIterator(ranges);
+
+    // And one for the mask, if needed
+    BitVectorIterator* maskIterator = (mask == NULL) ? NULL : 
+    new BitVectorIterator(*mask);
+    
+    // We need a vector to return.
+    std::vector<std::pair<int64_t,size_t>> mappings;
+    
+    // Keep around the result that we get from the single-character mapping
+    // function. We use it as our working state to trackour FMDPosition and how
+    // many characters we've extended by. We use the is_mapped flag to indicate
+    // whether the current iteration is an extension or a restart.
+    MisMatchAttemptResults search;
+    // Make sure the scratch position is empty so we re-start on the first base
+    search.positions.push_back(
+	std::pair<FMDPosition,size_t>(EMPTY_FMD_POSITION,0));
+    search.characters = 0;
+    search.maxCharacters = 0;
+
+    MisMatchAttemptResults searchExtend;
+    // Make sure the scratch position is empty so we re-start on the first base
+    searchExtend.positions.push_back(
+	std::pair<FMDPosition,size_t>(EMPTY_FMD_POSITION,0));
+    search.characters = 0;
+    searchExtend.maxCharacters = 0;
+    
+    int64_t range;
+    
+    for(int i = start + length - 1; i >= start; i--) {
+	// Go from the end of our selected region to the beginning.
+
+	Log::info() << "On position " << i << " from " <<
 	    start + length - 1 << " to " << start << std::endl;
-	    
-	    if(location.position.isEmpty()) {
-		Log::debug() << "Starting over by mapping position " << i <<
-		std::endl;
-		// We do not currently have a non-empty FMDPosition to extend. Start
-		// over by mapping this character by itself.
-		location = this->mapPosition(rangeIterator, query, i, maskIterator);
-	    } else {
-		Log::debug() << "Extending with position " << i << std::endl;
-		// The last base either mapped successfully or failed due to multi-
-		// mapping. Try to extend the FMDPosition we have to the left
-		// (backwards) with the next base.
-		location.position = this->extend(location.position, query[i], true);
-		location.characters++;
-	    }
-	    
-	    // What range index does our current left-side position (the one we just
-	    // moved) correspond to, if any?
-	    int64_t range = location.position.range(rangeIterator, maskIterator);
-	    
-	    if(location.is_mapped && location.characters >= minContext && 
-		!location.position.isEmpty(maskIterator) && range != -1) {
-		
+
+	if(search.positions.size() == 1 && search.positions.front().first.isEmpty()) {
+	    Log::info() << "Starting over by mapping position " << i << std::endl;
+	    // We do not currently have a non-empty FMDPosition to extend. Start
+	    // over by mapping this character by itself.
+	    search = this->misMatchMapPosition(rangeIterator, query, i, minContext,
+		z_max, maskIterator);
+
+	    if(search.is_mapped && search.characters >= minContext && 
+		!search.positions.front().first.isEmpty(maskIterator) && range != -1
+		&& search.positions.size() == 1) {
+
 		// It mapped. We didn't do a re-start and fail, we have sufficient
 		// context to be confident, and our interval is nonempty and
 		// subsumed by a range.
 		
-		Log::debug() << "Mapped " << location.characters << 
-		" context to " << location.position << " in range #" << range <<
+		range = search.positions.front().first.range(rangeIterator, maskIterator);
+		
+		Log::info() << "Mapped " << search.characters << 
+		" context to " << search.positions.front().first << " in range #" << range <<
 		std::endl;
 	    
-	    // Remember that this base mapped to this range
-	    mappings.push_back(std::make_pair(range,location.characters - 1));
+		// Remember that this base mapped to this range
+		mappings.push_back(std::make_pair(range,searchExtend.maxCharacters - 1));
 	    
+		// We definitely have a non-empty FMDPosition to continue from
+	    } else {
+		 // It didn't map. Say it corresponds to no range.
+		 mappings.push_back(std::make_pair(-1,0));
+		    
+		 // Mark that the next iteration will be an extension (if we had
+		 // any results this iteration; if not it will just restart)
+		 search.is_mapped = true;
+	    }
+	} else {
+
+	    Log::info() << "Extending with position " << i << std::endl;
+	    // The last base either mapped successfully or failed due to multi-
+	    // mapping. Try to extend the FMDPosition we have to the left
+	    // (backwards) with the next base.
+	    searchExtend = this->misMatchExtend(search, query[i], true, z_max, maskIterator, true, false);
+	    searchExtend.characters++;
+	    if(searchExtend.characters > searchExtend.maxCharacters) {
+		searchExtend.maxCharacters = searchExtend.characters;
+	    }
+
+	    // What range index does our current left-side position (the one we just
+	    // moved) correspond to, if any?
+	    range = searchExtend.positions.front().first.range(rangeIterator, maskIterator);
 	    
-	    // We definitely have a non-empty FMDPosition to continue from
-	    
+	    if(searchExtend.is_mapped && searchExtend.positions.front().first.isEmpty(maskIterator)
+		&& searchExtend.positions.size() == 1) {
+
+		Log::info() << "Failed at " << searchExtend.positions.front().first << " (" << 
+		searchExtend.positions.size() << " mismatch search results for " <<
+		searchExtend.characters << " context)." << std::endl;
+		// We extended right until we got no results. We need to try
+		// this base again, in case we tried with a too-long left
+		// context.
+		
+		Log::info() << "Restarting from here..." << std::endl;
+		
+		search = searchExtend;
+		
+		// Move the loop index towards the end we started from (right)
+		i++;
+		
+		// Since the FMDPosition is empty, on the next iteration we will
+		// retry this base.
+		
+	    } else {
+		if(searchExtend.is_mapped && searchExtend.characters >= minContext && 
+		    !searchExtend.positions.front().first.isEmpty(maskIterator) && range != -1
+		    && searchExtend.positions.size() == 1) {
+
+		    // It mapped. We didn't do a re-start and fail, we have sufficient
+		    // context to be confident, and our interval is nonempty and
+		    // subsumed by a range.
+		    
+		    Log::info() << "Mapped " << search.characters << 
+		    " context to " << searchExtend.positions.front().first << " in range #" << range <<
+		    std::endl;
+		
+		    // Remember that this base mapped to this range
+		    mappings.push_back(std::make_pair(range,searchExtend.characters - 1));
+		
+		    // We definitely have a non-empty FMDPosition to continue from
+		
+			
 		} else {
 		    
-		    Log::debug() << "Failed at " << location.position << " (" << 
-		    location.position.ranges(rangeIterator, maskIterator) <<
-		    " options for " << location.characters << " context)." << 
+		    Log::info() << "Failed at " << searchExtend.positions.front().first << " (" << 
+		    searchExtend.positions.size() <<
+		    " mismatch search results for " << searchExtend.characters << " context)." << 
 		    std::endl;
 		    
-		    if(location.is_mapped && location.position.isEmpty(maskIterator)) {
-			// We extended right until we got no results. We need to try
-			// this base again, in case we tried with a too-long left
-			// context.
-			
-			Log::debug() << "Restarting from here..." << std::endl;
-			
-			// Move the loop index towards the end we started from (right)
-			i++;
-			
-			// Since the FMDPosition is empty, on the next iteration we will
-			// retry this base.
-			
-		    } else {
-			// It didn't map for some other reason:
-			// - It was an initial mapping with too little right context to 
-			//   be unique to a range.
-			// - It was an initial mapping with a nonexistent right context
-			// - It was an extension that was multimapped and still is
-			
-			// In none of these cases will re-starting from this base help
-			// at all. If we just restarted here, we don't want to do it
-			// again. If it was multimapped before, it had as much left
-			// context as it could take without running out of string or
-			// getting no results.
-			
-			// It didn't map. Say it corresponds to no range.
-			mappings.push_back(std::make_pair(-1,0));
-			
-			// Mark that the next iteration will be an extension (if we had
-			// any results this iteration; if not it will just restart)
-			location.is_mapped = true;
-			
-		    }
+		    // It didn't map for some other reason:
+		    // - It was an initial mapping with too little right context to 
+		    //   be unique to a range.
+		    // - It was an initial mapping with a nonexistent right context
+		    // - It was an extension that was multimapped and still is
+		    
+		    // In none of these cases will re-starting from this base help
+		    // at all. If we just restarted here, we don't want to do it
+		    // again. If it was multimapped before, it had as much left
+		    // context as it could take without running out of string or
+		    // getting no results.
+		    
+		    // It didn't map. Say it corresponds to no range.
+		    mappings.push_back(std::make_pair(-1,0));
+		    
+		    // Mark that the next iteration will be an extension (if we had
+		    // any results this iteration; if not it will just restart)
+		    search.is_mapped = true;
 		}
+			    
+		search = this->misMatchExtend(search, query[i], true, z_max, maskIterator, false, true);
+		search.characters = searchExtend.characters;
+		search.maxCharacters = searchExtend.maxCharacters;
+		
+		
+		if(!search.positions.front().first.isEmpty()) {
+		    if(!searchExtend.positions.front().first.isEmpty()) {
+			search.positions.insert(search.positions.end(), searchExtend.positions.begin(), searchExtend.positions.end());
+		    }
+		} else if(!searchExtend.positions.front().first.isEmpty()) {
+		    search = searchExtend;
+		}
+	    }
 	}
-	
-	// We've gone through and attempted the whole string. Put our results in the
-	// same order as the string, instead of the backwards order we got them in.
-	// See <http://www.cplusplus.com/reference/algorithm/reverse/>
-	std::reverse(mappings.begin(), mappings.end());
-	
-	// Get rid of the mask iterator if needed
-	if(maskIterator != NULL) {
-	    delete maskIterator;
-	}
-	
-	// Give back our answers.
-	return mappings;
+    }
+
+    // We've gone through and attempted the whole string. Put our results in the
+    // same order as the string, instead of the backwards order we got them in.
+    // See <http://www.cplusplus.com/reference/algorithm/reverse/>
+    std::reverse(mappings.begin(), mappings.end());
     
+    // Get rid of the mask iterator if needed
+    if(maskIterator != NULL) {
+	delete maskIterator;
+    }
+
+    // Give back our answers.
+    return mappings;
 }
 
 std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(const BitVector& ranges, 
@@ -1713,7 +1773,7 @@ MisMatchAttemptResults FMDIndex::misMatchMapPosition(BitVectorIterator& ranges,
 	// Necessary here to create new result set since we're editing every
 	// position of the last one. Is there a way around this? Don't think so...
             
-	MisMatchAttemptResults new_result = this->misMatchExtend(result, pattern[index], false, z_max, mask, false);
+	MisMatchAttemptResults new_result = this->misMatchExtend(result, pattern[index], false, z_max, mask, false, false);
 			
 	if(new_result.positions.front().first.isEmpty(mask)) {
 	    if(result.positions.size() == 1 && result.characters >= minContext) {

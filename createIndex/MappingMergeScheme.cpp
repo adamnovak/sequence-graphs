@@ -102,7 +102,7 @@ void MappingMergeScheme::join() {
 
 void MappingMergeScheme::generateMerge(size_t queryContig, size_t queryBase, 
     size_t referenceContig, size_t referenceBase, bool orientation) const {
-      
+	
     // Right now credit merging schemes are attempting to merge off-contig
     // positions but are otherwise behaving as expected. Throw warning and
     // don't merge rather than runtime error until this is worked out.
