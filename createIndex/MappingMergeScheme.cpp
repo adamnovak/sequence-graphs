@@ -312,7 +312,7 @@ void MappingMergeScheme::generateMerges(
 			    if(i > leftSentinel && rightSentinel > i) {
 				creditCandidates.push_back(i);
 			    }
-			    Log::info() << "Conflicted " << i << " " << contig[i] << std::endl;
+			    Log::debug() << "Conflicted " << i << " " << contig[i] << std::endl;
 			}
 			
 		} else {
@@ -323,7 +323,7 @@ void MappingMergeScheme::generateMerges(
 		    // right-semantics, so flip it.
 		    generateMerge(queryContig, i + 1, leftBase.first.first, 
 				  leftBase.first.second, !leftBase.second);
-		    Log::info() << "Anchor Merged pos " << i << ", a(n) " << contig[i] << " on contig " << queryContig << " to " << leftBase.first.second << " on contig " << leftBase.first.first << " with orientation " << !leftBase.second << std::endl;
+		    Log::debug() << "Anchor Merged pos " << i << ", a(n) " << contig[i] << " on contig " << queryContig << " to " << leftBase.first.second << " on contig " << leftBase.first.first << " with orientation " << !leftBase.second << std::endl;
 		    
 		    
 		    mappedBases++;
@@ -339,7 +339,7 @@ void MappingMergeScheme::generateMerges(
 		// (since it's backwards to start with).
 		generateMerge(queryContig, i + 1, rightBase.first.first, 
 			      rightBase.first.second, rightBase.second);
-		Log::info() << "Anchor Merged pos " << i << ", a(n) " << contig[i] << " on contig " << queryContig << " to " << rightBase.first.second << " on contig " << rightBase.first.first << " with orientation " << rightBase.second << std::endl;
+		Log::debug() << "Anchor Merged pos " << i << ", a(n) " << contig[i] << " on contig " << queryContig << " to " << rightBase.first.second << " on contig " << rightBase.first.first << " with orientation " << rightBase.second << std::endl;
 		
 		mappedBases++; 
 	    } else {
@@ -412,8 +412,8 @@ void MappingMergeScheme::generateMerges(
 				rangeBases[rightMappings[j].first].second != firstBaseR.second ||
 				rangeBases[rightMappings[j].first].first.first != firstBaseR.first.first) {
 				contextMappedR = false;
-			    break;
-				}
+				break;
+			    }
 			}
 		    }
 		}
