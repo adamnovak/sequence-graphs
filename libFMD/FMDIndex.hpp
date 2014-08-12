@@ -343,7 +343,7 @@ public:
      * Map a string on the right. Lets you pick just a range. Uses restarts
      * instead of retract.
      */
-    std::vector<Mapping> mapRightOld(const std::string& query,
+    std::vector<Mapping> mapLeftOld(const std::string& query,
         const BitVector* mask = NULL, int minContext = 0, int start = 0, 
         int length = -1) const;
         

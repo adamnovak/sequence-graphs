@@ -143,15 +143,32 @@ int main(int argc, char** argv) {
             recordContigs.end());
     }
     
+    size_t originalContigs = nonemptyContigs.size();
+    for(size_t i = 0; i < originalContigs; i++) {
+        // Make sure each contig is in forwards and backwards, to eliminate
+        // directional bias. TODO: not really needed.
+        nonemptyContigs.push_back(reverseComplement(nonemptyContigs[i]));
+    }
+    
+    // This holds reverse-complemented contigs, so each mapper can map in its
+    // prefered direction.
+    std::vector<std::string> rcContigs;
+    for(auto record: nonemptyContigs) {
+        rcContigs.push_back(reverseComplement(record));
+    }
+    
     // Get a stream so we can print without a new message every time
     auto output = Log::output();    
     
     // We want to time the mapping code.
     Timer* timer = new Timer("Mapping New Way");
-    for(auto record : nonemptyContigs) {
+    for(auto record : rcContigs) {
         for(size_t i = 0; i < repetitions; i++) {
             // Map the record a bunch
             output << ".";
+            // TODO: This flips, so compare internal mapRight all with the
+            // mapLeftOld. This still introduces possibly a bias depending on
+            // sequence orientation.
             newMappings.push_back(index.mapRight(record));
         }
     }
@@ -159,6 +176,28 @@ int main(int argc, char** argv) {
     
     // Stop the timer
     delete timer;
+    
+    // Reverse all the new mappings (off the clock), so the will match up with
+    // the right mappings
+    for(size_t i = 0; i < newMappings.size(); i++) {
+        // Put them in proper base order.
+        std::reverse(newMappings[i].begin(), newMappings[i].end());
+        
+        for(size_t j = 0; j < newMappings[i].size(); j++) {
+            // Go through all the mappings
+            
+            if(newMappings[i][j].is_mapped) {
+                // Flip the mapping onto the correct text for left semantics.
+                size_t contigLength = index.getContigLength(
+                    index.getContigNumber(newMappings[i][j].location));
+                    
+                newMappings[i][j].location.setText(
+                    newMappings[i][j].location.getText() ^ 1);
+                newMappings[i][j].location.setOffset(contigLength - 
+                    newMappings[i][j].location.getOffset() - 1);
+            }
+        }
+    }
     
     
     // Get a new message
@@ -171,13 +210,32 @@ int main(int argc, char** argv) {
         for(size_t i = 0; i < repetitions; i++) {
             // Map the record a bunch
             output << ".";
-            newMappings.push_back(index.mapRightOld(record));
+            oldMappings.push_back(index.mapLeftOld(record));
         }
     }
     output << std::endl;
     
     // Stop the timer
     delete timer;
+    
+    for(size_t i = 0; i < oldMappings.size(); i++) {
+        // Check the answers to make sure they match and they did the same work.
+        if(oldMappings[i].size() != newMappings[i].size()) {
+            Log::critical() << "Mapping " << i << " has a length mismatch (" <<
+            oldMappings[i].size() << " vs " << newMappings[i].size() << ")" <<
+            std::endl;
+            throw std::runtime_error("Mapping length mismatch");
+        }
+        
+        for(size_t j = 0; j < oldMappings[i].size(); j++) {
+            // Complain if they got different answers
+            if(oldMappings[i][j] != newMappings[i][j]) {
+                Log::error() << "Mapping mismatch: " << oldMappings[i][j] << 
+                    " vs. " << newMappings[i][j] << std::endl;
+            }
+        }
+        
+    }
     
 }
     

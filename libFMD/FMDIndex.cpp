@@ -616,7 +616,7 @@ FMDPosition FMDIndex::count(std::string pattern) const {
     
     for(int i = pattern.size() - 2; !position.isEmpty() && i >= 0; i--) {
         // Extend backwards with each character
-        position = extend(position, pattern[i], true);
+        extendFast(position, pattern[i], true);
     }
     
     // We either ran out of matching locations or finished the pattern.
@@ -1066,7 +1066,7 @@ Mapping FMDIndex::disambiguate(const Mapping& left,
     
 }
 
-std::vector<Mapping> FMDIndex::mapRightOld(const std::string& query,
+std::vector<Mapping> FMDIndex::mapLeftOld(const std::string& query,
     const BitVector* mask, int minContext, int start, int length) const {
 
     if(length == -1) {
@@ -1116,8 +1116,7 @@ std::vector<Mapping> FMDIndex::mapRightOld(const std::string& query,
             // The last base either mapped successfully or failed due to multi-
             // mapping. Try to extend the FMDPosition we have to the right (not
             // backwards) with the next base.
-            location.position = this->extend(location.position, query[i],
-                false);
+            this->extendFast(location.position, query[i], false);
             location.characters++;
         }
 
@@ -1255,8 +1254,8 @@ MapAttemptResult FMDIndex::mapPosition(const std::string& pattern,
             character << "(" << character << ")" << std::endl;
 
         // Backwards extend with subsequent characters.
-        FMDPosition next_position = this->extend(result.position, character,
-            true);
+        FMDPosition next_position = result.position;
+        this->extendFast(next_position, character, true);
 
         Log::trace() << "Now at " << next_position << " after " << 
             pattern[index] << std::endl;
