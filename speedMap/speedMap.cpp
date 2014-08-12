@@ -19,6 +19,8 @@
  
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/classification.hpp>
 
 // Grab timers from libsuffixtools
 #include <Timer.h>
@@ -108,30 +110,53 @@ int main(int argc, char** argv) {
     // Load the index.
     FMDIndex index(indexDirectory + "/index.basename");
     
+    // We want copies of all the mappings from the new method.
+    std::vector<std::vector<Mapping>> newMappings;
+    
+    // And the old one
+    std::vector<std::vector<Mapping>> oldMappings;
+    
     // Load the FASTA
     Fasta fasta(fastaName);
     
+    // Load all the records
+    std::vector<std::string> nonemptyContigs;
     while(fasta.hasNext()) {
-        // Grab each FASTA record
-        std::string fastaRecord(fasta.getNext());
+        std::string fastaRecord = fasta.getNext();
+    
+        // We're going to split each record into contigs.
+        std::vector<std::string> recordContigs;
         
-        // Only map to the whole index (bottom level).
-        index.mapBoth(fastaRecord);
+        // We compress runs of Ns thanks to Boost
+        boost::algorithm::split(recordContigs, fastaRecord,
+            boost::is_any_of("Nn"), boost::token_compress_on);
         
-        Log::output() << "Mapped FASTA record:" << std::endl;
-        Log::output() << fastaRecord << std::endl;
+        // Put all the new contigs in the vector of contigs.
+        nonemptyContigs.insert(nonemptyContigs.end(), recordContigs.begin(),
+            recordContigs.end());
     }
     
+    // We want to time the mapping code.
+    Timer* timer = new Timer("Mapping New Way");
     
+    for(auto record : nonemptyContigs) {
+        // Map each record
+        newMappings.push_back(index.mapBoth(record));
+    }
     
+    // Stop the timer
+    delete timer;
     
+    // And the old mapping code
+    timer = new Timer("Mapping Old Way");
     
+    for(auto record : nonemptyContigs) {
+        // Map each record
+        //newMappings.push_back(index.mapBothOld(record));
+    }
     
-    
-    
-    
-    
-    
+    // Stop the timer
+    delete timer;
     
 }
     
