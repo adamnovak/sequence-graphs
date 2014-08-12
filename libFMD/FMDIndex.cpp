@@ -1044,7 +1044,7 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMapRight(
 	    maskIterator, true, false);
 	
 	while(extended.positions.front().first.isEmpty(maskIterator)) {
-	    Log::info() << "At position " << i << ", retracting to " <<
+	    Log::debug() << "At position " << i << ", retracting to " <<
 		search.characters - 1 << " characters" << std::endl;
 	    // We would have no results if we extended with this character right
 	    // now.
@@ -1087,7 +1087,7 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMapRight(
 	    // If you happen to have results in exactly one range with
 	    // sufficient context, record a mapping to it.
 	    
-	    Log::info() << "Mapped " << extended.characters << " context to " << 
+	    Log::debug() << "Mapped " << extended.characters << " context to " << 
 	    extended.positions.front().first << " in range #" <<
 	    range << std::endl;
 	
@@ -1098,7 +1098,7 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMapRight(
 	} else {
 	    // Otherwise record that this position is unmapped on the right.
 	
-	    Log::info() << "Failed at " << extended.positions.front().first <<
+	    Log::debug() << "Failed at " << extended.positions.front().first <<
 	    " (" << extended.positions.size() << " mismatch search results for "
 	    << extended.characters << " context)." << std::endl;
 	    
