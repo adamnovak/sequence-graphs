@@ -34,7 +34,13 @@ struct MisMatchAttemptResults
     // hit below minimum context length
     size_t characters;
     size_t maxCharacters;
-
+    
+    // Store a vector of the offset from the right side of each search result
+    std::vector<size_t> misMatchOffsets;
+    
+    // Store a size_t to track right-sided reductions in the lengths of the
+    // search results instead of updating every misMatchOffsets value
+    size_t offsetCorrection;
 };
 
 #endif
