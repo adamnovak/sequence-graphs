@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <utility>
 
-#include "BitVector.hpp"
+#include "GenericBitVector.hpp"
 #include "Log.hpp"
 
 /**
@@ -100,7 +100,7 @@ public:
      * Is an FMDPosition empty? If a mask is specified, only counts matches with
      * 1s in the mask.
      */
-    inline bool isEmpty(BitVectorIterator* mask = NULL) const {
+    inline bool isEmpty(const GenericBitVector* mask = NULL) const {
         return getLength(mask) <= 0;
     }
 
@@ -108,7 +108,7 @@ public:
     * Return the actual number of matches represented by an FMDPosition. If a
     * mask is specified, only counts matches with 1s in the mask.
     */
-    inline int64_t getLength(BitVectorIterator* mask = NULL) const
+    inline int64_t getLength(const GenericBitVector* mask = NULL) const
     {
         if(mask == NULL || end_offset == -1) {
             // Fast path: no mask or an actually empty interval. Can just look
@@ -142,16 +142,16 @@ public:
      *
      * If a mask is specified, only counts matches with 1s in the mask.
      */
-    int64_t range(BitVectorIterator& ranges, BitVectorIterator* mask = NULL)
-        const;
+    int64_t range(const GenericBitVector& ranges, 
+        const GenericBitVector* mask = NULL) const;
 
     /**
      * Return the number of ranges that the forward-strand interval of this
      * FMDPosition overlaps. If a mask is specified, only counts matches with 1s
      * in the mask.
      */
-    int64_t ranges(BitVectorIterator& ranges,BitVectorIterator* mask = NULL)
-        const;
+    int64_t ranges(const GenericBitVector& ranges, 
+        const GenericBitVector* mask = NULL) const;
     
     /**
      * Provide pretty-printing for FMDPositions. See

@@ -10,7 +10,7 @@
 
 #include "TextPosition.hpp"
 #include "FMDIndexIterator.hpp"
-#include "BitVector.hpp"
+#include "GenericBitVector.hpp"
 #include "Mapping.hpp"
 #include "MapAttemptResult.hpp"
 #include "LCPArray.hpp"
@@ -135,7 +135,7 @@ public:
     /**
      * Get the mask for the positions in the given genome.
      */
-    const BitVector& getGenomeMask(size_t genome) const;
+    const GenericBitVector& getGenomeMask(size_t genome) const;
     
     /***************************************************************************
      * Search Functions
@@ -281,7 +281,7 @@ public:
      *
      */
     std::vector<Mapping> mapRight(const std::string& query, 
-        const BitVector* mask, int minContext = 0) const;
+        const GenericBitVector* mask, int minContext = 0) const;
         
     /**
      * RIGHT-map to a specific genome, or to all genomes if genome is -1. Same
@@ -324,15 +324,15 @@ public:
      * Returns a vector of one-based range numbers for left-mapping each base,
      * or -1 if the base did not map to a range.
      */
-    std::vector<int64_t> mapRight(const BitVector& ranges,
-        const std::string& query, const BitVector* mask,
+    std::vector<int64_t> mapRight(const GenericBitVector& ranges,
+        const std::string& query, const GenericBitVector* mask,
         int minContext = 0) const;
         
     /**
      * RIGHT-map to ranges using contexts from a specific genome, or all genomes
      * if genome is -1. Same semantics as the function above.
      */
-    std::vector<int64_t> mapRight(const BitVector& ranges,
+    std::vector<int64_t> mapRight(const GenericBitVector& ranges,
         const std::string& query, int64_t genome = -1,
         int minContext = 0) const;
     
@@ -344,14 +344,14 @@ public:
      * Map a certain position on the right.
      */
     MapAttemptResult mapPosition(const std::string& pattern, size_t index, 
-        BitVectorIterator* mask) const;
+        const GenericBitVector* mask) const;
         
     /**
      * Map a string on the right. Lets you pick just a range. Uses restarts
      * instead of retract.
      */
     std::vector<Mapping> mapLeftOld(const std::string& query,
-        const BitVector* mask = NULL, int minContext = 0, int start = 0, 
+        const GenericBitVector* mask = NULL, int minContext = 0, int start = 0, 
         int length = -1) const;
         
     /***************************************************************************
@@ -431,11 +431,12 @@ protected:
      * genome. Note that we can't get genome by contig or contigs for genome.
      * Only genome by BWT position.
      *
-     * If we had C++11 we would use a vector, but we don't and since BitVector
-     * is not copy constructable/assignable we can't put it in a vector. So we
-     * put pointers in a vector.
+     * If we had C++11 we would use a vector, but we don't and since
+     * GenericBitVector is not copy constructable/assignable we can't put it in
+     * a vector. So we put pointers in a vector.
+     * TODO: We have C++11 now. Fix this.
      */
-    std::vector<BitVector*> genomeMasks;
+    std::vector<GenericBitVector*> genomeMasks;
     
     /**
      * Holds the actual underlying index.
