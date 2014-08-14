@@ -1612,98 +1612,104 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(const BitVector& ra
 		 search.is_mapped = true;
 	    }
 	} else {
-
-	    Log::info() << "Extending with position " << i << std::endl;
+	    
 	    // The last base either mapped successfully or failed due to multi-
 	    // mapping. Try to extend the FMDPosition we have to the left
 	    // (backwards) with the next base.
-	    searchExtend = this->misMatchExtend(search, query[i], true, z_max, maskIterator, true, false);
-	    searchExtend.characters++;
-	    if(searchExtend.characters > searchExtend.maxCharacters) {
-		searchExtend.maxCharacters = searchExtend.characters;
-	    }
-
-	    // What range index does our current left-side position (the one we just
-	    // moved) correspond to, if any?
-	    range = searchExtend.positions.front().first.range(rangeIterator, maskIterator);
 	    
-	    if(searchExtend.is_mapped && searchExtend.positions.front().first.isEmpty(maskIterator)
-		&& searchExtend.positions.size() == 1) {
-
-		Log::info() << "Failed at " << searchExtend.positions.front().first << " (" << 
-		searchExtend.positions.size() << " mismatch search results for " <<
-		searchExtend.characters << " context)." << std::endl;
-		// We extended right until we got no results. We need to try
-		// this base again, in case we tried with a too-long left
-		// context.
-		
-		Log::info() << "Restarting from here..." << std::endl;
-		
-		search = searchExtend;
-		
-		// Move the loop index towards the end we started from (right)
+	    // Extend by *only* mismatched bases. Do not extend by the correct base yet.
+	    searchExtend = this->misMatchExtend(search, query[i], true, z_max, maskIterator, false, true);
+	    
+	    // Check if mismatch extension gives you any results. If so, restart. See discussion
+	    // of mis-identifying mapped positions in the email thread
+	    if(searchExtend.positions.size() > 1 || !searchExtend.positions.front().first.isEmpty()) {
 		i++;
-		
-		// Since the FMDPosition is empty, on the next iteration we will
-		// retry this base.
+		search.positions.clear();
+		search.positions.push_back(
+		    std::pair<FMDPosition,size_t>(EMPTY_FMD_POSITION,0));
+		search.characters = 0;
+		search.maxCharacters = 0;
 		
 	    } else {
-		if(searchExtend.is_mapped && searchExtend.characters >= minContext && 
-		    !searchExtend.positions.front().first.isEmpty(maskIterator) && range != -1
-		    && searchExtend.positions.size() == 1) {
-
+		
+		// If no mismatch extension results exist, we can safely extend by the correct base
+		// and be assured we are passing forward a complete set of search results
+		
+		Log::info() << "Extending with position " << i << std::endl;
+		
+		search = this->misMatchExtend(search, query[i], true, z_max, maskIterator, true, false);
+		search.characters++;
+		
+		// What range index does our current left-side position (the one we just
+		// moved) correspond to, if any?
+		range = search.positions.front().first.range(rangeIterator, maskIterator);
+		
+		if(search.is_mapped && search.characters >= minContext && 
+		    !search.positions.front().first.isEmpty(maskIterator) && range != -1
+		    && search.positions.size() == 1) {
+		    
 		    // It mapped. We didn't do a re-start and fail, we have sufficient
 		    // context to be confident, and our interval is nonempty and
 		    // subsumed by a range.
 		    
 		    Log::info() << "Mapped " << search.characters << 
-		    " context to " << searchExtend.positions.front().first << " in range #" << range <<
+		    " context to " << search.positions.front().first << " in range #" << range <<
 		    std::endl;
+		
 		
 		    // Remember that this base mapped to this range
 		    mappings.push_back(std::make_pair(range,searchExtend.characters - 1));
 		
 		    // We definitely have a non-empty FMDPosition to continue from
-		
-			
+		   
 		} else {
+		
+		    if(search.is_mapped && search.positions.front().first.isEmpty(maskIterator)
+			&& searchExtend.positions.size() == 1) {
 		    
-		    Log::info() << "Failed at " << searchExtend.positions.front().first << " (" << 
-		    searchExtend.positions.size() <<
-		    " mismatch search results for " << searchExtend.characters << " context)." << 
-		    std::endl;
-		    
-		    // It didn't map for some other reason:
-		    // - It was an initial mapping with too little right context to 
-		    //   be unique to a range.
-		    // - It was an initial mapping with a nonexistent right context
-		    // - It was an extension that was multimapped and still is
-		    
-		    // In none of these cases will re-starting from this base help
-		    // at all. If we just restarted here, we don't want to do it
-		    // again. If it was multimapped before, it had as much left
-		    // context as it could take without running out of string or
-		    // getting no results.
-		    
-		    // It didn't map. Say it corresponds to no range.
-		    mappings.push_back(std::make_pair(-1,0));
-		    
-		    // Mark that the next iteration will be an extension (if we had
-		    // any results this iteration; if not it will just restart)
-		    search.is_mapped = true;
-		}
+			Log::info() << "Failed at " << searchExtend.positions.front().first << " (" << 
+			searchExtend.positions.size() << " mismatch search results for " <<
+			searchExtend.characters << " context)." << std::endl;
+			// We extended right until we got no results. We need to try
+			// this base again, in case we tried with a too-long left
+			// context.
+		
+			Log::info() << "Restarting from here..." << std::endl;
+		
+			search = searchExtend;
+		
+			// Move the loop index towards the end we started from (right)
+			i++;
+		
+			// Since the FMDPosition is empty, on the next iteration we will
+			// retry this base.
+
+		    } else {
 			    
-		search = this->misMatchExtend(search, query[i], true, z_max, maskIterator, false, true);
-		search.characters = searchExtend.characters;
-		search.maxCharacters = searchExtend.maxCharacters;
-		
-		
-		if(!search.positions.front().first.isEmpty()) {
-		    if(!searchExtend.positions.front().first.isEmpty()) {
-			search.positions.insert(search.positions.end(), searchExtend.positions.begin(), searchExtend.positions.end());
+			Log::info() << "Failed at " << search.positions.front().first << " (" << 
+			search.positions.size() <<
+			" mismatch search results for " << search.characters << " context)." << 
+			std::endl;
+			
+			// It didn't map for some other reason:
+			// - It was an initial mapping with too little right context to 
+			//   be unique to a range.
+			// - It was an initial mapping with a nonexistent right context
+			// - It was an extension that was multimapped and still is
+			
+			// In none of these cases will re-starting from this base help
+			// at all. If we just restarted here, we don't want to do it
+			// again. If it was multimapped before, it had as much left
+			// context as it could take without running out of string or
+			// getting no results.
+			
+			// It didn't map. Say it corresponds to no range.
+			mappings.push_back(std::make_pair(-1,0));
+			
+			// Mark that the next iteration will be an extension (if we had
+			// any results this iteration; if not it will just restart)
+			search.is_mapped = true;
 		    }
-		} else if(!searchExtend.positions.front().first.isEmpty()) {
-		    search = searchExtend;
 		}
 	    }
 	}

@@ -740,7 +740,6 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
 			  firstBaseR.second != firstBaseL.second) {
 		    generateMerge(queryContig, creditCandidates[i] + 1, firstBaseL.first.first, 
                         firstBaseL.first.second, !firstBaseL.second);
-		    //Log::info() << "LR Credit Merged pos " << creditCandidates[i] << ", a(n) " << contig[creditCandidates[i]] << " on contig " << queryContig << " to " << firstBaseR.first.second << " on contig " << firstBaseR.first.first << " with orientation " << firstBaseR.second << std::endl;
 		    mappedBases++;
 		    unmappedBases--;
 		    creditBases++;
@@ -749,7 +748,6 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
 	    } else {
 		  generateMerge(queryContig, creditCandidates[i] + 1, firstBaseR.first.first, 
                         firstBaseR.first.second, firstBaseR.second);
-		  //Log::info() << "R Credit Merged pos " << creditCandidates[i] << ", a(n) " << contig[creditCandidates[i]] << " on contig " << queryContig << " to " << firstBaseR.first.second << " on contig " << firstBaseR.first.first << " with orientation " << firstBaseR.second << std::endl;
 		  mappedBases++;
 		  unmappedBases--;
 		  creditBases++;
@@ -764,10 +762,8 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
 	    }
 	    int64_t temp = (int64_t)firstBaseL.first.second + LROffset;
 	    firstBaseL.first.second = (size_t)temp;
-	    //Log::info() << "After " << firstBaseL.first.second << ", moved by " << LROffset << std::endl;
 	    generateMerge(queryContig, creditCandidates[i] + 1, firstBaseL.first.first, 
                         firstBaseL.first.second, !firstBaseL.second);
-	    //Log::info() << "L Credit Merged pos " << creditCandidates[i] << ", a(n) " << contig[creditCandidates[i]] << " on contig " << queryContig << " to " << firstBaseL.first.second << " on contig " << firstBaseL.first.first << " with orientation " << firstBaseL.second << std::endl;
 	    mappedBases++;
 	    unmappedBases--;
 	    creditBases++;

@@ -269,46 +269,83 @@ public:
      * Returns a vector of one-based range numbers for left-mapping each base,
      * or -1 if the base did not map to a range.
      */
-    std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> Cmap(const BitVector& ranges,
-        const std::string& query, const BitVector* mask, int minContext = 0, 
-        int start = 0, int length = -1) const;
-    
-    /**
-     * RIGHT-map to ranges using contexts from a specific genome, or all genomes
-     * if genome is -1. Same semantics as the function above.
-     */
-    std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> Cmap(const BitVector& ranges,
-        const std::string& query, int64_t genome = -1, int minContext = 0, 
-        int start = 0, int length = -1) const;
-        
-    /**
-     * Left-right exact versions:
-     */
+            
     std::vector<std::pair<int64_t,size_t>> map(const BitVector& ranges,
         const std::string& query, int64_t genome = -1, int minContext = 0, 
         int start = 0, int length = -1) const;
 	
+    /**
+     * RIGHT-map to ranges using contexts from a specific genome, or all genomes
+     * if genome is -1. Same semantics as the function above.
+     */
+	
     std::vector<std::pair<int64_t,size_t>> map(const BitVector& ranges,
         const std::string& query, const BitVector* mask, int minContext = 0, 
+        int start = 0, int length = -1) const;
+
+    /**
+     * CENTERED VERSIONS of the functions described above
+     **/
+    
+    std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> Cmap(const BitVector& ranges,
+        const std::string& query, const BitVector* mask, int minContext = 0, 
+        int start = 0, int length = -1) const;
+    
+    
+    std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> Cmap(const BitVector& ranges,
+        const std::string& query, int64_t genome = -1, int minContext = 0, 
         int start = 0, int length = -1) const;
 	
     /***************************************************************************
      * Mismatch
      **************************************************************************/
+    
+    /**
+     * Given a set of mismatch search results, extend each result in the set,
+     * throwing out those which do not exist in the reference.
+     * 
+     * z_max is the maximum number of mismatches allowed
+     * 
+     * if startExtension is true, we only extend by the correct base.
+     * 
+     * if finishExtension is true we only extend by the incorrect bases.
+     * 
+     * These two options are used for right extension of left-context results,
+     * respectively left extension of right-context results
+     * 
+     * If both bools are false, then we extend with everything. This is what
+     * happens when left-extending a set of left context results.
+     * 
+     * For speed, this implementation does not sort search results.
+     **/ 
 	
     MisMatchAttemptResults misMatchExtend(MisMatchAttemptResults& prevMisMatches,
-	char c, bool backward, size_t z_max, BitVectorIterator* mask, bool startExtension = false, bool finishExtension = false) const;
+	char c, bool backward, size_t z_max, BitVectorIterator* mask,
+	bool startExtension = false, bool finishExtension = false) const;
+	
+    /**
+     * An old implementation of the method described above, sorting the results
+     * in order of number of mismatches. This will allow a speed-up if ever we
+     * want to find the match with the fewest number of mismatches.
+     **/
 	
     MisMatchAttemptResults sortedMisMatchExtend(MisMatchAttemptResults& prevMisMatches,
 	char c, bool backward, size_t z_max, BitVectorIterator* mask) const;
+	
+    /**
+     * A submethod of sortedMisMatchExtend to check for existence and then sort
+     * extension results
+     **/
     
     void processMisMatchPositions(
-		MisMatchAttemptResults& nextMisMatches,
-		std::vector<std::pair<FMDPosition,size_t>>& waitingMatches,
-		std::vector<std::pair<FMDPosition,size_t>>& waitingMisMatches,
-		BitVectorIterator* mask) const;
+	MisMatchAttemptResults& nextMisMatches,
+	std::vector<std::pair<FMDPosition,size_t>>& waitingMatches,
+	std::vector<std::pair<FMDPosition,size_t>>& waitingMisMatches,
+	BitVectorIterator* mask) const;
 		
-    // Implementing mismatch search for Left-Right exact contexts
+    /**
+     * Implementing mismatch search for Left-Right exact contexts
+     **/
 		 
     std::vector<std::pair<int64_t,size_t>> misMatchMap(const BitVector& ranges,
 	const std::string& query, const BitVector* mask, int minContext = 0, size_t z_max = 0,
@@ -319,10 +356,12 @@ public:
 	int start = 0, int length = -1) const;
 	
     MisMatchAttemptResults misMatchMapPosition(BitVectorIterator& ranges, 
-    const std::string& pattern, size_t index, size_t z_max, size_t minContext,
-    BitVectorIterator* mask = NULL) const;
+	const std::string& pattern, size_t index, size_t z_max, size_t minContext,
+	BitVectorIterator* mask = NULL) const;
     
-    // We also need centered search versions of all the mismatch mapping functions
+    /**
+     * Centered search versions of all the mismatch mapping functions
+    **/
     
     std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> CmisMap(const BitVector& ranges,
 	const std::string& query, const BitVector* mask, int minContext = 0, size_t z_max = 0,
