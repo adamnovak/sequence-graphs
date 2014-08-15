@@ -56,11 +56,18 @@ void GenericBitVector::finish(size_t length) {
     // Finish encoding
     encoder->flush();
     // Make the BitVector
-    bitvector = new BitVector(*encoder, length);    
+    bitvector = new BitVector(*encoder, length);
+    
+    // Set our size
+    size = length;    
 }
 
 void GenericBitVector::writeTo(std::ofstream& stream) const {
     bitvector->writeTo(stream);
+}
+
+size_t GenericBitVector::getSize() const {
+    return size;
 }
 
 size_t GenericBitVector::rank(size_t index) const {
@@ -72,7 +79,14 @@ size_t GenericBitVector::rank(size_t index, bool atLeast) const {
     if(atLeast) {
         // Implement this mode ourselves so we can be certain of exactly what it
         // does.
-        return rank(index) + isSet(index);
+        if(index == 0) {
+            // rank(-1) would be 0, but we can't express that with size_ts.
+            // So we onlu check if we are in range.
+            return (index < size);
+        }
+        // Get the rank of the previous position, then add 1 if this position
+        // could contain a 1.
+        return rank(index-1) + (index < size);
     } else {
         return rank(index);
     }

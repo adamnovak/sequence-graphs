@@ -58,9 +58,8 @@ void GenericBitVectorTests::testIsSet() {
     GenericBitVector* v = pair.first;
     BitVectorIterator* v2 = new BitVectorIterator(*pair.second);
     
-    for(size_t i = 0; i < 10; i++) {
+    for(size_t i = 0; i < 20; i++) {
         // Check a bunch of positions.
-        Log::info() << "Checking " << i << std::endl;
         CPPUNIT_ASSERT(v->isSet(i) == v2->isSet(i));
     }
     
@@ -72,11 +71,69 @@ void GenericBitVectorTests::testIsSet() {
 
 
 void GenericBitVectorTests::testRank() {
+
+    auto pair = makeTestData();
+    GenericBitVector* v = pair.first;
+    BitVectorIterator* v2 = new BitVectorIterator(*pair.second);
+    
+    for(size_t i = 0; i < 20; i++) {
+        // Check a bunch of positions.
+        Log::info() << "Position " << i << " rank at least " << v->rank(i, true) << " vs " << v2->rank(i, true) << std::endl;
+        CPPUNIT_ASSERT(v->rank(i) == v2->rank(i));
+        CPPUNIT_ASSERT(v->rank(i, true) == v2->rank(i, true));
+        CPPUNIT_ASSERT(v->rank(i, false) == v2->rank(i, false));
+    }
+    
+    delete pair.first;
+    delete pair.second;
+    delete v2;
+
 }
 void GenericBitVectorTests::testSelect() {
+
+    auto pair = makeTestData();
+    GenericBitVector* v = pair.first;
+    BitVectorIterator* v2 = new BitVectorIterator(*pair.second);
+    
+    for(size_t i = 0; i < 6; i++) {
+        // Check a bunch of positions.
+        CPPUNIT_ASSERT(v->select(i) == v2->select(i));
+    }
+    
+    delete pair.first;
+    delete pair.second;
+    delete v2;
+
 }
 void GenericBitVectorTests::testValueBefore() {
+    
+    auto pair = makeTestData();
+    GenericBitVector* v = pair.first;
+    BitVectorIterator* v2 = new BitVectorIterator(*pair.second);
+    
+    for(size_t i = 0; i < 20; i++) {
+        // Check a bunch of positions.
+        CPPUNIT_ASSERT(v->valueBefore(i) == v2->valueBefore(i));
+    }
+    
+    delete pair.first;
+    delete pair.second;
+    delete v2;
 }
 void GenericBitVectorTests::testValueAfter() {
+
+    auto pair = makeTestData();
+    GenericBitVector* v = pair.first;
+    BitVectorIterator* v2 = new BitVectorIterator(*pair.second);
+    
+    for(size_t i = 0; i < 20; i++) {
+        // Check a bunch of positions.
+        CPPUNIT_ASSERT(v->valueAfter(i) == v2->valueAfter(i));
+    }
+    
+    delete pair.first;
+    delete pair.second;
+    delete v2;
+    
 }
 

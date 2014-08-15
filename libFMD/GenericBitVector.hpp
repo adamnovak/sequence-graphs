@@ -64,6 +64,11 @@ public:
     void writeTo(std::ofstream& stream) const;
     
     /**
+     * Get the size of the bitvector in bits. Must have been finished first.
+     */
+    size_t getSize() const;
+    
+    /**
      * Get the number of 1s occurring before the given index. Must be thread-
      * safe.
      */
