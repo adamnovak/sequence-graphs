@@ -26,17 +26,17 @@ std::pair<GenericBitVector*, BitVector*>
     BitVectorEncoder v2(32);
     
     // Populate them
-    v->addBit(1);
-    v2.addBit(1);
-    
-    v->addBit(3);
-    v2.addBit(3);
+    v->addBit(2);
+    v2.addBit(2);
     
     v->addBit(4);
     v2.addBit(4);
     
     v->addBit(5);
     v2.addBit(5);
+    
+    v->addBit(6);
+    v2.addBit(6);
     
     // Finish up the new one
     v->finish(10);
@@ -78,7 +78,6 @@ void GenericBitVectorTests::testRank() {
     
     for(size_t i = 0; i < 20; i++) {
         // Check a bunch of positions.
-        Log::info() << "Position " << i << " rank at least " << v->rank(i, true) << " vs " << v2->rank(i, true) << std::endl;
         CPPUNIT_ASSERT(v->rank(i) == v2->rank(i));
         CPPUNIT_ASSERT(v->rank(i, true) == v2->rank(i, true));
         CPPUNIT_ASSERT(v->rank(i, false) == v2->rank(i, false));
@@ -113,7 +112,9 @@ void GenericBitVectorTests::testValueBefore() {
     
     for(size_t i = 0; i < 20; i++) {
         // Check a bunch of positions.
-        CPPUNIT_ASSERT(v->valueBefore(i) == v2->valueBefore(i));
+        auto ourResult = v->valueBefore(i);
+        auto theirResult = v2->valueBefore(i);
+        CPPUNIT_ASSERT(ourResult == theirResult);
     }
     
     delete pair.first;
@@ -128,7 +129,12 @@ void GenericBitVectorTests::testValueAfter() {
     
     for(size_t i = 0; i < 20; i++) {
         // Check a bunch of positions.
-        CPPUNIT_ASSERT(v->valueAfter(i) == v2->valueAfter(i));
+        auto ourResult = v->valueAfter(i);
+        auto theirResult = v2->valueAfter(i);
+        Log::info() << "Position " << i << ": " << ourResult.first << ", " <<
+            ourResult.second << " vs. " << theirResult.first << ", " << 
+            theirResult.second << std::endl;
+        CPPUNIT_ASSERT(ourResult == theirResult);
     }
     
     delete pair.first;

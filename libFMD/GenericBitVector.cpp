@@ -103,13 +103,29 @@ size_t GenericBitVector::select(size_t one) const {
 
 std::pair<size_t, size_t> GenericBitVector::valueAfter(size_t index) const {
     // Get the rank of the next 1 at or after the given position.
-    size_t nextRank = rank(index, true) + 1;
+    size_t nextRank = rank(index, true) - 1;
+    if(index >= size) {
+        // We ought to be giving the past-the-end value even though rank dips by
+        // 1 at the end of the bitvector.
+        nextRank += 1;
+    }
+    
+    // Look up where it is and return that and the rank.
     return std::make_pair(select(nextRank), nextRank);
 }
 
 std::pair<size_t, size_t> GenericBitVector::valueBefore(size_t index) const {
-    // Get the rank of the 1 before this position.
+    // Get the rank of the 1 before this position, 1-based apparently.
     size_t lastRank = rank(index);
+    if(lastRank == 0 || index >= size) {
+        // We ought to be giving the past-the-end value.
+        lastRank = rank(size + 1);
+    } else {
+        // Budge left to get the actual 0-based rank.
+        lastRank--;
+    }
+    
+    // Look up where it is and return that and the rank.
     return std::make_pair(select(lastRank), lastRank);
 }
 

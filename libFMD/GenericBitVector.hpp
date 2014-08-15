@@ -105,7 +105,7 @@ public:
     
     /**
      * Given an indes, return the index of the last 1 at or before that
-     * position, paired with its rank.
+     * position, paired with its rank. Wraps around if no such value is found.
      */
     std::pair<size_t, size_t> valueBefore(size_t index) const;
     
