@@ -2,6 +2,7 @@
 #define GENERICBITVECTORTESTS_HPP
 
 #include <cppunit/extensions/HelperMacros.h>
+#include <utility>
 
 /**
  * Tests for GenericBitVector against BitVector.
@@ -24,6 +25,8 @@ public:
     void testSelect();
     void testValueBefore();
     void testValueAfter();
+    
+    std::pair<GenericBitVector*, BitVector*> makeTestData();
 };
 
 #endif

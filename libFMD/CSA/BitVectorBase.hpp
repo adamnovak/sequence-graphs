@@ -154,7 +154,7 @@ class BitVectorBase
 
         // Counts the number of 1-bit runs.
         virtual size_t countRuns() = 0;
-
+        
       protected:
         const BitVectorBase& parent;
 
