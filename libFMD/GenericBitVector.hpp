@@ -95,7 +95,7 @@ public:
     /**
      * OR two bitvectors together.
      */
-    GenericBitVector* createUnion(GenericBitVector& other);
+    GenericBitVector* createUnion(const GenericBitVector& other) const;
     
     /**
      * Given an indes, return the index of the next 1 at or after that position,

@@ -129,7 +129,9 @@ std::pair<size_t, size_t> GenericBitVector::valueBefore(size_t index) const {
     return std::make_pair(select(lastRank), lastRank);
 }
 
-GenericBitVector* GenericBitVector::createUnion(GenericBitVector& other) {
+GenericBitVector* GenericBitVector::createUnion(
+    const GenericBitVector& other) const {
+
     // We need to hack a BitVector into a GenericBitVector.
     
     // Make one to populate.

@@ -8,9 +8,10 @@
 
 
 MappingMergeScheme::MappingMergeScheme(const FMDIndex& index, 
-    const BitVector& rangeVector, 
+    const GenericBitVector& rangeVector, 
     const std::vector<std::pair<std::pair<size_t, size_t>, bool> >& rangeBases, 
-    const BitVector& includedPositions, size_t genome, size_t minContext) : 
+    const GenericBitVector& includedPositions, size_t genome,
+    size_t minContext): 
     MergeScheme(index), threads(), queue(NULL), contigsToMerge(NULL),
     rangeVector(rangeVector), rangeBases(rangeBases),
     includedPositions(includedPositions), genome(genome),
@@ -187,7 +188,7 @@ void MappingMergeScheme::generateMerges(
         
         // How many positions are available to map to?
         Log::info() << taskName << " mapping " << contig.size() << 
-            " bases via " << BitVectorIterator(includedPositions).rank(
+            " bases via " << includedPositions.rank(
             includedPositions.getSize()) << " bottom-level positions" <<
             std::endl;
         

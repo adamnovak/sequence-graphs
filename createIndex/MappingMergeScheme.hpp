@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "MergeScheme.hpp"
+#include <GenericBitVector.hpp>
 
 
 /**
@@ -25,10 +26,10 @@ public:
      *
      * TODO: Make this function take a less absurd number of things.
      */
-    MappingMergeScheme(const FMDIndex& index, const BitVector& rangeVector, 
-        const std::vector<std::pair<std::pair<size_t, size_t>, bool> >&
-        rangeBases, const BitVector& includedPositions, size_t genome,
-        size_t minContext = 0);
+    MappingMergeScheme(const FMDIndex& index, const GenericBitVector&
+        rangeVector, const std::vector<std::pair<std::pair<size_t, size_t>,
+        bool> >& rangeBases, const GenericBitVector& includedPositions,
+        size_t genome, size_t minContext = 0);
     
     /**
      * Get rid of a MappingMergeScheme (and delete its queue, if it has one).
@@ -77,7 +78,7 @@ protected:
     
     // Holds the bit vector marking out the BWT ranges that belong to higher-
     // level positions.
-    const BitVector& rangeVector;
+    const GenericBitVector& rangeVector;
     
     // Holds the canonicalized position to merge into for a forward mapping to
     // each range. Positions are 1-based.
@@ -85,7 +86,7 @@ protected:
         
     // Holds a mask; we should only consider positions with 1s here as actually
     // being in the bottom level.
-    const BitVector& includedPositions;
+    const GenericBitVector& includedPositions;
     
     // Holds the number of the genome we are going to map.
     size_t genome;
