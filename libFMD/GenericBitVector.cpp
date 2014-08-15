@@ -1,4 +1,5 @@
 #include "GenericBitVector.hpp"
+#include <stdexcept>
 
 GenericBitVector::GenericBitVector(std::ifstream& stream): encoder(NULL), 
     bitvector(new BitVector(stream)), size(bitvector->getSize()) {
@@ -38,11 +39,28 @@ GenericBitVector::~GenericBitVector() {
     }
 }
 
-void GenericBitVector::finish() {
+void GenericBitVector::addBit(size_t index) {
+    if(encoder == NULL) {
+        throw std::runtime_error("Can't add to a vector we didn't create!");
+    }
+    
+    // Pass on valid requests.
+    encoder->addBit(index);
+}
+
+void GenericBitVector::finish(size_t length) {
+    if(encoder == NULL) {
+        throw std::runtime_error("Can't finish a vector we didn't create!");
+    }
+    
     // Finish encoding
     encoder->flush();
     // Make the BitVector
-    bitvector = new BitVector(*encoder, size);    
+    bitvector = new BitVector(*encoder, length);    
+}
+
+void GenericBitVector::writeTo(std::ofstream& stream) const {
+    bitvector->writeTo(stream);
 }
 
 size_t GenericBitVector::rank(size_t index) const {
