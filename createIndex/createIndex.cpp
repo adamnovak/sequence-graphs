@@ -985,7 +985,9 @@ mergeGreedy(
     const FMDIndex& index,
     size_t context = 0,
     bool credit = false,
-    std::string mapType = "LRexact"
+    std::string mapType = "LRexact",
+    bool mismatch = false,
+    int z_max = 0
 ) {
 
     Log::info() << "Creating initial pinch thread set" << std::endl;
@@ -1015,7 +1017,8 @@ mergeGreedy(
         // and also the bitmask of what bottom-level things to count. We also
         // need to tell it what genome to map the contigs of.
         MappingMergeScheme scheme(index, *mergedRuns.first, mergedRuns.second,
-            *includedPositions, genome, context, credit, mapType);
+            *includedPositions, genome, context, credit, mapType,
+	    mismatch, z_max);
 
         // Set it running and grab the queue where its results come out.
         ConcurrentQueue<Merge>& queue = scheme.run();
@@ -1188,7 +1191,11 @@ main(
 	("credit", "Mapping on credit for greedy scheme")
 	("mapType", boost::program_options::value<std::string>()
             ->default_value("LRexact"),
-            "Merging scheme (\"centered\" or \"LRexact\")") ;
+            "Merging scheme (\"centered\" or \"LRexact\")")
+	("mismatches", boost::program_options::value<size_t>()
+            ->default_value(0), 
+            "Maximum allowed number of mismatches")
+	("mismatch", "Allow for mismatches");
         
     // And set up our positional arguments
     boost::program_options::positional_options_description positionals;
@@ -1293,13 +1300,21 @@ main(
     // We want to time the merge code.
     Timer* mergeTimer = new Timer("Merging");
     
+    // We want to flag whether we want mismatches
+    
+    bool mismatchb = false;
+    if(options.count("mismatch")) {
+	mismatchb = true;
+    }
+    
     if(mergeScheme == "overlap") {
         // Make a thread set that's all merged, with the given minimum merge
         // context.
         threadSet = mergeOverlap(index, options["context"].as<size_t>());
     } else if(mergeScheme == "greedy") {
         // Use the greedy merge instead.
-        threadSet = mergeGreedy(index, options["context"].as<size_t>(), creditBool, mapType);
+        threadSet = mergeGreedy(index, options["context"].as<size_t>(), creditBool, mapType,
+	    mismatchb, options["mismatches"].as<size_t>());
     } else {
         // Complain that's not a real merge scheme. TODO: Can we make the
         // options parser parse an enum or something instead of this?

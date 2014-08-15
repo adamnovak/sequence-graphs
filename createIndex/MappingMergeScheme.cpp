@@ -10,10 +10,12 @@
 MappingMergeScheme::MappingMergeScheme(const FMDIndex& index, 
     const BitVector& rangeVector, 
     const std::vector<std::pair<std::pair<size_t, size_t>, bool> >& rangeBases, 
-    const BitVector& includedPositions, size_t genome, size_t minContext, bool credit, std::string mapType) : 
+    const BitVector& includedPositions, size_t genome, size_t minContext, bool credit,
+    std::string mapType, bool mismatch, size_t z_max) :
     MergeScheme(index), threads(), queue(NULL), rangeVector(rangeVector), 
     rangeBases(rangeBases), includedPositions(includedPositions), 
-    genome(genome), minContext(minContext), credit(credit), mapType(mapType) {
+    genome(genome), minContext(minContext), credit(credit), mapType(mapType),
+    mismatch(mismatch), z_max(z_max) {
     
     // Nothing to do
     
@@ -52,10 +54,16 @@ ConcurrentQueue<Merge>& MappingMergeScheme::run() {
     // Make the queue    
     queue = new ConcurrentQueue<Merge>(threadCount);
     
+    // Start up a thread for every contig in this genome.
+    
     for(size_t contig = genomeContigs.first; contig < genomeContigs.second; 
         contig++) {
+      
+	// We require different contig merge generation methods for left-right
+	// schemes and for the centered schemes. Specification of mapping on
+	// credit and/or allowance for inexact matching are handled within
+	// these methods
         
-        // Start up a thread for every contig in this genome.
 	if(mapType == "LRexact") {
 	    Log::info() << "Using Left-Right exact contexts" << std::endl;
 	    threads.push_back(std::thread(&MappingMergeScheme::generateMerges,
@@ -94,8 +102,12 @@ void MappingMergeScheme::join() {
 
 void MappingMergeScheme::generateMerge(size_t queryContig, size_t queryBase, 
     size_t referenceContig, size_t referenceBase, bool orientation) const {
+	
+    // Right now credit merging schemes are attempting to merge off-contig
+    // positions but are otherwise behaving as expected. Throw warning and
+    // don't merge rather than runtime error until this is worked out.
     
-    if(referenceBase > index.getContigLength(referenceContig) || 
+    /*if(referenceBase > index.getContigLength(referenceContig) || 
         referenceBase == 0) {
         
         // Complain that we're trying to talk about an off-the-contig position.
@@ -114,7 +126,7 @@ void MappingMergeScheme::generateMerge(size_t queryContig, size_t queryBase,
             " on contig " + std::to_string(queryContig) + 
             " is beyond 1-based bounds of length " + 
             std::to_string(index.getContigLength(queryContig)));
-    }
+    }*/
     
     // Where in the query do we want to come from? Always on the forward strand.
     // Correct offset to 0-based.
@@ -128,6 +140,19 @@ void MappingMergeScheme::generateMerge(size_t queryContig, size_t queryBase,
         (referenceBase - 1));
     
     // Make a Merge between these positions.
+    
+    // Right now credit merging schemes are attempting to merge off-contig
+    // positions but are otherwise behaving as expected. Throw warning and
+    // don't merge rather than runtime error until this is worked out.
+
+    
+    if(queryBase > index.getContigLength(queryContig) || queryBase == 0 ||
+	referenceBase > index.getContigLength(referenceContig) || referenceBase == 0) {
+	
+	Log::info() << "****WARNING: tried to merge (to) an off-contig position!****" << std::endl;
+    
+    } else {
+    
     Merge merge(queryPos, referencePos);
         
     // Send that merge to the queue.
@@ -136,7 +161,12 @@ void MappingMergeScheme::generateMerge(size_t queryContig, size_t queryBase,
     // Spend our lock to add something to it.
     queue->enqueue(merge, lock);
     
+    }
+    
 }
+
+// Generate merges per-contig based on the centered family of
+// context schemes
 
 void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
     
@@ -147,6 +177,8 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
     // How many bases have we mapped or not mapped
     size_t mappedBases = 0;
     size_t unmappedBases = 0;
+    
+    // What fraction of the mapped bases map on credit?
     size_t creditBases = 0;
     
     // Grab the contig as a string
@@ -156,14 +188,26 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
     Log::info() << threadName << " mapping " << contig.size() << 
         " bases via " << BitVectorIterator(includedPositions).rank(
         includedPositions.getSize()) << " bottom-level positions" << std::endl;
+	
+    std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> Mappings;
     
-    // Map it
-    std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> Mappings = index.Cmap(rangeVector, contig, 
-        &includedPositions, minContext);
+    // How do we want to perform the mapping?    
+    if (mismatch) {
+	Log::info() << "Using mismatch mapping with z_max " << z_max << std::endl;
+
+	Mappings = index.CmisMap(rangeVector, contig, &includedPositions, minContext, z_max);
+	
+    } else {
     
-    size_t leftSentinel;
-    size_t rightSentinel;
-    std::vector<size_t> creditCandidates;
+	// Map it
+	Mappings = index.Cmap(rangeVector, contig, &includedPositions, minContext);
+    
+    }
+    
+    // index::C(mis)map methods currently match ranges to leftmost positions in
+    // the context corresponding to the range. Correct this to the center position.
+    // We note that the matched contexts returned are guaranteed to have an odd
+    // number of bases
     
     std::pair<std::pair<size_t, size_t>, bool> MappingBases [Mappings.size()];
     
@@ -171,12 +215,21 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
 	if(Mappings[i].first != -1) {
 	    MappingBases[i] = rangeBases[Mappings[i].first];
 	    if(MappingBases[i].second == 0) {
-		MappingBases[i].first.second = MappingBases[i].first.second + Mappings[i].second.first - 1;
+		MappingBases[i].first.second = MappingBases[i].first.second + (size_t)Mappings[i].second.first - 1;
 	    } else {
- 		MappingBases[i].first.second = MappingBases[i].first.second - Mappings[i].second.first + 1;
+ 		MappingBases[i].first.second = MappingBases[i].first.second - (size_t)Mappings[i].second.first + 1;
 	    }
 	}
     }
+    
+    // Find the left and right sentinel positions: the leftmost and rightmost
+    // mapped positions in the contig. To ensure stability of credit mapping
+    // against elsewhere-mapping under extension of the input genome we will
+    // only credit map between these positions
+    
+    size_t leftSentinel = Mappings.size() - 1;
+    size_t rightSentinel = 0;
+    std::vector<size_t> creditCandidates;
     
     for(size_t i = 0; i < Mappings.size(); i++) {
 	// Scan for the first mapped position in this contig
@@ -214,25 +267,33 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
             mappedBases++;
 	} else {
             // Didn't map this one
+	  
+	    // Enqueue it in a left-to-right position-ordered vector of
+	    // unmapped positions to be checked for credit
+	  
             unmappedBases++;
 	    if(i > leftSentinel && i < rightSentinel) {
 		creditCandidates.push_back(i);
 	    }
 	}
     }
-    
+        
     if(credit) {
+      
+    // Perform mapping on credit on unmapped positions between the sentinel nodes
     
     int64_t firstR = -1;
     bool contextMappedR;
     int64_t firstL = -1;
     bool contextMappedL;
     int64_t centeredOffset;
-        
-    
+            
     size_t maxContext = 0;
     
     Log::info() << "Checking " << creditCandidates.size() << " unmapped positions \"in the middle\"" << std::endl;
+    
+    // What is the maximum context length of any base in the contig? We will not
+    // search beyond this bound for neighbouring bases to provide credit
     
     for(size_t i; i < Mappings.size(); i++) {
 	if(Mappings[i].second.second > maxContext) {
@@ -240,19 +301,26 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
 	}
     }
     
-    Log::info() << "Max context is " << maxContext << std::endl;
+    Log::debug() << "Max context is " << maxContext << std::endl;
         
+    // We search the unmapped positions between the sentinel nodes, scanning
+    // left-to-right.
+    
     for(size_t i = 0; i < creditCandidates.size(); i++) {
 	std::pair<std::pair<size_t,size_t>,bool> firstBaseR;
 	std::pair<std::pair<size_t,size_t>,bool> firstBaseL;
 	
-	
 	contextMappedR = true;
-	contextMappedL = true;	
+	contextMappedL = true;
+
+	// Starting at the unmapped position under consideration, scan leftward
+	// for contexts containing it
+	  
 	for(size_t j = creditCandidates[i] - 1; j + 1 > 1 && creditCandidates[i] - j < maxContext; j--) {
-	    // Search leftward from each position until you find a position
-	    // whose context includes creditCandidates[i]
-	    	  
+	    
+	    // Find the first position containing creditCandidates[i] in its maximal
+	    // context
+	  
 	    if(firstR == -1) {
 		if(Mappings[j].second.second > creditCandidates[i] - j) {
 		    firstBaseR = MappingBases[j];
@@ -263,10 +331,12 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
 	    // in its right context we want to see if subsequent positions map to
 	    // the same place
 	    
-	    // Terminate the search at the first base you come to which no longer
+	    // Terminate the search at the first base found which no longer
 	    // has our base in its right context. It is not possible that a position
 	    // farther to the left has our base in its right context and continues
 	    // to map to the same place as before
+	    
+	    // TODO: prove rigorously that this is true
 		
 	    } else {
 		if(Mappings[j].second.second > creditCandidates[i] - j) {
@@ -275,6 +345,10 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
 		    } else {
 			centeredOffset = firstR - j;
 		    }
+		    
+		    // Check if this other credit-providing position matches our "credit candidate"
+		    // to another position in the reference. If so terminate the search and don't
+		    // merge
 		    
 		    if(MappingBases[j].first.second != firstBaseR.first.second + centeredOffset ||
 			    MappingBases[j].second != firstBaseR.second ||
@@ -286,31 +360,41 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
 	    }
 	}
 	
+	// Search rightward for left context
+	
 	for(size_t j = creditCandidates[i] + 1; j < Mappings.size() && j - creditCandidates[i] < maxContext; j++) {
 	    
-	  if(firstL == -1) {
+	    // What's the nearest position containing our candidate in its context?
+	  
+	    if(firstL == -1) {
 		if(Mappings[j].second.second > j - creditCandidates[i]) {
 		    firstBaseL = MappingBases[j];
 		    firstL = j;
 		}
 	    } else {
+	      
+		// Make sure our credit mapping is consistent
+		
 		if(Mappings[j].second.second > j - creditCandidates[i]) {
-		  if(!MappingBases[j].second) {
+		    if(!MappingBases[j].second) {
 			centeredOffset = j - firstL;
-		  } else {
+		    } else {
 			centeredOffset = firstL - j;
-		  }
+		    }
 		  
 		    if(MappingBases[j].first.second != firstBaseL.first.second + centeredOffset ||
-			    MappingBases[j].second != firstBaseL.second ||
-			    MappingBases[j].first.first != firstBaseL.first.first) {
+			  MappingBases[j].second != firstBaseL.second ||
+			  MappingBases[j].first.first != firstBaseL.first.first) {
+		    
 			contextMappedL = false;
 			break;
 		    }
 		}
 	    }
 	}
-		    
+	
+	// Check if our position was credit mapped on the left, and if this mapping
+	// was furthermore consistent
 		    
 	if(firstR != -1 && contextMappedR) {
 	    firstBaseR.first.second = firstBaseR.first.second + creditCandidates[i] - firstR;
@@ -375,6 +459,9 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
     size_t mappedBases = 0;
     size_t unmappedBases = 0;
     size_t creditBases = 0;
+    size_t conflictedBases = 0;
+    
+    //TODO: can conflicted bases be mapped on credit?
     
     // Grab the contig as a string
     std::string contig = index.displayContig(queryContig);
@@ -384,20 +471,37 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
         " bases via " << BitVectorIterator(includedPositions).rank(
         includedPositions.getSize()) << " bottom-level positions" << std::endl;
     
-    // Map it on the right
-    std::vector<std::pair<int64_t,size_t>> rightMappings = index.map(rangeVector, contig, 
-        &includedPositions, minContext);
+    std::vector<std::pair<int64_t,size_t>> rightMappings;
+    std::vector<std::pair<int64_t,size_t>> leftMappings;    
+	
+    if (mismatch) {
+      
+	Log::info() << "Using mismatch mapping with z_max " << z_max << std::endl;
+	
+	// Map it on the right
+	rightMappings = index.misMatchMap(rangeVector, contig,
+	    &includedPositions, minContext, z_max);
+	
+	// Map it on the left
+	leftMappings = index.misMatchMap(rangeVector, 
+	    reverseComplement(contig), &includedPositions, minContext, z_max); 
+		
+    } else {
+		
+	// Map it on the right
+	rightMappings = index.map(rangeVector, contig, &includedPositions, minContext);
     
-    // Map it on the left
-    std::vector<std::pair<int64_t,size_t>> leftMappings = index.map(rangeVector, 
-        reverseComplement(contig), &includedPositions, minContext);
+	// Map it on the left
+	leftMappings = index.map(rangeVector, reverseComplement(contig), &includedPositions, minContext);
+    
+    }
     
     // Flip the left mappings back into the original order. They should stay as
     // other-side ranges.
     std::reverse(leftMappings.begin(), leftMappings.end());
     
-    size_t leftSentinel;
-    size_t rightSentinel;
+    int64_t leftSentinel;
+    int64_t rightSentinel;
     std::vector<size_t> creditCandidates;
     
     for(size_t i = 0; i < leftMappings.size(); i++) {
@@ -472,15 +576,21 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
                     // our backwards right-semantics, so flip it.
                     generateMerge(queryContig, i + 1, leftBase.first.first, 
                         leftBase.first.second, !leftBase.second);
-		    //Log::info() << "Anchor Merged pos " << i << ", a(n) " << contig[i] << " on contig " << queryContig << " to " << leftBase.first.second << " on contig " << leftBase.first.first << " with orientation " << leftBase.second << std::endl;
+		    
+		    Log::info() << "Anchor Merged pos " << i << ", a(n) " << contig[i]
+			<< " on contig " << queryContig << " to " << leftBase.first.second
+			<< " on contig " << leftBase.first.first << " with orientation "
+			<< !leftBase.second << std::endl;
                         
                     mappedBases++;                   
                 } else {
                     // Didn't map this one
                     unmappedBases++;
+		    conflictedBases++;
 		    if(i > leftSentinel && rightSentinel > i) {
 			creditCandidates.push_back(i);
 		    }
+		    Log::info() << "Conflicted " << i << " " << contig[i] << std::endl;
                 }
                 
             } else {
@@ -491,7 +601,10 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
                 // right-semantics, so flip it.
                 generateMerge(queryContig, i + 1, leftBase.first.first, 
                         leftBase.first.second, !leftBase.second);
-		//Log::info() << "Anchor Merged pos " << i << ", a(n) " << contig[i] << " on contig " << queryContig << " to " << leftBase.first.second << " on contig " << leftBase.first.first << " with orientation " << leftBase.second << std::endl;
+		Log::info() << "Anchor Merged pos " << i << ", a(n) " << contig[i]
+		    << " on contig " << queryContig << " to " << leftBase.first.second
+		    << " on contig " << leftBase.first.first << " with orientation "
+		    << !leftBase.second << std::endl;
 
                         
                 mappedBases++;
@@ -507,7 +620,7 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
             // (since it's backwards to start with).
             generateMerge(queryContig, i + 1, rightBase.first.first, 
                         rightBase.first.second, rightBase.second);
-	    //Log::info() << "Anchor Merged pos " << i << ", a(n) " << contig[i] << " on contig " << queryContig << " to " << rightBase.first.second << " on contig " << rightBase.first.first << " with orientation " << rightBase.second << std::endl;
+	    Log::info() << "Anchor Merged pos " << i << ", a(n) " << contig[i] << " on contig " << queryContig << " to " << rightBase.first.second << " on contig " << rightBase.first.first << " with orientation " << rightBase.second << std::endl;
             
             mappedBases++; 
         } else {
@@ -536,6 +649,8 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
     size_t maxLContext = 0;
     
     Log::info() << "Checking " << creditCandidates.size() << " unmapped positions \"in the middle\"" << std::endl;
+    
+    // Scan for the maximum 
     
     for(size_t i; i < rightMappings.size(); i++) {
 	if(rightMappings[i].second > maxRContext) {
@@ -625,7 +740,6 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
 			  firstBaseR.second != firstBaseL.second) {
 		    generateMerge(queryContig, creditCandidates[i] + 1, firstBaseL.first.first, 
                         firstBaseL.first.second, !firstBaseL.second);
-		    //Log::info() << "LR Credit Merged pos " << creditCandidates[i] << ", a(n) " << contig[creditCandidates[i]] << " on contig " << queryContig << " to " << firstBaseR.first.second << " on contig " << firstBaseR.first.first << " with orientation " << firstBaseR.second << std::endl;
 		    mappedBases++;
 		    unmappedBases--;
 		    creditBases++;
@@ -634,7 +748,6 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
 	    } else {
 		  generateMerge(queryContig, creditCandidates[i] + 1, firstBaseR.first.first, 
                         firstBaseR.first.second, firstBaseR.second);
-		  //Log::info() << "R Credit Merged pos " << creditCandidates[i] << ", a(n) " << contig[creditCandidates[i]] << " on contig " << queryContig << " to " << firstBaseR.first.second << " on contig " << firstBaseR.first.first << " with orientation " << firstBaseR.second << std::endl;
 		  mappedBases++;
 		  unmappedBases--;
 		  creditBases++;
@@ -649,10 +762,8 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
 	    }
 	    int64_t temp = (int64_t)firstBaseL.first.second + LROffset;
 	    firstBaseL.first.second = (size_t)temp;
-	    //Log::info() << "After " << firstBaseL.first.second << ", moved by " << LROffset << std::endl;
 	    generateMerge(queryContig, creditCandidates[i] + 1, firstBaseL.first.first, 
                         firstBaseL.first.second, !firstBaseL.second);
-	    //Log::info() << "L Credit Merged pos " << creditCandidates[i] << ", a(n) " << contig[creditCandidates[i]] << " on contig " << queryContig << " to " << firstBaseL.first.second << " on contig " << firstBaseL.first.first << " with orientation " << firstBaseL.second << std::endl;
 	    mappedBases++;
 	    unmappedBases--;
 	    creditBases++;
@@ -660,17 +771,20 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
     }
     }
     
-    // Close the queue to saygm we're done.
+    // Close the queue to say we're done.
     auto lock = queue->lock();
     queue->close(lock);
     
     // Report that we're done.
     Log::info() << threadName << " finished (" << mappedBases << "|" << 
         unmappedBases << ")" << std::endl;
+    if(conflictedBases != 0) {
+	Log::info() << conflictedBases << " unmapped on account of conflicting left and right context matches." << std::endl;
+    }
 	
     if(credit) {
 	Log::info() << mappedBases - creditBases << " anchor mapped; " << creditBases << " extension mapped" <<  std::endl;
-	}
+    }
 
 }
 
