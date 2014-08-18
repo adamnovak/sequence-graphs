@@ -195,13 +195,13 @@ void MappingMergeScheme::generateMerge(size_t queryContig, size_t queryBase,
     
     } else {
     
-    Merge merge(queryPos, referencePos);
-        
-    // Send that merge to the queue.
-    // Lock the queue.
-    auto lock = queue->lock();
-    // Spend our lock to add something to it.
-    queue->enqueue(merge, lock);
+        Merge merge(queryPos, referencePos);
+            
+        // Send that merge to the queue.
+        // Lock the queue.
+        auto lock = queue->lock();
+        // Spend our lock to add something to it.
+        queue->enqueue(merge, lock);
     
     }
     
