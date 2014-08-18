@@ -624,7 +624,7 @@ void FMDIndex::misMatchRetractRightOnly(MisMatchAttemptResults& prevMisMatches,
     
     // Apply the retract
         
-    for(size_t i = prevMisMatches.positions.size() - 1; i >= 0; i--) {
+    for(size_t i = prevMisMatches.positions.size() - 1; i != (size_t) -1; i--) {
         retractRightOnly(prevMisMatches.positions[i].first, newPatternLength);    
         
         // Remove now-empty positions and their corresponding offset entries
