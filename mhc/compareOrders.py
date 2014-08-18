@@ -100,7 +100,11 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         random.seed(self.seed)
             
         # Generate an order for the FASTAs
-        random.shuffle(self.fasta_list)
+        # Make sure the first one stays first.
+        fasta_first = self.fasta_list[0]
+        fasta_rest = list(self.fasta_list[1:])
+        random.shuffle(fasta_rest)
+        self.fasta_list = [fasta_first] + fasta_rest
         
         # Make a temp directory for the index
         index_dir = sonLib.bioio.getTempFile(rootDir=self.getLocalTempDir())

@@ -39,7 +39,7 @@ public:
     
     /**
      * Create and return a queue of merges, and start feeding merges into it
-     * from some other thread(s). The writers on the queue must be know to it,
+     * from some other thread(s). The writers on the queue will be known to it,
      * so that the queue will know when all merges have been written.
      *
      * May only be called once.
@@ -58,12 +58,23 @@ public:
     
 protected:
 
+    // How many worker threads should be started, maximum, to produce merges
+    // from contigs? TODO: Magically know a good answer for all systems.
+    static const size_t MAX_THREADS = 32;
+
     // Holds all the threads that are generating merges.
     std::vector<std::thread> threads;
     
     // Holds a pointer to a ConcurrentQueue, so we can create one and then
     // destroy it only when we get destroyed.
     ConcurrentQueue<Merge>* queue;
+    
+    // Holds a ConcurrentQueue of all the contig IDs that need to be processed.
+    // We fill this up with contig IDs, and our merge threads read from it, so
+    // we can pool them instead of spawning about a thousand of them. It will
+    // have one writer, which is done pretty much as soon as the queue starts
+    // getting used.
+    ConcurrentQueue<size_t>* contigsToMerge;
     
     // Holds the bit vector marking out the BWT ranges that belong to higher-
     // level positions.
@@ -102,15 +113,25 @@ protected:
     
     /**
      * Run as a thread. Generates merges by mapping a query contig to the target
-     * genome; left-right exact contexts
+     * genome; left-right contexts
      */
-    virtual void generateMerges(size_t queryContig) const;
+    virtual void generateMerges(ConcurrentQueue<size_t>* contigs) const;
     
+    /**
+     * Generate laft-right merges from one particular contig.
+     */
+    virtual void generateSomeMerges(size_t queryContig) const;
+
     /**
      * Run as a thread. Generates merges by mapping a query contig to the target
      * genome; centered contexts
      */
-    virtual void CgenerateMerges(size_t queryContig) const;
+    virtual void CgenerateMerges(ConcurrentQueue<size_t>* contigs) const;
+    
+    /**
+     * Generate centered-context merges for one particular contig.
+     */
+    virtual void CgenerateSomeMerges(size_t queryContig) const;
     
 };
 

@@ -31,6 +31,12 @@ MappingMergeScheme::~MappingMergeScheme() {
         queue = NULL;
     }
     
+    if(contigsToMerge != NULL) {
+        // And the collection of contigs to merge.
+        delete contigsToMerge;
+        contigsToMerge = NULL;
+    }
+    
 }
 
 ConcurrentQueue<Merge>& MappingMergeScheme::run() {
@@ -44,21 +50,37 @@ ConcurrentQueue<Merge>& MappingMergeScheme::run() {
     // Grab the limits of the contig range belonging to this genome.
     auto genomeContigs = index.getGenomeContigs(genome);
     
-    // Figure out how many threads to run. Let's do one per contig in this
-    // genome.
-    size_t threadCount = genomeContigs.second - genomeContigs.first;
+    // Don't start more threads than we have contigs.
+    size_t numThreads = std::min(MAX_THREADS, genomeContigs.second - 
+        genomeContigs.first);
     
-    Log::info() << "Running Mapping merge on " << threadCount << " threads" <<
+    Log::info() << "Running Mapping merge on " << numThreads << " threads" <<
         std::endl;
     
-    // Make the queue    
-    queue = new ConcurrentQueue<Merge>(threadCount);
+    // Make the queue of merges    
+    queue = new ConcurrentQueue<Merge>(numThreads);
+    
+    // And one for the contigs to merge
+    contigsToMerge = new ConcurrentQueue<size_t>(1);
     
     // Start up a thread for every contig in this genome.
     
     for(size_t contig = genomeContigs.first; contig < genomeContigs.second; 
         contig++) {
       
+        // Put each contig in the genome into the queue of work to do.
+        // TODO: Can we just use an imaginary queue of numbers in a range?
+        auto lock = contigsToMerge->lock();
+        contigsToMerge->enqueue(contig, lock);
+    }
+    
+    // Say we are done writing to the queue. Good thing it doesn't have a max
+    // count. Otherwise we'd need a thread to dump in all the contigs.
+    auto lock = contigsToMerge->lock();
+    contigsToMerge->close(lock);
+
+    // Start up a reasonable number of threads to do the work.
+    for(size_t threadID = 0; threadID < numThreads; threadID++) {
         // We require different contig merge generation methods for left-right
         // schemes and for the centered schemes. Specification of mapping on
         // credit and/or allowance for inexact matching are handled within
@@ -67,12 +89,12 @@ ConcurrentQueue<Merge>& MappingMergeScheme::run() {
         if(mapType == "LRexact") {
             Log::info() << "Using Left-Right exact contexts" << std::endl;
             threads.push_back(std::thread(&MappingMergeScheme::generateMerges,
-                this, contig));
+                this, contigsToMerge));
             
         } else if(mapType == "centered") {
             Log::info() << "Using centered contexts" << std::endl;
             threads.push_back(std::thread(&MappingMergeScheme::CgenerateMerges,
-                this, contig));
+                this, contigsToMerge));
             
         } else {
             throw std::runtime_error(mapType + 
@@ -81,7 +103,8 @@ ConcurrentQueue<Merge>& MappingMergeScheme::run() {
         }
     }
 
-    // Return a reference to the queue.
+    // Return a reference to the queue of merges, for our caller to do something
+    // with.
     return *queue;
     
 }
@@ -98,6 +121,21 @@ void MappingMergeScheme::join() {
     
     // Probably not a good idea to join the same threads twice.
     threads.clear();
+    
+    if(contigsToMerge != NULL) {
+        auto lock = contigsToMerge->lock();
+        if(!contigsToMerge->isEmpty(lock)) {
+            // Don't hold a lock and throw an exception.
+            lock.unlock();
+        
+            // Complain our thread pool somehow broke.
+            throw std::runtime_error(
+                "Jobs left in queue after threads have terminated.");
+        } else {
+            // Everything is fine, but we still need to unlock.
+            lock.unlock();
+        }
+    }
     
 }
 
@@ -172,10 +210,39 @@ void MappingMergeScheme::generateMerge(size_t queryContig, size_t queryBase,
 // Generate merges per-contig based on the centered family of
 // context schemes
 
-void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
+void MappingMergeScheme::CgenerateMerges(
+    ConcurrentQueue<size_t>* contigs) const {
+    
+    // Wait for a contig, or for there to be no more.
+    auto contigLock = contigs->waitForNonemptyOrEnd();
+    
+    while(!contigs->isEmpty(contigLock)) {
+        // We got a contig to do. Dequeue it and unlock.
+        size_t queryContig = contigs->dequeue(contigLock);
+        
+        // Make the actual merges
+        CgenerateSomeMerges(queryContig);
+        
+        // Now wait for a new task, or for there to be no more contigs.
+        contigLock = contigs->waitForNonemptyOrEnd();
+        
+    }
+        
+    // If we get here, there were no more contigs in the queue, and no
+    // writers writing. Unlock it and finish the thread. TODO: Should the
+    // queue just unlock if it happens to be empty?
+    contigLock.unlock();
+    
+    // Close the output queue to say we're done.
+    auto lock = queue->lock();
+    queue->close(lock);
+    
+}
+
+void MappingMergeScheme::CgenerateSomeMerges(size_t queryContig) const {
     
     // What's our thread name?
-    std::string threadName = "T" + std::to_string(genome) + "." + 
+    std::string taskName = "T" + std::to_string(genome) + "." + 
         std::to_string(queryContig);
         
     // How many bases have we mapped or not mapped
@@ -189,7 +256,7 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
     std::string contig = index.displayContig(queryContig);
     
     // How many positions are available to map to?
-    Log::info() << threadName << " mapping " << contig.size() << 
+    Log::info() << taskName << " mapping " << contig.size() << 
         " bases via " << BitVectorIterator(includedPositions).rank(
         includedPositions.getSize()) << " bottom-level positions" << std::endl;
         
@@ -483,20 +550,45 @@ void MappingMergeScheme::CgenerateMerges(size_t queryContig) const {
     
     }
     
-    // Close the queue to say we're done.
-    auto lock = queue->lock();
-    queue->close(lock);
-    
     // Report that we're done.
-    Log::info() << threadName << " Anchor Merged (" << mappedBases << "|" << 
+    Log::info() << taskName << " Anchor Merged (" << mappedBases << "|" << 
         unmappedBases << ")." << " Credit Merged " << creditBases << std::endl;
         
 }
 
-void MappingMergeScheme::generateMerges(size_t queryContig) const {
+void MappingMergeScheme::generateMerges(
+    ConcurrentQueue<size_t>* contigs) const {
     
-    // What's our thread name?
-    std::string threadName = "T" + std::to_string(genome) + "." + 
+    // Wait for a contig, or for there to be no more.
+    auto contigLock = contigs->waitForNonemptyOrEnd();
+    
+    while(!contigs->isEmpty(contigLock)) {
+        // We got a contig to do. Dequeue it and unlock.
+        size_t queryContig = contigs->dequeue(contigLock);
+        
+        generateSomeMerges(queryContig);
+        
+        // Now wait for a new task, or for there to be no more contigs.
+        contigLock = contigs->waitForNonemptyOrEnd();
+        
+    }
+        
+    // If we get here, there were no more contigs in the queue, and no
+    // writers writing. Unlock it and finish the thread. TODO: Should the
+    // queue just unlock if it happens to be empty?
+    contigLock.unlock();
+    
+    // Close the output queue to say we're done.
+    auto lock = queue->lock();
+    queue->close(lock);
+    
+}
+
+void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
+    
+    
+    // Set our task name to something descriptive.
+    std::string taskName = "T" + std::to_string(genome) + "." + 
         std::to_string(queryContig);
         
     // How many bases have we mapped or not mapped
@@ -505,15 +597,17 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
     size_t creditBases = 0;
     size_t conflictedBases = 0;
     
-    //TODO: can conflicted bases be mapped on credit?
-    
     // Grab the contig as a string
     std::string contig = index.displayContig(queryContig);
     
+
+    //TODO: can conflicted bases be mapped on credit?
+    
     // How many positions are available to map to?
-    Log::info() << threadName << " mapping " << contig.size() << 
+    Log::info() << taskName << " mapping " << contig.size() << 
         " bases via " << BitVectorIterator(includedPositions).rank(
-        includedPositions.getSize()) << " bottom-level positions" << std::endl;
+        includedPositions.getSize()) << " bottom-level positions" << 
+        std::endl;
     
     std::vector<std::pair<int64_t,size_t>> rightMappings;
     std::vector<std::pair<int64_t,size_t>> leftMappings;    
@@ -529,7 +623,8 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
         
         // Map it on the left
         leftMappings = index.misMatchMap(rangeVector, 
-            reverseComplement(contig), &includedPositions, minContext, z_max); 
+            reverseComplement(contig), &includedPositions, minContext, 
+            z_max); 
                 
     } else {
                 
@@ -543,8 +638,8 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
     
     }
     
-    // Flip the left mappings back into the original order. They should stay as
-    // other-side ranges.
+    // Flip the left mappings back into the original order. They should stay
+    // as other-side ranges.
     std::reverse(leftMappings.begin(), leftMappings.end());
     
     int64_t leftSentinel;
@@ -565,8 +660,8 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
                 rangeBases[rightMappings[i].first].first &&
                 rangeBases[leftMappings[i].first].second != 
                 rangeBases[rightMappings[i].first].second) {
-                // This position is mapped on the left, and the right-mapping
-                // agrees.
+                // This position is mapped on the left, and the right-
+                // mapping agrees.
                 leftSentinel = i;
                 break;
 
@@ -588,8 +683,8 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
                 rangeBases[rightMappings[i].first].first &&
                 rangeBases[leftMappings[i].first].second != 
                 rangeBases[rightMappings[i].first].second) {
-                // This position is mapped on the right, and the left-mapping
-                // agrees.
+                // This position is mapped on the right, and the left-
+                // mapping agrees.
                 rightSentinel = i;
                 break;
 
@@ -621,25 +716,26 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
                     leftBase.second != rightBase.second) {
                     
                     // These are opposite faces of the same base.
-                    
-                    // Produce a merge between the base we're looking at on the
-                    // forward strand of this contig, and the canonical location
-                    // and strand in the merged genome, accounting for
-                    // orientation. TODO: Just set everything up on
+
+                    // Produce a merge between the base we're looking at on
+                    // the forward strand of this contig, and the canonical
+                    // location and strand in the merged genome, accounting
+                    // for orientation. TODO: Just set everything up on
                     // TextPositions or something.
                     
                     // These positions being sent are 1-based, so we have to
-                    // correct i to i + 1 to get the offset of that base in the
-                    // query string. Orientation is backwards to start with from
-                    // our backwards right-semantics, so flip it.
+                    // correct i to i + 1 to get the offset of that base in
+                    // the query string. Orientation is backwards to start
+                    // with from our backwards right-semantics, so flip it.
                     generateMerge(queryContig, i + 1, leftBase.first.first, 
                         leftBase.first.second, !leftBase.second);
                     
-                    Log::info() << "Anchor Merged pos " << i << ", a(n) " << 
-                        contig[i] << " on contig " << queryContig << " to " << 
-                        leftBase.first.second << " on contig " << 
-                        leftBase.first.first << " with orientation " << 
-                        !leftBase.second << std::endl;
+                    Log::info() << "Anchor Merged pos " << i << 
+                        ", a(n) " << contig[i] << " on contig " << 
+                        queryContig << " to " << leftBase.first.second << 
+                        " on contig " << leftBase.first.first << 
+                        " with orientation " << !leftBase.second << 
+                        std::endl;
                         
                     mappedBases++;                   
                 } else {
@@ -651,8 +747,8 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
                     }
                     Log::info() << "Conflicted " << i << " " << contig[i] << 
                         std::endl;
-                }
-                
+                    }
+            
             } else {
                 // Left mapped and right didn't.
                 
@@ -671,7 +767,7 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
                         
                 mappedBases++;
             }
-            
+        
         } else if(rightMappings[i].first != -1) {
             // Right mapped and left didn't.
             
@@ -699,7 +795,7 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
             }
         }   
     }
-        
+    
     if(credit) {
       
         // Iterate across all possible positions for mapping on credit
@@ -774,7 +870,8 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
                 }
             }
             
-            for(size_t j = creditCandidates[i] + 1; j < leftMappings.size() && 
+            for(size_t j = creditCandidates[i] + 1; j < 
+            leftMappings.size() && 
                 j - creditCandidates[i] < maxLContext; j++) {
                 
                 if(firstL == -1) {
@@ -857,13 +954,10 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
             }
         }
     }
-    
-    // Close the queue to say we're done.
-    auto lock = queue->lock();
-    queue->close(lock);
-    
+
     // Report that we're done.
-    Log::info() << threadName << " finished (" << mappedBases << "|" << 
+    // Report that we're done.
+    Log::info() << taskName << " finished (" << mappedBases << "|" << 
         unmappedBases << ")" << std::endl;
     if(conflictedBases != 0) {
         Log::info() << conflictedBases << " unmapped on account of " <<
@@ -874,7 +968,7 @@ void MappingMergeScheme::generateMerges(size_t queryContig) const {
         Log::info() << mappedBases - creditBases << " anchor mapped; " << 
             creditBases << " extension mapped" <<  std::endl;
     }
-
+        
 }
 
 
