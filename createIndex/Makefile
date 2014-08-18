@@ -15,11 +15,13 @@ LDLIBS += ../deps/sonLib/lib/stPinchesAndCacti.a ../deps/sonLib/lib/sonLib.a \
 ../libFMD/libfmd.a ../libsuffixtools/libsuffixtools.a \
 -lboost_filesystem -lboost_program_options -lpthread -lz -lboost_system
 
+LDFLAGS = -g
+
 # We need to make sure all our dependency header files are where our other
 # dependency includes want them to be. pinchesAndCacti just includes "sonLib.h",
 # so we need to explicitly point at its include directory. And similarly we need
 # to grab all the internal include directories from libsuffixtools.
-CXXFLAGS += -std=c++11 -O3 -g -pg -I../deps -I../deps/pinchesAndCacti/inc \
+CXXFLAGS += -O0 -std=c++11 -g -pg -I../deps -I../deps/pinchesAndCacti/inc \
 -I../deps/sonLib/C/inc -I../libFMD -I../libsuffixtools
 
 # Stop deleting intermediate files I might need to use in the final program!

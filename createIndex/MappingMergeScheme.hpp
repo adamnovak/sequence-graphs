@@ -60,7 +60,7 @@ protected:
 
     // How many worker threads should be started, maximum, to produce merges
     // from contigs? TODO: Magically know a good answer for all systems.
-    static const size_t MAX_THREADS = 32;
+    static const size_t MAX_THREADS;
 
     // Holds all the threads that are generating merges.
     std::vector<std::thread> threads;

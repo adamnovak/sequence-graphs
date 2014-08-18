@@ -5,7 +5,7 @@
 
 #include "MappingMergeScheme.hpp"
 
-
+const size_t MappingMergeScheme::MAX_THREADS = 32;
 
 MappingMergeScheme::MappingMergeScheme(const FMDIndex& index, 
     const BitVector& rangeVector, 
@@ -79,8 +79,11 @@ ConcurrentQueue<Merge>& MappingMergeScheme::run() {
 
     // Start up a reasonable number of threads to do the work.
     for(size_t threadID = 0; threadID < numThreads; threadID++) {
-        threads.push_back(std::thread(&MappingMergeScheme::generateMerges,
-                this, contigsToMerge));
+        //threads.push_back(std::thread(&MappingMergeScheme::generateMerges,
+        //        this, contigsToMerge));
+        
+        // TODO: for now, make all the merges at once.
+        generateMerges(contigsToMerge);
     }
 
     // Return a reference to the queue of merges, for our caller to do something

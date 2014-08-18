@@ -506,8 +506,8 @@ FMDPosition FMDIndex::extend(FMDPosition range, char c, bool backward) const {
 }
     
 void FMDIndex::misMatchExtendLeftOnly(MisMatchAttemptResults& prevMisMatches,
-	char c, size_t z_max, BitVectorIterator* mask, bool startExtension,
-	bool finishExtension) const {
+        char c, size_t z_max, BitVectorIterator* mask, bool startExtension,
+        bool finishExtension) const {
 
     // We want to work directly on the argument positions vector, so we iterate
     // through its entries up to its original size so that we can just push new
@@ -519,60 +519,60 @@ void FMDIndex::misMatchExtendLeftOnly(MisMatchAttemptResults& prevMisMatches,
     FMDPosition scratch = EMPTY_FMD_POSITION;
     
     for(size_t i = 0; i < prevMisMatchCount; i++) {
-	
-	// Extend our previous position by the proper base
-	if(!finishExtension) {
-	    extendLeftOnly(prevMisMatches.positions[i].first, c);
-	    prevMisMatches.misMatchOffsets.push_back(0);
-	}
-	
-	if(finishExtension) {
-	    prevMisMatches.positions[i].first = EMPTY_FMD_POSITION;
-	}
-	    
-	// Try the other three bases
-	if(!startExtension) {
-	    if(prevMisMatches.positions[i].second < z_max) {
-		for(size_t base = 0; base < NUM_BASES; base++) {
-		    if(BASES[base] != c) {
-			scratch = prevMisMatches.positions[i].first;
-			extendLeftOnly(scratch, BASES[base]);
-		    
-			// If the mismatches extension matches, add it to the back
-			// of the vector
-		    
-			if(scratch.getLength(mask) > 0) {
-			    prevMisMatches.positions.push_back(
-				std::pair<FMDPosition,size_t>(scratch,
-				prevMisMatches.positions[i].second + 1));
-			    prevMisMatches.misMatchOffsets.push_back(
-				prevMisMatches.characters);
-			}
-		    }
-		}
-	    }
-	}
+        
+        // Extend our previous position by the proper base
+        if(!finishExtension) {
+            extendLeftOnly(prevMisMatches.positions[i].first, c);
+            prevMisMatches.misMatchOffsets.push_back(0);
+        }
+        
+        if(finishExtension) {
+            prevMisMatches.positions[i].first = EMPTY_FMD_POSITION;
+        }
+            
+        // Try the other three bases
+        if(!startExtension) {
+            if(prevMisMatches.positions[i].second < z_max) {
+                for(size_t base = 0; base < NUM_BASES; base++) {
+                    if(BASES[base] != c) {
+                        scratch = prevMisMatches.positions[i].first;
+                        extendLeftOnly(scratch, BASES[base]);
+                    
+                        // If the mismatches extension matches, add it to the back
+                        // of the vector
+                    
+                        if(scratch.getLength(mask) > 0) {
+                            prevMisMatches.positions.push_back(
+                                std::pair<FMDPosition,size_t>(scratch,
+                                prevMisMatches.positions[i].second + 1));
+                            prevMisMatches.misMatchOffsets.push_back(
+                                prevMisMatches.characters);
+                        }
+                    }
+                }
+            }
+        }
     }
         
     // Remove all correct-base extensions which returned an empty range
     
     for(size_t i = prevMisMatchCount - 1; i < prevMisMatchCount; i--) {
-	if(prevMisMatches.positions[i].first.isEmpty(mask)) {	    
-	    std::swap(prevMisMatches.positions[i],
-					prevMisMatches.positions.back());
-	    std::swap(prevMisMatches.misMatchOffsets[i],
-					prevMisMatches.misMatchOffsets.back());
-	    prevMisMatches.positions.pop_back();
-	    prevMisMatches.misMatchOffsets.pop_back();
-	}
+        if(prevMisMatches.positions[i].first.isEmpty(mask)) {            
+            std::swap(prevMisMatches.positions[i],
+                                        prevMisMatches.positions.back());
+            std::swap(prevMisMatches.misMatchOffsets[i],
+                                        prevMisMatches.misMatchOffsets.back());
+            prevMisMatches.positions.pop_back();
+            prevMisMatches.misMatchOffsets.pop_back();
+        }
     }
         
     // If no results are found, place an empty FMDPosition in the
     // output vector
             
     if(prevMisMatches.positions.size() == 0) {
-	prevMisMatches.positions.push_back(std::pair<FMDPosition,size_t>(EMPTY_FMD_POSITION,0));
-	prevMisMatches.offsetCorrection = 0;
+        prevMisMatches.positions.push_back(std::pair<FMDPosition,size_t>(EMPTY_FMD_POSITION,0));
+        prevMisMatches.offsetCorrection = 0;
     }    
 }
 
@@ -608,34 +608,34 @@ void FMDIndex::extendLeftOnly(FMDPosition& range, char c) const {
 
 void FMDIndex::misMatchRetractRightOnly(MisMatchAttemptResults& prevMisMatches,
     size_t newPatternLength, BitVectorIterator* mask) const {
-	
+        
     // Iterate back-to-front (so you don't disturb the front elements) through
     // your vector of positions, retracting and removing positions which no
     // no longer match
-	
+        
     if(newPatternLength > prevMisMatches.characters) {
-	throw std::runtime_error("Can't retract to a longer search string");
+        throw std::runtime_error("Can't retract to a longer search string");
     }
-	
+        
     // What distance are we retracting by? Track the total retraction distance
     // in the offsetCorrection size_t
     size_t shift = prevMisMatches.characters - newPatternLength;
     prevMisMatches.offsetCorrection += shift;
     
     // Apply the retract
-	
+        
     for(size_t i = prevMisMatches.positions.size() - 1; i >= 0; i--) {
-	retractRightOnly(prevMisMatches.positions[i].first, newPatternLength);    
-	
-	// Remove now-empty positions and their corresponding offset entries
-	if(prevMisMatches.positions[i].first.isEmpty(mask)) {
-	    std::swap(prevMisMatches.positions[i],
-		prevMisMatches.positions.back());
-	    std::swap(prevMisMatches.misMatchOffsets[i],
-		prevMisMatches.misMatchOffsets.back());
-	    prevMisMatches.positions.pop_back();
-	    prevMisMatches.misMatchOffsets.pop_back();
-	}
+        retractRightOnly(prevMisMatches.positions[i].first, newPatternLength);    
+        
+        // Remove now-empty positions and their corresponding offset entries
+        if(prevMisMatches.positions[i].first.isEmpty(mask)) {
+            std::swap(prevMisMatches.positions[i],
+                prevMisMatches.positions.back());
+            std::swap(prevMisMatches.misMatchOffsets[i],
+                prevMisMatches.misMatchOffsets.back());
+            prevMisMatches.positions.pop_back();
+            prevMisMatches.misMatchOffsets.pop_back();
+        }
     }
     
     // If our retract distance exceeds the right-sided offset of our mismatched
@@ -647,31 +647,31 @@ void FMDIndex::misMatchRetractRightOnly(MisMatchAttemptResults& prevMisMatches,
     // this loop in a way that makes sense...
     
     for(size_t i = prevMisMatches.positions.size() - 1; i >= 0; i--) {
-	if(prevMisMatches.offsetCorrection > prevMisMatches.misMatchOffsets[i]
-	    && prevMisMatches.positions[i].second > 0) {
-	    
-	    // Remove the mismatch indicators
-	    
-	    prevMisMatches.positions[i].second--;
-	    prevMisMatches.misMatchOffsets[i] = 0;
-	
-	    // Since we have removed a mismatch, it is possible that we now
-	    // have duplicated FMDPositions in our search results. If so,
-	    // delete these
-	
-	    for(size_t j = 0; j < i; i++) {
-		if(prevMisMatches.positions[j].first ==
-		    prevMisMatches.positions[i].first) {
-		    
-		    std::swap(prevMisMatches.positions[j],
-			      prevMisMatches.positions.back());
-		    std::swap(prevMisMatches.misMatchOffsets[j],
-			      prevMisMatches.misMatchOffsets.back());
-		    prevMisMatches.positions.pop_back();
-		    prevMisMatches.misMatchOffsets.pop_back();
-		}
-	    }
-	}
+        if(prevMisMatches.offsetCorrection > prevMisMatches.misMatchOffsets[i]
+            && prevMisMatches.positions[i].second > 0) {
+            
+            // Remove the mismatch indicators
+            
+            prevMisMatches.positions[i].second--;
+            prevMisMatches.misMatchOffsets[i] = 0;
+        
+            // Since we have removed a mismatch, it is possible that we now
+            // have duplicated FMDPositions in our search results. If so,
+            // delete these
+        
+            for(size_t j = 0; j < i; i++) {
+                if(prevMisMatches.positions[j].first ==
+                    prevMisMatches.positions[i].first) {
+                    
+                    std::swap(prevMisMatches.positions[j],
+                              prevMisMatches.positions.back());
+                    std::swap(prevMisMatches.misMatchOffsets[j],
+                              prevMisMatches.misMatchOffsets.back());
+                    prevMisMatches.positions.pop_back();
+                    prevMisMatches.misMatchOffsets.pop_back();
+                }
+            }
+        }
     }    
 }
 
@@ -1067,135 +1067,135 @@ std::vector<Mapping> FMDIndex::mapBoth(const std::string& query, int64_t genome,
 std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMapRight(
     const BitVector& ranges, const std::string& query, const BitVector* mask,
     int minContext, size_t z_max) const {
-	
-	// RIGHT-map to a range.
-	
-	// Implementing extension with mismatches
-	
-	// Make an iterator for ranges, so we can query it.
-	BitVectorIterator rangeIterator(ranges);
-	
-	// And one for the mask, if needed
-	BitVectorIterator* maskIterator = (mask == NULL) ? NULL : 
-	new BitVectorIterator(*mask);
-	
-	// TODO: Is it practical (in terms of memory use) to extend this to check
-	// for reversible multimappings?
-	
-	// We need a vector to return.
-	std::vector<std::pair<int64_t,size_t>> mappings;
-	
-	int64_t range;
-	
-	// Start with the whole index selected.
-	MisMatchAttemptResults search;
-	search.positions.push_back(
-	    std::pair<FMDPosition,size_t>(getCoveringPosition(),0));
-	search.misMatchOffsets.push_back(0);
-	search.characters = 0;
-	search.offsetCorrection = 0;
-	
-	for(size_t i = query.size() - 1; i != (size_t) -1; i--)
-	{
-	    // For each position in the subrange we're mapping, stopping on
-	    // underflow
-	    
-	    // Try extending with that character
-	    MisMatchAttemptResults extended = search;
-	    misMatchExtendLeftOnly(extended, query[i], z_max,
-				   maskIterator, true, false);
-	    
-	    while(extended.positions.front().first.isEmpty(maskIterator)) {
-		Log::debug() << "At position " << i << ", retracting to " <<
-		search.characters - 1 << " characters" << std::endl;
-		// We would have no results if we extended with this character right
-		// now.
-		
-		if(search.characters == 0) {
-		    // If you have no results after an extension, your original
-		    // pattern length has to be nonzero. We assume the index
-		    // contains at least one copy of every character.
-		    
-		    // TODO: Remove that assumption
-		    throw std::runtime_error("No results at zero pattern length! "
-		    "Is a character not present in the index/genome?");
-		}            
-		
-		// Retract on the right. TODO: Integrate more deeply with
-		// retractRightOnly because we will only ever want to retract to
-		// points where we get more results.
-		misMatchRetractRightOnly(search, search.characters - 1,
-					 maskIterator);
-		search.characters--;
-		
-		// Try extending again until you do get results.
-		extended = search;
-		misMatchExtendLeftOnly(extended, query[i], z_max,
-				       maskIterator, true, false);
-		
-	    }
-	    
-	    // Now you have some results. Adopt the new interval as your current
-	    // interval.
-	    extended.characters++;
-	    
-	    // What range index does our current position correspond to, if any?
-	    int64_t range = extended.positions.front().first.range(rangeIterator,
-								   maskIterator);
-	    
-	    if(extended.positions.size() == 1 && range != -1 &&
-		!extended.positions.front().first.isEmpty(maskIterator) &&
-		range != -1 && extended.characters >=minContext) {
-		// If you happen to have results in exactly one range with
-		// sufficient context, record a mapping to it.
-		
-		Log::debug() << "Mapped " << extended.characters << " context to " << 
-		extended.positions.front().first << " in range #" <<
-		range << std::endl;
-	    
-	    // Remember that this base mapped to this range
-	    mappings.push_back(
-		std::pair<int64_t,size_t>(range,extended.characters));
-	    
-		} else {
-		    // Otherwise record that this position is unmapped on the right.
-		    
-		    Log::debug() << "Failed at " << extended.positions.front().first <<
-		    " (" << extended.positions.size() << " mismatch search results for "
-		    << extended.characters << " context)." << std::endl;
-		    
-		    mappings.push_back(std::pair<int64_t,size_t>(-1,0));
-		}
-		
-		misMatchExtendLeftOnly(search, query[i], z_max,
-				       maskIterator, false, true);
-		search.characters++;
-		
-		if(!search.positions.front().first.isEmpty()) {
-		    if(!extended.positions.front().first.isEmpty()) {
-			search.positions.insert(search.positions.end(),
-						extended.positions.begin(), extended.positions.end());
-			search.misMatchOffsets.insert(search.misMatchOffsets.begin(),
-						      extended.misMatchOffsets.begin(),
-						      extended.misMatchOffsets.end());
-		    }
-		} else if(!extended.positions.front().first.isEmpty()) {
-		    search = extended;
-		}
-	}
-	
-	// We've gone through and attempted the whole string. Put our results in the
-	// same order as the string, instead of the backwards order we got them in.
-	// See <http://www.cplusplus.com/reference/algorithm/reverse/>
-	std::reverse(mappings.begin(), mappings.end());
-	
-	// Get rid of the mask iterator if needed
-	if(maskIterator != NULL) {
-	    delete maskIterator;
-	}
-	
-	// Give back our answers.
-	return mappings;
+        
+        // RIGHT-map to a range.
+        
+        // Implementing extension with mismatches
+        
+        // Make an iterator for ranges, so we can query it.
+        BitVectorIterator rangeIterator(ranges);
+        
+        // And one for the mask, if needed
+        BitVectorIterator* maskIterator = (mask == NULL) ? NULL : 
+        new BitVectorIterator(*mask);
+        
+        // TODO: Is it practical (in terms of memory use) to extend this to check
+        // for reversible multimappings?
+        
+        // We need a vector to return.
+        std::vector<std::pair<int64_t,size_t>> mappings;
+        
+        int64_t range;
+        
+        // Start with the whole index selected.
+        MisMatchAttemptResults search;
+        search.positions.push_back(
+            std::pair<FMDPosition,size_t>(getCoveringPosition(),0));
+        search.misMatchOffsets.push_back(0);
+        search.characters = 0;
+        search.offsetCorrection = 0;
+        
+        for(size_t i = query.size() - 1; i != (size_t) -1; i--)
+        {
+            // For each position in the subrange we're mapping, stopping on
+            // underflow
+            
+            // Try extending with that character
+            MisMatchAttemptResults extended = search;
+            misMatchExtendLeftOnly(extended, query[i], z_max,
+                                   maskIterator, true, false);
+            
+            while(extended.positions.front().first.isEmpty(maskIterator)) {
+                Log::debug() << "At position " << i << ", retracting to " <<
+                search.characters - 1 << " characters" << std::endl;
+                // We would have no results if we extended with this character right
+                // now.
+                
+                if(search.characters == 0) {
+                    // If you have no results after an extension, your original
+                    // pattern length has to be nonzero. We assume the index
+                    // contains at least one copy of every character.
+                    
+                    // TODO: Remove that assumption
+                    throw std::runtime_error("No results at zero pattern length! "
+                    "Is a character not present in the index/genome?");
+                }            
+                
+                // Retract on the right. TODO: Integrate more deeply with
+                // retractRightOnly because we will only ever want to retract to
+                // points where we get more results.
+                misMatchRetractRightOnly(search, search.characters - 1,
+                                         maskIterator);
+                search.characters--;
+                
+                // Try extending again until you do get results.
+                extended = search;
+                misMatchExtendLeftOnly(extended, query[i], z_max,
+                                       maskIterator, true, false);
+                
+            }
+            
+            // Now you have some results. Adopt the new interval as your current
+            // interval.
+            extended.characters++;
+            
+            // What range index does our current position correspond to, if any?
+            int64_t range = extended.positions.front().first.range(rangeIterator,
+                                                                   maskIterator);
+            
+            if(extended.positions.size() == 1 && range != -1 &&
+                !extended.positions.front().first.isEmpty(maskIterator) &&
+                range != -1 && extended.characters >=minContext) {
+                // If you happen to have results in exactly one range with
+                // sufficient context, record a mapping to it.
+                
+                Log::debug() << "Mapped " << extended.characters << " context to " << 
+                extended.positions.front().first << " in range #" <<
+                range << std::endl;
+            
+            // Remember that this base mapped to this range
+            mappings.push_back(
+                std::pair<int64_t,size_t>(range,extended.characters));
+            
+                } else {
+                    // Otherwise record that this position is unmapped on the right.
+                    
+                    Log::debug() << "Failed at " << extended.positions.front().first <<
+                    " (" << extended.positions.size() << " mismatch search results for "
+                    << extended.characters << " context)." << std::endl;
+                    
+                    mappings.push_back(std::pair<int64_t,size_t>(-1,0));
+                }
+                
+                misMatchExtendLeftOnly(search, query[i], z_max,
+                                       maskIterator, false, true);
+                search.characters++;
+                
+                if(!search.positions.front().first.isEmpty()) {
+                    if(!extended.positions.front().first.isEmpty()) {
+                        search.positions.insert(search.positions.end(),
+                                                extended.positions.begin(), extended.positions.end());
+                        search.misMatchOffsets.insert(search.misMatchOffsets.begin(),
+                                                      extended.misMatchOffsets.begin(),
+                                                      extended.misMatchOffsets.end());
+                    }
+                } else if(!extended.positions.front().first.isEmpty()) {
+                    search = extended;
+                }
+        }
+        
+        // We've gone through and attempted the whole string. Put our results in the
+        // same order as the string, instead of the backwards order we got them in.
+        // See <http://www.cplusplus.com/reference/algorithm/reverse/>
+        std::reverse(mappings.begin(), mappings.end());
+        
+        // Get rid of the mask iterator if needed
+        if(maskIterator != NULL) {
+            delete maskIterator;
+        }
+        
+        // Give back our answers.
+        return mappings;
     }
 
 std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMapRight(
@@ -1294,7 +1294,7 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::mapRight(const BitVector& range
                 " options for " << patternLength << " context)." << 
                 std::endl;
             
-	    mappings.push_back(std::pair<int64_t,size_t>(-1,0));
+            mappings.push_back(std::pair<int64_t,size_t>(-1,0));
         }
         
     }

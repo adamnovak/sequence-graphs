@@ -9,12 +9,12 @@ HASHMAP_FLAGS = -DHAVE_EXT_HASH_MAP -DHAVE_GOOGLE_SPARSE_HASH_MAP
 
 # We need to define CFLAGS since some of our thirdparty code is in C and needs
 # -fPIC
-CFLAGS = -O3 -Wall -Wextra -fPIC -pthread $(DEBUG_FLAGS) $(PARALLEL_FLAGS) \
+CFLAGS = -O0 -Wall -Wextra -fPIC -pthread $(DEBUG_FLAGS) $(PARALLEL_FLAGS) \
     $(HASHMAP_FLAGS)
     
 CXXFLAGS = $(CFLAGS) -std=c++11
     
-LDFLAGS = -lz
+LDFLAGS = -lz -g
     
 # We need to link against cppunit when we run our tests.
 TEST_LIBS = -lcppunit
