@@ -264,7 +264,8 @@ void MappingMergeScheme::CgenerateSomeMerges(size_t queryContig) const {
     
     // How do we want to perform the mapping?    
     if (mismatch) {
-        Log::info() << "Using mismatch mapping with z_max " << z_max << std::endl;
+        Log::info() << "Using mismatch mapping with z_max " << z_max << 
+            std::endl;
 
         Mappings = index.CmisMap(rangeVector, contig, &includedPositions, 
             minContext, z_max);
