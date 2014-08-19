@@ -58,7 +58,7 @@ void GenericBitVectorTests::testIsSet() {
     GenericBitVector* v = pair.first;
     BitVectorIterator* v2 = new BitVectorIterator(*pair.second);
     
-    for(size_t i = 0; i < 20; i++) {
+    for(size_t i = 0; i < 10; i++) {
         // Check a bunch of positions.
         CPPUNIT_ASSERT(v->isSet(i) == v2->isSet(i));
     }
@@ -76,8 +76,10 @@ void GenericBitVectorTests::testRank() {
     GenericBitVector* v = pair.first;
     BitVectorIterator* v2 = new BitVectorIterator(*pair.second);
     
-    for(size_t i = 0; i < 20; i++) {
+    for(size_t i = 0; i < 10; i++) {
         // Check a bunch of positions.
+        Log::info() << "Position " << i << " ranks: " << v->rank(i) << 
+            " vs. " << v2->rank(i) << std::endl;
         CPPUNIT_ASSERT(v->rank(i) == v2->rank(i));
         CPPUNIT_ASSERT(v->rank(i, true) == v2->rank(i, true));
         CPPUNIT_ASSERT(v->rank(i, false) == v2->rank(i, false));
@@ -94,7 +96,7 @@ void GenericBitVectorTests::testSelect() {
     GenericBitVector* v = pair.first;
     BitVectorIterator* v2 = new BitVectorIterator(*pair.second);
     
-    for(size_t i = 0; i < 6; i++) {
+    for(size_t i = 0; i < 3; i++) {
         // Check a bunch of positions.
         CPPUNIT_ASSERT(v->select(i) == v2->select(i));
     }
@@ -110,11 +112,11 @@ void GenericBitVectorTests::testValueBefore() {
     GenericBitVector* v = pair.first;
     BitVectorIterator* v2 = new BitVectorIterator(*pair.second);
     
-    for(size_t i = 0; i < 20; i++) {
+    for(size_t i = 0; i < 10; i++) {
         // Check a bunch of positions.
         auto ourResult = v->valueBefore(i);
         auto theirResult = v2->valueBefore(i);
-        Log::debug() << "Position " << i << ": " << ourResult.first << ", " <<
+        Log::info() << "Position " << i << ": " << ourResult.first << ", " <<
             ourResult.second << " vs. " << theirResult.first << ", " << 
             theirResult.second << std::endl;
         CPPUNIT_ASSERT(ourResult == theirResult);
@@ -130,11 +132,11 @@ void GenericBitVectorTests::testValueAfter() {
     GenericBitVector* v = pair.first;
     BitVectorIterator* v2 = new BitVectorIterator(*pair.second);
     
-    for(size_t i = 0; i < 20; i++) {
+    for(size_t i = 0; i < 10; i++) {
         // Check a bunch of positions.
         auto ourResult = v->valueAfter(i);
         auto theirResult = v2->valueAfter(i);
-        Log::debug() << "Position " << i << ": " << ourResult.first << ", " <<
+        Log::info() << "Position " << i << ": " << ourResult.first << ", " <<
             ourResult.second << " vs. " << theirResult.first << ", " << 
             theirResult.second << std::endl;
         CPPUNIT_ASSERT(ourResult == theirResult);

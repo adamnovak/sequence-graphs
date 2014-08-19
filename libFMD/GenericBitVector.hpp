@@ -6,7 +6,16 @@
 #include <istream>
 #include <ostream>
 #include <utility>
-#include "BitVector.hpp"
+
+#define BITVECTOR_SDSL
+#ifdef BITVECTOR_CSA
+    // Using CSA bitvectors
+    #include "BitVector.hpp"
+#endif
+#ifdef BITVECTOR_SDSL
+    // Using SDSL bitvectors
+    #include <sdsl/bit_vectors.hpp>
+#endif
 
 /**
  * Represents a bit vector that bastracts out its underlying implementation in
@@ -110,7 +119,7 @@ public:
     std::pair<size_t, size_t> valueBefore(size_t index) const;
     
     // Move construction OK
-    constexpr GenericBitVector(GenericBitVector&& other) = default;
+    GenericBitVector(GenericBitVector&& other) = default;
     
     // Move assignment OK
     GenericBitVector& operator=(GenericBitVector&& other) = default; 
@@ -123,14 +132,30 @@ private:
     // No assignment
     GenericBitVector& operator=(const GenericBitVector& other) = delete;
     
-    // Actual implementation
-    // We need an encoder to actually make the bitvector. We own this.
-    BitVectorEncoder* encoder;
-    // And we need a place to put the vector when done.
-    BitVector* bitvector;
-    // And we need to remember how far along we are in our encoding.
-    size_t size;
+    #ifdef BITVECTOR_CSA
+        // Actual implementation on CSA
+        // We need an encoder to actually make the bitvector. We own this.
+        BitVectorEncoder* encoder;
+        // And we need a place to put the vector when done.
+        BitVector* bitvector;
+        // And we need to remember how far along we are in our encoding.
+        size_t size;
+    #endif
+    #ifdef BITVECTOR_SDSL
+        // Actual implementation on SDSL.
+        
+        // We seem to be only able to use full uncompressed bitvectors when 
+        // we're actually building them...
+        sdsl::bit_vector bitvector;
+        
+        // And we need rank on that
+        sdsl::rank_support_v5<>* rankSupport;
+        // And select
+        sdsl::select_support_mcl<>* selectSupport;        
+    #endif
     
 };
+
+
 
 #endif

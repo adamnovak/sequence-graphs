@@ -38,6 +38,12 @@
 
 %include "CSA/BitVectorBase.hpp"
 %include "CSA/BitVector.hpp"
+%{
+  #include "CSA/BitVectorBase.hpp"
+%}
+%{
+  #include "CSA/BitVector.hpp"
+%}
 
 // We need to use the inner vector iterator classes to look at vectors. Give a
 // partial definition under a new name.
