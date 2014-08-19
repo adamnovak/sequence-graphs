@@ -74,14 +74,6 @@ def main(args):
         # Make sure they gave us a place to put it if they want a truth
         # comparison.
         raise Exception("--truthFile is required if --trueMaf is used.")
-    
-    # Make sure we've given everything an absolute module name.
-    # Don't try to import * because that's illegal.
-    if __name__ == "__main__":
-        from compareOrders import ReferenceStructureTarget, \
-            StructureAssessmentTarget, ConcatenateTarget, \
-            AlignmentSetComparisonTarget, AlignmentTruthComparisonTarget, \
-            AlignmentComparisonTarget, RunTarget
         
     # Make a stack of jobs to run
     stack = jobTree.scriptTree.stack.Stack(StructureAssessmentTarget(

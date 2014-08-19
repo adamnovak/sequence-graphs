@@ -245,8 +245,7 @@ class StructureAssessmentTarget(jobTree.scriptTree.target.Target):
         child targets, and they are saved in a <genome number>\t<coverage
         fraction> TSV.
         
-        The alignment statistics are just a bunch of concatenated mafComparator
-        XML files.
+        The alignment statistics are just a <precision>\t<recall> TSV.
         
         TODO: This target is getting a bit unweildy and probably should be
         broken up to use an output directory and a configuration object or
