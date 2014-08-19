@@ -55,20 +55,17 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         self.seed = seed
         
         # Save the concatenated coverage stats file name to use
-        self.coverage_filename = coverage_filename
-        
-        # Save the number of child targets to run
-        self.num_children = num_children
+        self.coverage_basename = coverage_basename
         
         # Save the filename of a MAF to compare all our MAFs against (or None)
         self.true_maf = true_maf
         
         # And the filename to send the results of that comparison to (which also
         # may be None)
-        self.truth_filename = truth_filename
+        self.truth_basename = truth_basename
         
         self.logToMaster(
-            "Creating StructureAssessmentTarget with seed {}".format(seed))
+            "Creating SchemeAssessmentTarget with seed {}".format(seed))
         
         
     def run(self):
@@ -81,7 +78,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # We need a few different follow-on jobs.
         followOns = []        
         
-        for mismatch, credit in itertools.permutations([False, True], 2):
+        for mismatch, credit in itertools.product([False, True], repeat=2):
             # Decide if we want mismatches and credit for this run.
             
             self.logToMaster("Preparing for mismatch: {} credit: {}".format(
@@ -134,7 +131,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 # shuffles the non-reference ones it doesn't do anything.
                 self.addChildTarget(ReferenceStructureTarget(
                     [reference_fasta, other_fasta], random.getrandbits(256), 
-                    stats_filename, maf_filename))
+                    stats_filename, maf_filename, extra_args=extra_args))
         
         
                 

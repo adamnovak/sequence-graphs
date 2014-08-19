@@ -13,6 +13,14 @@ import jobTree.scriptTree.target
 import jobTree.scriptTree.stack
 import sonLib.bioio
 
+def check_call(target, args):
+    """
+    Make a subprocess call, announcing that we are doing it.
+    """
+    print("Calling: {}".format(" ".join(args)))
+    target.logToMaster("Calling: {}".format(" ".join(args)))
+    return subprocess.check_call(args)
+
 class RunTarget(jobTree.scriptTree.target.Target):
     """
     A target that runs other targets as its children.
@@ -125,10 +133,9 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
             rootDir=self.getLocalTempDir())
         
         # Put together the arguments to invoke
-        args = ["../createIndex/createIndex", "--credit", "--context", 
-            "100", "--scheme", "greedy", "--alignment", c2h_filename, 
-            "--alignmentFasta", fasta_filename, index_dir] + self.fasta_list + \
-            self.extra_args
+        args = ["../createIndex/createIndex", "--context", "100", "--scheme", 
+            "greedy", "--alignment", c2h_filename, "--alignmentFasta", 
+            fasta_filename, index_dir] + self.fasta_list + self.extra_args
             
         # Announce our command we're going to run
         self.logToMaster("Invoking {}".format(" ".join(args)))
@@ -200,7 +207,7 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         os.unlink(hal_filename)
         
         # Turn the c2h into a HAL with the given tree.
-        subprocess.check_call(["halAppendCactusSubtree", c2h_filename, 
+        check_call(self, ["halAppendCactusSubtree", c2h_filename, 
             fasta_filename, tree, hal_filename])
             
         # Clean up the temp files we needed to make the HAL
@@ -215,7 +222,7 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         # reference, and we will never call a duplication relative to this first
         # genome), and don't include rootSeq (since it is just an artifact of
         # the HAL format and not a real genome).
-        subprocess.check_call(["hal2maf", "--refGenome", genomes[0], 
+        check_call(self, ["hal2maf", "--refGenome", genomes[0], 
             "--targetGenomes", ",".join(genomes[1:]), hal_filename,
             self.alignment_filename])
             
@@ -382,7 +389,7 @@ class AlignmentComparisonTarget(jobTree.scriptTree.target.Target):
         seed = random.getrandbits(32)
         
         # Run mafComparator and generate the output XML
-        subprocess.check_call(["mafComparator", "--maf1", self.maf_a, "--maf2",
+        check_call(self, ["mafComparator", "--maf1", self.maf_a, "--maf2",
             self.maf_b, "--out", xml_filename, "--seed", str(seed)])
         
         # Now parse the XML output down to the statistics we actually want.
