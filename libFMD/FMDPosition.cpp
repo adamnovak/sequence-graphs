@@ -23,8 +23,8 @@ bool FMDPosition::operator==(const FMDPosition& other) const {
         end_offset == other.end_offset;
 }
 
-int64_t FMDPosition::range(BitVectorIterator& ranges, BitVectorIterator* mask)
-    const {
+int64_t FMDPosition::range(const GenericBitVector& ranges, 
+    const GenericBitVector* mask) const {
 
     // What's the first index in the BWT that the range would need to cover?
     size_t interval_start;
@@ -100,8 +100,8 @@ int64_t FMDPosition::range(BitVectorIterator& ranges, BitVectorIterator* mask)
     }
 }
 
-int64_t FMDPosition::ranges(BitVectorIterator& ranges, BitVectorIterator* mask)
-    const {
+int64_t FMDPosition::ranges(const GenericBitVector& ranges, 
+    const GenericBitVector* mask) const {
 
     if(end_offset < 0) {
         // Special case the empty FMDPosition so we don't have to deal with that

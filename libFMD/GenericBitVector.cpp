@@ -1,15 +1,13 @@
 #include "GenericBitVector.hpp"
 
 GenericBitVector::GenericBitVector(std::ifstream& stream): encoder(NULL), 
-    bitvector(new BitVector(stream)), 
-    iterator(new BitVectorIterator(*bitvector)), size(bitvector->getSize()) {
+    bitvector(new BitVector(stream)), size(bitvector->getSize()) {
     
     // Nothing to do, loaded from the stream.
 }
 
 GenericBitVector::GenericBitVector(std::ifstream&& stream): encoder(NULL), 
-    bitvector(new BitVector(stream)), 
-    iterator(new BitVectorIterator(*bitvector)), size(bitvector->getSize()) {
+    bitvector(new BitVector(stream)), size(bitvector->getSize()) {
     
     // Nothing to do, loaded from the stream.
 }
@@ -22,7 +20,7 @@ GenericBitVector::GenericBitVector(const std::string& filename):
 }
 
 GenericBitVector::GenericBitVector(): encoder(new BitVectorEncoder(32)), 
-    bitvector(NULL), iterator(NULL), size(0) {
+    bitvector(NULL), size(0) {
 
     // Nothing to do, already made the encoder.
 }
@@ -38,10 +36,6 @@ GenericBitVector::~GenericBitVector() {
     if(bitvector != NULL) {
         delete bitvector;
     }
-    
-    if(iterator != NULL) {
-        delete iterator;
-    }
 }
 
 void GenericBitVector::finish() {
@@ -49,18 +43,61 @@ void GenericBitVector::finish() {
     encoder->flush();
     // Make the BitVector
     bitvector = new BitVector(*encoder, size);    
-    // And keep a persistent iterator to look in it.
-    iterator = new BitVectorIterator(*bitvector);
 }
 
-size_t GenericBitVector::rank(size_t index) {
+size_t GenericBitVector::rank(size_t index) const {
     // Take the rank of a position (not in at_least mode)
-    return iterator->rank(index, false);
+    return BitVectorIterator(*bitvector).rank(index, false);
 }
 
-size_t GenericBitVector::select(size_t one) {
+size_t GenericBitVector::rank(size_t index, bool atLeast) const {
+    if(atLeast) {
+        // Implement this mode ourselves so we can be certain of exactly what it
+        // does.
+        return rank(index) + isSet(index);
+    } else {
+        return rank(index);
+    }
+}
+
+bool GenericBitVector::isSet(size_t index) const {
+    return BitVectorIterator(*bitvector).isSet(index);
+}
+
+size_t GenericBitVector::select(size_t one) const {
     // Go select the right position
-    return iterator->select(one);
+    return BitVectorIterator(*bitvector).select(one);
+}
+
+std::pair<size_t, size_t> GenericBitVector::valueAfter(size_t index) const {
+    // Get the rank of the next 1 at or after the given position.
+    size_t nextRank = rank(index, true) + 1;
+    return std::make_pair(select(nextRank), nextRank);
+}
+
+std::pair<size_t, size_t> GenericBitVector::valueBefore(size_t index) const {
+    // Get the rank of the 1 before this position.
+    size_t lastRank = rank(index);
+    return std::make_pair(select(lastRank), lastRank);
+}
+
+GenericBitVector* GenericBitVector::createUnion(GenericBitVector& other) {
+    // We need to hack a BitVector into a GenericBitVector.
+    
+    // Make one to populate.
+    GenericBitVector* toReturn = new GenericBitVector();
+    
+    // make the bitvector to put in
+    BitVector* unionBitvector = bitvector->createUnion(*(other.bitvector));
+    
+    // Put it in
+    toReturn->bitvector = unionBitvector;
+    // Populate the size
+    toReturn->size = unionBitvector->getSize();
+    
+    // Return the new GenericBitVector holding the BitVector we made.
+    return toReturn;
+    
 }
 
 

@@ -11,7 +11,7 @@
 
 #include "TextPosition.hpp"
 #include "FMDIndexIterator.hpp"
-#include "BitVector.hpp"
+#include "GenericBitVector.hpp"
 #include "Mapping.hpp"
 #include "MapAttemptResult.hpp"
 #include "LCPArray.hpp"
@@ -136,7 +136,7 @@ public:
     /**
      * Get the mask for the positions in the given genome.
      */
-    const BitVector& getGenomeMask(size_t genome) const;
+    const GenericBitVector& getGenomeMask(size_t genome) const;
     
     /***************************************************************************
      * Search Functions
@@ -282,7 +282,7 @@ public:
      *
      */
     std::vector<Mapping> mapRight(const std::string& query, 
-        const BitVector* mask, int minContext = 0) const;
+        const GenericBitVector* mask, int minContext = 0) const;
         
     /**
      * RIGHT-map to a specific genome, or to all genomes if genome is -1. Same
@@ -325,15 +325,15 @@ public:
      * Returns a vector of one-based range numbers for left-mapping each base,
      * or -1 if the base did not map to a range.
      */
-    std::vector<int64_t> mapRight(const BitVector& ranges,
-        const std::string& query, const BitVector* mask,
+    std::vector<int64_t> mapRight(const GenericBitVector& ranges,
+        const std::string& query, const GenericBitVector* mask,
         int minContext = 0) const;
         
     /**
      * RIGHT-map to ranges using contexts from a specific genome, or all genomes
      * if genome is -1. Same semantics as the function above.
      */
-    std::vector<int64_t> mapRight(const BitVector& ranges,
+    std::vector<int64_t> mapRight(const GenericBitVector& ranges,
         const std::string& query, int64_t genome = -1,
         int minContext = 0) const;
       
@@ -341,21 +341,21 @@ public:
      * Exact left-map without ranges.
      */
     std::vector<Mapping> map(const std::string& query, 
-        const BitVector* mask = NULL, int minContext = 0, int start = 0, 
+        const GenericBitVector* mask = NULL, int minContext = 0, int start = 0, 
         int length = -1) const; 
 
-	/**
+        /**
      * Exact left-map with ranges ranges by original restart-based algorithm.
      */
-    std::vector<std::pair<int64_t,size_t>> map(const BitVector& ranges,
-        const std::string& query, const BitVector* mask, int minContext = 0, 
-        int start = 0, int length = -1) const;
+    std::vector<std::pair<int64_t,size_t>> map(const GenericBitVector& ranges,
+        const std::string& query, const GenericBitVector* mask, 
+        int minContext = 0, int start = 0, int length = -1) const;
         
     /**
      * Exact left-map with ranges to a genome by original restart-based
      * algorithm.
      */
-    std::vector<std::pair<int64_t,size_t>> map(const BitVector& ranges,
+    std::vector<std::pair<int64_t,size_t>> map(const GenericBitVector& ranges,
         const std::string& query, int64_t genome = -1, int minContext = 0, 
         int start = 0, int length = -1) const;
 
@@ -363,15 +363,15 @@ public:
      * CENTERED VERSIONS of the functions described above
      **/
     
-    std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> Cmap(const BitVector& ranges,
-        const std::string& query, const BitVector* mask, int minContext = 0, 
+    std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> Cmap(const GenericBitVector& ranges,
+        const std::string& query, const GenericBitVector* mask, int minContext = 0, 
         int start = 0, int length = -1) const;
     
     
-    std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> Cmap(const BitVector& ranges,
+    std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> Cmap(const GenericBitVector& ranges,
         const std::string& query, int64_t genome = -1, int minContext = 0, 
         int start = 0, int length = -1) const;
-	
+        
     /***************************************************************************
      * Mismatch
      **************************************************************************/
@@ -394,62 +394,62 @@ public:
      * 
      * For speed, this implementation does not sort search results.
      **/ 
-	
+        
     MisMatchAttemptResults misMatchExtend(MisMatchAttemptResults& prevMisMatches,
-	char c, bool backward, size_t z_max, BitVectorIterator* mask,
-	bool startExtension = false, bool finishExtension = false) const;
-	
+        char c, bool backward, size_t z_max, const GenericBitVector* mask,
+        bool startExtension = false, bool finishExtension = false) const;
+        
     /**
      * An old implementation of the method described above, sorting the results
      * in order of number of mismatches. This will allow a speed-up if ever we
      * want to find the match with the fewest number of mismatches.
      **/
-	
+        
     MisMatchAttemptResults sortedMisMatchExtend(MisMatchAttemptResults& prevMisMatches,
-	char c, bool backward, size_t z_max, BitVectorIterator* mask) const;
-	
+            char c, bool backward, size_t z_max, const GenericBitVector* mask) const;
+        
     /**
      * A submethod of sortedMisMatchExtend to check for existence and then sort
      * extension results
      **/
     
     void processMisMatchPositions(
-	MisMatchAttemptResults& nextMisMatches,
-	std::vector<std::pair<FMDPosition,size_t>>& waitingMatches,
-	std::vector<std::pair<FMDPosition,size_t>>& waitingMisMatches,
-	BitVectorIterator* mask) const;
-		
+        MisMatchAttemptResults& nextMisMatches,
+        std::vector<std::pair<FMDPosition,size_t>>& waitingMatches,
+        std::vector<std::pair<FMDPosition,size_t>>& waitingMisMatches,
+        const GenericBitVector* mask) const;
+                
     /**
      * Implementing mismatch search for Left-Right exact contexts
      **/
-		 
-    std::vector<std::pair<int64_t,size_t>> misMatchMap(const BitVector& ranges,
-	const std::string& query, const BitVector* mask, int minContext = 0, size_t z_max = 0,
-	int start = 0, int length = -1) const;
-	
-    std::vector<std::pair<int64_t,size_t>> misMatchMap(const BitVector& ranges, 
-	const std::string& query, int64_t genome = -1, int minContext = 0, size_t z_max = 0,
-	int start = 0, int length = -1) const;
-	
-    MisMatchAttemptResults misMatchMapPosition(BitVectorIterator& ranges, 
-	const std::string& pattern, size_t index, size_t z_max, size_t minContext,
-	BitVectorIterator* mask = NULL) const;
+                 
+    std::vector<std::pair<int64_t,size_t>> misMatchMap(const GenericBitVector& ranges,
+        const std::string& query, const GenericBitVector* mask, int minContext = 0, size_t z_max = 0,
+        int start = 0, int length = -1) const;
+        
+    std::vector<std::pair<int64_t,size_t>> misMatchMap(const GenericBitVector& ranges, 
+        const std::string& query, int64_t genome = -1, int minContext = 0, size_t z_max = 0,
+        int start = 0, int length = -1) const;
+        
+    MisMatchAttemptResults misMatchMapPosition(const GenericBitVector& ranges, 
+        const std::string& pattern, size_t index, size_t z_max, size_t minContext,
+        const GenericBitVector* mask = NULL) const;
     
     /**
      * Centered search versions of all the mismatch mapping functions
     **/
     
-    std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> CmisMap(const BitVector& ranges,
-	const std::string& query, const BitVector* mask, int minContext = 0, size_t z_max = 0,
-	int start = 0, int length = -1) const;
-	
-    std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> CmisMap(const BitVector& ranges, 
-	const std::string& query, int64_t genome = -1, int minContext = 0, size_t z_max = 0,
-	int start = 0, int length = -1) const;
-	
-    MisMatchAttemptResults CmisMatchMapPosition(BitVectorIterator& ranges, 
-	const std::string& pattern, size_t index, size_t z_max, size_t minContext,
-	BitVectorIterator* mask = NULL) const;
+    std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> CmisMap(const GenericBitVector& ranges,
+        const std::string& query, const GenericBitVector* mask, int minContext = 0, size_t z_max = 0,
+        int start = 0, int length = -1) const;
+        
+    std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> CmisMap(const GenericBitVector& ranges, 
+        const std::string& query, int64_t genome = -1, int minContext = 0, size_t z_max = 0,
+        int start = 0, int length = -1) const;
+        
+    MisMatchAttemptResults CmisMatchMapPosition(const GenericBitVector& ranges, 
+        const std::string& pattern, size_t index, size_t z_max, size_t minContext,
+        const GenericBitVector* mask = NULL) const;
 
     /***************************************************************************
      * Iteration Functions
@@ -528,11 +528,12 @@ protected:
      * genome. Note that we can't get genome by contig or contigs for genome.
      * Only genome by BWT position.
      *
-     * If we had C++11 we would use a vector, but we don't and since BitVector
-     * is not copy constructable/assignable we can't put it in a vector. So we
-     * put pointers in a vector.
+     * If we had C++11 we would use a vector, but we don't and since
+     * GenericBitVector is not copy constructable/assignable we can't put it in
+     * a vector. So we put pointers in a vector.
+     * TODO: We have C++11 now. Fix this.
      */
-    std::vector<BitVector*> genomeMasks;
+    std::vector<GenericBitVector*> genomeMasks;
     
     /**
      * Holds the actual underlying index.
@@ -556,7 +557,6 @@ protected:
     LCPArray lcpArray;
     
     /**
-<<<<<<< HEAD
      * Try left-mapping the given index in the given string, starting from
      * scratch. Start a backwards search at that index in the string and extend
      * left until we map to exactly one or zero places. Returns true or false
@@ -574,7 +574,7 @@ protected:
      * will be counted for mapping purposes.
      */
     MapAttemptResult mapPosition(const std::string& pattern,
-        size_t index, BitVectorIterator* mask = NULL) const;
+        size_t index, const GenericBitVector* mask = NULL) const;
       
     /**
      * Try RIGHT-mapping the given index in the given string to a unique forward-
@@ -598,17 +598,15 @@ protected:
      * If a mask is specified, only positions in the index with a 1 in the mask
      * will be counted for mapping purposes.
      */
-    creditMapAttemptResult CmapPosition(BitVectorIterator& ranges, 
+    creditMapAttemptResult CmapPosition(const GenericBitVector& ranges, 
         const std::string& pattern, size_t index, 
-        BitVectorIterator* mask = NULL) const;
+        const GenericBitVector* mask = NULL) const;
         
-    MapAttemptResult mapPosition(BitVectorIterator& ranges, 
+    MapAttemptResult mapPosition(const GenericBitVector& ranges, 
         const std::string& pattern, size_t index, 
-        BitVectorIterator* mask = NULL) const;
-	
+        const GenericBitVector* mask = NULL) const;
+        
     /**
-=======
->>>>>>> 699f007ada4a3f94f7914e3c3c801753dbb4b9c2
      * Given a left mapping and a right mapping for a base, disambiguate them to
      * produce one mapping. Things that consistently left and right-mapped to a
      * forward strand will be on an even text.
