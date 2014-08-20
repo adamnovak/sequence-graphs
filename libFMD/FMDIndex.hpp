@@ -14,6 +14,7 @@
 #include "BitVector.hpp"
 #include "Mapping.hpp"
 #include "MapAttemptResult.hpp"
+#include "LCPArray.hpp"
 
 // State that the test cases class exists, even though we can't see it.
 class FMDIndexTests;
@@ -165,10 +166,55 @@ public:
     void extendFast(FMDPosition& range, char c, bool backward) const;
     
     /**
+     * Extend a search by a character on the left in a backwards-search-only
+     * extension. Compatible with retract. Modifies the range to be extended,
+     * replacing it with the extended version.
+     */
+    void extendLeftOnly(FMDPosition& range, char c) const;
+    
+    /**
+     * Given a search range, retract characters on the right until it
+     * corresponds to a search pattern of the given length. Modifies the range
+     * in place.
+     *
+     * Only updates the interval used for backward search, so after this method
+     * is used, only extendLeftOnly can be used to extend the search.
+     *
+     * May not be called on an interval with no results in it.
+     */
+    void retractRightOnly(FMDPosition& range, size_t newPatternLength) const;
+    
+    /**
      * Select all the occurrences of the given pattern, using FMD backwards
      * search.
      */
     FMDPosition count(std::string pattern) const;
+    
+    /***************************************************************************
+     * Longest Common Prefix (LCP) functions
+     **************************************************************************/
+    
+    // TODO: Privatize or elimintate these? They're super small.
+    
+    /**
+     * Get the LCP value at a certain position. This is the length of the prefix
+     * that the suffix corresponding to this BWT position shares with the
+     * previous one.
+     */
+    size_t getLCP(size_t index) const;
+    
+    /**
+     * Get the previous smaller value in the LCP array before the given index,
+     * or 0 if no such value exists (or the index is out of range).
+     */
+    size_t getLCPPSV(size_t index) const;
+    
+    /**
+     * Get the index of the next smaller value in the LCP array after the given
+     * index, or 1 past the end of the BWT if no such value exists (or if the
+     * index is out of range).
+     */
+    size_t getLCPNSV(size_t index) const;
     
     
     /***************************************************************************
@@ -473,6 +519,11 @@ protected:
      * instead. Owned by this object, if not null.
      */
     SuffixArray* fullSuffixArray;
+    
+    /**
+     * Holds the longest common prefix array.
+     */
+    LCPArray lcpArray;
     
     /**
      * Try left-mapping the given index in the given string, starting from

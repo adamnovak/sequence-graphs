@@ -338,6 +338,58 @@ void FMDIndexTests::testContextLimit() {
     }
 }
 
+/**
+ * Test left-extending and right-retracting.
+ */
+void FMDIndexTests::testRetract() {
+
+    // Select the whole thing.
+    FMDPosition search = index->getCoveringPosition();
+    
+    // Search some stuff
+    index->extendLeftOnly(search, 'C');
+    index->extendLeftOnly(search, 'T');
+    index->extendLeftOnly(search, 'T');
+    
+    // Make an interval to compare against
+    FMDPosition countInterval = index->count("TTC");
+    
+    Log::output() << "For string TTC, got " << search << " by left extend, " <<
+        countInterval << " by count." << std::endl;
+    
+    // Make sure they match in the forward-strand interval, which is the one
+    // used here.
+    CPPUNIT_ASSERT(search.getForwardStart() == countInterval.getForwardStart());
+    CPPUNIT_ASSERT(search.getEndOffset() == countInterval.getEndOffset());
+ 
+    // Reverse back 1 character (to a search string of 2).
+    index->retractRightOnly(search, 2);
+    
+    // Search that instead
+    countInterval = index->count("TT");
+    
+    Log::output() << "For string TT, got " << search << " by retract, " <<
+        countInterval << " by count." << std::endl;
+    
+    // Compare
+    CPPUNIT_ASSERT(search.getForwardStart() == countInterval.getForwardStart());
+    CPPUNIT_ASSERT(search.getEndOffset() == countInterval.getEndOffset());
+    
+    // Reverse back to an empty search string.
+    index->retractRightOnly(search, 0);
+    
+    // Search that
+    countInterval = index->count("");
+    
+    Log::output() << "For empty string, got " << search << 
+        " by left extend, " << countInterval << " by count." << std::endl;
+    
+    // Compare
+    CPPUNIT_ASSERT(search.getForwardStart() == countInterval.getForwardStart());
+    CPPUNIT_ASSERT(search.getEndOffset() == countInterval.getEndOffset());
+    
+}
+
 
 
 
