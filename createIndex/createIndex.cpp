@@ -1101,7 +1101,7 @@ testBottomMapping(
     clock_t start = clock();
     for(int i = 0; i < TEST_ITERATIONS; i++) {
         // Map repeatedly
-        index.map(TEST_READ);
+        index.mapRight(TEST_READ);
     }
     // Stop the timer
     clock_t end = clock();
@@ -1125,7 +1125,7 @@ testMergedMapping(
     clock_t start = clock();
     for(int i = 0; i < TEST_ITERATIONS; i++) {
         // Map repeatedly
-        index.map(*ranges, TEST_READ);
+        index.mapRight(*ranges, TEST_READ);
     }
     // Stop the timer
     clock_t end = clock();
