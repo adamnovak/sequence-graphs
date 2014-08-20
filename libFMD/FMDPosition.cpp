@@ -56,12 +56,13 @@ int64_t FMDPosition::range(const GenericBitVector& ranges,
         
         // Find the first 1 at position >= our start. This holds (index, rank-1)
         // TODO: Convert to std::tie
-        CSA::pair_type firstOne = mask->valueAfter(forward_start);
+        std::pair<size_t, size_t> firstOne = mask->valueAfter(forward_start);
         // TODO: What if there is no such 1?
         
         // Find the last 1 at position <= our end. This holds (index, rank-1),
         // or (size, items) if no such 1 exists.
-        CSA::pair_type lastOne = mask->valueBefore(forward_start + end_offset);
+        std::pair<size_t, size_t> lastOne = mask->valueBefore(forward_start + 
+            end_offset);
         if(lastOne.first > forward_start + end_offset) {
             // We didn't find such a 1. There must be no 1 in our interval and
             // we are thus empty.
@@ -139,7 +140,7 @@ int64_t FMDPosition::ranges(const GenericBitVector& ranges,
         
             // Find the index and rank of the first 1 in the mask that's here or
             // beyond our current position.
-            CSA::pair_type nextPosition = mask->valueAfter(left);
+            std::pair<size_t, size_t> nextPosition = mask->valueAfter(left);
             
             if(nextPosition.first <= forward_start + end_offset) {
                 // This masked-in position is within us. We should count its
@@ -148,7 +149,7 @@ int64_t FMDPosition::ranges(const GenericBitVector& ranges,
                 
                 // Find the next 1 in the ranges vector after this masked-in
                 // position (exclusive), indicating the start of the next range.
-                CSA::pair_type nextRange = ranges.valueAfter(
+                std::pair<size_t, size_t> nextRange = ranges.valueAfter(
                     nextPosition.first + 1);
                     
                 // Look in or after that range for the next masked-in position.

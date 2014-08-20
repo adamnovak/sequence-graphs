@@ -14,7 +14,7 @@ DEPS=libsuffixtools libfmd
 
 # Specify all the libs to link with.
 LDLIBS += ../libFMD/libfmd.a ../libsuffixtools/libsuffixtools.a \
--lboost_filesystem -lboost_program_options -lpthread -lz -lboost_system
+-lboost_filesystem -lboost_program_options -lpthread -lz -lboost_system -lsdsl
 
 # We need to make sure all our dependency header files are where our other
 # dependency includes want them to be. We need to grab all the internal include

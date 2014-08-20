@@ -17,7 +17,8 @@ TEST_OBJS=Test/TestRunner.o Test/GenericBitVectorTests.o \
 DEPS=libsuffixtools
 
 # Specify all the libs to link with.
-LDLIBS += ../libsuffixtools/libsuffixtools.a -lboost_filesystem -lboost_system
+LDLIBS += ../libsuffixtools/libsuffixtools.a -lboost_filesystem -lboost_system \
+	-lsdsl
 
 LDFLAGS += -L../libsuffixtools
 

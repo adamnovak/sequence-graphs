@@ -4,6 +4,9 @@
 #include <cppunit/extensions/HelperMacros.h>
 #include <utility>
 
+#include "../GenericBitVector.hpp"
+#include "../BitVector.hpp"
+
 /**
  * Tests for GenericBitVector against BitVector.
  */
