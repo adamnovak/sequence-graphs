@@ -187,13 +187,12 @@ FMDIndex* FMDIndexBuilder::build() {
     Log::info() << "Creating " << numGenomes << " genome bitmasks..." <<
         std::endl;
     
-    // Holds a bit vector encoder for each genome. TODO: Make this a C++11
-    // vector with emplace_back to work around non-copy-constructability of
-    // encoders. TODO: Before that, make this pointers in a vector.
-    BitVectorEncoder** encoders = new BitVectorEncoder*[numGenomes];
+    // Holds a bit vector for each genome. TODO: Make this a C++11
+    // vector with emplace_back to work around non-copy-constructability.
+    GenericBitVector** encoders = new GenericBitVector*[numGenomes];
     for(size_t i = 0; i < numGenomes; i++) {
         // Make each of the individual encoders.
-        encoders[i] = new BitVectorEncoder(32);
+        encoders[i] = new GenericBitVector();
     }
     
    
@@ -224,11 +223,10 @@ FMDIndex* FMDIndexBuilder::build() {
         // Save all the bit vectors to the bitmask file.
         
         // Finish encoding to an actual BitVector
-        encoders[i]->flush();
-        BitVector bitVector(*encoders[i], suffixArray->getSize() + 1);
+        encoders[i]->finish(suffixArray->getSize() + 1);
         
         // Save the BitVector
-        bitVector.writeTo(bitmaskStream);
+        encoders[i]->writeTo(bitmaskStream);
         
         // All the bitvectors can go in the same file. When reading them just
         // see if there are any bytes left. TODO: This is probably true.

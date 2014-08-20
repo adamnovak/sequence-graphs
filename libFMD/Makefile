@@ -9,8 +9,9 @@ OBJS=FMDIndex.o FMDIndexBuilder.o util.o FMDIndexIterator.o Mapping.o \
 SWIG_OBJS=swigbindings_wrap.o
     
 # What do we need for our test runner binary?
-TEST_OBJS=Test/TestRunner.o Test/BWTTests.o Test/FMDIndexBuilderTests.o \
-    Test/FMDIndexTests.o Test/SmallSideTests.o
+TEST_OBJS=Test/TestRunner.o Test/GenericBitVectorTests.o \
+	Test/BWTTests.o Test/FMDIndexBuilderTests.o \
+	Test/FMDIndexTests.o Test/SmallSideTests.o
 
 # What projects do we depend on? We have rules for each of these.
 DEPS=libsuffixtools
@@ -24,7 +25,7 @@ LDFLAGS += -L../libsuffixtools
 # our libs need.
 TEST_LIBS = -lcppunit -lpthread -lz
 
-CXXFLAGS += -O3  -std=c++11 -fPIC -g -pg -I../deps -I../libsuffixtools
+CXXFLAGS += -O3 -std=c++11 -fPIC -g -pg -I../deps -I../libsuffixtools
 
 # What Java package should we put the SWIG bindings in? Also used as the Maven
 # groupID.
@@ -75,7 +76,8 @@ jar-install: libfmd.jar
 	swig -c++ -java -outdir java -package $(JAVA_PACKAGE) $(SIZE_FLAGS) $(VECTOR_FLAGS) $<
 
 clean:
-	rm -Rf $(TEST_OBJS) $(OBJS) testRunner libfmd.a libfmd.so libfmd.jar java/ jar/ *_wrap.cxx
+	rm -Rf $(TEST_OBJS) $(OBJS) $(SWIG_OBJS) testRunner libfmd.a libfmd.so \
+	libfmd.jar java/ jar/ *_wrap.cxx
 	
 test: check
 

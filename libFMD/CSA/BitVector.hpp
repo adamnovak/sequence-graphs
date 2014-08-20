@@ -97,7 +97,7 @@ class BitVector : public BitVectorBase
 
         static const size_t GAP_ENCODING = 0;
         static const size_t RUN_LENGTH_ENCODING = 1;
-
+        
       protected:
 
         void valueLoop(size_t value);
@@ -115,14 +115,10 @@ class BitVector : public BitVectorBase
         Iterator();
         Iterator(const Iterator&);
         Iterator& operator = (const Iterator&);
+        
     };
 
 //--------------------------------------------------------------------------
-  
-    /**
-     * We can move BitVectors in the ordinary way.
-     */
-    BitVector& operator = (BitVector&& other) = default;
   
   protected:
 

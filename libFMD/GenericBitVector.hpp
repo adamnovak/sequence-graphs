@@ -4,6 +4,7 @@
 #include <string>
 #include <fstream>
 #include <istream>
+#include <ostream>
 #include <utility>
 #include "BitVector.hpp"
 
@@ -44,10 +45,28 @@ public:
     ~GenericBitVector();
     
     /**
-     * Must be called on a bitvector not loaded from a file before using rank
-     * and select.
+     * Add a 1 bit at the given index. Must be called in increasing order.
+     * Cannot be run on a bitvector that has been loaded or finished.
      */
-    void finish();
+    void addBit(size_t index);
+    
+    /**
+     * Must be called on a bitvector not loaded from a file before using rank
+     * and select, or saving to a file. Takes the total length of the bitvector
+     * inclusing all trailing zeros.
+     */
+    void finish(size_t length);
+    
+    /**
+     * Save the BitVector to the given stream. It hust have already been
+     * finished.
+     */
+    void writeTo(std::ofstream& stream) const;
+    
+    /**
+     * Get the size of the bitvector in bits. Must have been finished first.
+     */
+    size_t getSize() const;
     
     /**
      * Get the number of 1s occurring before the given index. Must be thread-
@@ -86,7 +105,7 @@ public:
     
     /**
      * Given an indes, return the index of the last 1 at or before that
-     * position, paired with its rank.
+     * position, paired with its rank. Wraps around if no such value is found.
      */
     std::pair<size_t, size_t> valueBefore(size_t index) const;
     
