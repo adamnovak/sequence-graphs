@@ -133,9 +133,9 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
             rootDir=self.getLocalTempDir())
         
         # Put together the arguments to invoke
-        args = ["../createIndex/createIndex", "--context", "100", "--scheme", 
-            "greedy", "--alignment", c2h_filename, "--alignmentFasta", 
-            fasta_filename, index_dir] + self.fasta_list + self.extra_args
+        args = ["../createIndex/createIndex", "--scheme", "greedy", 
+            "--alignment", c2h_filename, "--alignmentFasta", fasta_filename, 
+            index_dir] + self.fasta_list + self.extra_args
             
         # Announce our command we're going to run
         self.logToMaster("Invoking {}".format(" ".join(args)))
@@ -314,7 +314,8 @@ class StructureAssessmentTarget(jobTree.scriptTree.target.Target):
             # Make a child to produce this reference structure, giving it a
             # 256-bit seed.
             self.addChildTarget(ReferenceStructureTarget(self.fasta_list,
-                random.getrandbits(256), stats_filename, maf_filename))
+                random.getrandbits(256), stats_filename, maf_filename, 
+                extra_args=["--coverage", "100"]))
         
         # We need a few different follow-on jobs.
         followOns = []

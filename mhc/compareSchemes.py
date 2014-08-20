@@ -76,7 +76,11 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         self.logToMaster("Starting SchemeAssessmentTarget")
         
         # We need a few different follow-on jobs.
-        followOns = []        
+        followOns = []    
+        
+        # We'll keep track of our random state so we can seed without messing up
+        # temp filenames.
+        random_state = None
         
         for mismatch, credit in itertools.product([False, True], repeat=2):
             # Decide if we want mismatches and credit for this run.
@@ -85,8 +89,8 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 mismatch, credit))
 
             # Prepare the extra args that we want to send to createIndex to tell
-            # it to use this scheme.
-            extra_args = []
+            # it to use this scheme. Start out just setting context length
+            extra_args = ["--context", "100"]
             # And give it a name to stick on our output files
             scheme = "Exact"
             if mismatch:
@@ -105,6 +109,11 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             # compare against the reference FASTA
             num_children = len(self.fasta_list) - 1
             
+            if random_state is not None:
+                # Pull out our unseeded random state so filenames on successive
+                # iterations don't conflict.
+                random.setstate(random_state)
+            
             # Make a temp file for each of the children with this scheme to
             # write coverage stats to.
             stats_filenames = [sonLib.bioio.getTempFile(
@@ -114,8 +123,12 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             maf_filenames = [sonLib.bioio.getTempFile(
                 rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
             
+            # Save the RNG state before clobbering it with the seed.
+            random_state = random.getstate()
+            
             # Seed the RNG after sonLib does whatever it wants with temp file
-            # names
+            # names. Each scheme will get runs with the same seeds, but that is
+            # probably OK.
             random.seed(self.seed)
             
             for i, other_fasta in enumerate(self.fasta_list[1:]):
