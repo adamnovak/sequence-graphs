@@ -76,7 +76,7 @@ void GenericBitVectorTests::testRank() {
     GenericBitVector* v = pair.first;
     BitVectorIterator* v2 = new BitVectorIterator(*pair.second);
     
-    for(size_t i = 0; i < 10; i++) {
+    for(size_t i = 0; i < 20; i++) {
         // Check a bunch of positions.
         Log::info() << "Position " << i << " ranks: " << v->rank(i) << 
             " vs. " << v2->rank(i) << std::endl;

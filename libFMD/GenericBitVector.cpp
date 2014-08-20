@@ -211,8 +211,8 @@ size_t GenericBitVector::rank(size_t index, bool atLeast) const {
         // Implement this mode ourselves so we can be certain of exactly what it
         // does.
         if(index == 0) {
-            // rank(-1) would be 0, but we can't express that with size_ts.
-            // So we onlu check if we are in range.
+            // Do the calculation below, simplifying out the rank(-1) call which
+            // would alwauys be 0 if we could actually run it.
             return (index < getSize());
         }
         // Get the rank of the previous position, then add 1 if this position
