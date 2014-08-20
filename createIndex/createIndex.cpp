@@ -1128,6 +1128,54 @@ testMergedMapping(
 }
 
 /**
+ * Take a pinch thread set and get the spectrum of adjacency component sizes.
+ * Size 2 components are things like SNPs and indels, while larger components
+ * are probably more complex structures.
+ */
+std::map<size_t, size_t>
+getAdjacencyComponentSpectrum(
+    stPinchThreadSet* threadSet
+) {
+    
+    Log::info() << "Making adjacency component spectrum..." << std::endl;
+
+
+    // Make an empty map to populate.
+    std::map<size_t, size_t> toReturn;
+    
+    // Get all the adjacency components.
+    stList* adjacencyComponents = stPinchThreadSet_getAdjacencyComponents(
+        threadSet);
+        
+    // Get an iterator over them
+    stListIterator* componentIterator = stList_getIterator(adjacencyComponents);
+    
+    // Grab the first component
+    stList* component = (stList*) stList_getNext(componentIterator);
+    
+    while(component != NULL) {
+        
+        // Get its size
+        size_t componentSize = stList_length(component);
+        
+        if(!toReturn.count(componentSize)) {
+            // This is the first component of this size we have found
+            toReturn[componentSize] = 1;
+        } else {
+            // We found another one
+            toReturn[componentSize]++;
+        }
+        
+        // Look at the next component
+        component = (stList*) stList_getNext(componentIterator);
+    }
+    
+    // Give back the map
+    return toReturn;
+    
+}
+
+/**
  * createIndex: command-line tool to create a multi-level reference structure.
  */
 int 
@@ -1302,8 +1350,8 @@ main(
         threadSet = mergeOverlap(index, options["context"].as<size_t>());
     } else if(mergeScheme == "greedy") {
         // Use the greedy merge instead.
-        threadSet = mergeGreedy(index, options["context"].as<size_t>(), creditBool, mapType,
-	    mismatchb, options["mismatches"].as<size_t>());
+        threadSet = mergeGreedy(index, options["context"].as<size_t>(), 
+            creditBool, mapType, mismatchb, options["mismatches"].as<size_t>());
     } else {
         // Complain that's not a real merge scheme. TODO: Can we make the
         // options parser parse an enum or something instead of this?
@@ -1352,8 +1400,21 @@ main(
     // Write it out, deleting the bit vector in the process
     saveLevelIndex(levelIndex, indexDirectory + "/level1");
     
+    // Now, while we still have the threadSet, we can work out how many
+    // adjacency components of each size there are. Adjacency components of size
+    // 2 are just SNPs or indels, while adjacency components of larger sizes are
+    // generally more complex rearrangements.
+    
+    for(auto kv : getAdjacencyComponentSpectrum(threadSet)) {
+        // We loop over component size, number of occurrences pairs in order.
+        Log::output() << "Spectrum: size " << kv.first << " count = " <<
+            kv.second << std::endl;
+    }
+    
     // Clean up the thread set
     stPinchThreadSet_destruct(threadSet);
+    
+    
     
     // Run the speed tests if we want to
     if(options.count("test")) {

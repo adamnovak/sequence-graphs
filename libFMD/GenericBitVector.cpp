@@ -195,6 +195,11 @@ size_t GenericBitVector::rank(size_t index) const {
 
 #ifdef BITVECTOR_SDSL
 size_t GenericBitVector::rank(size_t index) const {
+    if(index >= getSize()) {
+        // Get the total number of 1s in the bitvector
+        return rank(getSize() - 1) + isSet(getSize() - 1);
+    }
+    
     // Take the rank of a position (not in at_least mode). Correct for
     // disagreement over what rank is.
     return (*rankSupport)(index + 1);
