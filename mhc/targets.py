@@ -61,7 +61,7 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
     """
     
     def __init__(self, fasta_list, seed, coverage_filename, alignment_filename,
-        extra_args=[]):
+        spectrum_filename=None, extra_args=[]):
         """
         Make a new Target for building a reference structure from the given
         FASTAs, using the specified RNG seed, and writing coverage statistics to
@@ -73,6 +73,9 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         Those coverage statistics are, specifically, alignment coverage of a
         genome vs. the order number at which the genome is added, and they are
         saved in a <genome number>\t<coverage fraction> TSV.
+        
+        If spectrum_filename is specified, saves the adjacency component size
+        spectrum to the given file, as a TSV of <size>\t<count> lines.
         
         If extra_args is specified, it should be a list of additional command-
         line arguments to createIndex, for specifying things like inexact
@@ -96,6 +99,9 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         
         # And the alignemnt filename to use
         self.alignment_filename = alignment_filename
+        
+        # And the spectrum filename to use, if any
+        self.spactrum_filename = spectrum_filename
         
         # And the extra args
         self.extra_args = extra_args
@@ -136,6 +142,11 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         args = ["../createIndex/createIndex", "--scheme", "greedy", 
             "--alignment", c2h_filename, "--alignmentFasta", fasta_filename, 
             index_dir] + self.fasta_list + self.extra_args
+            
+        if spectrumFilename is not None:
+            # We want to keep the adjacency spectrum.
+            args.append("--spectrum")
+            args.append(spectrumFilename)
             
         # Announce our command we're going to run
         self.logToMaster("Invoking {}".format(" ".join(args)))

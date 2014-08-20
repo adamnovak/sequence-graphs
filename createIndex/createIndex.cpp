@@ -1176,6 +1176,29 @@ getAdjacencyComponentSpectrum(
 }
 
 /**
+ * Save an adjacency component spectrum to a file as a <size>\t<count> TSV.
+ */
+void
+writeAdjacencyComponentSpectrum(
+    std::map<size_t, size_t> spectrum,
+    std::string filename
+) {
+
+    Log::info() << "Saving adjacency component spectrum to " <<
+        filename << std::endl;
+
+    // Open up the file to write.
+    std::ofstream file(filename.c_str());
+    
+    for(auto kv : spectrum) {
+        file << kv.first << "\t" << kv.second << std::endl;
+    }    
+    
+    file.close();
+    
+}
+
+/**
  * createIndex: command-line tool to create a multi-level reference structure.
  */
 int 
@@ -1211,6 +1234,8 @@ main(
             "File in which to save FASTA records for building HAL from .c2h")
         ("degrees", boost::program_options::value<std::string>(), 
             "File in which to save degrees of pinch graph nodes")
+        ("spectrum", boost::program_options::value<std::string>(), 
+            "File in which to save graph adjacency component size spectrum")
         ("context", boost::program_options::value<size_t>()
             ->default_value(0), 
             "Minimum required context length to merge on")
@@ -1404,17 +1429,22 @@ main(
     // adjacency components of each size there are. Adjacency components of size
     // 2 are just SNPs or indels, while adjacency components of larger sizes are
     // generally more complex rearrangements.
+    auto spectrum = getAdjacencyComponentSpectrum(threadSet);
     
-    for(auto kv : getAdjacencyComponentSpectrum(threadSet)) {
+    // Clean up the thread set
+    stPinchThreadSet_destruct(threadSet);
+    
+    for(auto kv : spectrum) {
         // We loop over component size, number of occurrences pairs in order.
         Log::output() << "Spectrum: size " << kv.first << " count = " <<
             kv.second << std::endl;
     }
     
-    // Clean up the thread set
-    stPinchThreadSet_destruct(threadSet);
-    
-    
+    if(options.count("spectrum")) {
+        // Save a dump of pinch graph adjacency component sizes
+        writeAdjacencyComponentSpectrum(spectrum,
+            options["spectrum"].as<std::string>());
+    }
     
     // Run the speed tests if we want to
     if(options.count("test")) {

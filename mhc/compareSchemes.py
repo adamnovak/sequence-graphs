@@ -25,13 +25,14 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
     """
     
     def __init__(self, fasta_list, true_maf, seed, coverage_basename,
-        truth_basename):
+        spectrum_basename, truth_basename):
         """
         Make a new Target for building a several reference structures from the
         given FASTAs, and comparing against the given truth MAF, using the
         specified RNG seed, and writing coverage statistics to files with
-        specified base name, and a comparison against the true MAF to files with
-        the other other specified base name.
+        specified coverage base name, a set of adjacency component size spectra
+        to files with the specified spectrum basename, and a comparison against
+        the true MAF to files named after the truth_basename.
         
         The coverage statistics are just alignment coverage for each pair of
         genomes, in <genome number>\t<coverage fraction> TSVs per scheme.
@@ -56,6 +57,11 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         
         # Save the concatenated coverage stats file name to use
         self.coverage_basename = coverage_basename
+        
+        # And the concatenated frequency spectrum basename.
+        # TODO: reduce or sum instead of concatenating?
+        # TODO: just use an output directory and dump in it.
+        self.spectrum_basename = spectrum_basename
         
         # Save the filename of a MAF to compare all our MAFs against (or None)
         self.true_maf = true_maf
@@ -122,6 +128,11 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             # And another one to hold each child's MAF alignment
             maf_filenames = [sonLib.bioio.getTempFile(
                 rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
+                
+            # And another one to hold each child's adjacency component size
+            # spectrum
+            spectrum_filenames = [sonLib.bioio.getTempFile(
+                rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
             
             # Save the RNG state before clobbering it with the seed.
             random_state = random.getstate()
@@ -134,17 +145,20 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             for i, other_fasta in enumerate(self.fasta_list[1:]):
                 # For each other FASTA to compare against
                 
-                # Pull out the start and MAF files that this child should
-                # output.
+                # Pull out the files that this child should output.
                 stats_filename = stats_filenames[i]
                 maf_filename = maf_filenames[i]
+                spectrum_filename = spectrum_filenames[i]
+                
                 
                 # Make a child to produce those, giving it a seed. Make sure to
                 # give it only two FASTAs, reference first, so that when it
-                # shuffles the non-reference ones it doesn't do anything.
+                # shuffles the non-reference ones it doesn't do anything. Also
+                # make sure to tell it to use the spectrum output file.
                 self.addChildTarget(ReferenceStructureTarget(
                     [reference_fasta, other_fasta], random.getrandbits(256), 
-                    stats_filename, maf_filename, extra_args=extra_args))
+                    stats_filename, maf_filename,
+                    spectrum_filename=spectrum_filename, extra_args=extra_args))
         
         
                 
@@ -152,6 +166,11 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             # produce our coverage output file for this scheme.
             followOns.append(ConcatenateTarget(stats_filenames, 
                 self.coverage_basename + "." + scheme))
+                
+            # Make a follow-on job to merge all the child spectrum outputs and
+            # produce our spectrum output file for this scheme.
+            followOns.append(ConcatenateTarget(stats_filenames, 
+                self.spectrum_basename + "." + scheme))
             
             if self.true_maf is not None:
                 # We also need another target for comparing all these MAFs
@@ -187,6 +206,8 @@ def parse_args(args):
     # General options
     parser.add_argument("coverageBasename", 
         help="filename prefix to save the coverage stats output to")
+    parser.add_argument("spectrumBasename", 
+        help="filename prefix to save the adjacency component sizes to")
     parser.add_argument("fastas", nargs="+",
         help="FASTA files to index")
     parser.add_argument("--seed", default=random.getrandbits(256),
@@ -230,7 +251,7 @@ def main(args):
     # Make a stack of jobs to run
     stack = jobTree.scriptTree.stack.Stack(SchemeAssessmentTarget(
         options.fastas, options.trueMaf, options.seed, options.coverageBasename, 
-        options.truthBasename))
+        options.spectrumBasename, options.truthBasename))
     
     print "Starting stack"
     
