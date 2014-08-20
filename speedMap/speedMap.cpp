@@ -218,6 +218,10 @@ int main(int argc, char** argv) {
     // Stop the timer
     delete timer;
     
+    // Keep some simple mapping stats
+    size_t mapped = 0;
+    size_t unmapped = 0;
+    
     for(size_t i = 0; i < oldMappings.size(); i++) {
         // Check the answers to make sure they match and they did the same work.
         if(oldMappings[i].size() != newMappings[i].size()) {
@@ -233,9 +237,18 @@ int main(int argc, char** argv) {
                 Log::error() << "Mapping mismatch: " << oldMappings[i][j] << 
                     " vs. " << newMappings[i][j] << std::endl;
             }
+            
+            if(oldMappings[i][j].is_mapped) {
+                mapped++;
+            } else {
+                unmapped++;
+            }
         }
         
     }
+    
+    Log::info() << mapped << " total mapped, " << unmapped << 
+        " total unmapped" << std::endl;
     
 }
     
