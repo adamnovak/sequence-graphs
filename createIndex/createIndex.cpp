@@ -21,9 +21,8 @@
 
 // Grab all the libFMD stuff.
 #include <FMDIndexBuilder.hpp>
-#include <BitVector.hpp>
+#include <GenericBitVector.hpp>
 #include <FMDIndexIterator.hpp>
-#include <BitVector.hpp>
 #include <TextPosition.hpp>
 #include <util.hpp>
 #include <Mapping.hpp>
@@ -766,28 +765,25 @@ writeAlignmentFasta(
  * If a mask bit vector is specified, only positions which have a 1 in the mask
  * will be able to break up ranges.
  *
- * Returns a BitVector marking each such range with a 1 at the start, and a
- * vector of canonicalized positions. Each anonicalized position is a contig
+ * Returns a GenericBitVector marking each such range with a 1 at the start, and
+ * a vector of canonicalized positions. Each anonicalized position is a contig
  * number, a base number, and a face flag.
  *
  * All BWT positions must be represented in the pinch set.
  *
  * Scans through the entire BWT.
  */
-std::pair<BitVector*, std::vector<std::pair<std::pair<size_t, size_t>, bool> > > 
+std::pair<GenericBitVector*, 
+    std::vector<std::pair<std::pair<size_t, size_t>, bool>>> 
 identifyMergedRuns(
     stPinchThreadSet* threadSet, 
     const FMDIndex& index,
-    const BitVector* mask = NULL
+    const GenericBitVector* mask = NULL
 ) {
-    
-    // We need an iterator over the mask, if applicable.
-    BitVectorIterator* maskIterator = (mask != NULL ? 
-        new BitVectorIterator(*mask) : NULL);
     
     // We need to make bit vector denoting ranges, which we encode with this
     // encoder, which has 32 byte blocks.
-    BitVectorEncoder encoder(32);
+    GenericBitVector* encoder = new GenericBitVector();
     
     // We also need to make a vector of canonical positions.
     std::vector<std::pair<std::pair<size_t, size_t>, bool> > mappings;
@@ -811,7 +807,7 @@ identifyMergedRuns(
         // Note: stop characters aren't at the front in the last column, only
         // the first.
         
-        if(maskIterator != NULL && !maskIterator->isSet(j)) {
+        if(mask != NULL && !mask->isSet(j)) {
             // This position is masked out. We don't allow it to break up
             // ranges, so no range needs to start here. Skip it and pretend it
             // doesn't exist.
@@ -839,7 +835,7 @@ identifyMergedRuns(
                 // 0 (and match up with mapping 0), and it's OK not to split it
                 // off from the stop characters since they can't ever be
                 // searched.
-                encoder.addBit(j);
+                encoder->addBit(j);
                 Log::debug() << "Set bit " << j << std::endl;
             }
             
@@ -852,21 +848,14 @@ identifyMergedRuns(
     }
             
     // Set a bit after the end of the last range (i.e. at the end of the BWT).
-    encoder.addBit(index.getBWTLength());
+    encoder->addBit(index.getBWTLength());
     
-    // Finish the vector encoder into a vector of the right length, leaving room
-    // for that trailing bit. Make sure to flush first.
-    encoder.flush();
-    BitVector* bitVector = new BitVector(encoder,
-        index.getBWTLength() + 1);
-    
-    // If we made a mask iterator, get rid of it.
-    if(maskIterator != NULL) {
-        delete maskIterator;
-    }
+    // Finish the vector at the right length, leaving room for that trailing
+    // bit.
+    encoder->finish(index.getBWTLength() + 1);
     
     // Return the bit vector and the canonicalized base vector
-    return std::make_pair(bitVector, mappings);
+    return std::make_pair(encoder, mappings);
 }
 
 /**
@@ -880,7 +869,7 @@ identifyMergedRuns(
  *
  * Don't forget to delete the bit vector when done!
  */
-std::pair<BitVector*, std::vector<SmallSide> > 
+std::pair<GenericBitVector*, std::vector<SmallSide> > 
 makeLevelIndexScanning(
     stPinchThreadSet* threadSet, 
     const FMDIndex& index, 
@@ -940,7 +929,7 @@ makeLevelIndexScanning(
  * index, so it can be reused.
  */
 void saveLevelIndex(
-    std::pair<BitVector*, std::vector<SmallSide> > levelIndex,
+    std::pair<GenericBitVector*, std::vector<SmallSide> > levelIndex,
     std::string directory
 ) {
     
@@ -1002,7 +991,7 @@ mergeGreedy(
     
     // Keep around a bit vector of all the positions that are in. This will
     // start with the very first genome, which we know exists.
-    const BitVector* includedPositions = &index.getGenomeMask(0);
+    const GenericBitVector* includedPositions = &index.getGenomeMask(0);
     
     // Canonicalize everything, yielding a bitvector (pointer) of ranges and a
     // vector of canonicalized positions.
@@ -1058,11 +1047,11 @@ mergeGreedy(
         
         // Merge the new genome into includedPositions, replacing the old
         // bitvector.
-        BitVector* newIncludedPositions = includedPositions->createUnion(
+        GenericBitVector* newIncludedPositions = includedPositions->createUnion(
             index.getGenomeMask(genome));
         if(genome > 1) {
-            // If we already alocated a new BitVector that wasn't the one that
-            // came when we loaded in the genomes, we need to delete it.
+            // If we already alocated a new GenericBitVector that wasn't the one
+            // that came when we loaded in the genomes, we need to delete it.
             delete includedPositions;
         }
         includedPositions = newIncludedPositions;
@@ -1080,8 +1069,8 @@ mergeGreedy(
     delete mergedRuns.first;
     
     if(index.getNumberOfGenomes() > 1) {
-        // And, if we had to make any additional included position BitVectors,
-        // get the last one of those too.
+        // And, if we had to make any additional included position
+        // GenericBitVectors, get the last one of those too.
         delete includedPositions;
     }
     
@@ -1119,7 +1108,7 @@ testBottomMapping(
  */
 void
 testMergedMapping(
-    const FMDIndex& index, const BitVector* ranges
+    const FMDIndex& index, const GenericBitVector* ranges
 ) {
     // Start the timer
     clock_t start = clock();
@@ -1350,7 +1339,7 @@ main(
     IDSource<long long int> source(index.getTotalLength());
     
     // This will hold the computed level index of the merged level.
-    std::pair<BitVector*, std::vector<SmallSide> > levelIndex;
+    std::pair<GenericBitVector*, std::vector<SmallSide> > levelIndex;
     
     // We also want to time the merged level index building code
     Timer* levelIndexTimer = new Timer("Level Index Construction");

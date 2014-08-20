@@ -8,9 +8,9 @@
 
 
 MappingMergeScheme::MappingMergeScheme(const FMDIndex& index, 
-    const BitVector& rangeVector, 
+    const GenericBitVector& rangeVector, 
     const std::vector<std::pair<std::pair<size_t, size_t>, bool> >& rangeBases, 
-    const BitVector& includedPositions, size_t genome, size_t minContext, 
+    const GenericBitVector& includedPositions, size_t genome, size_t minContext, 
     bool credit, std::string mapType, bool mismatch, size_t z_max) :
     MergeScheme(index), threads(), queue(NULL), rangeVector(rangeVector), 
     rangeBases(rangeBases), includedPositions(includedPositions), 
@@ -257,7 +257,7 @@ void MappingMergeScheme::CgenerateSomeMerges(size_t queryContig) const {
     
     // How many positions are available to map to?
     Log::info() << taskName << " mapping " << contig.size() << 
-        " bases via " << BitVectorIterator(includedPositions).rank(
+        " bases via " << includedPositions.rank(
         includedPositions.getSize()) << " bottom-level positions" << std::endl;
         
     std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> Mappings;
@@ -606,7 +606,7 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
     
     // How many positions are available to map to?
     Log::info() << taskName << " mapping " << contig.size() << 
-        " bases via " << BitVectorIterator(includedPositions).rank(
+        " bases via " << includedPositions.rank(
         includedPositions.getSize()) << " bottom-level positions" << 
         std::endl;
     

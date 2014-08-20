@@ -114,6 +114,9 @@ void GenericBitVectorTests::testValueBefore() {
         // Check a bunch of positions.
         auto ourResult = v->valueBefore(i);
         auto theirResult = v2->valueBefore(i);
+        Log::debug() << "Position " << i << ": " << ourResult.first << ", " <<
+            ourResult.second << " vs. " << theirResult.first << ", " << 
+            theirResult.second << std::endl;
         CPPUNIT_ASSERT(ourResult == theirResult);
     }
     
@@ -131,7 +134,7 @@ void GenericBitVectorTests::testValueAfter() {
         // Check a bunch of positions.
         auto ourResult = v->valueAfter(i);
         auto theirResult = v2->valueAfter(i);
-        Log::info() << "Position " << i << ": " << ourResult.first << ", " <<
+        Log::debug() << "Position " << i << ": " << ourResult.first << ", " <<
             ourResult.second << " vs. " << theirResult.first << ", " << 
             theirResult.second << std::endl;
         CPPUNIT_ASSERT(ourResult == theirResult);
