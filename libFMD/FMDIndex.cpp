@@ -604,6 +604,66 @@ void FMDIndex::retractRightOnly(FMDPosition& range,
     }
 }
 
+size_t FMDIndex::retractRightOnly(FMDPosition& range) const {
+    
+    // Retract on the right in place. Can only extend left afterwards, since we
+    // use the forward range and ignore the reverse range.
+    
+    // Goes all the way to the parent suffix tree node.
+    
+    // Get the bounds of our range in the LCP: Where our range starts, and 1
+    // after it ends. (So 0 and 1 for a 1-element thing at 0).
+    // The end offset is 0 for a 1-element range, so we fix it up.
+    size_t rangeStart = range.getForwardStart();
+    size_t rangeEnd = range.getForwardStart() + range.getEndOffset() + 1;
+    
+    Log::trace() << "Retracting from [" << rangeStart << ", " << rangeEnd << 
+        ")" << std::endl;
+    
+    // rangeEnd may be actually past the end of the LCP array now. That is OK,
+    // we just get 0 and an LCP NSV of the same position in that case.
+        
+    // Get the LCP value at each end
+    size_t startLCP = getLCP(rangeStart);
+    // Don't try looking off the end. Fill in an imaginary 0 to bound the root.
+    size_t endLCP = rangeEnd < getBWTLength() ? getLCP(rangeEnd) : 0;
+    
+    // Figure out which end has the greater value, and what that value is, and
+    // where in the LCP that value is. Default to using the start in ties,
+    // because the start will always be at a real location, while the end can be
+    // past the end of the LCP array.
+    bool useStart = startLCP >= endLCP;
+    size_t lcp = useStart ? startLCP : endLCP;
+    size_t lcpIndex = useStart ? rangeStart : rangeEnd;
+    
+    // Now lcpIndex is guaranteed to be a real index in the LCP array, not off
+    // the end.
+    
+    Log::trace() << "Parent node string depth: " << lcp << " at " << lcpIndex <<
+        std::endl;
+    
+    // The larger LCP value cuts down to the string depth of the parent.
+    
+    // Go to the parent.
+   
+    // We'll update rangeStart and rangeEnd to the LCP array indices that
+    // cut out the parent.
+    rangeStart = getLCPPSV(lcpIndex);
+    // Note that rangeEnd can be off the end of the LCP array now, if we
+    // have moved up to the root node.
+    rangeEnd = getLCPNSV(lcpIndex);
+    
+    // Update the Range object to describe this range, converting end
+    // indices around. The range will never be empty so we don't have to
+    // worry about negative end offsets.
+    range.setForwardStart(rangeStart);
+    range.setEndOffset(rangeEnd - rangeStart - 1);
+    
+    // Returnj the new pattern length (i.e. string depth)
+    return lcp;
+    
+}
+
 FMDPosition FMDIndex::count(std::string pattern) const {
     if(pattern.size() == 0) {
         // We match everything! Say the whole range of the BWT.
@@ -616,7 +676,7 @@ FMDPosition FMDIndex::count(std::string pattern) const {
     
     for(int i = pattern.size() - 2; !position.isEmpty() && i >= 0; i--) {
         // Extend backwards with each character
-        position = extend(position, pattern[i], true);
+        extendFast(position, pattern[i], true);
     }
     
     // We either ran out of matching locations or finished the pattern.
@@ -931,11 +991,8 @@ std::vector<Mapping> FMDIndex::mapRight(const std::string& query,
                     "Is a character not present in the index/genome?");
             }            
                         
-            // Retract on the right. TODO: Integrate more deeply with
-            // retractRightOnly because we will only ever want to retract to
-            // points where we get more results.
-            retractRightOnly(search, patternLength - 1);
-            patternLength--;
+            // Retract on the right until we have more results.
+            patternLength = retractRightOnly(search);
             
             Log::debug() << "Retracted to length " << patternLength <<
                 std::endl;
@@ -1769,6 +1826,7 @@ MisMatchAttemptResults FMDIndex::misMatchExtend(MisMatchAttemptResults& prevMisM
     if(c == '\0') {
         throw std::runtime_error("Can't extend with null byte!");
     }
+
 
     if(!isBase(c)) {
         std::string errorMessage = std::string("Character #");

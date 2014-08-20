@@ -185,6 +185,13 @@ public:
     void retractRightOnly(FMDPosition& range, size_t newPatternLength) const;
     
     /**
+     * Retract on the right to the parent suffix tree node. Returns the new
+     * pattern length represented by the search query. Guaranteed to produce
+     * more results, unless you are at the root already.
+     */
+    size_t retractRightOnly(FMDPosition& range) const;
+    
+    /**
      * Select all the occurrences of the given pattern, using FMD backwards
      * search.
      */
@@ -333,8 +340,9 @@ public:
     /**
      * Exact left-map without ranges.
      */
-    std::vector<Mapping> map(const std::string& query, const BitVector* mask, 
-        int minContext, int start = 0, int length = -1) const; 
+    std::vector<Mapping> map(const std::string& query, 
+        const BitVector* mask = NULL, int minContext = 0, int start = 0, 
+        int length = -1) const; 
 
 	/**
      * Exact left-map with ranges ranges by original restart-based algorithm.
@@ -548,6 +556,7 @@ protected:
     LCPArray lcpArray;
     
     /**
+<<<<<<< HEAD
      * Try left-mapping the given index in the given string, starting from
      * scratch. Start a backwards search at that index in the string and extend
      * left until we map to exactly one or zero places. Returns true or false
@@ -598,6 +607,8 @@ protected:
         BitVectorIterator* mask = NULL) const;
 	
     /**
+=======
+>>>>>>> 699f007ada4a3f94f7914e3c3c801753dbb4b9c2
      * Given a left mapping and a right mapping for a base, disambiguate them to
      * produce one mapping. Things that consistently left and right-mapped to a
      * forward strand will be on an even text.

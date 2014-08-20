@@ -1,9 +1,12 @@
-all: createIndex
+all: createIndex speedMap
 
-.PHONY: createIndex scala libFMD libFMD-jar libsuffixtools
+.PHONY: libsuffixtools libFMD libFMD-jar createIndex speedMap scala
 
 scala: libFMD-jar
 	sbt stage
+
+speedMap:
+	$(MAKE) -C speedMap
 
 createIndex:
 	$(MAKE) -C createIndex

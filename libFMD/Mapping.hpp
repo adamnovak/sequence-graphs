@@ -22,6 +22,11 @@ public:
      */
     bool operator==(const Mapping& other) const;
     
+    /**
+     * Also provide inequality.
+     */
+    bool operator!=(const Mapping& other) const;
+    
     // Holds (text, offset)
     TextPosition location;
     bool is_mapped;

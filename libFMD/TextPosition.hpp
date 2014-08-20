@@ -56,6 +56,13 @@ public:
         return getText() == other.getText() && getOffset() == other.getOffset();
     }
     
+    /**
+     * Provide inequality comparison for testing.
+     */
+    inline bool operator!=(const TextPosition& other) const {
+        return !(*this == other);
+    }
+    
 protected:
     // The text that the position is on.
     size_t text;
