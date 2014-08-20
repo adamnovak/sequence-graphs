@@ -88,12 +88,12 @@ ConcurrentQueue<Merge>& MappingMergeScheme::run() {
         
         if(mapType == "LRexact") {
             Log::info() << "Using Left-Right exact contexts" << std::endl;
-            threads.push_back(std::thread(&MappingMergeScheme::generateMerges,
+            threads.push_back(Thread(&MappingMergeScheme::generateMerges,
                 this, contigsToMerge));
             
         } else if(mapType == "centered") {
             Log::info() << "Using centered contexts" << std::endl;
-            threads.push_back(std::thread(&MappingMergeScheme::CgenerateMerges,
+            threads.push_back(Thread(&MappingMergeScheme::CgenerateMerges,
                 this, contigsToMerge));
             
         } else {
@@ -111,7 +111,7 @@ ConcurrentQueue<Merge>& MappingMergeScheme::run() {
 
 void MappingMergeScheme::join() {
 
-    for(std::vector<std::thread>::iterator i = threads.begin(); 
+    for(auto i = threads.begin(); 
         i != threads.end(); ++i) {
     
         // Join each thread.

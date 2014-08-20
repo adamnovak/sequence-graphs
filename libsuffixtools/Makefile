@@ -104,3 +104,10 @@ testRunner: $(TEST_OBJS) libsuffixtools.a
 	
 clean:
 	rm -f *.a *.so *.o */*.o testRunner
+	
+# We can automagically get header dependencies.
+dependencies.mk: *.cpp *.h Thirdparty/*.C Thirdparty/*.c Thirdparty/*.h Test/*.cpp Test/*.h
+	g++ $(CXXFLAGS) -MM *.cpp Thirdparty/*.C Thirdparty/*.c Test/*.cpp > dependencies.mk
+	
+# Include auto-generated dependencies.
+include dependencies.mk

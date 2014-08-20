@@ -8,6 +8,8 @@
 #include <ReadTable.h>
 #include <SuffixArray.h>
 
+#include "Log.hpp"
+
 /**
  * Defines an array suitable for holding Longest Common Prefix information
  * between successive suffixes in a suffix array or FMD-index. Allows efficient
@@ -68,10 +70,16 @@ protected:
 
     /**
      * Get the character at the given offset into the given suffix in the given
-     * collection of strings.
+     * collection of strings. Returns the end-of-text character $ when
+     * appropriate.
      */
     static inline char getFromSuffix(const SAElem& suffix, size_t offset,
         const ReadTable& strings) {
+    
+        if(strings.getReadLength(suffix.getID()) == suffix.getPos() + offset) {
+            // This is the end of the suffix.
+            return '$';
+        }
     
         // Split out the text and offset from the suffix, and offset the offset.
         return strings.getChar(suffix.getID(), suffix.getPos() + offset);    
@@ -88,7 +96,7 @@ protected:
         return strings.getReadLength(suffix.getID()) - suffix.getPos();
         
     }
-
+    
     // Store all the LCP array entries.
     std::vector<size_t> values;
     

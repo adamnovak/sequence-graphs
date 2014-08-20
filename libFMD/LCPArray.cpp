@@ -16,50 +16,93 @@ LCPArray::LCPArray(const SuffixArray& suffixArray, const ReadTable& strings): va
         // Just have a 0-length LCP if there are absolutely no suffixes.
         return;    
     }
+    
+    // We shall use the algorithm of Kasai et al. 2001: "Linear-Time Longest-
+    // Common-Prefix Computation in Suffx Arrays and Its Applications"
+    // See <http://www.cs.iastate.edu/~cs548/references/linear_lcp.pdf>
+    
+    // Make the LCP big enough to hold everything.
+    values.resize(suffixArray.getSize());
+    
+    // We need to iterate through suffix array positions in order by text
+    // position. We make a map from SAElem to rank, exploiting the fact that
+    // std::map is sorted. But we need to tell it a better sort order.
+    std::map<SAElem, size_t, std::greater<SAElem>> ranks;
+    
+    Log::info() << "Calculating ranks" << std::endl;
+    
+    for(size_t i = 0; i < suffixArray.getSize(); i++) {
+        // Fill in all the ranks
+        ranks[suffixArray.get(i)] = i;
+    }
+    
+    Log::info() << "Applying Kasai's Algorithm" << std::endl;
+    
+    // The algorithm keeps this state as it goes through suffixes in rank order.
+    size_t height = 0;
+    
+    for(auto entry : ranks) {
+        // Go through all the element, rank pairs. Entry is a pair of a SAElem
+        // and its rank.
+        
+        // Grab the suffix as a local.
+        SAElem currentSuffix = entry.first;
+        
+        Log::trace() << currentSuffix << " at rank " << entry.second <<
+            std::endl;
+        
+        if(entry.second == 0) {
+            // Skip the very first because it has no predecessor
+            values[entry.second] = 0;
+            continue;
+        }
+        
+        // Get the suffix before this one
+        SAElem prevSuffix = suffixArray.get(entry.second - 1);
+        
+        Log::debug() << "LCP of " << currentSuffix << " @ " << entry.second << 
+            " and " << prevSuffix <<  " @ " << entry.second - 1 << " is: " <<
+            std::endl;
+        
+        Log::trace() << getFromSuffix(currentSuffix, 0, strings) << 
+            " vs. " << getFromSuffix(prevSuffix, 0, strings) << std::endl;
+        
+        while(getFromSuffix(currentSuffix, height, strings) == 
+            getFromSuffix(prevSuffix, height, strings) && 
+            getFromSuffix(prevSuffix, height, strings) != '$') {
+            
+            // While this suffix and the previous one match, keep scanning. We
+            // automatically define end-of-text characters to be distinct for
+            // each text, and since you can't have the same suffix of *the same
+            // text* twice, we can just say they never match anything.
 
-    // We need to scan the suffix array and fill in the values vector.
-    
-    // The first value is always 0. Nothing is shared with the before-the-
-    // beginning suffix. But this position (0) is also used as the "no previous
-    // smaller value available" position.
-    values.push_back(0);
-    
-    // This holds the last suffix that we need to compare the next one to.
-    SAElem last = suffixArray.get(0);
-    
-    for(size_t i = 1; i < suffixArray.getSize(); i++) {
-        // For each subsequent suffix
-        
-        SAElem next = suffixArray.get(i);
-        
-        Log::trace() << "Suffix " << next << " length " << 
-            getSuffixLength(next, strings) << " vs. " << last << " length " << 
-            getSuffixLength(last, strings) << std::endl;
-        
-        // lcp will hold the longest common prefix for this pair.
-        size_t lcp;
-        for(lcp = 0; lcp < getSuffixLength(last, strings) && 
-            lcp < getSuffixLength(next, strings); lcp++) {
+            // Advance the height by 1 since we matched.
+            height++;
             
-            // For every character that the two suffixes have
-            
-            Log::trace() << "Char " << getFromSuffix(next, lcp, strings) << 
-                " vs. " << getFromSuffix(last, lcp, strings) << std::endl;
-            
-            if(getFromSuffix(last, lcp, strings) != 
-                getFromSuffix(next, lcp, strings)) {
-                // They don't match here, so end the longest common prefix.
-                break;
-            }
+            Log::trace() << getFromSuffix(currentSuffix, height, strings) << 
+                " vs. " << getFromSuffix(prevSuffix, height, strings) << 
+                std::endl;
             
         }
         
-        // Now save that prefix length
-        values.push_back(lcp);
+        // Store the LCP value
+        values[entry.second] = height;
         
-        // Now advance to the next suffix.
-        last = next;
+        Log::debug() << "LCP[" << entry.second << "]=" << height << std::endl;
+        
+        if(height > 0) {
+            // If height isn't 0, dial it back. Not really sure how that
+            // balances out, but they proved this would work with math (despite
+            // mixing up their variables), so it ought to work in practice.
+            height--;
+        }
+        
     }
+    
+    // Now we should have calculated the whole LCP. Reclaim some memory.
+    ranks.clear(); 
+    
+    Log::info() << "Scanning for PSVs" << std::endl;
     
     // OK, now we need to construct the PSV/NSV indexes. The easiest way is with
     // scans.
@@ -86,6 +129,8 @@ LCPArray::LCPArray(const SuffixArray& suffixArray, const ReadTable& strings): va
     }
     
     // TODO: Just 1 scan?
+    
+    Log::info() << "Scanning for NSVs" << std::endl;
     
     // Now the same for the NSV
     for(size_t i = 0; i < values.size(); i++) {
@@ -156,12 +201,3 @@ void LCPArray::save(const std::string& filename) const {
     file.close();
     
 }
-
-
-
-
-
-
-
-
-

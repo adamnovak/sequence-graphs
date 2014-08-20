@@ -55,7 +55,7 @@ ConcurrentQueue<Merge>& OverlapMergeScheme::run() {
             
             // Otherwise, for each pair of genomes in each order, start a thread
             // to map the one to the other.
-            threads.push_back(std::thread(&OverlapMergeScheme::generateMerges,
+            threads.push_back(Thread(&OverlapMergeScheme::generateMerges,
                 this, i, j));
         }
     }
@@ -67,7 +67,7 @@ ConcurrentQueue<Merge>& OverlapMergeScheme::run() {
 
 void OverlapMergeScheme::join() {
 
-    for(std::vector<std::thread>::iterator i = threads.begin(); 
+    for(auto i = threads.begin(); 
         i != threads.end(); ++i) {
     
         // Join each thread.

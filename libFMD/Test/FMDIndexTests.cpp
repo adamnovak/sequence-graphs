@@ -140,7 +140,7 @@ void FMDIndexTests::testDump() {
     
         std::cout << i << ": " << index->displayFirst(i) << " " << 
             forwardReconstruction << " " << index->display(i) << " " << 
-            index->isInGenome(i, 0) << std::endl;
+            index->isInGenome(i, 0) << " " << index->getLCP(i) << std::endl;
     }
     
 }
@@ -389,6 +389,68 @@ void FMDIndexTests::testContextLimit() {
         // Make sure no base maps this way either.
         CPPUNIT_ASSERT(mappings[i].is_mapped == false);
     }
+}
+
+/**
+ * Make sure the LCP array is not lying.
+ */
+void FMDIndexTests::testLCP() {
+
+    // Save the previous reconstructed string at every step.
+    std::string lastReconstruction;
+
+    for(size_t i = 0; i < index->getBWTLength(); i++) {
+        // Look at each LCP entry
+        size_t lcp = index->getLCP(i);
+        
+        // Reconstruct the string.
+        std::string reconstruction;
+
+        // Start at the last character of this row in the BWT.
+        int64_t curIndex = i;
+        
+        do {
+            // Put the current character on the reconstruction.
+            reconstruction.push_back(index->display(curIndex));
+            
+            // Go to the previous character in the BWT row.
+            curIndex = index->getLF(curIndex);
+        } while(curIndex != i);      
+    
+        // Flip the string around forwards. See
+        // <http://www.cplusplus.com/forum/beginner/11633/>
+        std::string forwardReconstruction(reconstruction.rbegin(),
+            reconstruction.rend());
+            
+        
+        if(i == 0) {
+            // First entry must always be 0
+            CPPUNIT_ASSERT(lcp == 0);
+        } else {
+            // This reconstruction has to mismatch the last one at the
+            // appropriate index.
+            
+            size_t measuredLCP = 0;
+            
+            while(lastReconstruction[measuredLCP] == 
+                forwardReconstruction[measuredLCP] && 
+                lastReconstruction[measuredLCP] != '$') {
+                
+                // While they are characters that can match ("$" never matches
+                // another string's "$")...
+                measuredLCP++;
+            }
+            
+            // Make sure they got what we got.
+            CPPUNIT_ASSERT(measuredLCP == lcp);
+            
+        }
+        
+        // Save the reconstruction for the next test
+        lastReconstruction = forwardReconstruction;
+        
+    }
+    
 }
 
 /**
