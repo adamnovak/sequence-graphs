@@ -123,7 +123,7 @@ class StringReferenceStructure(index: FMDIndex) extends ReferenceStructure {
             case Face.LEFT =>
                 // Get the MappingVector for mapping to all genomes with the
                 // given minimum context.
-                val mappings = getIndex.map(pattern, -1, minContext)
+                val mappings = getIndex.mapLeft(pattern, -1, minContext)
                 
                 // Make an ArrayBuffer of all the mappings, to which we can
                 // efficiently append
@@ -299,7 +299,8 @@ class MergedReferenceStructure(index: FMDIndex, directory: String)
                 
                 // Map to range numbers, or -1 for no mapping. This comes as a
                 // SWIG- wrapped IntVector. Make sure to map to genome -1.
-                val ranges = getIndex.map(rangeVector, pattern, -1, minContext)
+                val ranges = getIndex.mapRight(rangeVector, pattern, -1,
+                    minContext)
                 
                 // Make an ArrayBuilder of all the mappings (which are Longs).
                 // We use an ArrayBuilder instead of an ArrayBuffer since it's
