@@ -101,7 +101,7 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         self.alignment_filename = alignment_filename
         
         # And the spectrum filename to use, if any
-        self.spactrum_filename = spectrum_filename
+        self.spectrum_filename = spectrum_filename
         
         # And the extra args
         self.extra_args = extra_args
@@ -143,10 +143,10 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
             "--alignment", c2h_filename, "--alignmentFasta", fasta_filename, 
             index_dir] + self.fasta_list + self.extra_args
             
-        if spectrumFilename is not None:
+        if self.spectrum_filename is not None:
             # We want to keep the adjacency spectrum.
             args.append("--spectrum")
-            args.append(spectrumFilename)
+            args.append(self.spectrum_filename)
             
         # Announce our command we're going to run
         self.logToMaster("Invoking {}".format(" ".join(args)))
