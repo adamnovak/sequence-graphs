@@ -55,10 +55,67 @@ public:
     ~GenericBitVector();
     
     /**
+     * Get the size of the bitvector in bits. Must have been finished first.
+     */
+    #ifdef BITVECTOR_CSA
+    inline size_t getSize() const {
+        return size;
+    }
+    #endif
+
+    #ifdef BITVECTOR_SDSL
+    inline size_t getSize() const {
+        return bitvector.size();
+    }
+    #endif
+    
+    /**
      * Add a 1 bit at the given index. Must be called in increasing order.
      * Cannot be run on a bitvector that has been loaded or finished.
      */
-    void addBit(size_t index);
+    #ifdef BITVECTOR_CSA
+    inline void addBit(size_t index) {
+        if(encoder == NULL) {
+            throw std::runtime_error("Can't add to a vector we didn't create!");
+        }
+        
+        // Pass on valid requests.
+        encoder->addBit(index);
+    }
+    #endif
+    #ifdef BITVECTOR_SDSL
+    inline void addBit(size_t index) {
+        if(rankSupport != NULL || selectSupport != NULL) {
+            throw std::runtime_error("Can't add to a finished/loaded vector!");
+        }
+
+        if(index >= getSize()) {
+            // Make sure we have room
+            bitvector.resize(index + 1);
+        }
+        
+        // Set the bit
+        bitvector[index] = 1;
+    }
+    #endif
+    
+    /**
+     * Returns true if the given index is set, or false otherwise. Must be
+     * thread-safe.
+     */
+    #ifdef BITVECTOR_CSA
+    inline bool isSet(size_t index) const {
+        // Grab the iterator
+        std::lock_guard<std::mutex> lock(iteratorMutex);
+        
+        return iterator->isSet(index);
+    }
+    #endif
+    #ifdef BITVECTOR_SDSL
+    inline bool isSet(size_t index) const {
+        return bitvector[index];
+    }
+    #endif
     
     /**
      * Must be called on a bitvector not loaded from a file before using rank
@@ -74,33 +131,75 @@ public:
     void writeTo(std::ofstream& stream) const;
     
     /**
-     * Get the size of the bitvector in bits. Must have been finished first.
-     */
-    size_t getSize() const;
-    
-    /**
      * Get the number of 1s occurring before the given index. Must be thread-
      * safe.
      */
-    size_t rank(size_t index) const;
+    #ifdef BITVECTOR_CSA
+    inline size_t rank(size_t index) const {
+
+        // Grab the iterator
+        std::lock_guard<std::mutex> lock(iteratorMutex);
+        
+        // Take the rank of a position (not in at_least mode)
+        return iterator->rank(index, false);
+    }
+    #endif
+    #ifdef BITVECTOR_SDSL
+    inline size_t rank(size_t index) const {
+        if(index >= getSize()) {
+            // Get the total number of 1s in the bitvector
+            return (*rankSupport)(getSize()) + isSet(getSize() - 1);
+        }
+        
+        // Take the rank of a position (not in at_least mode). Correct for
+        // disagreement over what rank is.
+        return (*rankSupport)(index + 1);
+    }
+    #endif
+
     
     /**
      * Get the number of 1s occurring before the given index. Must be thread-
      * safe. If at-least is set, includes a 1 at the given index.
      */
-    size_t rank(size_t index, bool atLeast) const;
-    
-    /**
-     * Returns true if the given index is set, or false otherwise. Must be
-     * thread-safe.
-     */
-    bool isSet(size_t index) const;
+    inline size_t rank(size_t index, bool atLeast) const {
+        if(atLeast) {
+            // Implement this mode ourselves so we can be certain of exactly what it
+            // does.
+            if(index == 0) {
+                // Do the calculation below, simplifying out the rank(-1) call which
+                // would alwauys be 0 if we could actually run it.
+                return (index < getSize());
+            }
+            // Get the rank of the previous position, then add 1 if this position
+            // could contain a 1.
+            return rank(index-1) + (index < getSize());
+        } else {
+            return rank(index);
+        }
+    }
     
     /**
      * Select the index at which the one with the given rank appears (i.e. the
      * first one would be 0). Must be thread-safe.
      */
-    size_t select(size_t one) const;
+    #ifdef BITVECTOR_CSA
+    inline size_t select(size_t one) const {
+        // Grab the iterator
+        std::lock_guard<std::mutex> lock(iteratorMutex);
+        
+        // Go select the right position.
+        return iterator->select(one);
+    }
+    #endif
+
+    #ifdef BITVECTOR_SDSL
+    inline size_t select(size_t one) const {
+        // Go select the right position. We need to compensate since 0 means the
+        // first one to us, but 1 means the first one to SDSL.
+        return (*selectSupport)(one + 1);
+    }
+    #endif
     
     /**
      * OR two bitvectors together.
@@ -111,13 +210,81 @@ public:
      * Given an indes, return the index of the next 1 at or after that position,
      * paired with its rank.
      */
-    std::pair<size_t, size_t> valueAfter(size_t index) const;
+    #ifdef BITVECTOR_CSA
+    inline std::pair<size_t, size_t> valueBefore(size_t index) const {
+        // Get the rank of the 1 before this position, 1-based apparently.
+        size_t lastRank = rank(index);
+        if(lastRank == 0 || index >= getSize()) {
+            // We ought to be giving the past-the-end value.
+            lastRank = rank(getSize() + 1);
+        } else {
+            // Budge left to get the actual 0-based rank.
+            lastRank--;
+        }
+        
+        // Look up where it is and return that and the rank.
+        return std::make_pair(select(lastRank), lastRank);
+    }
+    #endif
+    #ifdef BITVECTOR_SDSL
+    inline std::pair<size_t, size_t> valueBefore(size_t index) const {
+        // Get the rank of the 1 before this position, 1-based apparently.
+        size_t lastRank = rank(index);
+        
+        if(lastRank == 0) {
+            // There is no value before, do the past-the-end result.
+            return std::make_pair(getSize(), rank(getSize() - 1));
+        }
+        
+        // Assume we are in bounds.
+        
+        // Budge left to get the actual 0-based rank.
+        lastRank--;
+        
+        // Look up where it is and return that and the rank.
+        return std::make_pair(select(lastRank), lastRank);
+    }
+    #endif
     
     /**
      * Given an indes, return the index of the last 1 at or before that
      * position, paired with its rank. Wraps around if no such value is found.
      */
-    std::pair<size_t, size_t> valueBefore(size_t index) const;
+    #ifdef BITVECTOR_CSA
+    inline std::pair<size_t, size_t> valueAfter(size_t index) const {
+        // Get the rank of the next 1 at or after the given position.
+        size_t nextRank = rank(index, true) - 1;
+        if(index >= getSize()) {
+            // We ought to be giving the past-the-end value even though rank
+            // dips by 1 at the end of the bitvector.
+            nextRank += 1;
+        }
+        
+        // Look up where it is and return that and the rank.
+        return std::make_pair(select(nextRank), nextRank);
+    }
+    #endif
+    #ifdef BITVECTOR_SDSL
+    inline std::pair<size_t, size_t> valueAfter(size_t index) const {
+        if(index >= getSize()) {
+            // We ought to be giving the past-the-end value
+            return std::make_pair(getSize(), rank(getSize() - 1));
+        }
+        // Assume we're in bounds
+        
+        // Get the rank of the next 1 at or after the given position.
+        size_t nextRank = rank(index, true) - 1;
+        
+        if(nextRank >= rank(getSize() - 1)) {
+            // Too close to the end to do a select. Return past the end value
+            // again.
+            return std::make_pair(getSize(), rank(getSize() - 1));
+        }
+        
+        // Look up where it is and return that and the rank.
+        return std::make_pair(select(nextRank), nextRank);
+    }
+    #endif
     
     // Move construction OK
     GenericBitVector(GenericBitVector&& other) = default;
