@@ -172,10 +172,10 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
             # Collect and parse the log output, and get the coverage vs. genome
             # number data.
             
-            if "WARNING" in line or "ERROR" in line:
+            if "DEBUG" not in line and "TRACE" not in line:
                 # Log things that came out at high logging priorities (TODO: or
                 # are false positives) to our own log.
-                print line
+                print(line)
             
             # Record that we processed a line
             lines += 1

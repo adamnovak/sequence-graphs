@@ -1,9 +1,11 @@
 #include "GenericBitVector.hpp"
 #include <stdexcept>
+#include <thread>
 
 #ifdef BITVECTOR_CSA
 GenericBitVector::GenericBitVector(std::ifstream& stream): encoder(NULL), 
-    bitvector(new BitVector(stream)), size(bitvector->getSize()) {
+    bitvector(new BitVector(stream)), size(bitvector->getSize()), 
+    iterator(new BitVectorIterator(*bitvector)), iteratorMutex() {
     
     // Nothing to do, loaded from the stream.
 }
@@ -27,7 +29,8 @@ GenericBitVector::GenericBitVector(std::ifstream& stream): bitvector(),
 
 #ifdef BITVECTOR_CSA
 GenericBitVector::GenericBitVector(std::ifstream&& stream): encoder(NULL), 
-    bitvector(new BitVector(stream)), size(bitvector->getSize()) {
+    bitvector(new BitVector(stream)), size(bitvector->getSize()), 
+    iterator(new BitVectorIterator(*bitvector)), iteratorMutex() {
     
     // Nothing to do, loaded from the stream.
 }
@@ -56,7 +59,7 @@ GenericBitVector::GenericBitVector(const std::string& filename):
 
 #ifdef BITVECTOR_CSA
 GenericBitVector::GenericBitVector(): encoder(new BitVectorEncoder(32)), 
-    bitvector(NULL), size(0) {
+    bitvector(NULL), size(0), iterator(NULL), iteratorMutex() {
 
     // Nothing to do, already made the encoder.
 }
@@ -81,6 +84,10 @@ GenericBitVector::~GenericBitVector() {
     
     if(bitvector != NULL) {
         delete bitvector;
+    }
+    
+    if(iterator != NULL) {
+        delete iterator;
     }
 }
 #endif
@@ -137,6 +144,8 @@ void GenericBitVector::finish(size_t length) {
     encoder->flush();
     // Make the BitVector
     bitvector = new BitVector(*encoder, length);
+    // And an iterator for it
+    iterator = new BitVectorIterator(*bitvector);
     
     // Set our size
     size = length;    
@@ -188,8 +197,12 @@ size_t GenericBitVector::getSize() const {
 
 #ifdef BITVECTOR_CSA
 size_t GenericBitVector::rank(size_t index) const {
+
+    // Grab the iterator
+    std::lock_guard<std::mutex> lock(iteratorMutex);
+    
     // Take the rank of a position (not in at_least mode)
-    return BitVectorIterator(*bitvector).rank(index, false);
+    return iterator->rank(index, false);
 }
 #endif
 
@@ -225,7 +238,10 @@ size_t GenericBitVector::rank(size_t index, bool atLeast) const {
 
 #ifdef BITVECTOR_CSA
 bool GenericBitVector::isSet(size_t index) const {
-    return BitVectorIterator(*bitvector).isSet(index);
+    // Grab the iterator
+    std::lock_guard<std::mutex> lock(iteratorMutex);
+    
+    return iterator->isSet(index);
 }
 #endif
 
@@ -237,8 +253,11 @@ bool GenericBitVector::isSet(size_t index) const {
 
 #ifdef BITVECTOR_CSA
 size_t GenericBitVector::select(size_t one) const {
+    // Grab the iterator
+    std::lock_guard<std::mutex> lock(iteratorMutex);
+    
     // Go select the right position.
-    return BitVectorIterator(*bitvector).select(one);
+    return iterator->select(one);
 }
 #endif
 
@@ -339,6 +358,8 @@ GenericBitVector* GenericBitVector::createUnion(
     toReturn->bitvector = unionBitvector;
     // Populate the size
     toReturn->size = unionBitvector->getSize();
+    // And fill in the iterator
+    toReturn->iterator = new BitVectorIterator(*unionBitvector);
     
     // Return the new GenericBitVector holding the BitVector we made.
     return toReturn;

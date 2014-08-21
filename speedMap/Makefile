@@ -19,7 +19,7 @@ LDLIBS += ../libFMD/libfmd.a ../libsuffixtools/libsuffixtools.a \
 # We need to make sure all our dependency header files are where our other
 # dependency includes want them to be. We need to grab all the internal include
 # directories from libsuffixtools.
-CXXFLAGS += -std=c++11 -O3 -g -pg -I../deps -I../libFMD -I../libsuffixtools
+CXXFLAGS += -std=c++11 -O3 -g -I../deps -I../libFMD -I../libsuffixtools
 
 # Stop deleting intermediate files I might need to use in the final program!
 .SECONDARY:

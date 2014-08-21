@@ -6,6 +6,7 @@
 #include <istream>
 #include <ostream>
 #include <utility>
+#include <mutex>
 
 #define BITVECTOR_SDSL
 #ifdef BITVECTOR_CSA
@@ -140,6 +141,10 @@ private:
         BitVector* bitvector;
         // And we need to remember how far along we are in our encoding.
         size_t size;
+        // And we need an iterator to query the BitVector when done.
+        BitVectorIterator* iterator;
+        // And a lock to protect that
+        mutable std::mutex iteratorMutex;
     #endif
     #ifdef BITVECTOR_SDSL
         // Actual implementation on SDSL.
