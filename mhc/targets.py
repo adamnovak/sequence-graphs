@@ -6,6 +6,7 @@ reference structures.
 """
 
 import argparse, sys, os, os.path, random, subprocess, shutil, itertools
+import datetime
 from xml.etree import ElementTree
 import tsv
 
@@ -150,17 +151,22 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
             
         # Announce our command we're going to run
         self.logToMaster("Invoking {}".format(" ".join(args)))
+        print("Invoking {}".format(" ".join(args)))
         
         # Make an index with the FASTAs in that order, so we can read all the
-        # logging output.
+        # logging output. Make sure to send any errors through stdout as well.
         process = subprocess.Popen(args,
-            stdout=subprocess.PIPE)
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
         # Make a writer for the statistics
         writer = tsv.TsvWriter(open(self.coverage_filename, "w"))
     
         # Track how many lines of indexer output we process
         lines = 0
+    
+        # Tell our jobtree output we're reading from the process starting now,
+        # in case something goes wrong.
+        print("[{}] Reading process output...".format(datetime.datetime.now()))
     
         for line in process.stdout:            
             # Collect and parse the log output, and get the coverage vs. genome
@@ -182,6 +188,8 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
             
                 # Save the coverage vs. genome number data as a reasonable TSV.
                 writer.line(genome, coverage)
+                
+        print("[{}] Process output done".format(datetime.datetime.now()))
                 
         # Close up the output file. 
         writer.close()

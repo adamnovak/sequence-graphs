@@ -10,6 +10,7 @@
 class FMDIndexBuilderTests : public CppUnit::TestFixture {
     CPPUNIT_TEST_SUITE(FMDIndexBuilderTests);
     CPPUNIT_TEST(testBuild);
+    CPPUNIT_TEST(testGenomes);
     CPPUNIT_TEST_SUITE_END();
     
     // Keep a string saying where to get the haplotypes to test with.
@@ -23,6 +24,7 @@ public:
     void tearDown();
 
     void testBuild();
+    void testGenomes();
     
 };
 

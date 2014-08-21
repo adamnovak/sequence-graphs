@@ -1914,11 +1914,11 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(const GenericBitVec
     for(int i = start + length - 1; i >= start; i--) {
         // Go from the end of our selected region to the beginning.
 
-        Log::info() << "On position " << i << " from " <<
+        Log::debug() << "On position " << i << " from " <<
             start + length - 1 << " to " << start << std::endl;
 
         if(search.positions.size() == 1 && search.positions.front().first.isEmpty()) {
-            Log::info() << "Starting over by mapping position " << i << std::endl;
+            Log::debug() << "Starting over by mapping position " << i << std::endl;
             // We do not currently have a non-empty FMDPosition to extend. Start
             // over by mapping this character by itself.
             search = this->misMatchMapPosition(ranges, query, i, minContext,
@@ -1934,7 +1934,7 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(const GenericBitVec
                 
                 range = search.positions.front().first.range(ranges, mask);
                 
-                Log::info() << "Mapped " << search.characters << 
+                Log::debug() << "Mapped " << search.characters << 
                 " context to " << search.positions.front().first << " in range #" << range <<
                 std::endl;
             
@@ -1974,7 +1974,7 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(const GenericBitVec
                 // If no mismatch extension results exist, we can safely extend by the correct base
                 // and be assured we are passing forward a complete set of search results
                 
-                Log::info() << "Extending with position " << i << std::endl;
+                Log::debug() << "Extending with position " << i << std::endl;
                 
                 search = this->misMatchExtend(search, query[i], true, z_max, mask, true, false);
                 search.characters++;
@@ -1991,7 +1991,7 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(const GenericBitVec
                     // context to be confident, and our interval is nonempty and
                     // subsumed by a range.
                     
-                    Log::info() << "Mapped " << search.characters << 
+                    Log::debug() << "Mapped " << search.characters << 
                     " context to " << search.positions.front().first << " in range #" << range <<
                     std::endl;
                 
@@ -2006,14 +2006,14 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(const GenericBitVec
                     if(search.is_mapped && search.positions.front().first.isEmpty(mask)
                         && searchExtend.positions.size() == 1) {
                     
-                        Log::info() << "Failed at " << searchExtend.positions.front().first << " (" << 
+                        Log::debug() << "Failed at " << searchExtend.positions.front().first << " (" << 
                         searchExtend.positions.size() << " mismatch search results for " <<
                         searchExtend.characters << " context)." << std::endl;
                         // We extended right until we got no results. We need to try
                         // this base again, in case we tried with a too-long left
                         // context.
                 
-                        Log::info() << "Restarting from here..." << std::endl;
+                        Log::debug() << "Restarting from here..." << std::endl;
                 
                         search = searchExtend;
                 
@@ -2025,7 +2025,7 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(const GenericBitVec
 
                     } else {
                             
-                        Log::info() << "Failed at " << search.positions.front().first << " (" << 
+                        Log::debug() << "Failed at " << search.positions.front().first << " (" << 
                         search.positions.size() <<
                         " mismatch search results for " << search.characters << " context)." << 
                         std::endl;

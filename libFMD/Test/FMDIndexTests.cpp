@@ -84,6 +84,12 @@ void FMDIndexTests::testMetadata() {
     // Make sure the contigs belong to the genome
     CPPUNIT_ASSERT(index->getContigGenome(0) == 0);
     CPPUNIT_ASSERT(index->getContigGenome(1) == 0);
+    
+    // Make sure all the positions belong to the one genome
+    for(size_t i = 0; i < index->getBWTLength(); i++) {
+        CPPUNIT_ASSERT_MESSAGE("Genome claims position " + std::to_string(i), 
+            index->getGenomeMask(0).isSet(i));
+    }
 }
 
 /**

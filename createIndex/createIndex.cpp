@@ -1170,6 +1170,12 @@ getAdjacencyComponentSpectrum(
         component = (stList*) stList_getNext(componentIterator);
     }
     
+    // Clean up the iterator
+    stList_destructIterator(componentIterator);
+    
+    // And the entire list while we're at it
+    stList_destruct(adjacencyComponents);
+    
     // Give back the map
     return toReturn;
     

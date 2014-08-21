@@ -494,7 +494,7 @@ void MappingMergeScheme::CgenerateSomeMerges(size_t queryContig) const {
                         firstBaseR.first.first, firstBaseR.first.second, 
                         firstBaseR.second);
                         
-                    Log::info() << "Left-Right Credit Merged pos " << 
+                    Log::debug() << "Left-Right Credit Merged pos " << 
                         creditCandidates[i] << ", a(n) " << 
                         contig[creditCandidates[i]] << " on contig " << 
                         queryContig << " to " << firstBaseR.first.second << 
@@ -511,7 +511,7 @@ void MappingMergeScheme::CgenerateSomeMerges(size_t queryContig) const {
                     firstBaseR.first.first, firstBaseR.first.second, 
                     firstBaseR.second);
                         
-                Log::info() << "Right Credit Merged pos " << 
+                Log::debug() << "Right Credit Merged pos " << 
                     creditCandidates[i] << ", a(n) " << 
                     contig[creditCandidates[i]] << " on contig " << 
                     queryContig << " to " << firstBaseR.first.second << 
@@ -532,7 +532,7 @@ void MappingMergeScheme::CgenerateSomeMerges(size_t queryContig) const {
                 firstBaseL.first.first, firstBaseL.first.second, 
                 firstBaseL.second);
             
-            Log::info() << "Left Credit Merged pos " << creditCandidates[i] << 
+            Log::debug() << "Left Credit Merged pos " << creditCandidates[i] << 
             ", a(n) " << contig[creditCandidates[i]] << " on contig " << 
             queryContig << " to " << firstBaseL.first.second << " on contig " <<
             firstBaseL.first.first << " with orientation " << 
@@ -606,9 +606,8 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
     
     // How many positions are available to map to?
     Log::info() << taskName << " mapping " << contig.size() << 
-        " bases via " << includedPositions.rank(
-        includedPositions.getSize()) << " bottom-level positions" << 
-        std::endl;
+        " bases via " << includedPositions.rank(index.getBWTLength()) <<
+        " bottom-level positions" << std::endl;
     
     std::vector<std::pair<int64_t,size_t>> rightMappings;
     std::vector<std::pair<int64_t,size_t>> leftMappings;    
@@ -694,7 +693,7 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
     }
 
     
-    Log::info() << "Left sentinel is " << leftSentinel << 
+    Log::debug() << "Left sentinel is " << leftSentinel << 
         ", right sentinel is " << rightSentinel << std::endl;
     
     // Now identify and merged mapped bases from the individual left and
@@ -731,7 +730,7 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
                     generateMerge(queryContig, i + 1, leftBase.first.first, 
                         leftBase.first.second, !leftBase.second);
                     
-                    Log::info() << "Anchor Merged pos " << i << 
+                    Log::debug() << "Anchor Merged pos " << i << 
                         ", a(n) " << contig[i] << " on contig " << 
                         queryContig << " to " << leftBase.first.second << 
                         " on contig " << leftBase.first.first << 
@@ -746,7 +745,7 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
                     if(i > leftSentinel && rightSentinel > i) {
                         creditCandidates.push_back(i);
                     }
-                    Log::info() << "Conflicted " << i << " " << contig[i] << 
+                    Log::debug() << "Conflicted " << i << " " << contig[i] << 
                         std::endl;
                     }
             
@@ -759,7 +758,7 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
                 generateMerge(queryContig, i + 1, leftBase.first.first, 
                     leftBase.first.second, !leftBase.second);
                         
-                Log::info() << "Anchor Merged pos " << i << ", a(n) " << 
+                Log::debug() << "Anchor Merged pos " << i << ", a(n) " << 
                     contig[i] << " on contig " << queryContig << " to " << 
                     leftBase.first.second << " on contig " << 
                     leftBase.first.first << " with orientation " << 
@@ -779,7 +778,7 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
             // (since it's backwards to start with).
             generateMerge(queryContig, i + 1, rightBase.first.first, 
                 rightBase.first.second, rightBase.second);
-            Log::info() << "Anchor Merged pos " << i << ", a(n) " << 
+            Log::debug() << "Anchor Merged pos " << i << ", a(n) " << 
                 contig[i] << " on contig " << queryContig << " to " << 
                 rightBase.first.second << " on contig " << 
                 rightBase.first.first << " with orientation " << 
