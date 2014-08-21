@@ -8,7 +8,7 @@
 #include <utility>
 #include <mutex>
 
-#define BITVECTOR_SDSL
+#define BITVECTOR_CSA
 #ifdef BITVECTOR_CSA
     // Using CSA bitvectors
     #include "BitVector.hpp"
