@@ -17,6 +17,7 @@ class GenericBitVectorTests : public CppUnit::TestFixture {
     CPPUNIT_TEST(testSelect);
     CPPUNIT_TEST(testValueBefore);
     CPPUNIT_TEST(testValueAfter);
+    CPPUNIT_TEST(testStartsEmpty);
     CPPUNIT_TEST_SUITE_END();
     
 public:
@@ -28,6 +29,8 @@ public:
     void testSelect();
     void testValueBefore();
     void testValueAfter();
+    
+    void testStartsEmpty();
     
     std::pair<GenericBitVector*, BitVector*> makeTestData();
 };

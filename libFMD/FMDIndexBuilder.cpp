@@ -196,6 +196,9 @@ FMDIndex* FMDIndexBuilder::build() {
     }
     
    
+    // Keep track of how many 1 bits we put in each genome mask
+    std::vector<size_t> maskOnes(numGenomes, 0);
+   
     for(size_t i = 0; i < suffixArray->getSize(); i++) {
         // Scan the suffix array, and make a 1 in the correct place in each bit
         // vector for each genome.
@@ -214,6 +217,8 @@ FMDIndex* FMDIndexBuilder::build() {
         
         // Look up the genome, and set this bit in the appropriate encoder.
         encoders[genomeAssignments[contig]]->addBit(i);
+        // Record that we gave that vector a 1.
+        maskOnes[genomeAssignments[contig]]++;
     }
     
     // Open the bitmask file
@@ -224,6 +229,12 @@ FMDIndex* FMDIndexBuilder::build() {
         
         // Finish encoding to an actual BitVector
         encoders[i]->finish(suffixArray->getSize() + 1);
+        
+        Log::info() << "Saving genome mask " << i << " with " << 
+            encoders[i]->rank(suffixArray->getSize()) << " positions." <<
+            std::endl;
+        Log::info() << "We put in " << maskOnes[i] << " positions." <<
+            std::endl;
         
         // Save the BitVector
         encoders[i]->writeTo(bitmaskStream);

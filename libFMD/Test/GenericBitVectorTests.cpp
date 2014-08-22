@@ -148,3 +148,22 @@ void GenericBitVectorTests::testValueAfter() {
     
 }
 
+/**
+ * Make sure a bitvector starts empty.
+ */
+void GenericBitVectorTests::testStartsEmpty() {
+
+    GenericBitVector* v = new GenericBitVector;
+    
+    // We have to have at least one 1 in the bitvector, or some of the data
+    // structures don't work.
+    v->addBit(100000);
+    v->finish(200000);
+    
+    // Make sure we see only 1 bit.
+    CPPUNIT_ASSERT_EQUAL((size_t)1, v->rank(200000));
+    
+    delete v;
+
+}
+

@@ -8,7 +8,7 @@
 #include <utility>
 #include <mutex>
 
-#define BITVECTOR_CSA
+#define BITVECTOR_SDSL
 #ifdef BITVECTOR_CSA
     // Using CSA bitvectors
     #include "BitVector.hpp"
@@ -89,9 +89,18 @@ public:
             throw std::runtime_error("Can't add to a finished/loaded vector!");
         }
 
-        if(index >= getSize()) {
+        // What's the size of the bitvector before we make it bigger?
+        size_t oldSize = getSize();
+
+        if(index >= oldSize) {
             // Make sure we have room
             bitvector.resize(index + 1);
+            
+            for(size_t i = oldSize; i < index; i++) {
+                // Make sure all the bits we just added in are 0s.
+                bitvector[i] = 0;
+            }
+            
         }
         
         // Set the bit

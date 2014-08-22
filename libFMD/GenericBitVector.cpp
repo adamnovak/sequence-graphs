@@ -131,9 +131,18 @@ void GenericBitVector::finish(size_t length) {
         throw std::runtime_error("Can't finish a finished/loaded vector!");
     }
 
-    if(length > getSize()) {
-        // Make sure we are that long
+    // What's the size of the bitvector before we make it bigger?
+    size_t oldSize = getSize();
+
+    if(length > oldSize) {
+        // Make sure we have room
         bitvector.resize(length);
+        
+        for(size_t i = oldSize; i < length; i++) {
+            // Make sure all the bits we just added in are 0s.
+            bitvector[i] = 0;
+        }
+        
     }
     
     // Make the supports for rank and select

@@ -1440,12 +1440,6 @@ main(
     // Clean up the thread set
     stPinchThreadSet_destruct(threadSet);
     
-    for(auto kv : spectrum) {
-        // We loop over component size, number of occurrences pairs in order.
-        Log::output() << "Spectrum: size " << kv.first << " count = " <<
-            kv.second << std::endl;
-    }
-    
     if(options.count("spectrum")) {
         // Save a dump of pinch graph adjacency component sizes
         writeAdjacencyComponentSpectrum(spectrum,
