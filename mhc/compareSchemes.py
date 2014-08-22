@@ -195,7 +195,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # corresponding MAFs from the same FASTA pair with different schemes,
         # for all combinations of schemes.
         followOns.append(AlignmentSchemeAgreementTarget(alignments_by_scheme, 
-            self.agreement_basename, random.getrandbits(256)))
+            random.getrandbits(256), self.agreement_basename))
             
             
         # So we need to run all of the follow-ons in parallel after this job
@@ -211,11 +211,14 @@ class AlignmentSchemeAgreementTarget(jobTree.scriptTree.target.Target):
     
     """
     
-    def __init__(self, alignments_by_scheme, agreement_basename, seed):
+    def __init__(self, alignments_by_scheme, seed, agreement_basename):
         """
         Takes a dict of lists of alignments by scheme (arranged so alignments at
         the same indices are of the same FASTAs), and a file basename to name
         all results after. Runs all pairwise agreement comparisons.
+        
+        Uses the seed to generate mafComparator seeds and temporary file names,
+        so don't run two copies with the same seed.
         
         """
         
@@ -248,7 +251,7 @@ class AlignmentSchemeAgreementTarget(jobTree.scriptTree.target.Target):
         followOns = []    
         
         for scheme1, scheme2 in itertools.combinations(
-            self.alignments_by_scheme.iterkeys()):
+            self.alignments_by_scheme.iterkeys(), 2):
             
             # For each pair of schemes to compare
             
@@ -350,7 +353,7 @@ def main(args):
     # Make a stack of jobs to run
     stack = jobTree.scriptTree.stack.Stack(SchemeAssessmentTarget(
         options.fastas, options.trueMaf, options.seed, options.coverageBasename, 
-        options.agreementBasename. options.spectrumBasename,
+        options.agreementBasename, options.spectrumBasename,
         options.truthBasename))
     
     print "Starting stack"
