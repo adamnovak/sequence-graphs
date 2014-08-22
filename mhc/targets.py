@@ -434,7 +434,8 @@ class AlignmentComparisonTarget(jobTree.scriptTree.target.Target):
         else:
             # Calculate the F score and save that, since it's symmetric and
             # doesn't care which of the two inputs is "truth".
-            writer.line(averages[0] * averages[1] / (averages[0] + averages[1]))
+            writer.line(2 * averages[0] * averages[1] / 
+                (averages[0] + averages[1]))
             
         writer.close()
         
