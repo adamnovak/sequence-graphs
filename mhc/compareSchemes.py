@@ -25,14 +25,15 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
     """
     
     def __init__(self, fasta_list, true_maf, seed, coverage_basename,
-        spectrum_basename, truth_basename):
+        agreement_basename, spectrum_basename, truth_basename):
         """
         Make a new Target for building a several reference structures from the
         given FASTAs, and comparing against the given truth MAF, using the
         specified RNG seed, and writing coverage statistics to files with
         specified coverage base name, a set of adjacency component size spectra
-        to files with the specified spectrum basename, and a comparison against
-        the true MAF to files named after the truth_basename.
+        to files with the specified spectrum basename, stats for agreement
+        between the schemes to files anmed after the agreement basename, and a
+        comparison against the true MAF to files named after the truth_basename.
         
         The coverage statistics are just alignment coverage for each pair of
         genomes, in <genome number>\t<coverage fraction> TSVs per scheme.
@@ -57,6 +58,9 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         
         # Save the concatenated coverage stats file name to use
         self.coverage_basename = coverage_basename
+        
+        # And the agreement file name
+        self.agreement_basename = agreement_basename
         
         # And the concatenated frequency spectrum basename.
         # TODO: reduce or sum instead of concatenating?
@@ -87,6 +91,10 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # We'll keep track of our random state so we can seed without messing up
         # temp filenames.
         random_state = None
+        
+        # This will hold lists of alignments, in FASTA pair order, by scheme
+        # name.
+        alignments_by_scheme = {}
         
         for mismatch, credit in itertools.product([False, True], repeat=2):
             # Decide if we want mismatches and credit for this run.
@@ -129,6 +137,9 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             maf_filenames = [sonLib.bioio.getTempFile(
                 rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
                 
+            # Save these so we can compare them to other schemes later.
+            alignments_by_scheme[scheme] = maf_filenames
+                
             # And another one to hold each child's adjacency component size
             # spectrum
             spectrum_filenames = [sonLib.bioio.getTempFile(
@@ -169,7 +180,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 
             # Make a follow-on job to merge all the child spectrum outputs and
             # produce our spectrum output file for this scheme.
-            followOns.append(ConcatenateTarget(stats_filenames, 
+            followOns.append(ConcatenateTarget(spectrum_filenames, 
                 self.spectrum_basename + "." + scheme))
             
             if self.true_maf is not None:
@@ -178,12 +189,97 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 followOns.append(AlignmentTruthComparisonTarget(self.true_maf, 
                 maf_filenames, random.getrandbits(256), 
                 self.truth_basename + "." + scheme))
+                
+        # Now we have all the followons for concatenating our stats and
+        # comparing against the truth, we need a followon for comparing
+        # corresponding MAFs from the same FASTA pair with different schemes,
+        # for all combinations of schemes.
+        followOns.append(AlignmentSchemeAgreementTarget(alignments_by_scheme, 
+            self.agreement_basename, random.getrandbits(256)))
             
             
         # So we need to run all of the follow-ons in parallel after this job
         self.setFollowOnTarget(RunTarget(followOns))
                 
         self.logToMaster("SchemeAssessmentTarget Finished")
+
+class AlignmentSchemeAgreementTarget(jobTree.scriptTree.target.Target):
+    """
+    A target that, given lists of corresponding alignments in a dict by scheme,
+    compares corresponding alignments across all pairs of schemes and collates
+    the results.
+    
+    """
+    
+    def __init__(self, alignments_by_scheme, agreement_basename, seed):
+        """
+        Takes a dict of lists of alignments by scheme (arranged so alignments at
+        the same indices are of the same FASTAs), and a file basename to name
+        all results after. Runs all pairwise agreement comparisons.
+        
+        """
+        
+        # Make the base Target. Ask for 2gb of memory since this is easy.
+        super(AlignmentSchemeAgreementTarget, self).__init__(memory=2147483648)
+        
+        self.seed = seed
+        
+        # Save the alignment names
+        self.alignments_by_scheme = alignments_by_scheme
+        
+        # And the agreement file name
+        self.agreement_basename = agreement_basename
+        
+        self.logToMaster(
+            "Creating AlignmentSchemeAgreementTarget with seed {}".format(seed))
+        
+        
+    def run(self):
+        """
+        Send off all the child targets to do comparisons.
+        """
+        
+        self.logToMaster("Starting AlignmentSchemeAgreementTarget")
+        
+        # Seed the RNG
+        random.seed(self.seed)
+        
+        # We need a few different follow-on jobs.
+        followOns = []    
+        
+        for scheme1, scheme2 in itertools.combinations(
+            self.alignments_by_scheme.iterkeys()):
+            
+            # For each pair of schemes to compare
+            
+            # What files will we concatenate? Get one for each pair of
+            # corresponding alignments. Just use our seeded random state for
+            # this; we only seeded once. So don't run this target twice with the
+            # same seed.
+            comparison_filenames = [sonLib.bioio.getTempFile(
+                rootDir=self.getGlobalTempDir()) 
+                for i in xrange(len(self.alignments_by_scheme[scheme1]))]
+            
+            for comparison_filename, alignment1, alignment2 in itertools.izip(
+                comparison_filenames, self.alignments_by_scheme[scheme1], 
+                self.alignments_by_scheme[scheme2]):
+                
+                # For corresponding alignments
+                
+                # Compare them
+                self.addChildTarget(AlignmentComparisonTarget(alignment1, 
+                    alignment2, random.getrandbits(256), comparison_filename))
+                    
+            # Concatenate all the comparisons into a file named after both
+            # schemes.
+            followOns.append(ConcatenateTarget(comparison_filenames,
+                self.agreement_basename + "." + scheme1 + "." + scheme2))
+        
+        
+        # We need to run all of the follow-ons in parallel after this job
+        self.setFollowOnTarget(RunTarget(followOns))
+                
+        self.logToMaster("AlignmentSchemeAgreementTarget Finished")
 
 def parse_args(args):
     """
@@ -206,6 +302,8 @@ def parse_args(args):
     # General options
     parser.add_argument("coverageBasename", 
         help="filename prefix to save the coverage stats output to")
+    parser.add_argument("agreementBasename",
+        help="filename prefix to save the alignment agreement stats output to")
     parser.add_argument("spectrumBasename", 
         help="filename prefix to save the adjacency component sizes to")
     parser.add_argument("fastas", nargs="+",
@@ -246,12 +344,14 @@ def main(args):
     # Make sure we've given everything an absolute module name.
     # Don't try to import * because that's illegal.
     if __name__ == "__main__":
-        from compareSchemes import SchemeAssessmentTarget
+        from compareSchemes import SchemeAssessmentTarget, \
+            AlignmentSchemeAgreementTarget
         
     # Make a stack of jobs to run
     stack = jobTree.scriptTree.stack.Stack(SchemeAssessmentTarget(
         options.fastas, options.trueMaf, options.seed, options.coverageBasename, 
-        options.spectrumBasename, options.truthBasename))
+        options.agreementBasename. options.spectrumBasename,
+        options.truthBasename))
     
     print "Starting stack"
     

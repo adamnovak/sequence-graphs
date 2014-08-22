@@ -432,10 +432,9 @@ class AlignmentComparisonTarget(jobTree.scriptTree.target.Target):
             # that appear in the first).
             writer.line(averages[1], averages[0])
         else:
-            for average in averages:
-                # Dump averages as a 1-column TSV.
-                # TODO: Get more stuff to justify TSV-nes
-                writer.line(average)
+            # Calculate the F score and save that, since it's symmetric and
+            # doesn't care which of the two inputs is "truth".
+            writer.line(averages[0] * averages[1] / (averages[0] + averages[1]))
             
         writer.close()
         
