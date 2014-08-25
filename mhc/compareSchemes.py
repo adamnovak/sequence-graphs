@@ -213,8 +213,9 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         
         
         
-        # What genome pairs did we run, in order?
-        genome_pairs = [(self.fasta_list[0], other) 
+        # What genome pairs did we run, in order? Make sure to strip extensions.
+        genome_pairs = [(os.path.splitext(self.fasta_list[0])[0], 
+            os.path.splitext(other)[0]) 
             for other in self.fasta_list[1:]]
                 
         # Now we have all the followons for concatenating our stats and
@@ -343,8 +344,10 @@ class AlignmentSchemeAgreementTarget(jobTree.scriptTree.target.Target):
                     bed=temp_bed))
                     
                 # Split the BED file from this comparison out by genome.
+                # Override the feature names to be meaningful and list the
+                # scheme we're comparing against.
                 followOns.append(BedSplitTarget(temp_bed, compared_genomes, 
-                    bed_dir))
+                    bed_dir, feature_name="{}{}".format(scheme1, scheme2)))
                     
             # Concatenate all the comparisons into a file named after both
             # schemes.
@@ -359,16 +362,21 @@ class AlignmentSchemeAgreementTarget(jobTree.scriptTree.target.Target):
         
 class BedSplitTarget(jobTree.scriptTree.target.Target):
     """
-    A target which splits a BED up by genome.
+    A target which splits a BED up by genome. Also fixes them up a bit.
     
     """
 
-    def __init__(self, bed_file, genomes, out_dir):
+    def __init__(self, bed_file, genomes, out_dir, feature_name=None):
         """
         Split the given bed file per genome into <genome>/<genome>.bed in the
         given output directory, using the given list of genomes.
         
         out_dir must exist.
+        
+        If a feature_name is specified, it is used to rename all the BED
+        feratures.
+        
+        Does not leave a trailing newline.
         
         """
         
@@ -379,6 +387,7 @@ class BedSplitTarget(jobTree.scriptTree.target.Target):
         self.bed_file = bed_file
         self.genomes = genomes
         self.out_dir = out_dir
+        self.feature_name = feature_name
         
             
     def run(self):
@@ -390,23 +399,48 @@ class BedSplitTarget(jobTree.scriptTree.target.Target):
         self.logToMaster("Starting BedSplitTarget")
         
         for genome in self.genomes:
-            # Make directories for each genome to split out.
-            os.mkdir(self.out_dir + "/" + genome)
+            if not os.path.exists(self.out_dir + "/" + genome):
+                # Make directories for each genome to split out.
+                os.mkdir(self.out_dir + "/" + genome)
         
         # Open the output BED file for each genome
         out_files = [open(self.out_dir + "/{}/{}.bed".format(genome, genome), 
             "w") for genome in self.genomes]
             
+        # We need to keep track of whether anything has been written to each
+        # file yet, so we know when to put newlines, so we don't leave trailing
+        # newlines. We put a genome in this set when we have written to its
+        # file.
+        content_written = set()
+            
         for line in open(self.bed_file):
             # For each BED record, grab all the parts.
-            parts = line.split()
+            parts = line.strip().split()
+            
+            if self.feature_name is not None:
+                if len(parts) > 3:
+                    # Rename features with names
+                    parts[3] = self.feature_name
+                elif len(parts) == 3:
+                    # Add names to features without them.
+                    parts.append(feature_name)
+            
+            if len(parts) == 1 and parts[0] == "":
+                # Skip any blank lines
+                continue
             
             for genome, out_file in itertools.izip(self.genomes, out_files):
                 if parts[0] == genome:
                     # Send the line to the file corresponding to the matching
                     # genome. TODO: use a dict or something instead of scanning
                     # for matching names.
-                    out_file.write(line)
+                    if genome in content_written:
+                        # Terminate the previous line
+                        out_file.write("\n")
+                    # Write the line
+                    out_file.write("\t".join(parts))
+                    # Remember to end it if we need to write another.
+                    content_written.add(genome)
         
         self.logToMaster("BedSplitTarget Finished")
         
