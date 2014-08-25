@@ -95,7 +95,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         
         # We need a directory to save out tree of BED files under for making the
         # assembly hubs.
-        bed_root = sonLib.bioio.getTempFile(rootDir=self.getGlobalTempDir())
+        bed_root = sonLib.bioio.getTempDirectory(rootDir=self.getGlobalTempDir())
         
         # We'll keep track of our random state so we can seed without messing up
         # temp filenames.
@@ -150,8 +150,12 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
                 
             # And another one to hold each child's HAL alignment
-            hal_filenames = [sonLib.bioio.getTempFile(
+            hal_filenames = [sonLib.bioio.getTempFile(suffix="hal",
                 rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
+                
+            for hal in hal_filenames:
+                # Make sure the HALs don't exist yet.
+                os.unlink(hal)
                 
             # Save these so we can compare them to other schemes later.
             alignments_by_scheme[scheme] = maf_filenames
@@ -178,7 +182,6 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 maf_filename = maf_filenames[i]
                 hal_filename = hal_filenames[i]
                 spectrum_filename = spectrum_filenames[i]
-                
                 
                 # Make a child to produce those, giving it a seed. Make sure to
                 # give it only two FASTAs, reference first, so that when it
@@ -325,7 +328,7 @@ class AlignmentSchemeAgreementTarget(jobTree.scriptTree.target.Target):
                 
                 # Find a place for a temporary BED file
                 temp_bed = sonLib.bioio.getTempFile(
-                    rootDir=self.getLocalTempDir()) 
+                    rootDir=self.getGlobalTempDir()) 
                 
                 # Work out where the split up BED files should land
                 bed_dir = self.bed_root + "/{}/{}/{}-{}".format(scheme1, 
@@ -432,7 +435,8 @@ class AssemblyHubsTarget(jobTree.scriptTree.target.Target):
         
         <hub_root>/<scheme>/<genome1>-<genome2>
         
-        with one for each genome pair under each scheme.
+        with one for each genome pair under each scheme. hub_root will be
+        created if it does not exist.
         
         """
         
@@ -465,7 +469,8 @@ class AssemblyHubsTarget(jobTree.scriptTree.target.Target):
             
             # Figure out where hubs of this scheme go
             scheme_root = self.hub_root + "/" + scheme
-            os.mkdir(scheme_root)
+            if not os.path.exists(scheme_root):
+                os.makedirs(scheme_root)
             
             for i, (genome1, genome2) in enumerate(self.genome_names):
                 # Grab pairs of genomes, and their indices.
@@ -477,15 +482,27 @@ class AssemblyHubsTarget(jobTree.scriptTree.target.Target):
                 hub_dir = scheme_root + "/" + genome_pair
                 
                 # Make a temporary directory for the jobTree tree
-                tree_dir = sonLib.bioio.getTempFile(
+                tree_dir = sonLib.bioio.getTempDirectory(
                     rootDir=self.getLocalTempDir())
+                    
+                # Make sure it doesn't exist yet
+                os.rmdir(tree_dir)
                 
-                # Work out the bed dirs we want to include (one per other scheme
-                # we compared this one to.
-                bed_dirs = ",".join([self.bed_root + "/{}/{}/{}".format(
-                    scheme, other_scheme, genome_pair) for other_scheme in \
-                    self.hals_by_scheme.iterkeys()])
-
+                # Get all the pairs of schemes involving this one
+                possible_bed_pairs = ([(scheme, other) 
+                    for other in self.hals_by_scheme.iterkeys() 
+                    if other != scheme] + 
+                    [(other, scheme) 
+                    for other in self.hals_by_scheme.iterkeys() 
+                    if other != scheme])
+                    
+                # Get the directory each pair would produce    
+                bed_dirs = [self.bed_root + "/{}/{}/{}".format(scheme1, scheme2,
+                    genome_pair) for (scheme1, scheme2) in possible_bed_pairs]
+                    
+                # Keep the ones that exist and make a string of them.
+                bed_dirs_string = ",".join([directory for directory in bed_dirs
+                    if os.path.exists(directory)])
                 
                 # We want to make an assembly hub like so: 
                                
@@ -494,8 +511,8 @@ class AssemblyHubsTarget(jobTree.scriptTree.target.Target):
                 # --shortLabel="No Credit" --lod --cpHalFileToOut --noUcscNames
                 check_call(self, ["hal2assemblyHub.py", 
                     self.hals_by_scheme[scheme][i], hub_dir, "--jobTree", 
-                    tree_dir, "--bedDirs", bed_dirs, "--shortLabel", scheme, 
-                    "--lod", "--cpHalFileToOut", "--noUcscNames"])
+                    tree_dir, "--bedDirs", bed_dirs_string, "--shortLabel", 
+                    scheme, "--lod", "--cpHalFileToOut", "--noUcscNames"])
                 
                 # TODO: Make that run in parallel with more targets.
                 

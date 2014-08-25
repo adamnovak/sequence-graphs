@@ -94,7 +94,7 @@ class SequenceTarget(jobTree.scriptTree.target.Target):
     
         self.logToMaster("Starting SequenceTarget")
     
-        if self.first is not none:
+        if self.first is not None:
             # Run the head of the linked list.
             self.addChildTarget(self.first)
             
@@ -274,14 +274,19 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         # FASTA names without their extensions. 
         tree = "(" + ",".join(genomes) + ")rootSeq;"
         
-        # Where should we save it? ("" isn't a filename so this or is OK)
-        hal_filename = self.hal_filename or sonLib.bioio.getTempFile(
-            rootDir=self.getLocalTempDir())
+        if self.hal_filename is None:
+            # Where should we save it? ("" isn't a filename so this or is OK)
+            hal_filename = sonLib.bioio.getTempFile(
+                rootDir=self.getLocalTempDir())
+        else:
+            hal_filename = self.hal_filename
         
-        self.logToMaster("Creating HAL with tree: {}".format(tree))
+        self.logToMaster("Creating HAL {} with tree: {}".format(hal_filename,
+            tree))
         
-        # Make sure HAL doesn't exist when we try to make it
-        os.unlink(hal_filename)
+        if(os.path.exists(hal_filename)):
+            # Make sure HAL doesn't exist when we try to make it
+            os.unlink(hal_filename)
         
         # Turn the c2h into a HAL with the given tree.
         check_call(self, ["halAppendCactusSubtree", c2h_filename, 
@@ -303,8 +308,9 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
             "--targetGenomes", ",".join(genomes[1:]), hal_filename,
             self.alignment_filename])
             
-        # Get rid of the intermediate HAL
-        os.unlink(hal_filename)
+        # Get rid of the intermediate HAL if it wasn't sent somewhere specific
+        if self.hal_filename is None:
+            os.unlink(hal_filename)
         
         self.logToMaster("ReferenceStructureTarget Finished")
         
@@ -425,7 +431,8 @@ class AlignmentComparisonTarget(jobTree.scriptTree.target.Target):
     
     """
     
-    def __init__(self, maf_a, maf_b, seed, output_filename, is_correct=False):
+    def __init__(self, maf_a, maf_b, seed, output_filename, is_correct=False,
+        bed=None):
         """
         Compare the two MAFs referred to by the given input filenames, and write
         a digest of mafComparator results to the given output filename. Uses a
@@ -433,6 +440,9 @@ class AlignmentComparisonTarget(jobTree.scriptTree.target.Target):
         
         If is_correct is true, the first alignment is considered ground truth,
         and a two column <precision>\t<recall> output file is produced.
+        
+        If bed is specified, mafComnparator's --dumpBed option is used to dump a
+        BED of mismatching positions.
         
         """
         
@@ -445,6 +455,7 @@ class AlignmentComparisonTarget(jobTree.scriptTree.target.Target):
         self.seed = seed
         self.output_filename = output_filename
         self.is_correct = is_correct
+        self.bed = bed
         
         self.logToMaster("Creating AlignmentComparisonTarget")
         
@@ -465,10 +476,19 @@ class AlignmentComparisonTarget(jobTree.scriptTree.target.Target):
         # Generate a seed for mafComparator that's a C-ish integer (not 256
         # bits)
         seed = random.getrandbits(32)
+
+        # Set up the mafComparator arguments. Make sure to ask for an absurd
+        # number of samples so we check everything.
+        args = ["mafComparator", "--maf1", self.maf_a, "--maf2",
+            self.maf_b, "--out", xml_filename, "--seed", str(seed), "--samples",
+            "100000000"]
+        
+        if(self.bed is not None):
+            args.append("--dumpMismatches")
+            args.append(self.bed)
         
         # Run mafComparator and generate the output XML
-        check_call(self, ["mafComparator", "--maf1", self.maf_a, "--maf2",
-            self.maf_b, "--out", xml_filename, "--seed", str(seed)])
+        check_call(self, args)
         
         # Now parse the XML output down to the statistics we actually want.
         tree = ElementTree.parse(xml_filename)
