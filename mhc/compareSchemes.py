@@ -25,15 +25,17 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
     """
     
     def __init__(self, fasta_list, true_maf, seed, coverage_basename,
-        agreement_basename, spectrum_basename, truth_basename):
+        agreement_basename, spectrum_basename, truth_basename, hub_root):
         """
         Make a new Target for building a several reference structures from the
         given FASTAs, and comparing against the given truth MAF, using the
         specified RNG seed, and writing coverage statistics to files with
         specified coverage base name, a set of adjacency component size spectra
         to files with the specified spectrum basename, stats for agreement
-        between the schemes to files anmed after the agreement basename, and a
-        comparison against the true MAF to files named after the truth_basename.
+        between the schemes to files anmed after the agreement basename, a
+        comparison against the true MAF to files named after the truth_basename,
+        and a directory full of assembly hubs for different pairs of genomes and
+        schemes.
         
         The coverage statistics are just alignment coverage for each pair of
         genomes, in <genome number>\t<coverage fraction> TSVs per scheme.
@@ -74,6 +76,9 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # may be None)
         self.truth_basename = truth_basename
         
+        # And the place to put the assembly hubs
+        self.hub_root = hub_root
+        
         self.logToMaster(
             "Creating SchemeAssessmentTarget with seed {}".format(seed))
         
@@ -88,13 +93,20 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # We need a few different follow-on jobs.
         followOns = []    
         
+        # We need a directory to save out tree of BED files under for making the
+        # assembly hubs.
+        bed_root = sonLib.bioio.getTempFile(rootDir=self.getGlobalTempDir())
+        
         # We'll keep track of our random state so we can seed without messing up
         # temp filenames.
         random_state = None
         
-        # This will hold lists of alignments, in FASTA pair order, by scheme
+        # This will hold lists of MAF alignments, in FASTA pair order, by scheme
         # name.
         alignments_by_scheme = {}
+        
+        # And a similar structure for HALs
+        hals_by_scheme = {}
         
         for mismatch, credit in itertools.product([False, True], repeat=2):
             # Decide if we want mismatches and credit for this run.
@@ -137,8 +149,13 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             maf_filenames = [sonLib.bioio.getTempFile(
                 rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
                 
+            # And another one to hold each child's HAL alignment
+            hal_filenames = [sonLib.bioio.getTempFile(
+                rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
+                
             # Save these so we can compare them to other schemes later.
             alignments_by_scheme[scheme] = maf_filenames
+            hals_by_scheme[scheme] = hal_filenames
                 
             # And another one to hold each child's adjacency component size
             # spectrum
@@ -159,6 +176,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 # Pull out the files that this child should output.
                 stats_filename = stats_filenames[i]
                 maf_filename = maf_filenames[i]
+                hal_filename = hal_filenames[i]
                 spectrum_filename = spectrum_filenames[i]
                 
                 
@@ -168,7 +186,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 # make sure to tell it to use the spectrum output file.
                 self.addChildTarget(ReferenceStructureTarget(
                     [reference_fasta, other_fasta], random.getrandbits(256), 
-                    stats_filename, maf_filename,
+                    stats_filename, maf_filename, hal_filename=hal_filename,
                     spectrum_filename=spectrum_filename, extra_args=extra_args))
         
         
@@ -189,13 +207,28 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 followOns.append(AlignmentTruthComparisonTarget(self.true_maf, 
                 maf_filenames, random.getrandbits(256), 
                 self.truth_basename + "." + scheme))
+        
+        
+        
+        # What genome pairs did we run, in order?
+        genome_pairs = [(self.fasta_list[0], other) 
+            for other in self.fasta_list[1:]]
                 
         # Now we have all the followons for concatenating our stats and
         # comparing against the truth, we need a followon for comparing
         # corresponding MAFs from the same FASTA pair with different schemes,
         # for all combinations of schemes.
-        followOns.append(AlignmentSchemeAgreementTarget(alignments_by_scheme, 
-            random.getrandbits(256), self.agreement_basename))
+        agreement_target = AlignmentSchemeAgreementTarget(alignments_by_scheme,
+            genome_pairs, random.getrandbits(256), self.agreement_basename,
+            bed_root)
+            
+        # After that though, we need to take the BED files and the HAL files and
+        # make assembly hubs in hub_root.
+        hubs_target = AssemblyHubsTarget(hals_by_scheme, genome_pairs, bed_root,
+            self.hub_root)
+            
+        # Do those two things in order.
+        followOns.append(SequenceTarget([agreement_target, hubs_target]))
             
             
         # So we need to run all of the follow-ons in parallel after this job
@@ -211,14 +244,28 @@ class AlignmentSchemeAgreementTarget(jobTree.scriptTree.target.Target):
     
     """
     
-    def __init__(self, alignments_by_scheme, seed, agreement_basename):
+    def __init__(self, alignments_by_scheme, genome_names, seed, 
+        agreement_basename, bed_root):
         """
         Takes a dict of lists of alignments by scheme (arranged so alignments at
-        the same indices are of the same FASTAs), and a file basename to name
-        all results after. Runs all pairwise agreement comparisons.
+        the same indices are of the same FASTAs), a list of pairs of genomes
+        which are compared by each alignment. Sends output to a file basename to
+        name all results after, and a directory in which to build a fairly
+        oragnized tree of BED files.
+        
+        Compares each scheme to each other scheme on corresponding genome pairs.
         
         Uses the seed to generate mafComparator seeds and temporary file names,
         so don't run two copies with the same seed.
+        
+        Each (scheme1, scheme2, genome pair) combination produces a pair of BED
+        files of positions where the two schemes differ. These are saved in:
+            
+        <bed_root>/<scheme1>/<scheme2>/<genome1>-<genome2>/<genome>/<genome>.bed
+        
+        where scheme 1 is the lexicographically smaller scheme,  genome 1 and
+        genome 2 are the genomes as specified in the pair, and <genome> is the
+        genome on which the BED coordinates are given.
         
         """
         
@@ -230,8 +277,14 @@ class AlignmentSchemeAgreementTarget(jobTree.scriptTree.target.Target):
         # Save the alignment names
         self.alignments_by_scheme = alignments_by_scheme
         
+        # And the genome name pairs
+        self.genome_names = genome_names
+        
         # And the agreement file name
         self.agreement_basename = agreement_basename
+        
+        # And the BED root
+        self.bed_root = bed_root
         
         self.logToMaster(
             "Creating AlignmentSchemeAgreementTarget with seed {}".format(seed))
@@ -263,15 +316,32 @@ class AlignmentSchemeAgreementTarget(jobTree.scriptTree.target.Target):
                 rootDir=self.getGlobalTempDir()) 
                 for i in xrange(len(self.alignments_by_scheme[scheme1]))]
             
-            for comparison_filename, alignment1, alignment2 in itertools.izip(
-                comparison_filenames, self.alignments_by_scheme[scheme1], 
-                self.alignments_by_scheme[scheme2]):
+            for comparison_filename, alignment1, alignment2, compared_genomes \
+                in itertools.izip(comparison_filenames, 
+                self.alignments_by_scheme[scheme1], 
+                self.alignments_by_scheme[scheme2], self.genome_names):
                 
                 # For corresponding alignments
                 
-                # Compare them
+                # Find a place for a temporary BED file
+                temp_bed = sonLib.bioio.getTempFile(
+                    rootDir=self.getLocalTempDir()) 
+                
+                # Work out where the split up BED files should land
+                bed_dir = self.bed_root + "/{}/{}/{}-{}".format(scheme1, 
+                    scheme2, compared_genomes[0], compared_genomes[1])
+                
+                # Make sure that directory exists.
+                os.makedirs(bed_dir)
+                
+                # Compare the alignments
                 self.addChildTarget(AlignmentComparisonTarget(alignment1, 
-                    alignment2, random.getrandbits(256), comparison_filename))
+                    alignment2, random.getrandbits(256), comparison_filename,
+                    bed=temp_bed))
+                    
+                # Split the BED file from this comparison out by genome.
+                followOns.append(BedSplitTarget(temp_bed, compared_genomes, 
+                    bed_dir))
                     
             # Concatenate all the comparisons into a file named after both
             # schemes.
@@ -283,6 +353,153 @@ class AlignmentSchemeAgreementTarget(jobTree.scriptTree.target.Target):
         self.setFollowOnTarget(RunTarget(followOns))
                 
         self.logToMaster("AlignmentSchemeAgreementTarget Finished")
+        
+class BedSplitTarget(jobTree.scriptTree.target.Target):
+    """
+    A target which splits a BED up by genome.
+    
+    """
+
+    def __init__(self, bed_file, genomes, out_dir):
+        """
+        Split the given bed file per genome into <genome>/<genome>.bed in the
+        given output directory, using the given list of genomes.
+        
+        out_dir must exist.
+        
+        """
+        
+        # Make the base Target. Ask for 2gb of memory since this is easy.
+        super(BedSplitTarget, self).__init__(memory=2147483648)
+        
+        # Save the arguments
+        self.bed_file = bed_file
+        self.genomes = genomes
+        self.out_dir = out_dir
+        
+            
+    def run(self):
+        """
+        Run this target and do the splitting.
+        
+        """
+    
+        self.logToMaster("Starting BedSplitTarget")
+        
+        for genome in self.genomes:
+            # Make directories for each genome to split out.
+            os.mkdir(self.out_dir + "/" + genome)
+        
+        # Open the output BED file for each genome
+        out_files = [open(self.out_dir + "/{}/{}.bed".format(genome, genome), 
+            "w") for genome in self.genomes]
+            
+        for line in open(self.bed_file):
+            # For each BED record, grab all the parts.
+            parts = line.split()
+            
+            for genome, out_file in itertools.izip(self.genomes, out_files):
+                if parts[0] == genome:
+                    # Send the line to the file corresponding to the matching
+                    # genome. TODO: use a dict or something instead of scanning
+                    # for matching names.
+                    out_file.write(line)
+        
+        self.logToMaster("BedSplitTarget Finished")
+        
+class AssemblyHubsTarget(jobTree.scriptTree.target.Target):
+    """
+    A target that makes assembly hubs showing a bunch of HALs and how they
+    compare to each other.
+    
+    """
+    
+    def __init__(self, hals_by_scheme, genome_names, bed_root, hub_root):
+        """
+        Takes a dict of lists of HAL alignments by scheme (arranged so
+        alignments at the same indices are of the same FASTAs), and a list of
+        the pairs of genomes used to make each hal (in the same order).
+        
+        Also takes the root of a directory tree full of BED files:
+            
+        <bed_root>/<scheme1>/<scheme2>/<genome1>-<genome2>/<genome>/<genome>.bed
+        
+        where scheme 1 is the lexicographically smaller scheme,  genome 1 and
+        genome 2 are the genomes as specified in the pair, and <genome> is the
+        genome on which the BED coordinates are given.
+        
+        Produces a set of assembly hubs in:
+        
+        <hub_root>/<scheme>/<genome1>-<genome2>
+        
+        with one for each genome pair under each scheme.
+        
+        """
+        
+        # Make the base Target. Ask for 2gb of memory since this is easy.
+        super(AssemblyHubsTarget, self).__init__(memory=2147483648)
+        
+        # Save the alignment names
+        self.hals_by_scheme = hals_by_scheme
+        
+        # And the genome name pairs
+        self.genome_names = genome_names
+        
+        # And the BED root
+        self.bed_root = bed_root
+        
+        # And the hub root
+        self.hub_root = hub_root
+        
+        self.logToMaster("Creating AssemblyHubsTarget")
+        
+        
+    def run(self):
+        """
+        Make the assembly hubs.
+        """
+        
+        self.logToMaster("Starting AssemblyHubsTarget")
+        
+        for scheme in self.hals_by_scheme.iterkeys():
+            
+            # Figure out where hubs of this scheme go
+            scheme_root = self.hub_root + "/" + scheme
+            os.mkdir(scheme_root)
+            
+            for i, (genome1, genome2) in enumerate(self.genome_names):
+                # Grab pairs of genomes, and their indices.
+                
+                # Work out its directory name
+                genome_pair = "{}-{}".format(genome1, genome2)
+                
+                # Determine the directory for the assembly hub.
+                hub_dir = scheme_root + "/" + genome_pair
+                
+                # Make a temporary directory for the jobTree tree
+                tree_dir = sonLib.bioio.getTempFile(
+                    rootDir=self.getLocalTempDir())
+                
+                # Work out the bed dirs we want to include (one per other scheme
+                # we compared this one to.
+                bed_dirs = ",".join([self.bed_root + "/{}/{}/{}".format(
+                    scheme, other_scheme, genome_pair) for other_scheme in \
+                    self.hals_by_scheme.iterkeys()])
+
+                
+                # We want to make an assembly hub like so: 
+                               
+                # hal2assemblyHub.py data/alignment1.hal data/alignment1.hub
+                # --jobTree data/tree --bedDirs data/beddir --hub=nocredit
+                # --shortLabel="No Credit" --lod --cpHalFileToOut --noUcscNames
+                check_call(self, ["hal2assemblyHub.py", 
+                    self.hals_by_scheme[scheme][i], hub_dir, "--jobTree", 
+                    tree_dir, "--bedDirs", bed_dirs, "--shortLabel", scheme, 
+                    "--lod", "--cpHalFileToOut", "--noUcscNames"])
+                
+                # TODO: Make that run in parallel with more targets.
+                
+        self.logToMaster("AssemblyHubsTarget Finished")
 
 def parse_args(args):
     """
@@ -309,6 +526,8 @@ def parse_args(args):
         help="filename prefix to save the alignment agreement stats output to")
     parser.add_argument("spectrumBasename", 
         help="filename prefix to save the adjacency component sizes to")
+    parser.add_argument("hubRoot", 
+        help="directory to populate with assembly hubs")
     parser.add_argument("fastas", nargs="+",
         help="FASTA files to index")
     parser.add_argument("--seed", default=random.getrandbits(256),
@@ -348,13 +567,13 @@ def main(args):
     # Don't try to import * because that's illegal.
     if __name__ == "__main__":
         from compareSchemes import SchemeAssessmentTarget, \
-            AlignmentSchemeAgreementTarget
+            AlignmentSchemeAgreementTarget, BedSplitTarget, AssemblyHubsTarget
         
     # Make a stack of jobs to run
     stack = jobTree.scriptTree.stack.Stack(SchemeAssessmentTarget(
         options.fastas, options.trueMaf, options.seed, options.coverageBasename, 
         options.agreementBasename, options.spectrumBasename,
-        options.truthBasename))
+        options.truthBasename, options.hubRoot))
     
     print "Starting stack"
     

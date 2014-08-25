@@ -54,6 +54,57 @@ class RunTarget(jobTree.scriptTree.target.Target):
             self.addChildTarget(target)
                 
         self.logToMaster("RunTarget Finished")
+        
+class SequenceTarget(jobTree.scriptTree.target.Target):
+    """
+    A target that runs a list of targets in succession. This is kind of a hack
+    around the way JobTree wants you to think, but I need it to keep my targets
+    from becoming dependent on what needs to use their results.
+    
+    """
+    
+    def __init__(self, targets):
+        """
+        Maker a new target which runs the targets in the list in the order they
+        appear in.
+        
+        """
+        
+        # Make the base Target. Ask for 2gb of memory since this is easy.
+        super(SequenceTarget, self).__init__(memory=2147483648)
+        
+        if len(targets) > 0:
+            # If we have a first target, split that out.
+            self.first = targets[0]
+        else:
+            self.first = None
+        
+        if len(targets) > 1:
+            # If we have more than that, wrap them up in a linked list of
+            # SequenceTargets.
+            self.next = SequenceTarget(targets[1:])
+        else:
+            self.next = None
+            
+    def run(self):
+        """
+        Run this target and all subsequent ones.
+        
+        """
+    
+        self.logToMaster("Starting SequenceTarget")
+    
+        if self.first is not none:
+            # Run the head of the linked list.
+            self.addChildTarget(self.first)
+            
+        if self.next is not None:
+            # Continue on with the rest of it.
+            self.setFollowOnTarget(self.next)
+        
+        self.logToMaster("SequenceTarget Finished")
+    
+    
 
 class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
     """
@@ -62,7 +113,7 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
     """
     
     def __init__(self, fasta_list, seed, coverage_filename, alignment_filename,
-        spectrum_filename=None, extra_args=[]):
+        hal_filename=None, spectrum_filename=None, extra_args=[]):
         """
         Make a new Target for building a reference structure from the given
         FASTAs, using the specified RNG seed, and writing coverage statistics to
@@ -74,6 +125,9 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         Those coverage statistics are, specifically, alignment coverage of a
         genome vs. the order number at which the genome is added, and they are
         saved in a <genome number>\t<coverage fraction> TSV.
+        
+        If hal_filename is specified, the HAL file will be written there instead
+        of a temporary file.
         
         If spectrum_filename is specified, saves the adjacency component size
         spectrum to the given file, as a TSV of <size>\t<count> lines.
@@ -98,8 +152,11 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         # Save the coverage file name to use
         self.coverage_filename = coverage_filename
         
-        # And the alignemnt filename to use
+        # And the (MAF) alignemnt filename to use
         self.alignment_filename = alignment_filename
+        
+        # And the HAL filename to use, if any
+        self.hal_filename = hal_filename
         
         # And the spectrum filename to use, if any
         self.spectrum_filename = spectrum_filename
@@ -217,8 +274,9 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         # FASTA names without their extensions. 
         tree = "(" + ",".join(genomes) + ")rootSeq;"
         
-        # Where should we save it?
-        hal_filename = sonLib.bioio.getTempFile(rootDir=self.getLocalTempDir())
+        # Where should we save it? ("" isn't a filename so this or is OK)
+        hal_filename = self.hal_filename or sonLib.bioio.getTempFile(
+            rootDir=self.getLocalTempDir())
         
         self.logToMaster("Creating HAL with tree: {}".format(tree))
         
