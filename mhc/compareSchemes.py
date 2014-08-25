@@ -265,7 +265,7 @@ class AlignmentSchemeAgreementTarget(jobTree.scriptTree.target.Target):
         Each (scheme1, scheme2, genome pair) combination produces a pair of BED
         files of positions where the two schemes differ. These are saved in:
             
-        <bed_root>/<scheme1>/<scheme2>/<genome1>-<genome2>/<genome>/<genome>.bed
+        <bed_root>/<scheme1>-<scheme2>-<genome1>-<genome2>/<genome>/<genome>.bed
         
         where scheme 1 is the lexicographically smaller scheme,  genome 1 and
         genome 2 are the genomes as specified in the pair, and <genome> is the
@@ -332,7 +332,7 @@ class AlignmentSchemeAgreementTarget(jobTree.scriptTree.target.Target):
                     rootDir=self.getGlobalTempDir()) 
                 
                 # Work out where the split up BED files should land
-                bed_dir = self.bed_root + "/{}/{}/{}-{}".format(scheme1, 
+                bed_dir = self.bed_root + "/{}-{}-{}-{}".format(scheme1, 
                     scheme2, compared_genomes[0], compared_genomes[1])
                 
                 # Make sure that directory exists.
@@ -347,7 +347,7 @@ class AlignmentSchemeAgreementTarget(jobTree.scriptTree.target.Target):
                 # Override the feature names to be meaningful and list the
                 # scheme we're comparing against.
                 followOns.append(BedSplitTarget(temp_bed, compared_genomes, 
-                    bed_dir, feature_name="{}{}".format(scheme1, scheme2)))
+                    bed_dir, feature_name="{}-{}".format(scheme1, scheme2)))
                     
             # Concatenate all the comparisons into a file named after both
             # schemes.
@@ -459,7 +459,7 @@ class AssemblyHubsTarget(jobTree.scriptTree.target.Target):
         
         Also takes the root of a directory tree full of BED files:
             
-        <bed_root>/<scheme1>/<scheme2>/<genome1>-<genome2>/<genome>/<genome>.bed
+        <bed_root>/<scheme1>-<scheme2>-<genome1>-<genome2>/<genome>/<genome>.bed
         
         where scheme 1 is the lexicographically smaller scheme,  genome 1 and
         genome 2 are the genomes as specified in the pair, and <genome> is the
@@ -531,7 +531,7 @@ class AssemblyHubsTarget(jobTree.scriptTree.target.Target):
                     if other != scheme])
                     
                 # Get the directory each pair would produce    
-                bed_dirs = [self.bed_root + "/{}/{}/{}".format(scheme1, scheme2,
+                bed_dirs = [self.bed_root + "/{}-{}-{}".format(scheme1, scheme2,
                     genome_pair) for (scheme1, scheme2) in possible_bed_pairs]
                     
                 # Keep the ones that exist and make a string of them.
