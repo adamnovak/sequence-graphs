@@ -163,6 +163,12 @@ void FMDIndexTests::testDisplay() {
     // And the second
     CPPUNIT_ASSERT(index->displayContig(1) == 
         "CGGGCGCATCGCTATTATTTCTTTCTCTTTTCACA");
+        
+    std::string contig1("CGGGCGCATCGCTATTATTTCTTTCTCTTTTCACA");
+        
+    for(size_t i = 0; i < contig1.size(); i++) {
+        CPPUNIT_ASSERT_EQUAL(contig1[i], index->display(1, i)); 
+    }
 }
 
 /**

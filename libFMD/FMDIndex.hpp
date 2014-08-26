@@ -251,6 +251,12 @@ public:
     char display(int64_t index) const;
     
     /**
+     * Get the character at a given offset into the given contig. TODO: this is
+     * not very efficient at all.
+     */
+    char display(size_t offset, size_t contig) const;  
+    
+    /**
      * Get the character in the first column of the given row in the BWT matrix.
      */
     char displayFirst(int64_t index) const;

@@ -749,6 +749,25 @@ char FMDIndex::display(int64_t index) const {
     return bwt.getChar(index);
 }
 
+char FMDIndex::display(size_t contig, size_t offset) const {
+    // We need to loop through the contig from the back end until we get to the
+    // right position.
+    
+    // How far from the back do we need to be?
+    size_t backOffset = getContigLength(contig) - offset - 1;
+    
+    // Where are we in the BWT?
+    int64_t bwtIndex = getContigEndIndex(contig);
+    
+    while(backOffset > 0) {
+        // Go left until we find the right letter.
+        bwtIndex = getLF(bwtIndex);
+        backOffset--;
+    }
+    
+    return display(bwtIndex);
+}
+
 char FMDIndex::displayFirst(int64_t index) const {
     // Our BWT supports this natively.
     return bwt.getF(index);
