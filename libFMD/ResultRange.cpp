@@ -14,7 +14,7 @@ ResultRange::ResultRange(const FMDIndex& field, size_t queryLength):
 }
 
 ResultRange ResultRange::extendLeftMatch(const FMDIndex& index,
-    const std::string& query) {
+    const std::string& query) const {
     
     // Copy ourselves
     ResultRange toReturn(*this);
@@ -37,7 +37,7 @@ ResultRange ResultRange::extendLeftMatch(const FMDIndex& index,
 }
 
 std::array<ResultRange, 3> ResultRange::extendLeftMismatch(
-    const FMDIndex& index, const std::string& query) {
+    const FMDIndex& index, const std::string& query) const {
 
     // Make the array, copying ourselves 3 times.
     std::array<ResultRange, 3> toReturn = {*this, *this, *this};
@@ -65,7 +65,7 @@ std::array<ResultRange, 3> ResultRange::extendLeftMismatch(
             toReturn[nextResult].searchStringStart--;
             index.extendLeftOnly(toReturn[nextResult].position, base);
             // Make sure to log the mismatch.
-            toReturn[nextResult].mismatches.push(
+            toReturn[nextResult].mismatches.push_back(
                 toReturn[nextResult].searchStringStart);
             
             // And use up that result slot.
@@ -84,13 +84,13 @@ std::array<ResultRange, 3> ResultRange::extendLeftMismatch(
     // Return the array of results.
     return toReturn;
 }
-ResultRange ResultRange::retractRight(const FMDIndex& index) {
+ResultRange ResultRange::retractRight(const FMDIndex& index) const {
     // Copy ourselves.
     ResultRange toReturn(*this);
     
     if(toReturn.mismatches.front() == toReturn.searchStringEnd) {
         // We're retracting off a mismatch. Remove it.
-        toReturn.mismatches.pop();
+        toReturn.mismatches.pop_front();
     }
     
     // Throw a character out of the search string.
@@ -102,18 +102,33 @@ ResultRange ResultRange::retractRight(const FMDIndex& index) {
     return toReturn;
 }
 
-bool ResultRange::isEmpty(GenericBitVector* mask) {
+bool ResultRange::isEmpty(GenericBitVector* mask) const {
     return position.isEmpty(mask);
 }
 
-size_t ResultRange::getLength(GenericBitVector* mask) {
+size_t ResultRange::getLength(GenericBitVector* mask) const {
     return position.getLength(mask);
 }
 
-size_t ResultRange::getSearchStringLength() {
+size_t ResultRange::getSearchStringLength() const {
     return searchStringEnd - searchStringStart;
 }
 
+size_t ResultRange::mismatchesUsed() const {
+    return mismatches.size();
+}
+
+bool ResultRange::operator==(const ResultRange& other) const {
+    
+    
+    return(position == other.position && 
+        searchStringStart == other.searchStringStart && 
+        searchStringEnd == other.searchStringEnd && 
+        mismatches.size() == other.mismatches.size() && 
+        std::equal(mismatches.begin(), mismatches.end(), 
+        other.mismatches.begin()));
+        
+}
 
 
 

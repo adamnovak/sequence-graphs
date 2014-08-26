@@ -1,7 +1,7 @@
 #ifndef RESULTRANGE_HPP
 #define RESULTRANGE_HPP
 
-#include <queue>
+#include <deque>
 #include <array>
 #include "GenericBitVector.hpp"
 #include "FMDIndex.hpp"
@@ -36,7 +36,7 @@ public:
      * (which may be empty). The range being extended may not be empty.
      */
     ResultRange extendLeftMatch(const FMDIndex& index,
-        const std::string& query);
+        const std::string& query) const;
     
     /**
      * Try extending on the left with all 3 possible mismatches. Return all 3
@@ -44,31 +44,41 @@ public:
      * extended must not be empty.
      */
     std::array<ResultRange, 3> extendLeftMismatch(const FMDIndex& index, 
-        const std::string& query);
+        const std::string& query) const;
         
     /**
      * Retract one character on the right, forgetting its mismatch if necessary.
      * The range being retracted must not be empty, and it must have a nonempty
      * search string.
      */
-    ResultRange retractRight(const FMDIndex& index);
+    ResultRange retractRight(const FMDIndex& index) const;
     
     /**
      * Return whether the range is empty or not under the given mask if any.
      */
-    bool isEmpty(GenericBitVector* mask = NULL);
+    bool isEmpty(GenericBitVector* mask = NULL) const;
     
     /**
      * Return the number of items in the range, under the given bitvector mask
      * if any.
      */
-    size_t getLength(GenericBitVector* mask = NULL);
+    size_t getLength(GenericBitVector* mask = NULL) const;
     
     /**
      * Return the number of characters in the search string for this result
      * range.
      */
-    size_t getSearchStringLength();
+    size_t getSearchStringLength() const;
+    
+    /**
+     * Count the number of mismatches used by this ResultRange.
+     */
+    size_t mismatchesUsed() const;
+    
+    /**
+     * Provide equality.
+     */
+    bool operator==(const ResultRange& other) const;
 
     /**
      * Copy is OK.
@@ -104,7 +114,7 @@ private:
     // Which positions in the search string are included as mismatches? These
     // are sorted in ascending order; new ones are added at the back and old
     // ones are popped off at the front.
-    std::queue<size_t> mismatches;
+    std::deque<size_t> mismatches;
     
 
 };
