@@ -1791,9 +1791,13 @@ Mapping FMDIndex::disambiguate(const Mapping& left,
 
 MisMatchAttemptResults FMDIndex::misMatchExtend(MisMatchAttemptResults& prevMisMatches,
         char c, bool backward, size_t z_max, const GenericBitVector* mask, bool startExtension, bool finishExtension) const {
+    
+    // Copy over to a new result
     MisMatchAttemptResults nextMisMatches;
     nextMisMatches.is_mapped = prevMisMatches.is_mapped;
     nextMisMatches.characters = prevMisMatches.characters;
+    nextMisMatches.maxCharacters = prevMisMatches.maxCharacters;
+    
     
     // Note that we do not flip parameters when !backward since
     // FMDIndex::misMatchExtend uses FMDIndex::extend which performs
@@ -1981,7 +1985,7 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
                 " in range #" << range << std::endl;
             
                 // Remember that this base mapped to this range
-                mappings.push_back(std::make_pair(range,searchExtend.maxCharacters - 1));
+                mappings.push_back(std::make_pair(range,search.maxCharacters - 1));
             
                 // We definitely have a non-empty FMDPosition to continue from
             } else {
@@ -2024,10 +2028,17 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
                 // If no mismatch extension results exist, we can safely extend by the correct base
                 // and be assured we are passing forward a complete set of search results
                 
+                Log::debug() << "Max characters before: " << search.maxCharacters << 
+                    std::endl;
+                
                 Log::debug() << "Extending with position " << i << std::endl;
                 
                 search = this->misMatchExtend(search, query[i], true, z_max, mask, true, false);
                 search.characters++;
+                search.maxCharacters++;
+                
+                Log::debug() << "Max characters after: " << search.maxCharacters << 
+                    std::endl;
                 
                 // What range index does our current left-side position (the one we just
                 // moved) correspond to, if any?
@@ -2055,12 +2066,13 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
                     // subsumed by a range.
                     
                     Log::debug() << "Mapped " << search.characters << 
-                    " context to " << search.positions.front().first << " in range #" << range <<
-                    std::endl;
+                        " context, " << search.maxCharacters << " max to " << 
+                        search.positions.front().first << " in range #" << 
+                        range << std::endl;
                 
                 
                     // Remember that this base mapped to this range
-                    mappings.push_back(std::make_pair(range,searchExtend.characters - 1));
+                    mappings.push_back(std::make_pair(range,search.maxCharacters - 1));
                 
                     // We definitely have a non-empty FMDPosition to continue from
                     
@@ -2212,7 +2224,7 @@ MisMatchAttemptResults FMDIndex::misMatchMapPosition(const GenericBitVector& ran
         
         
         if(!result.is_mapped && new_result.positions.front().first.range(ranges, mask) != -1 &&
-          new_result.positions.size() == 1 && new_result.characters >= minContext) {
+          new_result.positions.size() == 1 && new_result.characters + 1 >= minContext) {
             // We will successfully map to exactly one range. Update our result
             // to reflect the additional extension and our success.
             

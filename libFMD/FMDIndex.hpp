@@ -362,7 +362,9 @@ public:
      * Exact left-map with ranges to a genome by original restart-based
      * algorithm.
      *
-     * minContext is the minuimum number of bases of context needed to map.
+     * minContext is the minuimum number of bases of context needed to map,
+     * including the base being mapped.
+     *
      * addContext is the number of bases required after uniqueness in order to 
      * map.
      */

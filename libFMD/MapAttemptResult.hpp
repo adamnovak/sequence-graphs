@@ -32,6 +32,7 @@ struct MisMatchAttemptResults
     // minimum context length from inside the misMatch mapping function, else
     // we'll funnel down our priority queue too early in the case of a unique
     // hit below minimum context length
+    // TODO: What's the difference here?
     size_t characters;
     size_t maxCharacters;
     

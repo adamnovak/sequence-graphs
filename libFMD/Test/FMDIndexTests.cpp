@@ -401,6 +401,19 @@ void FMDIndexTests::testContextLimit() {
         // Make sure no base maps this way either.
         CPPUNIT_ASSERT(mappings[i].is_mapped == false);
     }
+    
+    // And one where we actually get mappings.
+    mappings = index->mapLeft(query, -1, 10);
+    
+    for(size_t i = 0; i < query2.size(); i++ ) {
+        // Make sure only bases at positions 9+ map. Position 9 is at the end of
+        // a length 10 string and so should map.
+        if(i < 9) {
+            CPPUNIT_ASSERT(mappings[i].is_mapped == false);
+        } else {
+            CPPUNIT_ASSERT(mappings[i].is_mapped == true);
+        }
+    }
 }
 
 /**
@@ -430,9 +443,10 @@ void FMDIndexTests::testAddContext() {
         (GenericBitVector*)NULL, 0, 0);
         
     for(size_t i = 0; i < mappings.size(); i++) {
-        Log::output() << "Mapping " << i << ": " << mappings[i].first << "," << mappings[i].second << 
-            " vs " << mappingsExact[i].first  << "," << mappingsExact[i].second << std::endl;
-        CPPUNIT_ASSERT(mappings[i].first == mappingsExact[i].first);
+        Log::output() << "Mapping " << i << ": " << mappings[i].first << "," <<
+            mappings[i].second << " vs " << mappingsExact[i].first  << "," << 
+            mappingsExact[i].second << std::endl;
+        CPPUNIT_ASSERT(mappings[i] == mappingsExact[i]);
     }
         
     // The A in ACTCT should be the last mapped thing
@@ -445,16 +459,32 @@ void FMDIndexTests::testAddContext() {
     mappingsExact = index->map(bv, query, (GenericBitVector*)NULL, 0, 3);
     
     for(size_t i = 0; i < mappings.size(); i++) {
-        Log::output() << "Mapping " << i << ": " << mappings[i].first << 
-            " vs " << mappingsExact[i].first << std::endl;
-        CPPUNIT_ASSERT(mappings[i].first == mappingsExact[i].first);
+        Log::output() << "Mapping " << i << ": " << mappings[i].first << "," <<
+            mappings[i].second << " vs " << mappingsExact[i].first  << "," << 
+            mappingsExact[i].second << std::endl;
+        CPPUNIT_ASSERT(mappings[i] == mappingsExact[i]);
     }
     
     // The G in GCGACTCT should be the last mapped thing
     CPPUNIT_ASSERT(mappings[27].first != -1);
     CPPUNIT_ASSERT(mappings[28].first == -1);
     
+    // And a nonzero min context
+    mappings = index->misMatchMap(bv, query, (GenericBitVector*)NULL, 10, 0, 0);
     
+    mappingsExact = index->map(bv, query, (GenericBitVector*)NULL, 10, 0);
+    
+    for(size_t i = 0; i < mappings.size(); i++) {
+        Log::output() << "Mapping " << i << ": " << mappings[i].first << "," <<
+            mappings[i].second << " vs " << mappingsExact[i].first  << "," << 
+            mappingsExact[i].second << std::endl;
+        CPPUNIT_ASSERT(mappings[i] == mappingsExact[i]);
+    }
+    
+    // The first C in CTGCGACTCT should be the last mapped thing, because it's
+    // at the start of a length-10 string.
+    CPPUNIT_ASSERT(mappings[25].first != -1);
+    CPPUNIT_ASSERT(mappings[26].first == -1);
 
 }
 
