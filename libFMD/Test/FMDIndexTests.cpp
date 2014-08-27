@@ -486,6 +486,23 @@ void FMDIndexTests::testAddContext() {
     CPPUNIT_ASSERT(mappings[25].first != -1);
     CPPUNIT_ASSERT(mappings[26].first == -1);
 
+    // And a nonzero min context with an addContext
+    mappings = index->misMatchMap(bv, query, (GenericBitVector*)NULL, 10, 8, 0);
+    
+    mappingsExact = index->map(bv, query, (GenericBitVector*)NULL, 10, 8);
+    
+    for(size_t i = 0; i < mappings.size(); i++) {
+        Log::output() << "Mapping " << i << ": " << mappings[i].first << "," <<
+            mappings[i].second << " vs " << mappingsExact[i].first  << "," << 
+            mappingsExact[i].second << std::endl;
+        CPPUNIT_ASSERT(mappings[i] == mappingsExact[i]);
+    }
+    
+    // ATCT is unique, and then GCGACTCT after it is 8 extra characters, so
+    // that first A should be the last thing to map.
+    CPPUNIT_ASSERT(mappings[23].first != -1);
+    CPPUNIT_ASSERT(mappings[24].first == -1);
+
 }
 
 /**

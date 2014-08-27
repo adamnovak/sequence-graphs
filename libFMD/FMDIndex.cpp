@@ -1357,8 +1357,8 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
 
             Log::debug() << "Failed at " << location.position << " (" << 
                 location.position.ranges(ranges, mask) <<
-                " options for " << location.characters << " context)." << 
-                std::endl;
+                " options for " << location.characters << " context, " << 
+                extraContext << " extra )." << std::endl;
                 
             if(location.is_mapped && location.position.isEmpty(mask)) {
                 // We extended right until we got no results. We need to try
@@ -2178,11 +2178,16 @@ MisMatchAttemptResults FMDIndex::misMatchMapPosition(const GenericBitVector& ran
         result.is_mapped = true;    
         return result;
     } else if (result.positions.front().first.range(ranges, mask) != -1) {
-        // We've already mapped.
+        // We've already become unique.
 
         *extraContext = 0;
-        result.is_mapped = true;
-        return result;
+        
+        if(minContext <= 1 && addContext == 0) {
+            // And we just need to be unique to map
+        
+            result.is_mapped = true;
+            return result;
+        }
     }
     
     std::vector<std::pair<FMDPosition,size_t>> found_positions;
@@ -2222,24 +2227,40 @@ MisMatchAttemptResults FMDIndex::misMatchMapPosition(const GenericBitVector& ran
             }
         }
         
+        Log::debug() << "Extra context: " << *extraContext << std::endl;
         
         if(!result.is_mapped && new_result.positions.front().first.range(ranges, mask) != -1 &&
-          new_result.positions.size() == 1 && new_result.characters + 1 >= minContext) {
+          new_result.positions.size() == 1) {
             // We will successfully map to exactly one range. Update our result
-            // to reflect the additional extension and our success.
+            // to reflect the additional extension.
             
-            // We have no extra context since we will become unique on the next
-            // step.
-            *extraContext = 0;
+            // However, we may not have enough context to report this mapping,
+            // so sit on it by default.
             
-            Log::debug() << "Will become unique at index " << index + 1 <<
-                std::endl;
+            // If this it the first time through, we have 0 extra context (from
+            // -1). Otherwise, this counts as extra context even if we haven't
+            // met the min context.
+            (*extraContext)++;
+            
+            
             
             result.positions = new_result.positions;
             result.characters++;
             result.maxCharacters++;
-            result.is_mapped = true;
-            found_positions = result.positions;      
+            
+            if(result.characters >= minContext) {
+                // We do have enough context to report this mapping.
+                
+                result.is_mapped = true;
+                found_positions = result.positions;
+                
+                Log::debug() << "Will become unique at " << index  << 
+                    std::endl;
+            } else {
+                Log::debug() << 
+                    "Will become unique with insufficient context at " << 
+                    index << std::endl;
+            }   
         } else if(result.is_mapped && new_result.positions.front().first.range(ranges, mask) != -1) {
             
             // We have mapped to a single range after previously having done
@@ -2248,7 +2269,7 @@ MisMatchAttemptResults FMDIndex::misMatchMapPosition(const GenericBitVector& ran
             // Add 1 to the extra context after being unique.
             (*extraContext)++;
             
-            Log::debug() << "Will add context at index " << index + 1 <<
+            Log::debug() << "Will add context at index " << index <<
                 std::endl;
         
             result.positions = new_result.positions;
@@ -2259,7 +2280,7 @@ MisMatchAttemptResults FMDIndex::misMatchMapPosition(const GenericBitVector& ran
             // Otherwise, we still map to a plurality of ranges. Record the
             // extension and loop again.
             
-            Log::debug() << "Will multimap at index " << index + 1 <<
+            Log::debug() << "Will multimap at index " << index <<
                 std::endl;
             
             result.positions = new_result.positions;
