@@ -13,8 +13,6 @@ class Thread : public std::thread {
 
 public:
    
-#define SINGLE_THREAD
-    
 #ifdef SINGLE_THREAD
     /**
      * This mirrors the std::thread constructor exactly, but runs the thread
@@ -22,14 +20,11 @@ public:
      */
     template<typename _Callable, typename... _Args>
     explicit Thread(_Callable&& __f, _Args&&... __args): std::thread([]() {}) {
-            
+        
+        // Run right away.    
         std::bind(__f, __args...)();
         
     }
-                    
-        
-            
-               
 #else
     /**
      * This mirrors the std::thread constructor exactly.
