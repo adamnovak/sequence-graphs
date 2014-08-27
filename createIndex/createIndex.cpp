@@ -968,11 +968,15 @@ void saveLevelIndex(
  * 
  * If a context is specified, will not merge on fewer than that many bases of
  * context on a side, whether there is a unique mapping or not.
+ *
+ * If an addContext is specified, will require contexts extended out that far
+ * beyond where a unique result is obtained in order to map.
  */
 stPinchThreadSet*
 mergeGreedy(
     const FMDIndex& index,
     size_t context = 0,
+    size_t addContext = 0,
     bool credit = false,
     std::string mapType = "LRexact",
     bool mismatch = false,
@@ -1006,7 +1010,7 @@ mergeGreedy(
         // and also the bitmask of what bottom-level things to count. We also
         // need to tell it what genome to map the contigs of.
         MappingMergeScheme scheme(index, *mergedRuns.first, mergedRuns.second,
-            *includedPositions, genome, context, credit, mapType,
+            *includedPositions, genome, context, addContext, credit, mapType,
 	    mismatch, z_max);
 
         // Set it running and grab the queue where its results come out.
@@ -1245,6 +1249,9 @@ main(
         ("context", boost::program_options::value<size_t>()
             ->default_value(0), 
             "Minimum required context length to merge on")
+        ("addContext", boost::program_options::value<size_t>()
+            ->default_value(0), 
+            "Extra context beyond that needed to be unique for greedy LR")
         ("sampleRate", boost::program_options::value<unsigned int>()
             ->default_value(64), 
             "Set the suffix array sample rate to use")
@@ -1382,7 +1389,8 @@ main(
     } else if(mergeScheme == "greedy") {
         // Use the greedy merge instead.
         threadSet = mergeGreedy(index, options["context"].as<size_t>(), 
-            creditBool, mapType, mismatchb, options["mismatches"].as<size_t>());
+            options["addContext"].as<size_t>(), creditBool, mapType, mismatchb,
+            options["mismatches"].as<size_t>());
     } else {
         // Complain that's not a real merge scheme. TODO: Can we make the
         // options parser parse an enum or something instead of this?

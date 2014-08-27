@@ -11,11 +11,12 @@ MappingMergeScheme::MappingMergeScheme(const FMDIndex& index,
     const GenericBitVector& rangeVector, 
     const std::vector<std::pair<std::pair<size_t, size_t>, bool> >& rangeBases, 
     const GenericBitVector& includedPositions, size_t genome, size_t minContext, 
-    bool credit, std::string mapType, bool mismatch, size_t z_max) :
-    MergeScheme(index), threads(), queue(NULL), rangeVector(rangeVector), 
-    rangeBases(rangeBases), includedPositions(includedPositions), 
-    genome(genome), minContext(minContext), credit(credit), mapType(mapType),
-    mismatch(mismatch), z_max(z_max) {
+    size_t addContext, bool credit, std::string mapType, bool mismatch, 
+    size_t z_max) : MergeScheme(index), threads(), queue(NULL), 
+    rangeVector(rangeVector), rangeBases(rangeBases), 
+    includedPositions(includedPositions), genome(genome), 
+    minContext(minContext), addContext(addContext), credit(credit),
+    mapType(mapType), mismatch(mismatch), z_max(z_max) {
     
     // Nothing to do
     
@@ -630,22 +631,22 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
         
         // Map it on the right
         rightMappings = index.misMatchMap(rangeVector, contig,
-            &includedPositions, minContext, z_max);
+            &includedPositions, minContext, addContext, z_max);
         
         // Map it on the left
         leftMappings = index.misMatchMap(rangeVector, 
             reverseComplement(contig), &includedPositions, minContext, 
-            z_max); 
+            addContext, z_max); 
                 
     } else {
                 
         // Map it on the right
         rightMappings = index.map(rangeVector, contig, &includedPositions, 
-            minContext);
+            minContext, addContext);
     
         // Map it on the left
         leftMappings = index.map(rangeVector, reverseComplement(contig), 
-            &includedPositions, minContext);
+            &includedPositions, minContext, addContext);
     
     }
     

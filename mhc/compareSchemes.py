@@ -82,6 +82,44 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         self.logToMaster(
             "Creating SchemeAssessmentTarget with seed {}".format(seed))
         
+   
+    def generateSchemes(self):
+        """
+        Yield tuples of (scheme name, extra args list) for all the schemes we
+        want to do.
+        
+        """
+        
+        for mismatch, credit in itertools.product([False, True], repeat=2):
+            # For all combinations of mismatch and credit
+            for min_context in [50, 100]:
+                # And min context length
+                for add_context in [0, 30]:
+                    # And additional context
+                    
+                    # Start out with the context args
+                    extra_args = ["--context", str(min_context), "--addContext",
+                        str(add_context)]
+            
+                    # And give it a name to stick on our output files
+                    scheme_base = "Exact"
+                    if mismatch:
+                        # Add the args and scheme name component for mismatch
+                        extra_args.append("--mismatch")
+                        extra_args.append("--mismatches")
+                        extra_args.append("1")
+                        scheme_base = "Inexact"
+                    if credit:
+                        # Add the args and scheme name component for credit
+                        extra_args.append("--credit")
+                        scheme_base += "Credit"
+                        
+                    # Put together the full scheme name and yield it with the
+                    # args.
+                    yield ("{}Min{}Add{}".format(scheme_base, min_context, 
+                        add_context), extra_args)
+        
+        
         
     def run(self):
         """
@@ -108,26 +146,11 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # And a similar structure for HALs
         hals_by_scheme = {}
         
-        for mismatch, credit in itertools.product([False, True], repeat=2):
-            # Decide if we want mismatches and credit for this run.
+        for scheme, extra_args in self.generateSchemes():
+            # Work out all the schemes we want to run.
             
-            self.logToMaster("Preparing for mismatch: {} credit: {}".format(
-                mismatch, credit))
+            self.logToMaster("Preparing for scheme {}...".format(scheme))
 
-            # Prepare the extra args that we want to send to createIndex to tell
-            # it to use this scheme. Start out just setting context length
-            extra_args = ["--context", "100"]
-            # And give it a name to stick on our output files
-            scheme = "Exact"
-            if mismatch:
-                extra_args.append("--mismatch")
-                extra_args.append("--mismatches")
-                extra_args.append("1")
-                scheme = "Inexact"
-            if credit:
-                extra_args.append("--credit")
-                scheme += "Credit"
-            
             # Grab the reference FASTA (first in the list)
             reference_fasta = self.fasta_list[0]
             
@@ -423,7 +446,7 @@ class BedSplitTarget(jobTree.scriptTree.target.Target):
                     parts[3] = self.feature_name
                 elif len(parts) == 3:
                     # Add names to features without them.
-                    parts.append(feature_name)
+                    parts.append(self.feature_name)
             
             if len(parts) == 1 and parts[0] == "":
                 # Skip any blank lines
@@ -510,47 +533,112 @@ class AssemblyHubsTarget(jobTree.scriptTree.target.Target):
                 # Grab pairs of genomes, and their indices.
                 
                 # Work out its directory name
-                genome_pair = "{}-{}".format(genome1, genome2)
+                genome_string = "{}-{}".format(genome1, genome2)
                 
                 # Determine the directory for the assembly hub.
-                hub_dir = scheme_root + "/" + genome_pair
+                hub_dir = scheme_root + "/" + genome_string
                 
-                # Make a temporary directory for the jobTree tree
-                tree_dir = sonLib.bioio.getTempDirectory(
-                    rootDir=self.getLocalTempDir())
-                    
-                # Make sure it doesn't exist yet
-                os.rmdir(tree_dir)
-                
-                # Get all the pairs of schemes involving this one
-                possible_bed_pairs = ([(scheme, other) 
-                    for other in self.hals_by_scheme.iterkeys() 
-                    if other != scheme] + 
-                    [(other, scheme) 
-                    for other in self.hals_by_scheme.iterkeys() 
-                    if other != scheme])
-                    
-                # Get the directory each pair would produce    
-                bed_dirs = [self.bed_root + "/{}-{}-{}".format(scheme1, scheme2,
-                    genome_pair) for (scheme1, scheme2) in possible_bed_pairs]
-                    
-                # Keep the ones that exist and make a string of them.
-                bed_dirs_string = ",".join([directory for directory in bed_dirs
-                    if os.path.exists(directory)])
-                
-                # We want to make an assembly hub like so: 
-                               
-                # hal2assemblyHub.py data/alignment1.hal data/alignment1.hub
-                # --jobTree data/tree --bedDirs data/beddir --hub=nocredit
-                # --shortLabel="No Credit" --lod --cpHalFileToOut --noUcscNames
-                check_call(self, ["hal2assemblyHub.py", 
-                    self.hals_by_scheme[scheme][i], hub_dir, "--jobTree", 
-                    tree_dir, "--bedDirs", bed_dirs_string, "--shortLabel", 
-                    scheme, "--lod", "--cpHalFileToOut", "--noUcscNames"])
-                
-                # TODO: Make that run in parallel with more targets.
+                # Make a child target to make this actual hub
+                self.addChildTarget(AssemblyHubTarget(
+                    self.hals_by_scheme[scheme][i], scheme, 
+                    self.hals_by_scheme.keys(), (genome1, genome2), 
+                    self.bed_root, hub_dir))
                 
         self.logToMaster("AssemblyHubsTarget Finished")
+        
+class AssemblyHubTarget(jobTree.scriptTree.target.Target):
+    """
+    A target that makes a single assembly hub showing a HAL and some BEDs.
+    
+    """
+    
+    def __init__(self, hal, scheme, scheme_names, genome_pair, bed_root, hub):
+        """
+        Takes a hal alignment and a scheme name, along with the names of all the
+        other schemes to compare against (possibly including itself, which will
+        be skipped).
+        
+        Also takes the pair (as a tuple) of genomes we are making the hub for.
+        
+        Also takes the root of a directory tree full of BED files:
+            
+        <bed_root>/<scheme1>-<scheme2>-<genome1>-<genome2>/<genome>/<genome>.bed
+        
+        where scheme 1 is the lexicographically smaller scheme,  genome 1 and
+        genome 2 are the genomes as specified in the pair, and <genome> is the
+        genome on which the BED coordinates are given.
+        
+        Produces an assembly hub in the hub directory.
+        
+        """
+        
+        # Make the base Target. Ask for 2gb of memory since this is easy.
+        super(AssemblyHubTarget, self).__init__(memory=2147483648)
+        
+        # Save the alignment file
+        self.hal = hal
+        
+        # And the scheme
+        self.scheme = scheme
+        
+        # And all the other schemes to compare against
+        self.scheme_names = scheme_names
+        
+        # And the genome name pair
+        self.genome_pair = genome_pair
+        
+        # And the BED root
+        self.bed_root = bed_root
+        
+        # And the hub directory
+        self.hub = hub
+        
+        self.logToMaster("Creating AssemblyHubsTarget")
+        
+        
+    def run(self):
+        """
+        Make the assembly hubs.
+        """
+        
+        self.logToMaster("Starting AssemblyHubTarget")
+        
+                
+        # Make a temporary directory for the jobTree tree
+        tree_dir = sonLib.bioio.getTempDirectory(
+            rootDir=self.getLocalTempDir())
+            
+        # Make sure it doesn't exist yet
+        os.rmdir(tree_dir)
+        
+        # Get all the pairs of schemes involving this one
+        possible_bed_pairs = ([(self.scheme, other) 
+            for other in self.scheme_names
+            if other != self.scheme] + 
+            [(other, self.scheme) 
+            for other in self.scheme_names
+            if other != self.scheme])
+            
+        # Get the directory each pair of schemes would produce for this pair of
+        # genomes
+        bed_dirs = [self.bed_root + "/{}-{}-{}".format(scheme1, scheme2,
+            self.genome_pair) for (scheme1, scheme2) in possible_bed_pairs]
+            
+        # Keep the ones that exist and make a string of them.
+        bed_dirs_string = ",".join([directory for directory in bed_dirs
+            if os.path.exists(directory)])
+        
+        # We want to make an assembly hub like so: 
+                       
+        # hal2assemblyHub.py data/alignment1.hal data/alignment1.hub
+        # --jobTree data/tree --bedDirs data/beddir --hub=nocredit
+        # --shortLabel="No Credit" --lod --cpHalFileToOut --noUcscNames
+        check_call(self, ["hal2assemblyHub.py", 
+            self.hal, self.hub, "--jobTree", 
+            tree_dir, "--bedDirs", bed_dirs_string, "--shortLabel", 
+            self.scheme, "--lod", "--cpHalFileToOut", "--noUcscNames"])
+        
+        self.logToMaster("AssemblyHubTarget Finished")
 
 def parse_args(args):
     """
@@ -618,7 +706,8 @@ def main(args):
     # Don't try to import * because that's illegal.
     if __name__ == "__main__":
         from compareSchemes import SchemeAssessmentTarget, \
-            AlignmentSchemeAgreementTarget, BedSplitTarget, AssemblyHubsTarget
+            AlignmentSchemeAgreementTarget, BedSplitTarget, \
+            AssemblyHubsTarget, AssemblyHubTarget
         
     # Make a stack of jobs to run
     stack = jobTree.scriptTree.stack.Stack(SchemeAssessmentTarget(
