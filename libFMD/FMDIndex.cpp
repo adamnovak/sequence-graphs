@@ -1284,7 +1284,7 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
         length = query.length() - start;
     }
     
-    Log::debug() << "Mapping with minimum " << minContext << 
+    Log::debug() << "Mapping exactly with minimum " << minContext << 
         " and additional " << addContext << " context." << std::endl;
 
     // We need a vector to return.
@@ -1919,8 +1919,9 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
         length = query.length() - start;
     }
         
-    Log::debug() << "Mapping with minimum " << minContext << 
-        " and additional " << addContext << " context." << std::endl;
+    Log::debug() << "Mapping inexact (" << z_max << 
+        " mismatches) with minimum " << minContext << " and additional " << 
+        addContext << " context." << std::endl;
         
     // We need a vector to return.
     std::vector<std::pair<int64_t,size_t>> mappings;
@@ -1963,12 +1964,8 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
             search = this->misMatchMapPosition(ranges, query, i, minContext, 
                 addContext, &extraContext, z_max, mask);
                 
-            // TODO: Reset extraContext correctly depending on if we mapped to
-            // exactly one range already.
-            extraContext = -1;
-
             if(search.is_mapped && search.characters >= minContext && 
-                extraContext > addContext && 
+                extraContext >= addContext && 
                 !search.positions.front().first.isEmpty(mask) && range != -1
                 && search.positions.size() == 1) {
 
@@ -1987,12 +1984,20 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
             
                 // We definitely have a non-empty FMDPosition to continue from
             } else {
-                 // It didn't map. Say it corresponds to no range.
-                 mappings.push_back(std::make_pair(-1,0));
-                    
-                 // Mark that the next iteration will be an extension (if we had
-                 // any results this iteration; if not it will just restart)
-                 search.is_mapped = true;
+            
+                Log::debug() << search.positions.size() << 
+                    " positions, not mapping." << std::endl;
+                for(auto pos: search.positions) {
+                    Log::debug() << "\tPosition: " << pos.first << std::endl;
+                }
+                
+            
+                // It didn't map. Say it corresponds to no range.
+                mappings.push_back(std::make_pair(-1,0));
+
+                // Mark that the next iteration will be an extension (if we had
+                // any results this iteration; if not it will just restart)
+                search.is_mapped = true;
             }
         } else {
             
