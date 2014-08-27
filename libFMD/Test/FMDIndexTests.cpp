@@ -443,7 +443,7 @@ void FMDIndexTests::testAddContext() {
         (GenericBitVector*)NULL, 0, 0);
         
     for(size_t i = 0; i < mappings.size(); i++) {
-        Log::output() << "Mapping " << i << ": " << mappings[i].first << "," <<
+        Log::debug() << "Mapping " << i << ": " << mappings[i].first << "," <<
             mappings[i].second << " vs " << mappingsExact[i].first  << "," << 
             mappingsExact[i].second << std::endl;
         CPPUNIT_ASSERT(mappings[i] == mappingsExact[i]);
@@ -459,7 +459,7 @@ void FMDIndexTests::testAddContext() {
     mappingsExact = index->map(bv, query, (GenericBitVector*)NULL, 0, 3);
     
     for(size_t i = 0; i < mappings.size(); i++) {
-        Log::output() << "Mapping " << i << ": " << mappings[i].first << "," <<
+        Log::debug() << "Mapping " << i << ": " << mappings[i].first << "," <<
             mappings[i].second << " vs " << mappingsExact[i].first  << "," << 
             mappingsExact[i].second << std::endl;
         CPPUNIT_ASSERT(mappings[i] == mappingsExact[i]);
@@ -475,7 +475,7 @@ void FMDIndexTests::testAddContext() {
     mappingsExact = index->map(bv, query, (GenericBitVector*)NULL, 10, 0);
     
     for(size_t i = 0; i < mappings.size(); i++) {
-        Log::output() << "Mapping " << i << ": " << mappings[i].first << "," <<
+        Log::debug() << "Mapping " << i << ": " << mappings[i].first << "," <<
             mappings[i].second << " vs " << mappingsExact[i].first  << "," << 
             mappingsExact[i].second << std::endl;
         CPPUNIT_ASSERT(mappings[i] == mappingsExact[i]);
@@ -492,7 +492,7 @@ void FMDIndexTests::testAddContext() {
     mappingsExact = index->map(bv, query, (GenericBitVector*)NULL, 10, 8);
     
     for(size_t i = 0; i < mappings.size(); i++) {
-        Log::output() << "Mapping " << i << ": " << mappings[i].first << "," <<
+        Log::debug() << "Mapping " << i << ": " << mappings[i].first << "," <<
             mappings[i].second << " vs " << mappingsExact[i].first  << "," << 
             mappingsExact[i].second << std::endl;
         CPPUNIT_ASSERT(mappings[i] == mappingsExact[i]);

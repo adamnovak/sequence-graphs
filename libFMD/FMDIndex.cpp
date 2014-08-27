@@ -1340,7 +1340,7 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
                     // still extend on the right. Extend on the right more,
                     // making sure to count all these extensions as extra.
                     
-                    Log::debug() << "Right extending with index " << 
+                    Log::trace() << "Right extending with index " << 
                         i + location.characters << 
                         " to get maximal context (" << extraContext << "/" << 
                         addContext << " extra context)" << std::endl;
@@ -1595,7 +1595,7 @@ FMDIndex::iterator FMDIndex::end(size_t depth, bool reportDeadEnds) const {
 MapAttemptResult FMDIndex::mapPosition(const std::string& pattern,
     size_t index, const GenericBitVector* mask) const {
 
-    Log::debug() << "Mapping " << index << " in " << pattern << std::endl;
+    Log::trace() << "Mapping " << index << " in " << pattern << std::endl;
   
     // Initialize the struct we will use to return our somewhat complex result.
     // Contains the FMDPosition (which we work in), an is_mapped flag, and a
@@ -2049,7 +2049,7 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
                 Log::debug() << search.positions.size() << 
                     " positions, not mapping." << std::endl;
                 for(auto pos: search.positions) {
-                    Log::debug() << "\tPosition: " << pos.first << std::endl;
+                    Log::trace() << "\tPosition: " << pos.first << std::endl;
                 }
                 
             
@@ -2084,17 +2084,11 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
                 // If no mismatch extension results exist, we can safely extend by the correct base
                 // and be assured we are passing forward a complete set of search results
                 
-                Log::debug() << "Max characters before: " << search.maxCharacters << 
-                    std::endl;
-                
                 Log::debug() << "Extending with position " << i << std::endl;
                 
                 search = this->misMatchExtend(search, query[i], true, z_max, mask, true, false);
                 search.characters++;
                 search.maxCharacters++;
-                
-                Log::debug() << "Max characters after: " << search.maxCharacters << 
-                    std::endl;
                 
                 // What range index does our current left-side position (the one we just
                 // moved) correspond to, if any?
