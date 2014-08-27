@@ -426,9 +426,22 @@ class BedSplitTarget(jobTree.scriptTree.target.Target):
                 # Make directories for each genome to split out.
                 os.mkdir(self.out_dir + "/" + genome)
         
-        # Open the output BED file for each genome
-        out_files = [open(self.out_dir + "/{}/{}.bed".format(genome, genome), 
-            "w") for genome in self.genomes]
+        # Work out output file names
+        out_filenames = [self.out_dir + "/{}/{}.bed".format(genome, genome) 
+            for genome in self.genomes]
+            
+        # Work out temp files to write to first
+        temp_filenames = [sonLib.bioio.getTempFile(
+            rootDir=self.getLocalTempDir()) for _ in out_filenames]
+        
+        # Open the temp BED file for each genome
+        out_files = [open(temp_filename, "w")
+            for temp_filename in temp_filenames]
+            
+        
+        # We collapse adjacent identical things as we merge. So this dict holds
+        # the (start, end, name) tuple last written for each genome.
+        last_interval = {}
             
         # We need to keep track of whether anything has been written to each
         # file yet, so we know when to put newlines, so we don't leave trailing
@@ -457,6 +470,7 @@ class BedSplitTarget(jobTree.scriptTree.target.Target):
                     # Send the line to the file corresponding to the matching
                     # genome. TODO: use a dict or something instead of scanning
                     # for matching names.
+                    
                     if genome in content_written:
                         # Terminate the previous line
                         out_file.write("\n")
@@ -464,6 +478,32 @@ class BedSplitTarget(jobTree.scriptTree.target.Target):
                     out_file.write("\t".join(parts))
                     # Remember to end it if we need to write another.
                     content_written.add(genome)
+                    
+        for out_file in out_files:
+            # Close up all our output files.
+            out_file.close()
+        
+        # Now invoke bedtools to fix up our beds.
+        for temp_filename, out_filename in itertools.izip(temp_filenames,
+            out_filenames):
+            
+            # We need an intermediate file for sorting.
+            intermediate = sonLib.bioio.getTempFile(
+                rootDir=self.getLocalTempDir())
+            
+            # Sort the BED file    
+            handle = subprocess.Popen(["sort", "-k1,1", "-k2,2n"], 
+                stdin=open(temp_filename), stdout=open(intermediate, "w"))
+            if handle.wait() != 0:
+                raise RuntimeError("Could not sort " + temp_filename)
+            
+            # Merge the BED file
+            handle = subprocess.Popen(["bedtools", "merge", "-i", intermediate],
+                stdout=open(out_filename, "w"))
+            if handle.wait() != 0:
+                raise RuntimeError("Could not merge " + intermediate)            
+        
+        
         
         self.logToMaster("BedSplitTarget Finished")
         
