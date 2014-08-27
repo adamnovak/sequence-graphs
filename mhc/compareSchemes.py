@@ -421,11 +421,6 @@ class BedSplitTarget(jobTree.scriptTree.target.Target):
     
         self.logToMaster("Starting BedSplitTarget")
         
-        for genome in self.genomes:
-            if not os.path.exists(self.out_dir + "/" + genome):
-                # Make directories for each genome to split out.
-                os.mkdir(self.out_dir + "/" + genome)
-        
         # Work out output file names
         out_filenames = [self.out_dir + "/{}/{}.bed".format(genome, genome) 
             for genome in self.genomes]
@@ -435,7 +430,7 @@ class BedSplitTarget(jobTree.scriptTree.target.Target):
             rootDir=self.getLocalTempDir()) for _ in out_filenames]
         
         # Open the temp BED file for each genome
-        out_files = [open(temp_filename, "w")
+        temp_files = [open(temp_filename, "w")
             for temp_filename in temp_filenames]
             
         
@@ -465,7 +460,7 @@ class BedSplitTarget(jobTree.scriptTree.target.Target):
                 # Skip any blank lines
                 continue
             
-            for genome, out_file in itertools.izip(self.genomes, out_files):
+            for genome, temp_file in itertools.izip(self.genomes, temp_files):
                 if parts[0] == genome:
                     # Send the line to the file corresponding to the matching
                     # genome. TODO: use a dict or something instead of scanning
@@ -473,36 +468,46 @@ class BedSplitTarget(jobTree.scriptTree.target.Target):
                     
                     if genome in content_written:
                         # Terminate the previous line
-                        out_file.write("\n")
+                        temp_file.write("\n")
                     # Write the line
-                    out_file.write("\t".join(parts))
+                    temp_file.write("\t".join(parts))
                     # Remember to end it if we need to write another.
                     content_written.add(genome)
                     
-        for out_file in out_files:
+        for temp_file in temp_files:
             # Close up all our output files.
-            out_file.close()
-        
-        # Now invoke bedtools to fix up our beds.
-        for temp_filename, out_filename in itertools.izip(temp_filenames,
-            out_filenames):
+            temp_file.close()
             
-            # We need an intermediate file for sorting.
-            intermediate = sonLib.bioio.getTempFile(
-                rootDir=self.getLocalTempDir())
+        for genome, temp_filename, out_filename in itertools.izip(self.genomes, 
+            temp_filenames, out_filenames):
             
-            # Sort the BED file    
-            handle = subprocess.Popen(["sort", "-k1,1", "-k2,2n"], 
-                stdin=open(temp_filename), stdout=open(intermediate, "w"))
-            if handle.wait() != 0:
-                raise RuntimeError("Could not sort " + temp_filename)
+            # Fix up non-empty BEDs with bedtools, and don't pass on empty ones.
             
-            # Merge the BED file
-            handle = subprocess.Popen(["bedtools", "merge", "-i", intermediate],
-                stdout=open(out_filename, "w"))
-            if handle.wait() != 0:
-                raise RuntimeError("Could not merge " + intermediate)            
-        
+            if genome in content_written:
+                # We have content
+                
+                if not os.path.exists(self.out_dir + "/" + genome):
+                    # Make the directory for the final BED file.
+                    os.mkdir(self.out_dir + "/" + genome)
+            
+                # We need an intermediate file for sorting.
+                intermediate = sonLib.bioio.getTempFile(
+                    rootDir=self.getLocalTempDir())
+                
+                # Sort the BED file    
+                handle = subprocess.Popen(["sort", "-k1,1", "-k2,2n"], 
+                    stdin=open(temp_filename), stdout=open(intermediate, "w"))
+                if handle.wait() != 0:
+                    raise RuntimeError("Could not sort " + temp_filename)
+                
+                # Merge the BED file and write to the pre-calculate output file
+                # (in the above directory) for this genome.
+                handle = subprocess.Popen(["bedtools", "merge", "-i", 
+                    intermediate], stdout=open(out_filename, "w"))
+                if handle.wait() != 0:
+                    raise RuntimeError("Could not merge " + intermediate) 
+                    
+            # Otherwise, don't bother making the actual output file.
         
         
         self.logToMaster("BedSplitTarget Finished")
