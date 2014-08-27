@@ -404,6 +404,48 @@ void FMDIndexTests::testContextLimit() {
 }
 
 /**
+ * Make sure additional context requirement after becoming unique is working.
+ */
+void FMDIndexTests::testAddContext() {
+
+    // Grab all of the first contig. It becomes unique at "ACTCT" from the right
+    // end.
+    std::string query = "CATGCTTCGGCGATTCGACGCTCATCTGCGACTCT";
+    
+    // Declare everything to be a range
+    GenericBitVector bv;
+    for(size_t i = 0; i < index->getBWTLength(); i++) {
+        bv.addBit(i);
+    }
+    bv.finish(index->getBWTLength());
+    
+    // Grab (range number, context length) pairs for mapping with 0 additional
+    // context and 0 mismatches.
+    std::vector<std::pair<int64_t,size_t>> mappings = index->misMatchMap(bv,
+        query, (GenericBitVector*)NULL, 0, 0, 0);
+        
+    std::vector<std::pair<int64_t,size_t>> mappingsExact = index->map(bv, query,
+        (GenericBitVector*)NULL, 0, 0);
+        
+    for(size_t i = 0; i < mappings.size(); i++) {
+        Log::output() << "Mapping " << i << ": " << mappings[i].first << 
+            " vs " << mappingsExact[i].first << std::endl;
+    }
+        
+    // The A in ACTCT should be the last mapped thing
+    CPPUNIT_ASSERT(mappings[30].first != -1);
+    CPPUNIT_ASSERT(mappings[31].first == -1);
+    
+    // Try again with 1 context required after uniqueness
+    mappings = index->misMatchMap(bv, query, (GenericBitVector*)NULL, 0, 1, 0);
+    
+    // The G in GACTCT should be the last mapped thing
+    CPPUNIT_ASSERT(mappings[29].first != -1);
+    CPPUNIT_ASSERT(mappings[30].first == -1);
+
+}
+
+/**
  * Make sure the LCP array is not lying.
  */
 void FMDIndexTests::testLCP() {
