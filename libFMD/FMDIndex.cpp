@@ -1309,15 +1309,58 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
         Log::trace() << "On position " << i << " from " <<
             start + length - 1 << " to " << start << std::endl;
 
+        // What range index does our current left-side position (the one we just
+        // moved) correspond to, if any? Gets set in each branch of the if/else
+        // below.
+        int64_t range;
+
         if(location.position.isEmpty(mask)) {
             Log::debug() << "Starting over by mapping position " << i <<
                 std::endl;
             // We do not currently have a non-empty FMDPosition to extend. Start
-            // over by mapping this character by itself.
+            // over by mapping this character by itself. This will return as
+            // soon as it is unique.
             location = this->mapPosition(ranges, query, i, mask);
             
             // Reset the extra-context-after-uniqueness counter.
             extraContext = -1;
+            
+            // Look to see if we happen to be unique
+            range = location.position.range(ranges, mask);
+            
+            if(location.is_mapped && !location.position.isEmpty(mask) &&
+                range != -1) {
+                
+                // mapPosition finished happily and we have a unique result.
+                extraContext = 0;
+                
+                while(i + location.characters < query.size()) {
+                    
+                    // We always need the maximal context later, and we can
+                    // still extend on the right. Extend on the right more,
+                    // making sure to count all these extensions as extra.
+                    
+                    Log::debug() << "Right extending with index " << 
+                        i + location.characters << 
+                        " to get maximal context (" << extraContext << "/" << 
+                        addContext << " extra context)" << std::endl;
+                    
+                    // Where would we go if we extended?
+                    FMDPosition nextPosition = this->extend(location.position, 
+                        query[i + location.characters], false);
+                        
+                    if(!nextPosition.isEmpty(mask)) {
+                        // Extension was successful
+                        location.position = nextPosition;
+                        location.characters++;
+                        extraContext++;
+                    } else {
+                        // Extension was not successful, so we've hit maximal
+                        // context.
+                        break;
+                    }
+                }
+            }
         } else {
             Log::debug() << "Extending with position " << i << std::endl;
             // The last base either mapped successfully or failed due to multi-
@@ -1325,19 +1368,21 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
             // (backwards) with the next base.
             location.position = this->extend(location.position, query[i], true);
             location.characters++;
-        }
-
-        // What range index does our current left-side position (the one we just
-        // moved) correspond to, if any?
-        int64_t range = location.position.range(ranges, mask);
-
-        if(location.is_mapped && !location.position.isEmpty(mask) &&
-            range != -1) {
             
-            // We have a unique result.
-            extraContext++;
+            range = location.position.range(ranges, mask);
+            
+            if(range != -1 && extraContext == -1) {
+                // We've just become unique. That will only ever happen here if
+                // we aren't setting a minimum extra context, but we still need
+                // it to be >= the default addContext of 0.
+                extraContext = 0;
+            }
             
         }
+        
+        
+
+        
             
         if(location.is_mapped && !location.position.isEmpty(mask) &&
             range != -1 && location.characters >= minContext &&
@@ -1373,6 +1418,23 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
                 // Since the FMDPosition is empty, on the next iteration we will
                 // retry this base.
 
+            } else if(addContext > 0 && extraContext < addContext) {
+                // We need to have some amount of additional context when we do
+                // map, and it needs to be out to the right of the position
+                // we're mapping, after we get uniqueness going right. We didn't
+                // have it this time, and we can't guess when we would have had
+                // it by just extending left. So we need to restart to make sure
+                // we can count it correctly.
+                
+                Log::debug() << 
+                    "Restarting to properly count extra context..." << 
+                    std::endl;
+                
+                location.position = EMPTY_FMD_POSITION;
+                
+                // Incedentally, this position didn't map.
+                mappings.push_back(std::make_pair(-1,0));
+                
             } else {
                 // It didn't map for some other reason:
                 // - It was an initial mapping with too little right context to 
@@ -1729,8 +1791,6 @@ MapAttemptResult FMDIndex::mapPosition(const GenericBitVector& ranges,
 
     Log::trace() << "Starting with " << result.position << std::endl;
     
-    FMDPosition found_position;
-
     for(index++; index < pattern.size(); index++) {
         // Forwards extend with subsequent characters.
         FMDPosition next_position = this->extend(result.position,
@@ -1747,12 +1807,12 @@ MapAttemptResult FMDIndex::mapPosition(const GenericBitVector& ranges,
         if(next_position.range(ranges, mask) != -1) {
             // We have successfully mapped to exactly one range. Update our
             // result to reflect the additional extension and our success, 
-            // but continue the search
+            // and return our result
           
             result.position = next_position;
             result.characters++;
             result.is_mapped = true;
-            found_position = result.position;
+            return result;
             
         } else {
             // Otherwise, we still map to a plurality of ranges. Record the
@@ -1762,10 +1822,6 @@ MapAttemptResult FMDIndex::mapPosition(const GenericBitVector& ranges,
             result.characters++;
         
         }
-    }
-    
-    if(result.is_mapped) {
-        result.position = found_position;
     }
     
     return result;
