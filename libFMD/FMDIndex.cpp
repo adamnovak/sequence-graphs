@@ -759,7 +759,7 @@ char FMDIndex::display(size_t contig, size_t offset) const {
     // Where are we in the BWT?
     int64_t bwtIndex = getContigEndIndex(contig);
     
-    while(backOffset > 0) {
+    while(backOffset != (size_t) -1) {
         // Go left until we find the right letter.
         bwtIndex = getLF(bwtIndex);
         backOffset--;
