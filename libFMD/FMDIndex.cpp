@@ -1271,8 +1271,9 @@ std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> FMDIndex::Cmap(const Ge
         minContext, start, length);    
 }
 
-std::vector<std::pair<int64_t,size_t>> FMDIndex::map(const GenericBitVector& ranges,
-    const std::string& query, const GenericBitVector* mask, int minContext, int start,
+std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
+    const GenericBitVector& ranges, const std::string& query, 
+    const GenericBitVector* mask, int minContext, int addContext, int start,
     int length) const {
     
     // RIGHT-map to a range.
@@ -1283,8 +1284,8 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(const GenericBitVector& ran
         length = query.length() - start;
     }
     
-    Log::debug() << "Mapping with minimum " << minContext << " context." <<
-        std::endl;
+    Log::debug() << "Mapping with minimum " << minContext << 
+        " and additional " << addContext << " context." << std::endl;
 
     // We need a vector to return.
     std::vector<std::pair<int64_t,size_t>> mappings;
@@ -1296,6 +1297,11 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(const GenericBitVector& ran
     MapAttemptResult location;
     // Make sure the scratch position is empty so we re-start on the first base
     location.position = EMPTY_FMD_POSITION;
+    
+    // Remember how many characters of context we have found after uniqueness.
+    // Start it out at -1 so the first character we find making us unique brings
+    // us to 0.
+    int64_t extraContext = -1;
 
     for(int i = start + length - 1; i >= start; i--) {
         // Go from the end of our selected region to the beginning.
@@ -1309,6 +1315,9 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(const GenericBitVector& ran
             // We do not currently have a non-empty FMDPosition to extend. Start
             // over by mapping this character by itself.
             location = this->mapPosition(ranges, query, i, mask);
+            
+            // Reset the extra-context-after-uniqueness counter.
+            extraContext = -1;
         } else {
             Log::debug() << "Extending with position " << i << std::endl;
             // The last base either mapped successfully or failed due to multi-
@@ -1322,23 +1331,28 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(const GenericBitVector& ran
         // moved) correspond to, if any?
         int64_t range = location.position.range(ranges, mask);
 
-        if(location.is_mapped && location.characters >= minContext && 
-            !location.position.isEmpty(mask) && range != -1) {
+        if(location.is_mapped && !location.position.isEmpty(mask) &&
+            range != -1) {
             
-            // It mapped. We didn't do a re-start and fail, we have sufficient
-            // context to be confident, and our interval is nonempty and
-            // subsumed by a range.
+            // We have a unique result.
+            extraContext++;
+            
+        }
+            
+        if(location.is_mapped && !location.position.isEmpty(mask) &&
+            range != -1 && location.characters >= minContext &&
+            extraContext >= addContext) {
+            // We have sufficient context to be confident, and our interval
+            // is nonempty and subsumed by a range.
 
             Log::debug() << "Mapped " << location.characters << 
-                " context to " << location.position << " in range #" << range <<
-                std::endl;
+                " context to " << location.position << " in range #" << 
+                range << std::endl;
 
             // Remember that this base mapped to this range
-            mappings.push_back(std::make_pair(range,location.characters - 1));
-            
-            
+            mappings.push_back(std::make_pair(range, 
+                location.characters - 1));
             // We definitely have a non-empty FMDPosition to continue from
-
         } else {
 
             Log::debug() << "Failed at " << location.position << " (" << 
@@ -1488,13 +1502,13 @@ std::vector<int64_t> FMDIndex::mapRight(const GenericBitVector& ranges,
     return mappings;
 }
 
-std::vector<std::pair<int64_t,size_t>> FMDIndex::map(const GenericBitVector& ranges, 
-    const std::string& query, int64_t genome, int minContext, int start,
-    int length) const {
+std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
+    const GenericBitVector& ranges, const std::string& query, int64_t genome, 
+    int minContext, int addContext, int start, int length) const {
     
     // Get the appropriate mask, or NULL if given the special all-genomes value.
     return map(ranges, query, genome == -1 ? NULL : genomeMasks[genome], 
-        minContext, start, length);    
+        minContext, addContext, start, length);    
 }
 
 std::vector<int64_t> FMDIndex::mapRight(const GenericBitVector& ranges, 
@@ -1894,9 +1908,10 @@ MisMatchAttemptResults FMDIndex::misMatchExtend(MisMatchAttemptResults& prevMisM
     
 }
 
-std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(const GenericBitVector& ranges,
-    const std::string& query, const GenericBitVector* mask, int minContext, size_t z_max,
-    int start, int length) const {
+std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
+    const GenericBitVector& ranges, const std::string& query, 
+    const GenericBitVector* mask, int minContext, int addContext, 
+    size_t z_max, int start, int length) const {
     
     if(length == -1) {
         // Fix up the length parameter if it is -1: that means the whole rest of
@@ -1904,8 +1919,8 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(const GenericBitVec
         length = query.length() - start;
     }
         
-    Log::debug() << "Mapping with minimum " << minContext << " context." <<
-        std::endl;
+    Log::debug() << "Mapping with minimum " << minContext << 
+        " and additional " << addContext << " context." << std::endl;
         
     // We need a vector to return.
     std::vector<std::pair<int64_t,size_t>> mappings;
@@ -1928,6 +1943,11 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(const GenericBitVec
     search.characters = 0;
     searchExtend.maxCharacters = 0;
     
+    // Remember how many characters of context we have found after uniqueness.
+    // Start it out at -1 so the first character we find making us unique brings
+    // us to 0.
+    int64_t extraContext = -1;
+    
     int64_t range;
     
     for(int i = start + length - 1; i >= start; i--) {
@@ -1940,10 +1960,15 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(const GenericBitVec
             Log::debug() << "Starting over by mapping position " << i << std::endl;
             // We do not currently have a non-empty FMDPosition to extend. Start
             // over by mapping this character by itself.
-            search = this->misMatchMapPosition(ranges, query, i, minContext,
-                z_max, mask);
+            search = this->misMatchMapPosition(ranges, query, i, minContext, 
+                addContext, &extraContext, z_max, mask);
+                
+            // TODO: Reset extraContext correctly depending on if we mapped to
+            // exactly one range already.
+            extraContext = -1;
 
             if(search.is_mapped && search.characters >= minContext && 
+                extraContext > addContext && 
                 !search.positions.front().first.isEmpty(mask) && range != -1
                 && search.positions.size() == 1) {
 
@@ -2002,10 +2027,23 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(const GenericBitVec
                 // moved) correspond to, if any?
                 range = search.positions.front().first.range(ranges, mask);
                 
-                if(search.is_mapped && search.characters >= minContext && 
+                if(search.is_mapped && 
                     !search.positions.front().first.isEmpty(mask) && range != -1
                     && search.positions.size() == 1) {
                     
+                    // We're unique, but we don't necessarily have enpugh
+                    // context to actually map. Record that we have 1 more
+                    // context after becoming unique.
+                    extraContext++;
+                    
+                }
+                    
+                if(search.is_mapped && 
+                    !search.positions.front().first.isEmpty(mask) && range != -1
+                    && search.positions.size() == 1 && 
+                    search.characters >= minContext && 
+                    extraContext >= addContext) {
+                
                     // It mapped. We didn't do a re-start and fail, we have sufficient
                     // context to be confident, and our interval is nonempty and
                     // subsumed by a range.
@@ -2019,7 +2057,7 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(const GenericBitVec
                     mappings.push_back(std::make_pair(range,searchExtend.characters - 1));
                 
                     // We definitely have a non-empty FMDPosition to continue from
-                   
+                    
                 } else {
                 
                     if(search.is_mapped && search.positions.front().first.isEmpty(mask)
@@ -2082,16 +2120,18 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(const GenericBitVec
     return mappings;
 }
 
-std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(const GenericBitVector& ranges, 
-    const std::string& query, int64_t genome, int minContext, size_t z_max, int start, int length) const {
+std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
+    const GenericBitVector& ranges, const std::string& query, int64_t genome, 
+    int minContext, int addContext, size_t z_max, int start, int length) const {
     
     // Get the appropriate mask, or NULL if given the special all-genomes value.
     return misMatchMap(ranges, query, genome == -1 ? NULL : genomeMasks[genome], 
-        minContext, z_max, start, length);    
+        minContext, addContext, z_max, start, length);    
 }
 
 MisMatchAttemptResults FMDIndex::misMatchMapPosition(const GenericBitVector& ranges, 
-    const std::string& pattern, size_t index, size_t minContext, size_t z_max,
+    const std::string& pattern, size_t index, size_t minContext, 
+    size_t addContext, int64_t* extraContext, size_t z_max,
     const GenericBitVector* mask) const {
     
     // We're going to right-map so ranges match up with the things we can map to
@@ -2101,6 +2141,9 @@ MisMatchAttemptResults FMDIndex::misMatchMapPosition(const GenericBitVector& ran
     // Contains the FMDPosition (which we work in), an is_mapped flag, and a
     // variable counting the number of extensions made to the FMDPosition.
     MisMatchAttemptResults result;
+    
+    // To start with we haven't even become unique.
+    *extraContext = -1;
             
     // Do a forward search.
     // Start at the given index, and get the starting range for that character.
@@ -2119,6 +2162,7 @@ MisMatchAttemptResults FMDIndex::misMatchMapPosition(const GenericBitVector& ran
     } else if (result.positions.front().first.range(ranges, mask) != -1) {
         // We've already mapped.
 
+        *extraContext = 0;
         result.is_mapped = true;
         return result;
     }
@@ -2135,7 +2179,13 @@ MisMatchAttemptResults FMDIndex::misMatchMapPosition(const GenericBitVector& ran
         MisMatchAttemptResults new_result = this->misMatchExtend(result, pattern[index], false, z_max, mask, false, false);
                         
         if(new_result.positions.front().first.isEmpty(mask)) {
-            if(result.positions.size() == 1 && result.characters >= minContext) {
+            // We can't extend any more and have results, so we have reached
+            // maximal context length and need to return.
+        
+            if(result.positions.size() == 1 && 
+                result.characters >= minContext && 
+                *extraContext >= addContext) {
+                
                 result.is_mapped = true;
                 result.characters = result.maxCharacters;
                 return result;
@@ -2144,8 +2194,8 @@ MisMatchAttemptResults FMDIndex::misMatchMapPosition(const GenericBitVector& ran
                 // maps nowhere. Return an empty set of positions
               
                 // Or we don't map anywhere with at least the minimum
-                // context
-              
+                // context.
+                
                 result.positions.clear();
                 result.positions.push_back(std::pair<FMDPosition,size_t>(EMPTY_FMD_POSITION,0));
                 result.is_mapped = false;
@@ -2161,12 +2211,21 @@ MisMatchAttemptResults FMDIndex::misMatchMapPosition(const GenericBitVector& ran
             // result to reflect the additional extension and our success, and
             // return it.
             
+            // We have no extra context since we just became unique
+            *extraContext = 0;
+            
             result.positions = new_result.positions;
             result.characters++;
             result.maxCharacters++;
             result.is_mapped = true;
             found_positions = result.positions;      
         } else if(result.is_mapped && new_result.positions.front().first.range(ranges, mask) != -1) {
+            
+            // We have mapped to a single range after previously having done
+            // that.
+            
+            // Add 1 to the extra context after being unique.
+            (*extraContext)++;
         
             result.positions = new_result.positions;
             result.maxCharacters++;
@@ -2187,9 +2246,8 @@ MisMatchAttemptResults FMDIndex::misMatchMapPosition(const GenericBitVector& ran
    } else {
         
         // If we get here, we ran out of downstream context and still map to
-        // multiple ranges. Just give our multi-mapping FMDPosition and unmapped
-        // result.
-    
+        // multiple ranges. Send back a result indicating no mapping.
+        
         result.positions.clear();
         result.positions.push_back(std::pair<FMDPosition,size_t>(EMPTY_FMD_POSITION,0));
         result.is_mapped = false;

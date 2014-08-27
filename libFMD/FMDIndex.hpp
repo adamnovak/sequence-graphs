@@ -251,8 +251,8 @@ public:
     char display(int64_t index) const;
     
     /**
-     * Get the character at a given offset into the given contig. TODO: this is
-     * not very efficient at all.
+     * Get the character at a given offset into the given contig. Offset is
+     * 1-based. TODO: this is not very efficient at all.
      */
     char display(size_t offset, size_t contig) const;  
     
@@ -350,24 +350,29 @@ public:
         const GenericBitVector* mask = NULL, int minContext = 0, int start = 0, 
         int length = -1) const; 
 
-        /**
+    /**
      * Exact left-map with ranges ranges by original restart-based algorithm.
      */
     std::vector<std::pair<int64_t,size_t>> map(const GenericBitVector& ranges,
         const std::string& query, const GenericBitVector* mask, 
-        int minContext = 0, int start = 0, int length = -1) const;
+        int minContext = 0, int addContext = 0, int start = 0, 
+        int length = -1) const;
         
     /**
      * Exact left-map with ranges to a genome by original restart-based
      * algorithm.
+     *
+     * minContext is the minuimum number of bases of context needed to map.
+     * addContext is the number of bases required after uniqueness in order to 
+     * map.
      */
     std::vector<std::pair<int64_t,size_t>> map(const GenericBitVector& ranges,
         const std::string& query, int64_t genome = -1, int minContext = 0, 
-        int start = 0, int length = -1) const;
+        int addContext = 0, int start = 0, int length = -1) const;
 
     /**
      * CENTERED VERSIONS of the functions described above
-     **/
+     */
     
     std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> Cmap(const GenericBitVector& ranges,
         const std::string& query, const GenericBitVector* mask, int minContext = 0, 
@@ -399,7 +404,7 @@ public:
      * happens when left-extending a set of left context results.
      * 
      * For speed, this implementation does not sort search results.
-     **/ 
+     */ 
         
     MisMatchAttemptResults misMatchExtend(MisMatchAttemptResults& prevMisMatches,
         char c, bool backward, size_t z_max, const GenericBitVector* mask,
@@ -409,7 +414,7 @@ public:
      * An old implementation of the method described above, sorting the results
      * in order of number of mismatches. This will allow a speed-up if ever we
      * want to find the match with the fewest number of mismatches.
-     **/
+     */
         
     MisMatchAttemptResults sortedMisMatchExtend(MisMatchAttemptResults& prevMisMatches,
             char c, bool backward, size_t z_max, const GenericBitVector* mask) const;
@@ -417,7 +422,7 @@ public:
     /**
      * A submethod of sortedMisMatchExtend to check for existence and then sort
      * extension results
-     **/
+     */
     
     void processMisMatchPositions(
         MisMatchAttemptResults& nextMisMatches,
@@ -426,24 +431,31 @@ public:
         const GenericBitVector* mask) const;
                 
     /**
-     * Implementing mismatch search for Left-Right exact contexts
-     **/
+     * Implementing mismatch search for Left-Right exact contexts. addContext is
+     * minimum additional context after uniqueness required to map.
+     */
                  
     std::vector<std::pair<int64_t,size_t>> misMatchMap(const GenericBitVector& ranges,
-        const std::string& query, const GenericBitVector* mask, int minContext = 0, size_t z_max = 0,
+        const std::string& query, const GenericBitVector* mask, 
+        int minContext = 0, int addContext = 0, size_t z_max = 0,
         int start = 0, int length = -1) const;
         
     std::vector<std::pair<int64_t,size_t>> misMatchMap(const GenericBitVector& ranges, 
-        const std::string& query, int64_t genome = -1, int minContext = 0, size_t z_max = 0,
-        int start = 0, int length = -1) const;
+        const std::string& query, int64_t genome = -1, int minContext = 0, 
+        int addContext = 0, size_t z_max = 0, int start = 0, 
+        int length = -1) const;
         
+    // We have to pass back the extra context after uniqueness through a
+    // pointer, because this design is not really suitable for all the extra
+    // options and constraints we want to be able to tack on.
     MisMatchAttemptResults misMatchMapPosition(const GenericBitVector& ranges, 
-        const std::string& pattern, size_t index, size_t z_max, size_t minContext,
+        const std::string& pattern, size_t index, size_t minContext, 
+        size_t addContext, int64_t* extraContext, size_t z_max,
         const GenericBitVector* mask = NULL) const;
     
     /**
      * Centered search versions of all the mismatch mapping functions
-    **/
+     */
     
     std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> CmisMap(const GenericBitVector& ranges,
         const std::string& query, const GenericBitVector* mask, int minContext = 0, size_t z_max = 0,
