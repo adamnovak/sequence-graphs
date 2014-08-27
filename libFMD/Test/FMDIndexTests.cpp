@@ -409,7 +409,9 @@ void FMDIndexTests::testContextLimit() {
 void FMDIndexTests::testAddContext() {
 
     // Grab all of the first contig. It becomes unique at "ACTCT" from the right
-    // end.
+    // end, since "ACT" is unique, and it then has 2 extra context.
+    // "GCGACTCT" has 3 extra context on the right.
+    // "CGACTCT" has only 2 extra context on the right.
     std::string query = "CATGCTTCGGCGATTCGACGCTCATCTGCGACTCT";
     
     // Declare everything to be a range
@@ -428,20 +430,31 @@ void FMDIndexTests::testAddContext() {
         (GenericBitVector*)NULL, 0, 0);
         
     for(size_t i = 0; i < mappings.size(); i++) {
-        Log::output() << "Mapping " << i << ": " << mappings[i].first << 
-            " vs " << mappingsExact[i].first << std::endl;
+        Log::output() << "Mapping " << i << ": " << mappings[i].first << "," << mappings[i].second << 
+            " vs " << mappingsExact[i].first  << "," << mappingsExact[i].second << std::endl;
+        CPPUNIT_ASSERT(mappings[i].first == mappingsExact[i].first);
     }
         
     // The A in ACTCT should be the last mapped thing
     CPPUNIT_ASSERT(mappings[30].first != -1);
     CPPUNIT_ASSERT(mappings[31].first == -1);
     
-    // Try again with 1 context required after uniqueness
-    mappings = index->misMatchMap(bv, query, (GenericBitVector*)NULL, 0, 1, 0);
+    // Try again with 3 context required after uniqueness
+    mappings = index->misMatchMap(bv, query, (GenericBitVector*)NULL, 0, 3, 0);
     
-    // The G in GACTCT should be the last mapped thing
-    CPPUNIT_ASSERT(mappings[29].first != -1);
-    CPPUNIT_ASSERT(mappings[30].first == -1);
+    mappingsExact = index->map(bv, query, (GenericBitVector*)NULL, 0, 3);
+    
+    for(size_t i = 0; i < mappings.size(); i++) {
+        Log::output() << "Mapping " << i << ": " << mappings[i].first << 
+            " vs " << mappingsExact[i].first << std::endl;
+        CPPUNIT_ASSERT(mappings[i].first == mappingsExact[i].first);
+    }
+    
+    // The G in GCGACTCT should be the last mapped thing
+    CPPUNIT_ASSERT(mappings[27].first != -1);
+    CPPUNIT_ASSERT(mappings[28].first == -1);
+    
+    
 
 }
 

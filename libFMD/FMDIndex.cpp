@@ -1976,8 +1976,9 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
                 range = search.positions.front().first.range(ranges, mask);
                 
                 Log::debug() << "Mapped " << search.characters << 
-                " context to " << search.positions.front().first << " in range #" << range <<
-                std::endl;
+                " context (" << extraContext << "/" << addContext << 
+                " extra) to " << search.positions.front().first << 
+                " in range #" << range << std::endl;
             
                 // Remember that this base mapped to this range
                 mappings.push_back(std::make_pair(range,searchExtend.maxCharacters - 1));
@@ -2212,12 +2213,15 @@ MisMatchAttemptResults FMDIndex::misMatchMapPosition(const GenericBitVector& ran
         
         if(!result.is_mapped && new_result.positions.front().first.range(ranges, mask) != -1 &&
           new_result.positions.size() == 1 && new_result.characters >= minContext) {
-            // We have successfully mapped to exactly one range. Update our
-            // result to reflect the additional extension and our success, and
-            // return it.
+            // We will successfully map to exactly one range. Update our result
+            // to reflect the additional extension and our success.
             
-            // We have no extra context since we just became unique
+            // We have no extra context since we will become unique on the next
+            // step.
             *extraContext = 0;
+            
+            Log::debug() << "Will become unique at index " << index + 1 <<
+                std::endl;
             
             result.positions = new_result.positions;
             result.characters++;
@@ -2231,6 +2235,9 @@ MisMatchAttemptResults FMDIndex::misMatchMapPosition(const GenericBitVector& ran
             
             // Add 1 to the extra context after being unique.
             (*extraContext)++;
+            
+            Log::debug() << "Will add context at index " << index + 1 <<
+                std::endl;
         
             result.positions = new_result.positions;
             result.maxCharacters++;
@@ -2240,18 +2247,24 @@ MisMatchAttemptResults FMDIndex::misMatchMapPosition(const GenericBitVector& ran
             // Otherwise, we still map to a plurality of ranges. Record the
             // extension and loop again.
             
+            Log::debug() << "Will multimap at index " << index + 1 <<
+                std::endl;
+            
             result.positions = new_result.positions;
             result.characters++;
             result.maxCharacters++;
         }          
    }
 
-   if (result.is_mapped) {
-      result.positions = found_positions;
-   } else {
+    if (result.is_mapped && *extraContext >= addContext && 
+        result.maxCharacters >= minContext) {
+        
+        result.positions = found_positions;
+    } else {
         
         // If we get here, we ran out of downstream context and still map to
-        // multiple ranges. Send back a result indicating no mapping.
+        // multiple ranges and/or don't meet the min context requirements. Send
+        // back a result indicating no mapping.
         
         result.positions.clear();
         result.positions.push_back(std::pair<FMDPosition,size_t>(EMPTY_FMD_POSITION,0));
