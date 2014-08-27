@@ -142,21 +142,12 @@ void MappingMergeScheme::join() {
 void MappingMergeScheme::generateMerge(size_t queryContig, size_t queryBase, 
     size_t referenceContig, size_t referenceBase, bool orientation) const {
         
-    Log::info() << "Merging " << queryContig << ":" << queryBase << " " <<
+    Log::trace() << "Merging " << queryContig << ":" << queryBase << " " <<
         index.display(queryContig, queryBase) << " and " << referenceContig <<
         ":" << referenceBase << " " <<
         index.display(referenceContig, referenceBase) << " in orientation " <<
         orientation << std::endl;
     
-    if(index.display(queryContig, queryBase) !=
-        index.display(referenceContig, referenceBase) && orientation == 0) {
-
-        // Complain in the most hacky way possible in the event of a mismatch.
-        throw std::runtime_error(std::string("Base mismatch: ") +
-            index.display(queryContig, queryBase) + " vs " +
-            index.display(referenceContig, referenceBase));
-    }
-        
     // Right now credit merging schemes are attempting to merge off-contig
     // positions but are otherwise behaving as expected. Throw warning and
     // don't merge rather than runtime error until this is worked out.
@@ -1024,7 +1015,7 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
                 // Grab the bases we are thinking of merging
                 char queryBase = contig[creditCandidates[i]];
                 
-                Log::info() << "Query base: " << queryBase << " vs " <<
+                Log::trace() << "Query base: " << queryBase << " vs " <<
                     queryContig << ":" << creditCandidates[i] + 1 << " " <<
                     index.display(queryContig, creditCandidates[i] + 1) <<
                     std::endl;
@@ -1040,10 +1031,10 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
                 char referenceBase = contigCache[
                     firstBaseL.first.first][firstBaseL.first.second - 1];
                     
-                Log::info() << "Reference base: " << referenceBase << " vs " <<
-                    firstBaseL.first.first << ":" << firstBaseL.first.second << " " <<
-                    index.display(firstBaseL.first.first, firstBaseL.first.second) <<
-                    std::endl;
+                Log::trace() << "Reference base: " << referenceBase << " vs " <<
+                    firstBaseL.first.first << ":" << firstBaseL.first.second <<
+                    " " << index.display(firstBaseL.first.first, 
+                    firstBaseL.first.second) << std::endl;
                     
                 if(!firstBaseL.second) {
                     // Complement one base if they are supposed to be
@@ -1051,7 +1042,7 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
                     queryBase = complement(queryBase);
                 }
                 
-                Log::info() << "Want to merge " << queryBase << " and " <<
+                Log::trace() << "Want to merge " << queryBase << " and " <<
                     referenceBase << std::endl;
                 
                 if(queryBase == referenceBase) {
