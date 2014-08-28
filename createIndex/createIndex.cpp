@@ -1220,7 +1220,7 @@ main(
     // Register ctrl+c handler. See
     // <http://www.yolinux.com/TUTORIALS/C++Signals.html>
     signal(SIGINT, exitOnSignal);
-
+    
     // Parse options with boost::programOptions. See
     // <http://www.radmangames.com/programming/how-to-use-boost-program_options>
 

@@ -9,6 +9,9 @@
 #include <iostream>
 #include <ostream>
 #include <ctime>
+#include <functional>
+#include <sstream>
+
 
 // Configure log levels to compile in and out. Levels with OutStreams go to
 // stdout, levels with NullStreams go nowhere.
@@ -25,6 +28,30 @@
 #define DEBUG_STREAM NullStream
 // Trace: Messages that pedantically describe what the program is doing.
 #define TRACE_STREAM NullStream
+
+// Also we have some macros to facilitate lazy logging. If you use these, your
+// things you log are not evaluated unless that log level is enabled.
+
+// Capture everything by reference and when evaluated send the expression to a
+// stringstream. Make sure not to put the expression in parens so it can daisy-
+// chain << operators. We also need to make sure to convert to std::function so
+// later we can use the correct template (not the generic one for all types).
+// TODO: Maybe use <http://stackoverflow.com/a/6928769/402891> to detect
+// callableness instead and save a std::function construction?
+// Use like:
+// Log::debug() << "I know " << LOG_LAZY("Stuff" << std::endl);
+#define LOG_LAZY(exp) (std::function<void(std::stringstream&)>)\
+    ([&](std::stringstream& stream) -> void { stream << exp; })
+
+// We also have some log level macros to make that easy. Use like:
+// LOG_INFO("i is " << i << std::endl);
+// TODO: Make these no-ops early if using NullStream?
+#define LOG_CRITICAL(exp) Log::critical() << LOG_LAZY(exp);
+#define LOG_ERROR(exp) Log::error() << LOG_LAZY(exp);
+#define LOG_OUTPUT(exp) Log::output() << LOG_LAZY(exp);
+#define LOG_INFO(exp) Log::info() << LOG_LAZY(exp);
+#define LOG_DEBUG(exp) Log::debug() << LOG_LAZY(exp);
+#define LOG_TRACE(exp) Log::trace() << LOG_LAZY(exp);
 
 /**
  * Define a typedef for the type of ostream manipulators like std::endl. They
@@ -54,6 +81,17 @@ public:
         // Ignore the manipulator
         return *this;
     }
+    
+    /**
+     * Define another function that takes lambdas of stringstreams and ignores
+     * them.
+     */
+    inline NullStream& operator<<(
+        std::function<void(std::stringstream&)> message) {
+        
+        // Ignore the lambda
+        return *this;
+    }
 };
 
 /**
@@ -71,12 +109,28 @@ public:
     }
     
     /**
-     * Define another template that passes stream manipulators (which are really
+     * Define another function that passes stream manipulators (which are really
      * functions) on to the underlying stream.
      */
     inline OutStream& operator<<(OstreamManipulator manipulator) {
         // Send the manipulator to standard output.
         std::cout << manipulator;
+        return *this;
+    }
+    
+    /**
+     * Define another function that takes lambdas of stringstreams and evaluates
+     * them.
+     */
+    inline OutStream& operator<<(
+        std::function<void(std::stringstream&)> message) {
+        
+        // Send the message to a stringstream and then to the output.
+        
+        std::stringstream stream;
+        message(stream);
+        std::cout << stream.str();
+        
         return *this;
     }
      
