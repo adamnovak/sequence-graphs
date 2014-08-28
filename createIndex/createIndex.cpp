@@ -40,38 +40,6 @@
 #include "MergeApplier.hpp"
 
 
-// TODO: replace with cppunit!
-
-// Define a read to use for testing. 200 bp perfect match.
-const std::string TEST_READ(std::string("GACGGGACTCGCCGCCGCCCAGCCGGGGTTCCCGC") +
-    "TGGCGCAATTGAAAACTTTCGTCGATCAGGAATTTGCCCAAATAAAACATGTCCTGCATGGCATTAGTTTGT" +
-    "TGGGGCAGTGCCCGGATAGCATCAACGCTGCGCTGATTTGCCGTGGCGAGAAAATGTCGATCGCCATTATGG" +
-    "CCGGCGTATTAGAAGCGCG");
-    
-// 200 bp 5 changes
-const std::string TEST_READ2(std::string("GACGGGACTCGCCGCCGCACAGCCGGGGTTCCCGC") +
-    "TGGCGCAATTGAAAACTTTCGTCGACAGGAATTTGCCCAAATAAAACATGTCCTGCATGGCATTAGTTTGT" +
-    "TGGGGCAGTGACCGGATAGCATCAACGCTGCGCTGATTTGCCGTGGCCGAGAAAATGTCGATCGCCATTATGG" +
-    "CCGGCGTATTCGAAGCGCG");
-
-// 200 bp 10 changes
-const std::string TEST_READ3(std::string("GACGGGAATCGCCGACGCCCAGCCGGGTTTCCGC") +
-    "TGGCGCAATTTGAAAACTTTCGTCGATCAGGAATTTGCCCAAACAAAACATGTCCTGCATGGCGTTAGTTTGT" +
-    "TGGGGCAGTGCCCGGTAGCATCAACGCTGCGCTGATTTGCCGTGGCGTAGAAAATGTCGATCGCCATTATGG" +
-    "CCGGCGTATTCGAAGCGCG");
-    
-// 200bp unrelated
-// >hg19_dna range=chr21:33031597-33031797 5'pad=0 3'pad=0 strand=+ repeatMasking=none
-const std::string TEST_READ4(std::string("GCATCCATCTTGGGGCGTCCCAATTGCTGAGTAACAAATGAGACGCTGTG") +
-    "GCCAAACTCAGTCATAACTAATGACATTTCTAGACAAAGTGACTTCAGAT" +
-    "TTTCAAAGCGTACCCTGTTTACATCATTTTGCCAATTTCGCGTACTGCAA" +
-    "CCGGCGGGCCACGCCCCCGTGAAAAGAAGGTTGTTTTCTCCACATTTCGG" +
-    "G");
-
-    
-// How many times to try mapping this read?
-const int TEST_ITERATIONS = 1000;
-
 /**
  * Log current memory usage at INFO level.
  */
@@ -1084,54 +1052,6 @@ mergeGreedy(
 }
 
 /**
- * Map a read repeatedly to the bottom level.
- */
-void
-testBottomMapping(
-    const FMDIndex& index
-) {
-    // Start the timer
-    clock_t start = clock();
-    for(int i = 0; i < TEST_ITERATIONS; i++) {
-        // Map repeatedly
-        index.mapRight(TEST_READ);
-    }
-    // Stop the timer
-    clock_t end = clock();
-    
-    // Work out how many milliseconds each call took
-    double msPerCall = ((double)(end - start)) / 
-        (CLOCKS_PER_SEC / 1000.0) / TEST_ITERATIONS;
-        
-    Log::output() << "Mapping to bottom level: " << msPerCall << 
-        " ms per call" << std::endl;
-}
-
-/**
- * Map a read repeatedly to the merged level.
- */
-void
-testMergedMapping(
-    const FMDIndex& index, const GenericBitVector* ranges
-) {
-    // Start the timer
-    clock_t start = clock();
-    for(int i = 0; i < TEST_ITERATIONS; i++) {
-        // Map repeatedly
-        index.mapRight(*ranges, TEST_READ);
-    }
-    // Stop the timer
-    clock_t end = clock();
-    
-    // Work out how many milliseconds each call took
-    double msPerCall = ((double)(end - start)) / 
-        (CLOCKS_PER_SEC / 1000.0) / TEST_ITERATIONS;
-        
-    Log::output() << "Mapping to merged level: " << msPerCall <<
-        " ms per call" << std::endl;
-}
-
-/**
  * Take a pinch thread set and get the spectrum of adjacency component sizes.
  * Size 2 components are things like SNPs and indels, while larger components
  * are probably more complex structures.
@@ -1233,7 +1153,6 @@ main(
     // Add all the options
     description.add_options() 
         ("help", "Print help messages") 
-        ("test", "Run a mapping speed test")
         ("noMerge", "Don't compute merged level, only make lowest-level index")
         ("scheme", boost::program_options::value<std::string>()
             ->default_value("overlap"),
@@ -1452,13 +1371,6 @@ main(
         // Save a dump of pinch graph adjacency component sizes
         writeAdjacencyComponentSpectrum(spectrum,
             options["spectrum"].as<std::string>());
-    }
-    
-    // Run the speed tests if we want to
-    if(options.count("test")) {
-        Log::output() << "Running performance tests..." << std::endl;
-        testBottomMapping(index);
-        testMergedMapping(index, levelIndex.first);
     }
     
     // Get rid of the range vector
