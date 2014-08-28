@@ -173,7 +173,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
                 
             # And another one to hold each child's HAL alignment
-            hal_filenames = [sonLib.bioio.getTempFile(suffix="hal",
+            hal_filenames = [sonLib.bioio.getTempFile(suffix=".hal",
                 rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
                 
             for hal in hal_filenames:
@@ -672,6 +672,12 @@ class AssemblyHubTarget(jobTree.scriptTree.target.Target):
         # Keep the ones that exist and make a string of them.
         bed_dirs_string = ",".join([directory for directory in bed_dirs
             if os.path.exists(directory)])
+            
+        if bed_dirs_string == "":
+            bed_args = []
+        else:
+            # Only include the bedDirs option if there are beds.
+            bed_args = ["--bedDirs", bed_dirs_string]
         
         # We want to make an assembly hub like so: 
                        
@@ -680,7 +686,7 @@ class AssemblyHubTarget(jobTree.scriptTree.target.Target):
         # --shortLabel="No Credit" --lod --cpHalFileToOut --noUcscNames
         check_call(self, ["hal2assemblyHub.py", 
             self.hal, self.hub, "--jobTree", 
-            tree_dir, "--bedDirs", bed_dirs_string, "--shortLabel", 
+            tree_dir] + bed_args + ["--shortLabel", 
             self.scheme, "--lod", "--cpHalFileToOut", "--noUcscNames"])
         
         self.logToMaster("AssemblyHubTarget Finished")
