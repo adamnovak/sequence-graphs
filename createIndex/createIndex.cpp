@@ -1057,7 +1057,7 @@ mergeGreedy(
  *
  * Returns a vector of adjacency components, which are vectors of pinch ends.
  */
-std::vector<std::vector<stPinchEnd*>> 
+std::vector<std::vector<stPinchEnd>> 
 getAdjacencyComponents(
     stPinchThreadSet* threadSet
 ) {
@@ -1065,7 +1065,7 @@ getAdjacencyComponents(
     Log::info() << "Making adjacency component list..." << std::endl;
 
     // Make an empty vector of components to populate.
-    std::vector<std::vector<stPinchEnd*>> toReturn;
+    std::vector<std::vector<stPinchEnd>> toReturn;
     
     // Get all the adjacency components.
     stList* adjacencyComponents = stPinchThreadSet_getAdjacencyComponents(
@@ -1080,7 +1080,7 @@ getAdjacencyComponents(
     while(component != NULL) {
         
         // Make a vector to hold the ends in the component.
-        std::vector<stPinchEnd*> ends;
+        std::vector<stPinchEnd> ends;
         
         // Get an iterator over its contents
         stListIterator* endIterator = stList_getIterator(component);
@@ -1091,11 +1091,19 @@ getAdjacencyComponents(
         while(pinchEnd != NULL) {
             // For each pinch end in the component
             
-            // Put it in the vector that represents the component
-            ends.push_back(pinchEnd);
+            Log::trace() << LOG_LAZY("Observed end " << pinchEnd << 
+                " of block " << stPinchEnd_getBlock(pinchEnd) << 
+                " of degree " << 
+                stPinchBlock_getDegree(stPinchEnd_getBlock(pinchEnd)) << 
+                std::endl);
+            
+            // Put it in the vector that represents the component. Make sure to
+            // copy it since the actual ends pointed to here get destroyed when
+            // the list we're iterating over does.
+            ends.push_back(*pinchEnd);
         
             // Look at the next end
-            component = (stList*) stList_getNext(componentIterator);
+            pinchEnd = (stPinchEnd*) stList_getNext(endIterator);
         }
         
         // Clean up the iterator
@@ -1126,7 +1134,7 @@ getAdjacencyComponents(
  */
 std::map<size_t, size_t>
 getAdjacencyComponentSpectrum(
-    std::vector<std::vector<stPinchEnd*>> components
+    std::vector<std::vector<stPinchEnd>> components
 ) {
     
     Log::info() << "Making adjacency component spectrum..." << std::endl;
@@ -1180,19 +1188,19 @@ writeAdjacencyComponentSpectrum(
  * Get the components of a certain size from a vector of adjacency components.
  * Copies all those components.
  */
-std::vector<std::vector<stPinchEnd*>>
+std::vector<std::vector<stPinchEnd>>
 filterComponentsBySize(
-    std::vector<std::vector<stPinchEnd*>> components,
+    std::vector<std::vector<stPinchEnd>> components,
     size_t size
 ) {
     
     Log::info() << "Selecting size " << size << " components" << std::endl;
 
     // Make a vector to return
-    std::vector<std::vector<stPinchEnd*>> toReturn;
+    std::vector<std::vector<stPinchEnd>> toReturn;
     
     std::copy_if(components.begin(), components.end(), 
-        std::back_inserter(toReturn), [&](std::vector<stPinchEnd*> v) {
+        std::back_inserter(toReturn), [&](std::vector<stPinchEnd> v) {
             // Grab only the vectors that are the correct size.
             return v.size() == size;
         });
@@ -1210,6 +1218,12 @@ getAllPaths(
     stPinchEnd* start,
     stPinchEnd* end
 ) {
+    
+    Log::debug() << LOG_LAZY("Getting all paths from block " << 
+        stPinchEnd_getBlock(start) << " orientation " << 
+        stPinchEnd_getOrientation(start) << " to block " << 
+        stPinchEnd_getBlock(end) << " orientation " << 
+        stPinchEnd_getOrientation(end) << std::endl);
 
     // make the vector of paths we are going to return.
     std::vector<std::vector<stPinchSegment*>> toReturn;
@@ -1229,25 +1243,24 @@ getAllPaths(
         // Make a vector to include all the segments except the bookending ones.
         std::vector<stPinchSegment*> path;
         
+        // Keep track of the direction we are going. 0 is forwards.
+        bool direction = stPinchEnd_getOrientation(start);
+        
+        Log::trace() << LOG_LAZY("Starting direction " << direction <<
+            " from segment " << startSegment <<  " in block " << 
+            stPinchEnd_getBlock(start) << std::endl);
+        
         while(true) {
             // While we haven't made it to the block of the other end
             
-            // Get the orientation of this segment
-            bool segmentOrientation = stPinchSegment_getBlockOrientation(
-                segment);
-            
-            // Do we want to go towards the 3' end of this segment? TODO: what's
-            // correct here?
-            bool traverseForwards = (segmentOrientation == 
-                stPinchEnd_getOrientation(start));
-            
-            if(traverseForwards) {
+            if(!direction) {
                 // Go forwards (towards 3')
                 segment = stPinchSegment_get3Prime(segment);
             } else {
                 // Go backwards (towards 5')
                 segment = stPinchSegment_get5Prime(segment);
             }
+            
             
             if(segment == NULL) {
                 // We ran off the end of the thread without getting to the thing
@@ -1257,14 +1270,35 @@ getAllPaths(
                 break;
             }
             
-            segmentOrientation = stPinchSegment_getBlockOrientation(segment);
+            // Get the orientation of this segment. 0 is forwards.
+            bool segmentOrientation = stPinchSegment_getBlockOrientation(
+                segment);
             
-            if(stPinchSegment_getBlock(segment) != end->block && 
-                segmentOrientation != stPinchEnd_getOrientation(end)) {
-                // We hit the other end, in the correct orientation.
+            // We know segments are connected 5' to 3' along a whole thread, so
+            // we never need to change direction.
+            
+            Log::trace() << LOG_LAZY("Visiting segment " << segment << 
+                " orientation " << segmentOrientation << " in block " << 
+                stPinchSegment_getBlock(segment) << std::endl);
+            
+            if(stPinchSegment_getBlock(segment) == end->block && 
+                direction != stPinchEnd_getOrientation(end)) {
+                // We hit the other end. For orientation, if direction is true,
+                // we were going backwards and have hit the 5' end. If direction
+                // is false, we were going forwards and have hit the 3' end. End
+                // orientation is true if it's the 3' end. So we need direction
+                // and end orientation to not match if we are to detect the
+                // correct end.
+                
+                // This might not matter for the size 2 adjacency component case
+                // because any block we hit will be the right one. But if we
+                // ever use this in more complex cases we will care.
                 
                 // Keep our path.
                 toReturn.push_back(path);
+                
+                Log::debug() << LOG_LAZY("Path finished successfully with " << 
+                    path.size() << " segments" << std::endl);
                 
                 // Stop this path.
                 break;
@@ -1292,10 +1326,11 @@ getAllPaths(
  */
 std::vector<int64_t>
 getIndelLengths(
-    std::vector<std::vector<stPinchEnd*>> components
+    std::vector<std::vector<stPinchEnd>> components
 ) {
 
-    Log::info() << "Getting indel lengths..." << std::endl;
+    Log::info() << "Getting indel lengths from " << components.size() << 
+        " components..." << std::endl;
 
     // Make the vector of lengths we will populate.
     std::vector<int64_t> toReturn;
@@ -1303,17 +1338,23 @@ getIndelLengths(
     for(auto component : components) {
         // Look at every component
         
-        if(component.size() != 0) {
+        if(component.size() != 2) {
             // Complain we got a bad sized component in here
             throw std::runtime_error(
                 std::string("Component has incorrect size ") + 
                 std::to_string(component.size()) + " for an indel.");
         }
         
-        if(stPinchBlock_getDegree(stPinchEnd_getBlock(component[0])) != 2 ||
-            stPinchBlock_getDegree(stPinchEnd_getBlock(component[1])) != 2) {
+        if(stPinchBlock_getDegree(stPinchEnd_getBlock(&component[0])) != 2 ||
+            stPinchBlock_getDegree(stPinchEnd_getBlock(&component[1])) != 2) {
             // If there aren't exactly two segments on both ends, this isn't a
             // nice simple indel/substitution. Skip it.
+            
+            Log::error() << "Skipping component; Degrees are " << 
+                stPinchBlock_getDegree(stPinchEnd_getBlock(&component[0])) << 
+                " and " << 
+                stPinchBlock_getDegree(stPinchEnd_getBlock(&component[1])) << 
+                std::endl;
             continue;
             
             // TODO: account for ends of contigs lining up across from things
@@ -1322,7 +1363,12 @@ getIndelLengths(
         
         // Get two paths of 0 or more segments
         std::vector<std::vector<stPinchSegment*>> paths = 
-            getAllPaths(component[0], component[1]);
+            getAllPaths(&component[0], &component[1]);
+            
+        if(paths.size() != 2) {
+            Log::error() << "Got " << paths.size() << " paths instead of 2" <<
+                std::endl;
+        }
         
         // Keep the length of the segments on each path. There will always be 2
         // paths.
@@ -1335,6 +1381,9 @@ getIndelLengths(
                 // Add in each segment
                 pathLength += stPinchSegment_getLength(segment);
             }
+            
+            Log::debug() << "Path length: " << pathLength << std::endl;
+            
             // Record the length of this path.
             pathLengths.push_back(pathLength);
         }
@@ -1621,7 +1670,7 @@ main(
         // Get all the size-2 components, determine indel lengths for them, and
         // save them to the file the user wanted them in.
         writeColumn(getIndelLengths(filterComponentsBySize(components, 2)),
-            options["spectrum"].as<std::string>()); 
+            options["indelLengths"].as<std::string>()); 
     }
     
     // Clean up the thread set after we analyze everything about it.
