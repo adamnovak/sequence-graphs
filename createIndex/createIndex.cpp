@@ -1052,20 +1052,20 @@ mergeGreedy(
 }
 
 /**
- * Take a pinch thread set and get the spectrum of adjacency component sizes.
- * Size 2 components are things like SNPs and indels, while larger components
- * are probably more complex structures.
+ * Take a pinch thread set and get the adjacency components in a C++ idiomatic
+ * data structure.
+ *
+ * Returns a vector of adjacency components, which are vectors of pinch ends.
  */
-std::map<size_t, size_t>
-getAdjacencyComponentSpectrum(
+std::vector<std::vector<stPinchEnd*>> 
+getAdjacencyComponents(
     stPinchThreadSet* threadSet
 ) {
-    
-    Log::info() << "Making adjacency component spectrum..." << std::endl;
 
+    Log::info() << "Making adjacency component list..." << std::endl;
 
-    // Make an empty map to populate.
-    std::map<size_t, size_t> toReturn;
+    // Make an empty vector of components to populate.
+    std::vector<std::vector<stPinchEnd*>> toReturn;
     
     // Get all the adjacency components.
     stList* adjacencyComponents = stPinchThreadSet_getAdjacencyComponents(
@@ -1079,16 +1079,30 @@ getAdjacencyComponentSpectrum(
     
     while(component != NULL) {
         
-        // Get its size
-        size_t componentSize = stList_length(component);
+        // Make a vector to hold the ends in the component.
+        std::vector<stPinchEnd*> ends;
         
-        if(!toReturn.count(componentSize)) {
-            // This is the first component of this size we have found
-            toReturn[componentSize] = 1;
-        } else {
-            // We found another one
-            toReturn[componentSize]++;
+        // Get an iterator over its contents
+        stListIterator* endIterator = stList_getIterator(component);
+        
+        // Get the first pinch end in the component
+        stPinchEnd* pinchEnd = (stPinchEnd*) stList_getNext(endIterator);
+        
+        while(pinchEnd != NULL) {
+            // For each pinch end in the component
+            
+            // Put it in the vector that represents the component
+            ends.push_back(pinchEnd);
+        
+            // Look at the next end
+            component = (stList*) stList_getNext(componentIterator);
         }
+        
+        // Clean up the iterator
+        stList_destructIterator(endIterator);
+        
+        // Put this component in the vector of all components.
+        toReturn.push_back(std::move(ends));
         
         // Look at the next component
         component = (stList*) stList_getNext(componentIterator);
@@ -1099,6 +1113,40 @@ getAdjacencyComponentSpectrum(
     
     // And the entire list while we're at it
     stList_destruct(adjacencyComponents);
+    
+    // Give back the converted data structure
+    return toReturn;
+
+}
+
+/**
+ * Take a vector of adjacency components and get the spectrum of adjacency
+ * component sizes. Size 2 components are things like SNPs and indels, while
+ * larger components are probably more complex structures.
+ */
+std::map<size_t, size_t>
+getAdjacencyComponentSpectrum(
+    std::vector<std::vector<stPinchEnd*>> components
+) {
+    
+    Log::info() << "Making adjacency component spectrum..." << std::endl;
+
+    // Make the map we're going to return
+    std::map<size_t, size_t> toReturn;
+
+    for(auto component : components) {
+        
+        // Get its size
+        size_t componentSize = component.size();
+        
+        if(!toReturn.count(componentSize)) {
+            // This is the first component of this size we have found
+            toReturn[componentSize] = 1;
+        } else {
+            // We found another one
+            toReturn[componentSize]++;
+        }
+    }
     
     // Give back the map
     return toReturn;
@@ -1126,6 +1174,200 @@ writeAdjacencyComponentSpectrum(
     
     file.close();
     
+}
+
+/**
+ * Get the components of a certain size from a vector of adjacency components.
+ * Copies all those components.
+ */
+std::vector<std::vector<stPinchEnd*>>
+filterComponentsBySize(
+    std::vector<std::vector<stPinchEnd*>> components,
+    size_t size
+) {
+    
+    Log::info() << "Selecting size " << size << " components" << std::endl;
+
+    // Make a vector to return
+    std::vector<std::vector<stPinchEnd*>> toReturn;
+    
+    std::copy_if(components.begin(), components.end(), 
+        std::back_inserter(toReturn), [&](std::vector<stPinchEnd*> v) {
+            // Grab only the vectors that are the correct size.
+            return v.size() == size;
+        });
+        
+    return toReturn;
+}
+
+/**
+ * Given a pair of pinch ends, get all the segments on all paths from the first
+ * to the second. There must be no paths leaving the first on adjacency edges
+ * that do not enter the second on an adjacency edge.
+ */
+std::vector<std::vector<stPinchSegment*>>
+getAllPaths(
+    stPinchEnd* start,
+    stPinchEnd* end
+) {
+
+    // make the vector of paths we are going to return.
+    std::vector<std::vector<stPinchSegment*>> toReturn;
+    
+    // Iterate over the threads in the first end's block
+    stPinchBlockIt segmentsIterator = stPinchBlock_getSegmentIterator(
+        stPinchEnd_getBlock(start));
+        
+    // Grab the first segment
+    stPinchSegment* startSegment = stPinchBlockIt_getNext(&segmentsIterator);
+    
+    while(startSegment != NULL) {
+    
+        // Start a traversal from that segment
+        stPinchSegment* segment = startSegment;
+        
+        // Make a vector to include all the segments except the bookending ones.
+        std::vector<stPinchSegment*> path;
+        
+        while(true) {
+            // While we haven't made it to the block of the other end
+            
+            // Get the orientation of this segment
+            bool segmentOrientation = stPinchSegment_getBlockOrientation(
+                segment);
+            
+            // Do we want to go towards the 3' end of this segment? TODO: what's
+            // correct here?
+            bool traverseForwards = (segmentOrientation == 
+                stPinchEnd_getOrientation(start));
+            
+            if(traverseForwards) {
+                // Go forwards (towards 3')
+                segment = stPinchSegment_get3Prime(segment);
+            } else {
+                // Go backwards (towards 5')
+                segment = stPinchSegment_get5Prime(segment);
+            }
+            
+            if(segment == NULL) {
+                // We ran off the end of the thread without getting to the thing
+                // we were supposed to hit. Don't keep this path, and try the
+                // next start segment.
+                Log::error() << "Path escaped!" << std::endl;
+                break;
+            }
+            
+            segmentOrientation = stPinchSegment_getBlockOrientation(segment);
+            
+            if(stPinchSegment_getBlock(segment) != end->block && 
+                segmentOrientation != stPinchEnd_getOrientation(end)) {
+                // We hit the other end, in the correct orientation.
+                
+                // Keep our path.
+                toReturn.push_back(path);
+                
+                // Stop this path.
+                break;
+            }
+            
+            // If we didn't hit the other end yet, keep this new segment on our
+            // path.
+            path.push_back(segment);
+            
+        }
+    
+        // Try the next segment to get the path from it.
+        startSegment = stPinchBlockIt_getNext(&segmentsIterator);
+    }
+    
+    // Return the vector of paths.
+    return toReturn;
+
+}
+
+/**
+ * Take a vector of adjacency components all of size 2, and work out the indel
+ * length difference for all of them that are simple indels. A straight
+ * substitution is a length-0 indel.
+ */
+std::vector<int64_t>
+getIndelLengths(
+    std::vector<std::vector<stPinchEnd*>> components
+) {
+
+    Log::info() << "Getting indel lengths..." << std::endl;
+
+    // Make the vector of lengths we will populate.
+    std::vector<int64_t> toReturn;
+    
+    for(auto component : components) {
+        // Look at every component
+        
+        if(component.size() != 0) {
+            // Complain we got a bad sized component in here
+            throw std::runtime_error(
+                std::string("Component has incorrect size ") + 
+                std::to_string(component.size()) + " for an indel.");
+        }
+        
+        if(stPinchBlock_getDegree(stPinchEnd_getBlock(component[0])) != 2 ||
+            stPinchBlock_getDegree(stPinchEnd_getBlock(component[1])) != 2) {
+            // If there aren't exactly two segments on both ends, this isn't a
+            // nice simple indel/substitution. Skip it.
+            continue;
+            
+            // TODO: account for ends of contigs lining up across from things
+            // and having no paths across.
+        }
+        
+        // Get two paths of 0 or more segments
+        std::vector<std::vector<stPinchSegment*>> paths = 
+            getAllPaths(component[0], component[1]);
+        
+        // Keep the length of the segments on each path. There will always be 2
+        // paths.
+        std::vector<int64_t> pathLengths;
+        
+        for(auto path : paths) {
+            // For each path, we want to track the length
+            int64_t pathLength = 0;
+            for(auto segment : path) {
+                // Add in each segment
+                pathLength += stPinchSegment_getLength(segment);
+            }
+            // Record the length of this path.
+            pathLengths.push_back(pathLength);
+        }
+        
+        // Take the difference in lengths and report that as an indel length
+        // (absolute value).
+        toReturn.push_back(std::max(pathLengths[0], pathLengths[1]) - 
+            std::min(pathLengths[0], pathLengths[1]));
+    }
+    
+    return toReturn;
+
+}
+
+/**
+ * Save a vector of numbers as a single-column TSV.
+ */
+template<typename T>
+void
+writeColumn(
+    std::vector<T> numbers,
+    std::string filename
+) {
+
+    // Open up the file to write.
+    std::ofstream file(filename.c_str());
+    
+    for(auto number : numbers) {
+        // Write each number on its own line
+        file << number << std::endl;
+    }    
+    
+    file.close();
 }
 
 /**
@@ -1165,6 +1407,8 @@ main(
             "File in which to save degrees of pinch graph nodes")
         ("spectrum", boost::program_options::value<std::string>(), 
             "File in which to save graph adjacency component size spectrum")
+        ("indelLengths", boost::program_options::value<std::string>(), 
+            "File in which to save indel lengths between a pair of genomes")
         ("context", boost::program_options::value<size_t>()
             ->default_value(0), 
             "Minimum required context length to merge on")
@@ -1358,20 +1602,32 @@ main(
     // Write it out, deleting the bit vector in the process
     saveLevelIndex(levelIndex, indexDirectory + "/level1");
     
-    // Now, while we still have the threadSet, we can work out how many
-    // adjacency components of each size there are. Adjacency components of size
-    // 2 are just SNPs or indels, while adjacency components of larger sizes are
-    // generally more complex rearrangements.
-    auto spectrum = getAdjacencyComponentSpectrum(threadSet);
-    
-    // Clean up the thread set
-    stPinchThreadSet_destruct(threadSet);
+    // Now, while we still have the threadSet, we can work out the adjacency
+    // components. 
+    auto components = getAdjacencyComponents(threadSet);
     
     if(options.count("spectrum")) {
+        // How many adjacency components are what size? Adjacency components of
+        // size 2 are just SNPs or indels, while adjacency components of larger
+        // sizes are generally more complex rearrangements.
+        auto spectrum = getAdjacencyComponentSpectrum(components);
+    
         // Save a dump of pinch graph adjacency component sizes
         writeAdjacencyComponentSpectrum(spectrum,
             options["spectrum"].as<std::string>());
     }
+    
+    if(options.count("indelLengths")) {
+        // Get all the size-2 components, determine indel lengths for them, and
+        // save them to the file the user wanted them in.
+        writeColumn(getIndelLengths(filterComponentsBySize(components, 2)),
+            options["spectrum"].as<std::string>()); 
+    }
+    
+    // Clean up the thread set after we analyze everything about it.
+    stPinchThreadSet_destruct(threadSet);
+    
+    
     
     // Get rid of the range vector
     delete levelIndex.first;
