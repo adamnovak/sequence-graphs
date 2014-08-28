@@ -14,3 +14,6 @@ libFMD/java/
 libFMD/libfmd.jar
 nbproject/
 data/*
+mhc/*.fa
+mhc/*.txt
+gmon.out
