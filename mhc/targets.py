@@ -113,7 +113,8 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
     """
     
     def __init__(self, fasta_list, seed, coverage_filename, alignment_filename,
-        hal_filename=None, spectrum_filename=None, extra_args=[]):
+        hal_filename=None, spectrum_filename=None, indel_filename=None,
+        extra_args=[]):
         """
         Make a new Target for building a reference structure from the given
         FASTAs, using the specified RNG seed, and writing coverage statistics to
@@ -131,6 +132,9 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         
         If spectrum_filename is specified, saves the adjacency component size
         spectrum to the given file, as a TSV of <size>\t<count> lines.
+        
+        If indel_filename is specified, save the lengths of all simple (between
+        two degree-two blocks) indels to that file.
         
         If extra_args is specified, it should be a list of additional command-
         line arguments to createIndex, for specifying things like inexact
@@ -160,6 +164,9 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         
         # And the spectrum filename to use, if any
         self.spectrum_filename = spectrum_filename
+        
+        # And the indel lengths filename, if any
+        self.indel_filename = indel_filename
         
         # And the extra args
         self.extra_args = extra_args
@@ -205,6 +212,11 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
             # We want to keep the adjacency spectrum.
             args.append("--spectrum")
             args.append(self.spectrum_filename)
+            
+        if self.indel_filename is not None:
+            # We want to keep the indel lengths.
+            args.append("--indelLengths")
+            args.append(self.indel_filename)
             
         # Announce our command we're going to run
         self.logToMaster("Invoking {}".format(" ".join(args)))

@@ -24,18 +24,12 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
     
     """
     
-    def __init__(self, fasta_list, true_maf, seed, coverage_basename,
-        agreement_basename, spectrum_basename, truth_basename, hub_root):
+    def __init__(self, fasta_list, true_maf, seed, stats_dir, hub_root):
         """
         Make a new Target for building a several reference structures from the
         given FASTAs, and comparing against the given truth MAF, using the
-        specified RNG seed, and writing coverage statistics to files with
-        specified coverage base name, a set of adjacency component size spectra
-        to files with the specified spectrum basename, stats for agreement
-        between the schemes to files anmed after the agreement basename, a
-        comparison against the true MAF to files named after the truth_basename,
-        and a directory full of assembly hubs for different pairs of genomes and
-        schemes.
+        specified RNG seed, and writing statistics to one directory, and
+        assembly hubs for different pairs of genomes and schemes to another.
         
         The coverage statistics are just alignment coverage for each pair of
         genomes, in <genome number>\t<coverage fraction> TSVs per scheme.
@@ -55,26 +49,14 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # Save the FASTAs
         self.fasta_list = fasta_list
         
-        # Save the random seed
-        self.seed = seed
-        
-        # Save the concatenated coverage stats file name to use
-        self.coverage_basename = coverage_basename
-        
-        # And the agreement file name
-        self.agreement_basename = agreement_basename
-        
-        # And the concatenated frequency spectrum basename.
-        # TODO: reduce or sum instead of concatenating?
-        # TODO: just use an output directory and dump in it.
-        self.spectrum_basename = spectrum_basename
-        
         # Save the filename of a MAF to compare all our MAFs against (or None)
         self.true_maf = true_maf
         
-        # And the filename to send the results of that comparison to (which also
-        # may be None)
-        self.truth_basename = truth_basename
+        # Save the random seed
+        self.seed = seed
+        
+        # Save the stats directory to populate
+        self.stats_dir = stats_dir
         
         # And the place to put the assembly hubs
         self.hub_root = hub_root
@@ -165,11 +147,11 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             
             # Make a temp file for each of the children with this scheme to
             # write coverage stats to.
-            stats_filenames = [sonLib.bioio.getTempFile(
+            stats_filenames = [sonLib.bioio.getTempFile(suffix=".coverage",
                 rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
                 
             # And another one to hold each child's MAF alignment
-            maf_filenames = [sonLib.bioio.getTempFile(
+            maf_filenames = [sonLib.bioio.getTempFile(suffix=".maf",
                 rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
                 
             # And another one to hold each child's HAL alignment
@@ -186,7 +168,11 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 
             # And another one to hold each child's adjacency component size
             # spectrum
-            spectrum_filenames = [sonLib.bioio.getTempFile(
+            spectrum_filenames = [sonLib.bioio.getTempFile(suffix=".spectrum",
+                rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
+                
+            # And another one to hold each child's indel lengths
+            indel_filenames = [sonLib.bioio.getTempFile(suffix=".indels",
                 rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
             
             # Save the RNG state before clobbering it with the seed.
@@ -205,6 +191,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 maf_filename = maf_filenames[i]
                 hal_filename = hal_filenames[i]
                 spectrum_filename = spectrum_filenames[i]
+                indel_filename = indel_filenames[i]
                 
                 # Make a child to produce those, giving it a seed. Make sure to
                 # give it only two FASTAs, reference first, so that when it
@@ -213,26 +200,31 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 self.addChildTarget(ReferenceStructureTarget(
                     [reference_fasta, other_fasta], random.getrandbits(256), 
                     stats_filename, maf_filename, hal_filename=hal_filename,
-                    spectrum_filename=spectrum_filename, extra_args=extra_args))
+                    spectrum_filename=spectrum_filename, 
+                    indel_filename=indel_filename, extra_args=extra_args))
         
         
                 
             # Make a follow-on job to merge all the child coverage outputs and
             # produce our coverage output file for this scheme.
-            followOns.append(ConcatenateTarget(stats_filenames, 
-                self.coverage_basename + "." + scheme))
+            followOns.append(ConcatenateTarget(stats_filenames, self.stats_dir +
+                "/coverage." + scheme))
                 
             # Make a follow-on job to merge all the child spectrum outputs and
             # produce our spectrum output file for this scheme.
             followOns.append(ConcatenateTarget(spectrum_filenames, 
-                self.spectrum_basename + "." + scheme))
+                self.stats_dir + "/spectrum." + scheme))
+                
+            # Make a follow-on job to merge all the child indel length outputs.
+            followOns.append(ConcatenateTarget(indel_filenames, 
+                self.stats_dir + "/indels." + scheme))
             
             if self.true_maf is not None:
                 # We also need another target for comparing all these MAFs
                 # against the truth, which we have been given.
                 followOns.append(AlignmentTruthComparisonTarget(self.true_maf, 
                 maf_filenames, random.getrandbits(256), 
-                self.truth_basename + "." + scheme))
+                self.stats_dir + "/truth." + scheme))
         
         
         
@@ -246,8 +238,8 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # corresponding MAFs from the same FASTA pair with different schemes,
         # for all combinations of schemes.
         agreement_target = AlignmentSchemeAgreementTarget(alignments_by_scheme,
-            genome_pairs, random.getrandbits(256), self.agreement_basename,
-            bed_root)
+            genome_pairs, random.getrandbits(256), 
+            self.stats_dir + "/agreement", bed_root)
             
         # After that though, we need to take the BED files and the HAL files and
         # make assembly hubs in hub_root.

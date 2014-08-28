@@ -1366,8 +1366,14 @@ getIndelLengths(
             getAllPaths(&component[0], &component[1]);
             
         if(paths.size() != 2) {
-            Log::error() << "Got " << paths.size() << " paths instead of 2" <<
-                std::endl;
+            // This isn't just an indel. It might be an indel within a
+            // duplication, or an indel for one out of a set of merged genomes,
+            // but without just 2 paths we can't really define indel length.
+            // TODO: Handle the case where all paths but one are one length, and
+            // one is another length.
+            Log::error() << "Skipping component; got " << paths.size() << 
+                " paths instead of 2" << std::endl;
+            continue;
         }
         
         // Keep the length of the segments on each path. There will always be 2
