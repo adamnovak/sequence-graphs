@@ -745,8 +745,6 @@ def parse_args(args):
         help="seed for a particular deterministic run")
     parser.add_argument("--trueMaf", default=None,
         help="filename of a MAF to compare all generated MAFs against")
-    parser.add_argument("--truthBasename", default=None,
-        help="filename prefix to output comparison against the truth to")
         
     
     
@@ -768,11 +766,6 @@ def main(args):
     """
     
     options = parse_args(args) # This holds the nicely-parsed options object
-    
-    if (options.trueMaf is None) != (options.truthBasename is None):
-        # Make sure they gave us a place to put it if they want a truth
-        # comparison.
-        raise Exception("--truthBasename and --trueMaf are corequisites.")
     
     # Make sure we've given everything an absolute module name.
     # Don't try to import * because that's illegal.
