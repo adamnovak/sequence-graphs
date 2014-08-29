@@ -1028,8 +1028,8 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
                     
                 Log::trace() << "Reference base: " << referenceBase << " vs " <<
                     firstBaseL.first.first << ":" << firstBaseL.first.second <<
-                    " " << index.display(firstBaseL.first.first, 
-                    firstBaseL.first.second) << std::endl;
+                    " " << LOG_LAZY(index.display(firstBaseL.first.first, 
+                    firstBaseL.first.second)) << std::endl;
                     
                 if(!firstBaseL.second) {
                     // Complement one base if they are supposed to be
