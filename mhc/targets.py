@@ -504,10 +504,11 @@ class AlignmentComparisonTarget(jobTree.scriptTree.target.Target):
         writer = tsv.TsvWriter(open(self.output_filename, "w"))
         
         if self.is_correct:
-            # Save precision and recall. The first average is for recall
-            # (homologies in the first file that appear in the second), and the
-            # second average is for precision (homologies in the second file
-            # that appear in the first).
+            # Save precision and recall. The first average from mafComparator is
+            # for recall (homologies in the first file that appear in the
+            # second), and the second average from mafComparator is for
+            # precision (homologies in the second file that appear in the
+            # first). We save them as (precision, recall).
             writer.line(averages[1], averages[0])
         else:
             # Calculate the F score and save that, since it's symmetric and
