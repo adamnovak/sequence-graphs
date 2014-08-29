@@ -11,6 +11,7 @@
 #include <iterator>
 #include <cstdint> 
 #include <sys/resource.h>
+#include <execinfo.h>
 
 
 #include <boost/filesystem.hpp>
@@ -67,9 +68,39 @@ void logMemory() {
  */
 void exitOnSignal(int signalNumber) {
     // Log the signal.
-    Log::info() << "Exiting on signal " << signalNumber << std::endl;
+    Log::critical() << "Exiting on signal " << signalNumber << std::endl;
     
     // Call exit and report the signal.
+    exit(signalNumber);
+}
+
+/**
+ * Signal handler for printing a stack trace and exiting on a signal. See
+ * <http://stackoverflow.com/a/77336/402891>
+ */
+void stacktraceOnSignal(int signalNumber) {
+    // How many frames can we handle?
+    const size_t MAX_FRAMES = 100;
+    
+    // This holds the stack frames
+    void *frames[MAX_FRAMES];
+    
+    // And this holds how many there actually are, which comes out of the
+    // function that gets the frames.
+    size_t framesUsed = backtrace(frames, MAX_FRAMES);
+    
+    // Log the signal.
+    Log::critical() << "Critical signal " << signalNumber << 
+        ", stacktracing." << std::endl;
+        
+    char** traceMessages = backtrace_symbols(frames, framesUsed);
+    
+    for(size_t i = 0; i < framesUsed; i++) {
+        // Log the stack frames.
+        Log::critical() << "Frame " << i << ": " << traceMessages[i] << 
+            std::endl;
+    }
+    
     exit(signalNumber);
 }
 
@@ -1436,7 +1467,10 @@ main(
 
     // Register ctrl+c handler. See
     // <http://www.yolinux.com/TUTORIALS/C++Signals.html>
-    signal(SIGINT, exitOnSignal);
+    signal(SIGINT, stacktraceOnSignal);
+    
+    // Register segfaults with the stack trace handler
+    signal(SIGSEGV, stacktraceOnSignal);
     
     // Parse options with boost::programOptions. See
     // <http://www.radmangames.com/programming/how-to-use-boost-program_options>

@@ -19,8 +19,9 @@ LDLIBS += ../deps/sonLib/lib/stPinchesAndCacti.a ../deps/sonLib/lib/sonLib.a \
 # dependency includes want them to be. pinchesAndCacti just includes "sonLib.h",
 # so we need to explicitly point at its include directory. And similarly we need
 # to grab all the internal include directories from libsuffixtools.
-CXXFLAGS += -std=c++11 -O3 -g -I../deps -I../deps/pinchesAndCacti/inc \
--I../deps/sonLib/C/inc -I../libFMD -I../libsuffixtools
+CXXFLAGS += -std=c++11 -O3 -g -rdynamic -I../deps \
+-I../deps/pinchesAndCacti/inc -I../deps/sonLib/C/inc -I../libFMD \
+-I../libsuffixtools
 
 # Stop deleting intermediate files I might need to use in the final program!
 .SECONDARY:

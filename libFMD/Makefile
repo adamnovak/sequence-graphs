@@ -26,7 +26,7 @@ LDFLAGS += -L../libsuffixtools
 # our libs need.
 TEST_LIBS = -lcppunit -lpthread -lz
 
-CXXFLAGS += -O3 -std=c++11 -fPIC -g -I../deps -I../libsuffixtools
+CXXFLAGS += -O3 -std=c++11 -fPIC -g -rdynamic -I../deps -I../libsuffixtools
 
 # What Java package should we put the SWIG bindings in? Also used as the Maven
 # groupID.

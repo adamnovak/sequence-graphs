@@ -100,6 +100,40 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                     # args.
                     yield ("{}Min{}Add{}".format(scheme_base, min_context, 
                         add_context), extra_args)
+                        
+    def generateAddContextSchemes(self):
+        """
+        Generate some schemes just for comparing addContext values.
+        """
+        
+        for mismatch, credit in [(True, True)]:
+            # For all combinations of mismatch and credit
+            for min_context in [0]:
+                # And min context length
+                for add_context in [25, 50, 75, 100]:
+                    # And additional context
+                    
+                    # Start out with the context args
+                    extra_args = ["--context", str(min_context), "--addContext",
+                        str(add_context)]
+            
+                    # And give it a name to stick on our output files
+                    scheme_base = "Exact"
+                    if mismatch:
+                        # Add the args and scheme name component for mismatch
+                        extra_args.append("--mismatch")
+                        extra_args.append("--mismatches")
+                        extra_args.append("1")
+                        scheme_base = "Inexact"
+                    if credit:
+                        # Add the args and scheme name component for credit
+                        extra_args.append("--credit")
+                        scheme_base += "Credit"
+                        
+                    # Put together the full scheme name and yield it with the
+                    # args.
+                    yield ("{}Min{}Add{}".format(scheme_base, min_context, 
+                        add_context), extra_args)
         
         
         
@@ -671,8 +705,9 @@ class AssemblyHubTarget(jobTree.scriptTree.target.Target):
             
         # Get the directory each pair of schemes would produce for this pair of
         # genomes
-        bed_dirs = [self.bed_root + "/{}-{}-{}".format(scheme1, scheme2,
-            self.genome_pair) for (scheme1, scheme2) in possible_bed_pairs]
+        bed_dirs = [self.bed_root + "/{}-{}-{}-{}".format(scheme1, scheme2,
+            self.genome_pair[0], self.genome_pair[1]) 
+            for (scheme1, scheme2) in possible_bed_pairs]
             
         # Keep the ones that exist and make a string of them. Make sure they are
         # absolute paths.
