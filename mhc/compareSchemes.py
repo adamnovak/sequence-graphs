@@ -110,6 +110,14 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         
         self.logToMaster("Starting SchemeAssessmentTarget")
         
+        if not os.path.exists(self.stats_dir):
+            # Make our out directory exist
+            os.makedirs(self.stats_dir)
+            
+        if not os.path.exists(self.hub_root):
+            # And our hubs directory
+            os.makedirs(self.hub_root)
+        
         # We need a few different follow-on jobs.
         followOns = []    
         
@@ -575,6 +583,10 @@ class AssemblyHubsTarget(jobTree.scriptTree.target.Target):
                 # Determine the directory for the assembly hub.
                 hub_dir = scheme_root + "/" + genome_string
                 
+                if not os.path.exists(hub_dir):
+                    # Don't let something else try making these in parallel.
+                    os.makedirs(hub_dir)
+                
                 # Make a child target to make this actual hub
                 self.addChildTarget(AssemblyHubTarget(
                     self.hals_by_scheme[scheme][i], scheme, 
@@ -641,9 +653,10 @@ class AssemblyHubTarget(jobTree.scriptTree.target.Target):
         self.logToMaster("Starting AssemblyHubTarget")
         
                 
-        # Make a temporary directory for the jobTree tree
-        tree_dir = sonLib.bioio.getTempDirectory(
-            rootDir=self.getLocalTempDir())
+        # Make a temporary directory for the jobTree tree. Make sure it's
+        # absolute.
+        tree_dir = os.path.abspath(sonLib.bioio.getTempDirectory(
+            rootDir=self.getLocalTempDir()))
             
         # Make sure it doesn't exist yet
         os.rmdir(tree_dir)
@@ -661,9 +674,10 @@ class AssemblyHubTarget(jobTree.scriptTree.target.Target):
         bed_dirs = [self.bed_root + "/{}-{}-{}".format(scheme1, scheme2,
             self.genome_pair) for (scheme1, scheme2) in possible_bed_pairs]
             
-        # Keep the ones that exist and make a string of them.
-        bed_dirs_string = ",".join([directory for directory in bed_dirs
-            if os.path.exists(directory)])
+        # Keep the ones that exist and make a string of them. Make sure they are
+        # absolute paths.
+        bed_dirs_string = ",".join([os.path.abspath(directory) 
+            for directory in bed_dirs if os.path.exists(directory)])
             
         if bed_dirs_string == "":
             bed_args = []
@@ -676,10 +690,31 @@ class AssemblyHubTarget(jobTree.scriptTree.target.Target):
         # hal2assemblyHub.py data/alignment1.hal data/alignment1.hub
         # --jobTree data/tree --bedDirs data/beddir --hub=nocredit
         # --shortLabel="No Credit" --lod --cpHalFileToOut --noUcscNames
-        check_call(self, ["hal2assemblyHub.py", 
-            self.hal, self.hub, "--jobTree", 
-            tree_dir] + bed_args + ["--shortLabel", 
-            self.scheme, "--lod", "--cpHalFileToOut", "--noUcscNames"])
+        
+        # We need to do it in its own directory since it makes temp files in the
+        # current directory.
+        working_directory = sonLib.bioio.getTempDirectory(
+            rootDir=self.getLocalTempDir())
+            
+        # Where should we come back to when done?
+        original_directory = os.getcwd()
+            
+        # Turn our arguments into absolute paths (beddirs is already done).
+        # May or may not be necessary.
+        hal_abspath = os.path.abspath(self.hal)
+        hub_abspath = os.path.abspath(self.hub)
+        
+        try:
+            # Go in the temp directory and run the script
+            os.chdir(working_directory)
+            check_call(self, ["hal2assemblyHub.py", 
+                self.hal, self.hub, "--jobTree", 
+                tree_dir] + bed_args + ["--shortLabel", 
+                self.scheme, "--lod", "--cpHalFileToOut", "--noUcscNames"])
+        finally:
+            # Go back to the original directory
+            os.chdir(original_directory)
+            
         
         self.logToMaster("AssemblyHubTarget Finished")
 
@@ -702,14 +737,8 @@ def parse_args(args):
         formatter_class=argparse.RawDescriptionHelpFormatter)
     
     # General options
-    parser.add_argument("coverageBasename", 
-        help="filename prefix to save the coverage stats output to")
-    parser.add_argument("agreementBasename",
-        help="filename prefix to save the alignment agreement stats output to")
-    parser.add_argument("spectrumBasename", 
-        help="filename prefix to save the adjacency component sizes to")
-    parser.add_argument("hubRoot", 
-        help="directory to populate with assembly hubs")
+    parser.add_argument("outDir", 
+        help="directory to fill with statistics files and hubs")
     parser.add_argument("fastas", nargs="+",
         help="FASTA files to index")
     parser.add_argument("--seed", default=random.getrandbits(256),
@@ -754,9 +783,8 @@ def main(args):
         
     # Make a stack of jobs to run
     stack = jobTree.scriptTree.stack.Stack(SchemeAssessmentTarget(
-        options.fastas, options.trueMaf, options.seed, options.coverageBasename, 
-        options.agreementBasename, options.spectrumBasename,
-        options.truthBasename, options.hubRoot))
+        options.fastas, options.trueMaf, options.seed, options.outDir,
+        options.outDir + "/hubs"))
     
     print "Starting stack"
     
