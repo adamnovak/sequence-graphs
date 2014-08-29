@@ -1010,11 +1010,6 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
                 // Grab the bases we are thinking of merging
                 char queryBase = contig[creditCandidates[i]];
                 
-                Log::trace() << "Query base: " << queryBase << " vs " <<
-                    queryContig << ":" << creditCandidates[i] + 1 << " " <<
-                    index.display(queryContig, creditCandidates[i] + 1) <<
-                    std::endl;
-                
                 if(!contigCache.count(firstBaseL.first.first)) {
                     // Grab out the other contig
                     contigCache[firstBaseL.first.first] = 
@@ -1025,11 +1020,6 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
                 // indexing.
                 char referenceBase = contigCache[
                     firstBaseL.first.first][firstBaseL.first.second - 1];
-                    
-                Log::trace() << "Reference base: " << referenceBase << " vs " <<
-                    firstBaseL.first.first << ":" << firstBaseL.first.second <<
-                    " " << LOG_LAZY(index.display(firstBaseL.first.first, 
-                    firstBaseL.first.second)) << std::endl;
                     
                 if(!firstBaseL.second) {
                     // Complement one base if they are supposed to be
