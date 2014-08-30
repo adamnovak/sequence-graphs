@@ -1414,9 +1414,14 @@ getIndelLengths(
         for(auto path : paths) {
             // For each path, we want to track the length
             int64_t pathLength = 0;
-            for(auto segment : path) {
+            for(size_t i = 0; i < path.size(); i++) {
                 // Add in each segment
-                pathLength += stPinchSegment_getLength(segment);
+                pathLength += stPinchSegment_getLength(path[i]);
+                
+                if(stPinchSegment_getLength(path[i]) > 100000000000000) {
+                    // I saw some pretty wrong indel lengths.
+                    throw std::runtime_error("Segment stupidly long");
+                }
             }
             
             Log::debug() << "Path length: " << pathLength << std::endl;
@@ -1425,10 +1430,24 @@ getIndelLengths(
             pathLengths.push_back(pathLength);
         }
         
-        // Take the difference in lengths and report that as an indel length
-        // (absolute value).
-        toReturn.push_back(std::max(pathLengths[0], pathLengths[1]) - 
-            std::min(pathLengths[0], pathLengths[1]));
+        if(pathLengths[0] < 0 || pathLengths[1] < 0) {
+            // Maybe wrong indel lengths are from negative path lengths?
+            throw std::runtime_error("Negative length path");
+        }
+        
+        if(pathLengths[0] > 100000000000000 || 
+            pathLengths[1] > 100000000000000) {
+            // Maybe wrong indel lengths are from huge path lengths?
+            throw std::runtime_error("Path stupidly long");
+        }
+        
+        if(pathLengths[0] > pathLengths[1]) {
+            // This is the way the indel goes
+            toReturn.push_back(pathLengths[0] - pathLengths[1]);
+        } else {
+            // It goes the other way around.
+            toReturn.push_back(pathLengths[1] - pathLengths[0]);
+        }
     }
     
     return toReturn;
