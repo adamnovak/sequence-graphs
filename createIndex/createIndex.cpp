@@ -1457,6 +1457,80 @@ writeColumn(
 }
 
 /**
+ * Take a vector of adjacency components all of size 4, and count all the tandem
+ * duplications. We call it a tandem duplication if two of the ends belong to
+ * the same block and are connected.
+ */
+size_t
+countTandemDuplications(
+    std::vector<std::vector<stPinchEnd>> components
+) {
+
+    // How many have we found so far?
+    size_t tandemDuplications = 0;
+
+    for(auto component : components) {
+        for(size_t i = 0; i < component.size(); i++) {
+            // Go through all the ends
+            stPinchEnd end1 = component[i];
+            
+            for(size_t j = 0; j < i; j++) {
+                // And all the other ends
+                stPinchEnd end2 = component[j];
+                
+                if(stPinchEnd_getBlock(&end1) == stPinchEnd_getBlock(&end2)) {
+                    // We have two ends that share a block.
+                    
+                    // Get the ends attached to end 1
+                    stSet* connectedEnds = 
+                        stPinchEnd_getConnectedPinchEnds(&end1);
+                        
+                    // These ends are in there by address, so we have to scan
+                    // for ours.
+                    
+                    // Get an iterator over the set.
+                    stSetIterator* iterator = stSet_getIterator(connectedEnds);
+                    
+                    stPinchEnd* other = (stPinchEnd*) stSet_getNext(iterator);
+                    while(other != NULL) {
+                        // Go through all the things attached to end1
+                        
+                        if(stPinchEnd_getBlock(other) == 
+                            stPinchEnd_getBlock(&end2) && 
+                            stPinchEnd_getOrientation(other) == 
+                            stPinchEnd_getOrientation(&end2)) {
+                            
+                            // This end that the first end is connected to looks
+                            // exactly like the second end. Call this a tandem
+                            // duplication.
+                            tandemDuplications++;
+                            
+                            // TODO: Break out of like 3 loops now, so we don't
+                            // check all the other end pairs or somehow call two
+                            // tandem duplications in one component.
+                            
+                        }
+                                                
+                        other = (stPinchEnd*) stSet_getNext(iterator);
+                    }
+                    
+                    // Clean up the iterator
+                    stSet_destructIterator(iterator);
+                        
+                    // Clean up our connected ends set.
+                    stSet_destruct(connectedEnds);
+                }
+            }
+        }
+        
+    }
+    
+    // We counted up the tandem duplications. Now return.
+    return tandemDuplications;
+
+}
+
+/**
  * createIndex: command-line tool to create a multi-level reference structure.
  */
 int 
@@ -1498,6 +1572,8 @@ main(
             "File in which to save graph adjacency component size spectrum")
         ("indelLengths", boost::program_options::value<std::string>(), 
             "File in which to save indel lengths between a pair of genomes")
+        ("tandemDuplications", boost::program_options::value<std::string>(), 
+            "File in which to save the number of tandem duplications")
         ("context", boost::program_options::value<size_t>()
             ->default_value(0), 
             "Minimum required context length to merge on")
@@ -1711,6 +1787,17 @@ main(
         // save them to the file the user wanted them in.
         writeColumn(getIndelLengths(filterComponentsBySize(components, 2)),
             options["indelLengths"].as<std::string>()); 
+    }
+    
+    if(options.count("tandemDuplications")) {
+        // Get all the size-4 components, and count tandem duplications.
+        size_t tandemDuplications = countTandemDuplications(
+            filterComponentsBySize(components, 4));
+          
+        // Hack the count into a 1-element vector and write it to the file.  
+        std::vector<size_t> tandemDupeVector {tandemDuplications};
+        writeColumn(tandemDupeVector,
+            options["tandemDuplications"].as<std::string>()); 
     }
     
     // Clean up the thread set after we analyze everything about it.

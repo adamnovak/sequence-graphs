@@ -103,10 +103,12 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                         
     def generateAddContextSchemes(self):
         """
-        Generate some schemes just for comparing addContext values.
+        Generate some schemes just for comparing addContext values and hunting
+        credit-only indels.
+        
         """
         
-        for mismatch, credit in [(True, True)]:
+        for mismatch, credit in [(True, True), (True, False)]:
             # For all combinations of mismatch and credit
             for min_context in [0]:
                 # And min context length
@@ -170,7 +172,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # And a similar structure for HALs
         hals_by_scheme = {}
         
-        for scheme, extra_args in self.generateSchemes():
+        for scheme, extra_args in self.generateAddContextSchemes():
             # Work out all the schemes we want to run.
             
             self.logToMaster("Preparing for scheme {}...".format(scheme))
