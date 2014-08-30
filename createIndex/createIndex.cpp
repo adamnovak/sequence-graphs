@@ -1466,6 +1466,9 @@ countTandemDuplications(
     std::vector<std::vector<stPinchEnd>> components
 ) {
 
+    Log::info() << "Counting tandem duplications in " << components.size() << 
+        " components..." << std::endl;
+
     // How many have we found so far?
     size_t tandemDuplications = 0;
 
@@ -1474,12 +1477,18 @@ countTandemDuplications(
             // Go through all the ends
             stPinchEnd end1 = component[i];
             
+            Log::debug() << "End " << stPinchEnd_getOrientation(&end1) << 
+                " of block " << stPinchEnd_getBlock(&end1) << std::endl;
+            
             for(size_t j = 0; j < i; j++) {
                 // And all the other ends
                 stPinchEnd end2 = component[j];
                 
                 if(stPinchEnd_getBlock(&end1) == stPinchEnd_getBlock(&end2)) {
                     // We have two ends that share a block.
+                    
+                    Log::debug() << "We have two ends of block " << 
+                        stPinchEnd_getBlock(&end1) << std::endl;
                     
                     // Get the ends attached to end 1
                     stSet* connectedEnds = 
@@ -1495,10 +1504,16 @@ countTandemDuplications(
                     while(other != NULL) {
                         // Go through all the things attached to end1
                         
+                        Log::debug() << "Connection to block " << 
+                            stPinchEnd_getBlock(other) << " end " << 
+                            stPinchEnd_getOrientation(other) << std::endl;
+                        
                         if(stPinchEnd_getBlock(other) == 
                             stPinchEnd_getBlock(&end2) && 
                             stPinchEnd_getOrientation(other) == 
                             stPinchEnd_getOrientation(&end2)) {
+                            
+                            Log::debug() << "...which counts!" << std::endl;
                             
                             // This end that the first end is connected to looks
                             // exactly like the second end. Call this a tandem
@@ -1509,6 +1524,10 @@ countTandemDuplications(
                             // check all the other end pairs or somehow call two
                             // tandem duplications in one component.
                             
+                        } else {
+                            Log::debug() << "...which isn't block " << 
+                                stPinchEnd_getBlock(&end2) << " end " << 
+                                stPinchEnd_getOrientation(&end2) << std::endl;
                         }
                                                 
                         other = (stPinchEnd*) stSet_getNext(iterator);
@@ -1524,6 +1543,9 @@ countTandemDuplications(
         }
         
     }
+    
+    Log::info() << "Counted " << tandemDuplications << " duplications" <<
+        std::endl;
     
     // We counted up the tandem duplications. Now return.
     return tandemDuplications;

@@ -218,6 +218,11 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             # And another one to hold each child's indel lengths
             indel_filenames = [sonLib.bioio.getTempFile(suffix=".indels",
                 rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
+                
+            # And another one to hold the tandem duplication counts.
+            # TODO: these are probably just wrong at the moment.
+            tandem_filenames = [sonLib.bioio.getTempFile(suffix=".tandem",
+                rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
             
             # Save the RNG state before clobbering it with the seed.
             random_state = random.getstate()
@@ -236,6 +241,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 hal_filename = hal_filenames[i]
                 spectrum_filename = spectrum_filenames[i]
                 indel_filename = indel_filenames[i]
+                tandem_filename = tandem_filenames[i]
                 
                 # Make a child to produce those, giving it a seed. Make sure to
                 # give it only two FASTAs, reference first, so that when it
@@ -245,7 +251,8 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                     [reference_fasta, other_fasta], random.getrandbits(256), 
                     stats_filename, maf_filename, hal_filename=hal_filename,
                     spectrum_filename=spectrum_filename, 
-                    indel_filename=indel_filename, extra_args=extra_args))
+                    indel_filename=indel_filename, 
+                    tandem_filename=tandem_filename, extra_args=extra_args))
         
         
                 
@@ -262,6 +269,11 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             # Make a follow-on job to merge all the child indel length outputs.
             followOns.append(ConcatenateTarget(indel_filenames, 
                 self.stats_dir + "/indels." + scheme))
+                
+            # Make a follow-on job to merge all the child tandem duplication
+            # count outputs.
+            followOns.append(ConcatenateTarget(tandem_filenames, 
+                self.stats_dir + "/tandem." + scheme))
             
             if self.true_maf is not None:
                 # We also need another target for comparing all these MAFs

@@ -114,7 +114,7 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
     
     def __init__(self, fasta_list, seed, coverage_filename, alignment_filename,
         hal_filename=None, spectrum_filename=None, indel_filename=None,
-        extra_args=[]):
+        tandem_filename=None, extra_args=[]):
         """
         Make a new Target for building a reference structure from the given
         FASTAs, using the specified RNG seed, and writing coverage statistics to
@@ -135,6 +135,10 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         
         If indel_filename is specified, save the lengths of all simple (between
         two degree-two blocks) indels to that file.
+        
+        If tandem_filename is specified, save the count of tandem duplications
+        detected (4-end rearrangements that involve two connected ends of the
+        same block) to that file.
         
         If extra_args is specified, it should be a list of additional command-
         line arguments to createIndex, for specifying things like inexact
@@ -167,6 +171,9 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         
         # And the indel lengths filename, if any
         self.indel_filename = indel_filename
+        
+        # And the tandem duplication count filename, if any
+        self.tandem_filename = tandem_filename
         
         # And the extra args
         self.extra_args = extra_args
@@ -217,6 +224,11 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
             # We want to keep the indel lengths.
             args.append("--indelLengths")
             args.append(self.indel_filename)
+            
+        if self.tandem_filename is not None:
+            # We want to keep the tandem duplication count.
+            args.append("--tandemDuplications")
+            args.append(self.tandem_filename)
             
         # Announce our command we're going to run
         self.logToMaster("Invoking {}".format(" ".join(args)))
