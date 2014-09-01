@@ -549,9 +549,12 @@ class BedSplitTarget(jobTree.scriptTree.target.Target):
                     raise RuntimeError("Could not sort " + temp_filename)
                 
                 # Merge the BED file and write to the pre-calculate output file
-                # (in the above directory) for this genome.
+                # (in the above directory) for this genome. Make sure to
+                # preserve feature names with
+                # <https://www.biostars.org/p/109041/#109046>
                 handle = subprocess.Popen(["bedtools", "merge", "-i", 
-                    intermediate], stdout=open(out_filename, "w"))
+                    intermediate, "-c", "4", "-o", "distinct"], 
+                    stdout=open(out_filename, "w"))
                 if handle.wait() != 0:
                     raise RuntimeError("Could not merge " + intermediate) 
                     
