@@ -172,7 +172,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # And a similar structure for HALs
         hals_by_scheme = {}
         
-        for scheme, extra_args in self.generateAddContextSchemes():
+        for scheme, extra_args in self.generateSchemes():
             # Work out all the schemes we want to run.
             
             self.logToMaster("Preparing for scheme {}...".format(scheme))
