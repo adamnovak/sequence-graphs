@@ -136,6 +136,53 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                     # args.
                     yield ("{}Min{}Add{}".format(scheme_base, min_context, 
                         add_context), extra_args)
+                        
+    def generatePresentationSchemes(self):
+        """
+        Generate some schemes for my presentation.
+        
+        """
+        
+        # Plan out all the schemes as mismatch, credit, min_context,
+        # add_context.
+        scheme_plan = [
+                        (False, False, 100, 0),
+                        (True, False, 100, 0),
+                        (True, True, 100, 0),
+                        (True, True, 0, 25),
+                        (True, True, 0, 50),
+                        (True, True, 0, 75),
+                        (True, True, 0, 100)
+                    ]
+        
+        for mismatch, credit, min_context, add_context in scheme_plan:
+            # Start out with the context args
+            extra_args = ["--context", str(min_context), "--addContext",
+                str(add_context)]
+    
+            # And give it a name to stick on our output files
+            scheme_name = "Exact"
+            if mismatch:
+                # Add the args and scheme name component for mismatch
+                extra_args.append("--mismatch")
+                extra_args.append("--mismatches")
+                extra_args.append("1")
+                scheme_name = "Inexact"
+            if credit:
+                # Add the args and scheme name component for credit
+                extra_args.append("--credit")
+                scheme_name += "Credit"
+                
+            # Always include min cotnext in the name
+            scheme_name += "Min{}".format(min_context)
+            
+            if add_context > 0:
+                # Include additional context if in use. Also pad out so they go
+                # in a sane alphabetical order.
+                scheme_name += "Add{0:03d}".format(add_context)
+                
+            # Yield the name with the args.
+            yield (scheme_name, extra_args)
         
         
         
@@ -172,7 +219,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # And a similar structure for HALs
         hals_by_scheme = {}
         
-        for scheme, extra_args in self.generateSchemes():
+        for scheme, extra_args in self.generatePresentationSchemes():
             # Work out all the schemes we want to run.
             
             self.logToMaster("Preparing for scheme {}...".format(scheme))
@@ -756,16 +803,15 @@ class AssemblyHubTarget(jobTree.scriptTree.target.Target):
         hal_abspath = os.path.abspath(self.hal)
         hub_abspath = os.path.abspath(self.hub)
         
-        try:
-            # Go in the temp directory and run the script
-            os.chdir(working_directory)
-            check_call(self, ["hal2assemblyHub.py", 
-                self.hal, self.hub, "--jobTree", 
-                tree_dir] + bed_args + ["--shortLabel", 
-                self.scheme, "--lod", "--cpHalFileToOut", "--noUcscNames"])
-        finally:
-            # Go back to the original directory
-            os.chdir(original_directory)
+        # Go in the temp directory and run the script
+        os.chdir(working_directory)
+        check_call(self, ["hal2assemblyHub.py", 
+            self.hal, self.hub, "--jobTree", 
+            tree_dir] + bed_args + ["--shortLabel", 
+            self.scheme, "--lod", "--cpHalFileToOut", "--noUcscNames"])
+        
+        # Go back to the original directory
+        os.chdir(original_directory)
             
         
         self.logToMaster("AssemblyHubTarget Finished")
