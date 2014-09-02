@@ -806,7 +806,7 @@ class AssemblyHubTarget(jobTree.scriptTree.target.Target):
         # Go in the temp directory and run the script
         os.chdir(working_directory)
         check_call(self, ["hal2assemblyHub.py", 
-            self.hal, self.hub, "--jobTree", 
+            hal_abspath, hub_abspath, "--jobTree", 
             tree_dir] + bed_args + ["--shortLabel", 
             self.scheme, "--lod", "--cpHalFileToOut", "--noUcscNames"])
         
