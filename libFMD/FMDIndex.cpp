@@ -1314,10 +1314,17 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
         // moved) correspond to, if any? Gets set in each branch of the if/else
         // below.
         int64_t range;
+        
+        // Keep track of whether that last thing we did was a restart or an
+        // extend. This lets us know whether to try restarting from here again,
+        // or just restart from the next base.
+        bool lastRestarted;
 
         if(location.position.isEmpty(mask)) {
             Log::debug() << "Starting over by mapping position " << i <<
                 std::endl;
+            lastRestarted = true;
+            
             // We do not currently have a non-empty FMDPosition to extend. Start
             // over by mapping this character by itself. This will return as
             // soon as it is unique.
@@ -1364,6 +1371,7 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
             }
         } else {
             Log::debug() << "Extending with position " << i << std::endl;
+            lastRestarted = false;
             // The last base either mapped successfully or failed due to multi-
             // mapping. Try to extend the FMDPosition we have to the left
             // (backwards) with the next base.
@@ -1396,7 +1404,9 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
             // interval is nonempty and subsumed by a range.
 
             Log::debug() << "Mapped " << location.characters << 
-                " context to " << location.position << " in range #" << 
+                " context (" << extraContext << "/" << addContext << 
+                " extra) with multiplier " << multContext << 
+                " to " << location.position << " in range #" << 
                 range << std::endl;
 
             // Remember that this base mapped to this range
@@ -1423,13 +1433,13 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
                 i++;
 
                 // Since the FMDPosition is empty, on the next iteration we will
-                // retry this base.
+                // retry this base. The base is guaranteed to exist at least
+                // once, so it won't be empty on the next pass.
+            
+                // TODO: check lastRestarted
 
-            } else if((addContext > 0 && extraContext < addContext) || 
-                (multContext > 1 && location.characters < 
-                (location.characters - extraContext) * multContext)) {
-                // Not enough for additional context, or not enough for
-                // multiplicative context scalar.
+            } else if(addContext > 0 && extraContext < addContext) {
+                // Not enough context for additional context.
                 
                 // We need to have some amount of additional context when we do
                 // map, and it needs to be out to the right of the position
@@ -1438,14 +1448,44 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
                 // it by just extending left. So we need to restart to make sure
                 // we can count it correctly.
                 
+                // We just restarted from here, so don't do it again.
                 Log::debug() << 
-                    "Restarting to properly count extra context..." << 
+                    "Restarting at next base to satisfy addContext..." << 
                     std::endl;
-                
+                    
                 location.position = EMPTY_FMD_POSITION;
                 
                 // Incedentally, this position didn't map.
                 mappings.push_back(std::make_pair(-1,0));
+            
+            } else if(multContext > 1 && location.characters < 
+                (location.characters - extraContext) * multContext) {
+                // Not enough context for multiplicative context scalar. We need
+                // to restart to try to get more.
+                
+                if(lastRestarted) {
+                    // We just restarted from here, so don't do it again.
+                    Log::debug() << 
+                        "Restarting at next base to satisfy multContext..." << 
+                        std::endl;
+                        
+                    // This position didn't map.
+                    mappings.push_back(std::make_pair(-1,0));
+                        
+                } else {
+                    // We extended to get here, so we might find a closer
+                    // uniqueness point and get more extra context if we restart
+                    // from here instead.
+                    Log::debug() << 
+                        "Restarting from here to satisfy multContext..." << 
+                        std::endl;
+                        
+                    // Try this position again
+                    i++;
+                }
+                
+                location.position = EMPTY_FMD_POSITION;
+                
                 
             } else {
                 // It didn't map for some other reason:
@@ -2037,9 +2077,9 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
             search = this->misMatchMapPosition(ranges, query, i, minContext, 
                 addContext, multContext, &extraContext, z_max, mask);
                 
-            if(search.is_mapped && search.characters >= minContext && 
-                extraContext >= addContext && search.characters >= 
-                (search.characters - extraContext) * multContext &&
+            if(search.is_mapped && search.maxCharacters >= minContext && 
+                extraContext >= addContext && search.maxCharacters >= 
+                (search.maxCharacters - extraContext) * multContext &&
                 !search.positions.front().first.isEmpty(mask) && range != -1
                 && search.positions.size() == 1) {
 
@@ -2049,9 +2089,9 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
                 
                 range = search.positions.front().first.range(ranges, mask);
                 
-                Log::debug() << "Mapped " << search.characters << 
+                Log::debug() << "Mapped " << search.maxCharacters << 
                     " context (" << extraContext << "/" << addContext << 
-                    " extra) " << " with multiplier " << multContext << 
+                    " extra) with multiplier " << multContext << 
                     " to " << search.positions.front().first << " in range #" <<
                     range << std::endl;
             
@@ -2062,7 +2102,8 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
             } else {
             
                 Log::debug() << search.positions.size() << 
-                    " positions, not mapping." << std::endl;
+                    " positions, " << search.maxCharacters << " context, " << 
+                    extraContext << " extra. not mapping." << std::endl;
                 for(auto pos: search.positions) {
                     Log::trace() << "\tPosition: " << pos.first << std::endl;
                 }
@@ -2071,9 +2112,19 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
                 // It didn't map. Say it corresponds to no range.
                 mappings.push_back(std::make_pair(-1,0));
 
-                // Mark that the next iteration will be an extension (if we had
-                // any results this iteration; if not it will just restart)
-                search.is_mapped = true;
+                if(addContext == 0 && multContext <= 1) {
+                    // We can map as soon as we become unique, without needing
+                    // anything to the right. So it makes sense to extend a non-
+                    // unique thing left.
+
+                    // Mark that the next iteration will be an extension (if we had
+                    // any results this iteration; if not it will just restart)
+                    search.is_mapped = true;
+                } else {
+                    // We need to count context after becoming unique, even if
+                    // we have some results. Restart on the next base next.
+                    search.is_mapped = false;
+                }
             }
         } else {
             
@@ -2099,7 +2150,7 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
                 // If no mismatch extension results exist, we can safely extend by the correct base
                 // and be assured we are passing forward a complete set of search results
                 
-                Log::debug() << "Extending with position " << i << std::endl;
+                Log::debug() << "No mismatches exist; Extending with position " << i << std::endl;
                 
                 search = this->misMatchExtend(search, query[i], true, z_max, mask, true, false);
                 search.characters++;
@@ -2111,27 +2162,16 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
                 
                 if(search.is_mapped && 
                     !search.positions.front().first.isEmpty(mask) && range != -1
-                    && search.positions.size() == 1) {
-                    
-                    // We're unique, but we don't necessarily have enpugh
-                    // context to actually map. Record that we have 1 more
-                    // context after becoming unique.
-                    extraContext++;
-                    
-                }
-                    
-                if(search.is_mapped && 
-                    !search.positions.front().first.isEmpty(mask) && range != -1
                     && search.positions.size() == 1 && 
-                    search.characters >= minContext && 
-                    extraContext >= addContext && search.characters >= 
-                    (search.characters - extraContext) * multContext) {
+                    search.maxCharacters >= minContext && 
+                    extraContext >= addContext && search.maxCharacters >= 
+                    (search.maxCharacters - extraContext) * multContext) {
                 
-                    // It mapped. We didn't do a re-start and fail, we have sufficient
-                    // context to be confident, and our interval is nonempty and
-                    // subsumed by a range.
+                    // It mapped after extending. We didn't do a re-start and
+                    // fail, we have sufficient context to be confident, and our
+                    // interval is nonempty and subsumed by a range.
                     
-                    Log::debug() << "Mapped " << search.characters << 
+                    Log::debug() << "Mapped " << search.maxCharacters << 
                         " context (" << extraContext << "/" << addContext << 
                         " extra) " << " with multiplier " << multContext << 
                         " to " << search.positions.front().first << 
@@ -2145,15 +2185,20 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
                     
                 } else {
                 
-                    if(search.is_mapped && search.positions.front().first.isEmpty(mask)
-                        && searchExtend.positions.size() == 1) {
+                    if((search.is_mapped && search.positions.front().first.isEmpty(mask)
+                        && searchExtend.positions.size() == 1) || 
+                        (search.maxCharacters < 
+                        (search.maxCharacters - extraContext) * multContext)) {
+                        
+                        // We extended left and either got no results or made
+                        // our context so long that now too small a portion of
+                        // it is extra. We need to try this base again, in case
+                        // we tried with a too-long right context, or we need to
+                        // re-count extra context.
                     
                         Log::debug() << "Failed at " << searchExtend.positions.front().first << " (" << 
                         searchExtend.positions.size() << " mismatch search results for " <<
-                        searchExtend.characters << " context)." << std::endl;
-                        // We extended right until we got no results. We need to try
-                        // this base again, in case we tried with a too-long left
-                        // context.
+                        searchExtend.maxCharacters << " context)." << std::endl;
                 
                         Log::debug() << "Restarting from here..." << std::endl;
                 
@@ -2169,7 +2214,7 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
                             
                         Log::debug() << "Failed at " << search.positions.front().first << " (" << 
                         search.positions.size() <<
-                        " mismatch search results for " << search.characters << " context)." << 
+                        " mismatch search results for " << search.maxCharacters << " context)." << 
                         std::endl;
                         
                         // It didn't map for some other reason:
@@ -2279,7 +2324,6 @@ MisMatchAttemptResults FMDIndex::misMatchMapPosition(const GenericBitVector& ran
                 (result.maxCharacters - *extraContext) * multContext) {
                 
                 result.is_mapped = true;
-                result.characters = result.maxCharacters;
                 return result;
             } else {
                 // Last position multimapped but this extension now
@@ -2291,6 +2335,7 @@ MisMatchAttemptResults FMDIndex::misMatchMapPosition(const GenericBitVector& ran
                 result.positions.clear();
                 result.positions.push_back(std::pair<FMDPosition,size_t>(EMPTY_FMD_POSITION,0));
                 result.is_mapped = false;
+                result.maxCharacters = 1;
                 result.characters = 1;
                 return result;
             }
@@ -2317,18 +2362,18 @@ MisMatchAttemptResults FMDIndex::misMatchMapPosition(const GenericBitVector& ran
             result.characters++;
             result.maxCharacters++;
             
-            if(result.characters >= minContext) {
+            if(result.maxCharacters >= minContext) {
                 // We do have enough context to report this mapping.
                 
                 result.is_mapped = true;
                 found_positions = result.positions;
                 
                 Log::debug() << "Will become unique at " << index  << 
-                    std::endl;
+                    " with " << result.maxCharacters << " context" << std::endl;
             } else {
                 Log::debug() << 
-                    "Will become unique with insufficient context at " << 
-                    index << std::endl;
+                    "Will become unique with insufficient context (" << 
+                    result.maxCharacters << ") at " << index << std::endl;
             }   
         } else if(result.is_mapped && new_result.positions.front().first.range(ranges, mask) != -1) {
             
@@ -2338,23 +2383,24 @@ MisMatchAttemptResults FMDIndex::misMatchMapPosition(const GenericBitVector& ran
             // Add 1 to the extra context after being unique.
             (*extraContext)++;
             
-            Log::debug() << "Will add context at index " << index <<
-                std::endl;
-        
             result.positions = new_result.positions;
+            result.characters++;
             result.maxCharacters++;
+            
+            Log::debug() << "Will add context (for " << result.maxCharacters << 
+                ") at index " << index << std::endl;
             
         } else {
           
             // Otherwise, we still map to a plurality of ranges. Record the
             // extension and loop again.
             
-            Log::debug() << "Will multimap at index " << index <<
-                std::endl;
-            
             result.positions = new_result.positions;
             result.characters++;
             result.maxCharacters++;
+            
+            Log::debug() << "Will multimap at index " << index << " with " << 
+                result.maxCharacters << " context" << std::endl;
         }          
    }
 
