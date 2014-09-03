@@ -96,3 +96,20 @@ do
 done
     
 boxplot.py ${OUTFILE} --x_label "Merging Scheme" --y_label "Tandem Duplication Count" --title "Tandem Duplications vs. Merging Scheme" --x_sideways --save tandemsVsScheme.png
+
+OUTFILE="precisionRecall.tsv"
+truncate -s 0 ${OUTFILE}
+for FILE in `ls truth.*`
+do
+    # Grab the scheme
+    SCHEME=${FILE##*.}
+    
+    cat ${FILE} | while read LINE
+    do
+        # Tag each entry with its scheme
+        printf "${SCHEME}\t${LINE}\n" >> ${OUTFILE}
+    done
+    
+done
+
+scatter.py ${OUTFILE} --x_label "Precision" --y_label "Recall" --title "Recall vs. Precision by Scheme" --sparse_ticks --save recallVsPrecision.png

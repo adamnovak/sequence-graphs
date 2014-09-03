@@ -1273,8 +1273,8 @@ std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> FMDIndex::Cmap(const Ge
 
 std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
     const GenericBitVector& ranges, const std::string& query, 
-    const GenericBitVector* mask, int minContext, int addContext, int start,
-    int length) const {
+    const GenericBitVector* mask, int minContext, int addContext, 
+    double multContext, int start, int length) const {
     
     // RIGHT-map to a range.
     
@@ -1285,7 +1285,8 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
     }
     
     Log::debug() << "Mapping exactly with minimum " << minContext << 
-        " and additional " << addContext << " context." << std::endl;
+        " and additional +" << addContext << ", *" << multContext << 
+        " context." << std::endl;
 
     // We need a vector to return.
     std::vector<std::pair<int64_t,size_t>> mappings;
@@ -1386,9 +1387,13 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
             
         if(location.is_mapped && !location.position.isEmpty(mask) &&
             range != -1 && location.characters >= minContext &&
-            extraContext >= addContext) {
-            // We have sufficient context to be confident, and our interval
-            // is nonempty and subsumed by a range.
+            extraContext >= addContext && location.characters >= 
+            (location.characters - extraContext) * multContext) {
+            // We have sufficient context to be confident (greater than the
+            // minimum, with extraContext greater than the required additional
+            // context, and the total context greater than the context
+            // multiplier times the context taken to be unique), and our
+            // interval is nonempty and subsumed by a range.
 
             Log::debug() << "Mapped " << location.characters << 
                 " context to " << location.position << " in range #" << 
@@ -1403,7 +1408,9 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
             Log::debug() << "Failed at " << location.position << " (" << 
                 location.position.ranges(ranges, mask) <<
                 " options for " << location.characters << " context, " << 
-                extraContext << " extra )." << std::endl;
+                extraContext << " extra, " << 
+                (location.characters - extraContext) * multContext << 
+                " scaled)." << std::endl;
                 
             if(location.is_mapped && location.position.isEmpty(mask)) {
                 // We extended right until we got no results. We need to try
@@ -1418,7 +1425,12 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
                 // Since the FMDPosition is empty, on the next iteration we will
                 // retry this base.
 
-            } else if(addContext > 0 && extraContext < addContext) {
+            } else if((addContext > 0 && extraContext < addContext) || 
+                (multContext > 1 && location.characters < 
+                (location.characters - extraContext) * multContext)) {
+                // Not enough for additional context, or not enough for
+                // multiplicative context scalar.
+                
                 // We need to have some amount of additional context when we do
                 // map, and it needs to be out to the right of the position
                 // we're mapping, after we get uniqueness going right. We didn't
@@ -1566,11 +1578,12 @@ std::vector<int64_t> FMDIndex::mapRight(const GenericBitVector& ranges,
 
 std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
     const GenericBitVector& ranges, const std::string& query, int64_t genome, 
-    int minContext, int addContext, int start, int length) const {
+    int minContext, int addContext, double multContext, int start, 
+    int length) const {
     
     // Get the appropriate mask, or NULL if given the special all-genomes value.
     return map(ranges, query, genome == -1 ? NULL : genomeMasks[genome], 
-        minContext, addContext, start, length);    
+        minContext, addContext, multContext, start, length);    
 }
 
 std::vector<int64_t> FMDIndex::mapRight(const GenericBitVector& ranges, 
@@ -1970,8 +1983,8 @@ MisMatchAttemptResults FMDIndex::misMatchExtend(MisMatchAttemptResults& prevMisM
 
 std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
     const GenericBitVector& ranges, const std::string& query, 
-    const GenericBitVector* mask, int minContext, int addContext, 
-    size_t z_max, int start, int length) const {
+    const GenericBitVector* mask, int minContext, int addContext,
+    double multContext, size_t z_max, int start, int length) const {
     
     if(length == -1) {
         // Fix up the length parameter if it is -1: that means the whole rest of
@@ -1980,8 +1993,8 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
     }
         
     Log::debug() << "Mapping inexact (" << z_max << 
-        " mismatches) with minimum " << minContext << " and additional " << 
-        addContext << " context." << std::endl;
+        " mismatches) with minimum " << minContext << " and additional +" << 
+        addContext << ", *" << multContext << " context." << std::endl;
         
     // We need a vector to return.
     std::vector<std::pair<int64_t,size_t>> mappings;
@@ -2022,10 +2035,11 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
             // We do not currently have a non-empty FMDPosition to extend. Start
             // over by mapping this character by itself.
             search = this->misMatchMapPosition(ranges, query, i, minContext, 
-                addContext, &extraContext, z_max, mask);
+                addContext, multContext, &extraContext, z_max, mask);
                 
             if(search.is_mapped && search.characters >= minContext && 
-                extraContext >= addContext && 
+                extraContext >= addContext && search.characters >= 
+                (search.characters - extraContext) * multContext &&
                 !search.positions.front().first.isEmpty(mask) && range != -1
                 && search.positions.size() == 1) {
 
@@ -2036,9 +2050,10 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
                 range = search.positions.front().first.range(ranges, mask);
                 
                 Log::debug() << "Mapped " << search.characters << 
-                " context (" << extraContext << "/" << addContext << 
-                " extra) to " << search.positions.front().first << 
-                " in range #" << range << std::endl;
+                    " context (" << extraContext << "/" << addContext << 
+                    " extra) " << " with multiplier " << multContext << 
+                    " to " << search.positions.front().first << " in range #" <<
+                    range << std::endl;
             
                 // Remember that this base mapped to this range
                 mappings.push_back(std::make_pair(range,search.maxCharacters - 1));
@@ -2109,16 +2124,18 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
                     !search.positions.front().first.isEmpty(mask) && range != -1
                     && search.positions.size() == 1 && 
                     search.characters >= minContext && 
-                    extraContext >= addContext) {
+                    extraContext >= addContext && search.characters >= 
+                    (search.characters - extraContext) * multContext) {
                 
                     // It mapped. We didn't do a re-start and fail, we have sufficient
                     // context to be confident, and our interval is nonempty and
                     // subsumed by a range.
                     
                     Log::debug() << "Mapped " << search.characters << 
-                        " context, " << search.maxCharacters << " max to " << 
-                        search.positions.front().first << " in range #" << 
-                        range << std::endl;
+                        " context (" << extraContext << "/" << addContext << 
+                        " extra) " << " with multiplier " << multContext << 
+                        " to " << search.positions.front().first << 
+                        " in range #" << range << std::endl;
                 
                 
                     // Remember that this base mapped to this range
@@ -2190,16 +2207,17 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
 
 std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
     const GenericBitVector& ranges, const std::string& query, int64_t genome, 
-    int minContext, int addContext, size_t z_max, int start, int length) const {
+    int minContext, int addContext, double multContext, size_t z_max, int start,
+    int length) const {
     
     // Get the appropriate mask, or NULL if given the special all-genomes value.
     return misMatchMap(ranges, query, genome == -1 ? NULL : genomeMasks[genome], 
-        minContext, addContext, z_max, start, length);    
+        minContext, addContext, multContext, z_max, start, length);    
 }
 
 MisMatchAttemptResults FMDIndex::misMatchMapPosition(const GenericBitVector& ranges, 
     const std::string& pattern, size_t index, size_t minContext, 
-    size_t addContext, int64_t* extraContext, size_t z_max,
+    size_t addContext, double multContext, int64_t* extraContext, size_t z_max,
     const GenericBitVector* mask) const {
     
     // We're going to right-map so ranges match up with the things we can map to
@@ -2232,7 +2250,7 @@ MisMatchAttemptResults FMDIndex::misMatchMapPosition(const GenericBitVector& ran
 
         *extraContext = 0;
         
-        if(minContext <= 1 && addContext == 0) {
+        if(minContext <= 1 && addContext == 0 && multContext <= 1) {
             // And we just need to be unique to map
         
             result.is_mapped = true;
@@ -2256,8 +2274,9 @@ MisMatchAttemptResults FMDIndex::misMatchMapPosition(const GenericBitVector& ran
             // maximal context length and need to return.
         
             if(result.positions.size() == 1 && 
-                result.characters >= minContext && 
-                *extraContext >= addContext) {
+                result.maxCharacters >= minContext && 
+                *extraContext >= addContext && result.maxCharacters >= 
+                (result.maxCharacters - *extraContext) * multContext) {
                 
                 result.is_mapped = true;
                 result.characters = result.maxCharacters;
@@ -2340,6 +2359,8 @@ MisMatchAttemptResults FMDIndex::misMatchMapPosition(const GenericBitVector& ran
    }
 
     if (result.is_mapped && *extraContext >= addContext && 
+        result.maxCharacters >= 
+        (result.maxCharacters - *extraContext) * multContext &&
         result.maxCharacters >= minContext) {
         
         result.positions = found_positions;
