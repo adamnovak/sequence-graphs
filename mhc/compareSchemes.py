@@ -183,6 +183,57 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 
             # Yield the name with the args.
             yield (scheme_name, extra_args)
+            
+    def generateMultSchemes(self):
+        """
+        Generate some schemes for multiplicative context.
+        
+        """
+        
+        # Plan out all the schemes as mismatch, credit, min_context,
+        # add_context, mult_context
+        scheme_plan = [
+                        (True, True, 100, 0, 0),
+                        (True, True, 0, 0, 2.0),
+                        (True, True, 100, 0, 2.0),
+                        (True, True, 0, 0, 0)
+                    ]
+        
+        for mismatch, credit, min_context, add_context, mult_context in \
+            scheme_plan:
+            
+            # Start out with the context args
+            extra_args = ["--context", str(min_context), "--addContext",
+                str(add_context), "--multContext", str(mult_context)]
+    
+            # And give it a name to stick on our output files
+            scheme_name = "Exact"
+            if mismatch:
+                # Add the args and scheme name component for mismatch
+                extra_args.append("--mismatch")
+                extra_args.append("--mismatches")
+                extra_args.append("1")
+                scheme_name = "Inexact"
+            if credit:
+                # Add the args and scheme name component for credit
+                extra_args.append("--credit")
+                scheme_name += "Credit"
+                
+            if min_context > 0:
+                # Include min conext in the name if in use
+                scheme_name += "Min{}".format(min_context)
+            
+            if add_context > 0:
+                # Include additional context if in use. No need for badding
+                # since we can now natural sort.
+                scheme_name += "Add{}".format(add_context)
+                
+            if mult_context > 0:
+                # Include multiplicative context if in use.
+                scheme_name += "Mult{}".format(mult_context)
+                
+            # Yield the name with the args.
+            yield (scheme_name, extra_args)
         
         
         
@@ -219,7 +270,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # And a similar structure for HALs
         hals_by_scheme = {}
         
-        for scheme, extra_args in self.generatePresentationSchemes():
+        for scheme, extra_args in self.generateMultSchemes():
             # Work out all the schemes we want to run.
             
             self.logToMaster("Preparing for scheme {}...".format(scheme))
