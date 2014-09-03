@@ -11,12 +11,12 @@ MappingMergeScheme::MappingMergeScheme(const FMDIndex& index,
     const GenericBitVector& rangeVector, 
     const std::vector<std::pair<std::pair<size_t, size_t>, bool> >& rangeBases, 
     const GenericBitVector& includedPositions, size_t genome, size_t minContext, 
-    size_t addContext, bool credit, std::string mapType, bool mismatch, 
-    size_t z_max) : MergeScheme(index), threads(), queue(NULL), 
+    size_t addContext, double multContext, bool credit, std::string mapType, 
+    bool mismatch, size_t z_max) : MergeScheme(index), threads(), queue(NULL), 
     rangeVector(rangeVector), rangeBases(rangeBases), 
     includedPositions(includedPositions), genome(genome), 
-    minContext(minContext), addContext(addContext), credit(credit),
-    mapType(mapType), mismatch(mismatch), z_max(z_max) {
+    minContext(minContext), addContext(addContext), multContext(multContext),
+    credit(credit), mapType(mapType), mismatch(mismatch), z_max(z_max) {
     
     // Nothing to do
     
@@ -625,22 +625,22 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
         
         // Map it on the right
         rightMappings = index.misMatchMap(rangeVector, contig,
-            &includedPositions, minContext, addContext, z_max);
+            &includedPositions, minContext, addContext, multContext, z_max);
         
         // Map it on the left
         leftMappings = index.misMatchMap(rangeVector, 
             reverseComplement(contig), &includedPositions, minContext, 
-            addContext, z_max); 
+            addContext, multContext, z_max); 
                 
     } else {
                 
         // Map it on the right
         rightMappings = index.map(rangeVector, contig, &includedPositions, 
-            minContext, addContext);
+            minContext, addContext, multContext);
     
         // Map it on the left
         leftMappings = index.map(rangeVector, reverseComplement(contig), 
-            &includedPositions, minContext, addContext);
+            &includedPositions, minContext, addContext, multContext);
     
     }
     

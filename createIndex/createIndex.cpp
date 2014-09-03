@@ -970,12 +970,17 @@ void saveLevelIndex(
  *
  * If an addContext is specified, will require contexts extended out that far
  * beyond where a unique result is obtained in order to map.
+ *
+ * If multContext is specified, a base will only map if it has a maximum context
+ * as long as or longer than multContext times the length of its minimum unique
+ * context.
  */
 stPinchThreadSet*
 mergeGreedy(
     const FMDIndex& index,
     size_t context = 0,
     size_t addContext = 0,
+    double multContext = 0,
     bool credit = false,
     std::string mapType = "LRexact",
     bool mismatch = false,
@@ -1009,8 +1014,8 @@ mergeGreedy(
         // and also the bitmask of what bottom-level things to count. We also
         // need to tell it what genome to map the contigs of.
         MappingMergeScheme scheme(index, *mergedRuns.first, mergedRuns.second,
-            *includedPositions, genome, context, addContext, credit, mapType,
-	    mismatch, z_max);
+            *includedPositions, genome, context, addContext, multContext, 
+            credit, mapType, mismatch, z_max);
 
         // Set it running and grab the queue where its results come out.
         ConcurrentQueue<Merge>& queue = scheme.run();
@@ -1621,6 +1626,9 @@ main(
         ("addContext", boost::program_options::value<size_t>()
             ->default_value(0), 
             "Extra context beyond that needed to be unique for greedy LR")
+        ("multContext", boost::program_options::value<double>()
+            ->default_value(0), 
+            "Minimum context length as a fraction of uniqueness distance")
         ("sampleRate", boost::program_options::value<unsigned int>()
             ->default_value(64), 
             "Set the suffix array sample rate to use")
@@ -1758,7 +1766,8 @@ main(
     } else if(mergeScheme == "greedy") {
         // Use the greedy merge instead.
         threadSet = mergeGreedy(index, options["context"].as<size_t>(), 
-            options["addContext"].as<size_t>(), creditBool, mapType, mismatchb,
+            options["addContext"].as<size_t>(), 
+            options["multContext"].as<double>(), creditBool, mapType, mismatchb,
             options["mismatches"].as<size_t>());
     } else {
         // Complain that's not a real merge scheme. TODO: Can we make the
