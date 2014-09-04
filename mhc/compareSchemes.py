@@ -196,7 +196,8 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                         (True, True, 100, 0, 0),
                         (True, True, 0, 0, 2.0),
                         (True, True, 100, 0, 2.0),
-                        (True, True, 0, 0, 0)
+                        (True, True, 0, 0, 0),
+                        (True, False, 0, 0, 0)
                     ]
         
         for mismatch, credit, min_context, add_context, mult_context in \
@@ -229,8 +230,10 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 scheme_name += "Add{}".format(add_context)
                 
             if mult_context > 0:
-                # Include multiplicative context if in use.
-                scheme_name += "Mult{}".format(mult_context)
+                # Include multiplicative context if in use. Don't let any .s
+                # into the scheme name since it needs to be a valid file
+                # extension.
+                scheme_name += "Mult{}".format(mult_context).replace(".", "_")
                 
             # Yield the name with the args.
             yield (scheme_name, extra_args)
