@@ -1,0 +1,420 @@
+#include "adjacencyComponentUtil.hpp"
+#include <Log.hpp>
+
+#include <algorithm>
+
+std::vector<std::vector<stPinchEnd>> 
+getAdjacencyComponents(
+    stPinchThreadSet* threadSet
+) {
+
+    Log::info() << "Making adjacency component list..." << std::endl;
+
+    // Make an empty vector of components to populate.
+    std::vector<std::vector<stPinchEnd>> toReturn;
+    
+    // Get all the adjacency components.
+    stList* adjacencyComponents = stPinchThreadSet_getAdjacencyComponents(
+        threadSet);
+        
+    // Get an iterator over them
+    stListIterator* componentIterator = stList_getIterator(adjacencyComponents);
+    
+    // Grab the first component
+    stList* component = (stList*) stList_getNext(componentIterator);
+    
+    while(component != NULL) {
+        
+        // Make a vector to hold the ends in the component.
+        std::vector<stPinchEnd> ends;
+        
+        // Get an iterator over its contents
+        stListIterator* endIterator = stList_getIterator(component);
+        
+        // Get the first pinch end in the component
+        stPinchEnd* pinchEnd = (stPinchEnd*) stList_getNext(endIterator);
+        
+        while(pinchEnd != NULL) {
+            // For each pinch end in the component
+            
+            Log::trace() << LOG_LAZY("Observed end " << pinchEnd << 
+                " of block " << stPinchEnd_getBlock(pinchEnd) << 
+                " of degree " << 
+                stPinchBlock_getDegree(stPinchEnd_getBlock(pinchEnd)) << 
+                std::endl);
+            
+            // Put it in the vector that represents the component. Make sure to
+            // copy it since the actual ends pointed to here get destroyed when
+            // the list we're iterating over does.
+            ends.push_back(*pinchEnd);
+        
+            // Look at the next end
+            pinchEnd = (stPinchEnd*) stList_getNext(endIterator);
+        }
+        
+        // Clean up the iterator
+        stList_destructIterator(endIterator);
+        
+        // Put this component in the vector of all components.
+        toReturn.push_back(std::move(ends));
+        
+        // Look at the next component
+        component = (stList*) stList_getNext(componentIterator);
+    }
+    
+    // Clean up the iterator
+    stList_destructIterator(componentIterator);
+    
+    // And the entire list while we're at it
+    stList_destruct(adjacencyComponents);
+    
+    // Give back the converted data structure
+    return toReturn;
+
+}
+
+std::map<size_t, size_t>
+getAdjacencyComponentSpectrum(
+    std::vector<std::vector<stPinchEnd>> components
+) {
+    
+    Log::info() << "Making adjacency component spectrum..." << std::endl;
+
+    // Make the map we're going to return
+    std::map<size_t, size_t> toReturn;
+
+    for(auto component : components) {
+        
+        // Get its size
+        size_t componentSize = component.size();
+        
+        if(!toReturn.count(componentSize)) {
+            // This is the first component of this size we have found
+            toReturn[componentSize] = 1;
+        } else {
+            // We found another one
+            toReturn[componentSize]++;
+        }
+    }
+    
+    // Give back the map
+    return toReturn;
+    
+}
+
+std::vector<std::vector<stPinchEnd>>
+filterComponentsBySize(
+    std::vector<std::vector<stPinchEnd>> components,
+    size_t size
+) {
+    
+    Log::info() << "Selecting size " << size << " components" << std::endl;
+
+    // Make a vector to return
+    std::vector<std::vector<stPinchEnd>> toReturn;
+    
+    std::copy_if(components.begin(), components.end(), 
+        std::back_inserter(toReturn), [&](std::vector<stPinchEnd> v) {
+            // Grab only the vectors that are the correct size.
+            return v.size() == size;
+        });
+        
+    return toReturn;
+}
+
+std::vector<std::vector<stPinchSegment*>>
+getAllPaths(
+    stPinchEnd* start,
+    stPinchEnd* end
+) {
+    
+    Log::debug() << LOG_LAZY("Getting all paths from block " << 
+        stPinchEnd_getBlock(start) << " orientation " << 
+        stPinchEnd_getOrientation(start) << " to block " << 
+        stPinchEnd_getBlock(end) << " orientation " << 
+        stPinchEnd_getOrientation(end) << std::endl);
+
+    // make the vector of paths we are going to return.
+    std::vector<std::vector<stPinchSegment*>> toReturn;
+    
+    // Iterate over the threads in the first end's block
+    stPinchBlockIt segmentsIterator = stPinchBlock_getSegmentIterator(
+        stPinchEnd_getBlock(start));
+        
+    // Grab the first segment
+    stPinchSegment* startSegment = stPinchBlockIt_getNext(&segmentsIterator);
+    
+    while(startSegment != NULL) {
+    
+        // Start a traversal from that segment
+        stPinchSegment* segment = startSegment;
+        
+        // Make a vector to include all the segments except the bookending ones.
+        std::vector<stPinchSegment*> path;
+        
+        // Keep track of the direction we are going. 0 is forwards.
+        bool direction = stPinchEnd_getOrientation(start);
+        
+        Log::trace() << LOG_LAZY("Starting direction " << direction <<
+            " from segment " << startSegment <<  " in block " << 
+            stPinchEnd_getBlock(start) << std::endl);
+        
+        while(true) {
+            // While we haven't made it to the block of the other end
+            
+            if(!direction) {
+                // Go forwards (towards 3')
+                segment = stPinchSegment_get3Prime(segment);
+            } else {
+                // Go backwards (towards 5')
+                segment = stPinchSegment_get5Prime(segment);
+            }
+            
+            
+            if(segment == NULL) {
+                // We ran off the end of the thread without getting to the thing
+                // we were supposed to hit. Don't keep this path, and try the
+                // next start segment.
+                Log::error() << "Path escaped!" << std::endl;
+                break;
+            }
+            
+            // Get the orientation of this segment. 0 is forwards.
+            bool segmentOrientation = stPinchSegment_getBlockOrientation(
+                segment);
+            
+            // We know segments are connected 5' to 3' along a whole thread, so
+            // we never need to change direction.
+            
+            Log::trace() << LOG_LAZY("Visiting segment " << segment << 
+                " orientation " << segmentOrientation << " in block " << 
+                stPinchSegment_getBlock(segment) << std::endl);
+            
+            if(stPinchSegment_getBlock(segment) == end->block && 
+                direction != stPinchEnd_getOrientation(end)) {
+                // We hit the other end. For orientation, if direction is true,
+                // we were going backwards and have hit the 5' end. If direction
+                // is false, we were going forwards and have hit the 3' end. End
+                // orientation is true if it's the 3' end. So we need direction
+                // and end orientation to not match if we are to detect the
+                // correct end.
+                
+                // This might not matter for the size 2 adjacency component case
+                // because any block we hit will be the right one. But if we
+                // ever use this in more complex cases we will care.
+                
+                // Keep our path.
+                toReturn.push_back(path);
+                
+                Log::debug() << LOG_LAZY("Path finished successfully with " << 
+                    path.size() << " segments" << std::endl);
+                
+                // Stop this path.
+                break;
+            }
+            
+            // If we didn't hit the other end yet, keep this new segment on our
+            // path.
+            path.push_back(segment);
+            
+        }
+    
+        // Try the next segment to get the path from it.
+        startSegment = stPinchBlockIt_getNext(&segmentsIterator);
+    }
+    
+    // Return the vector of paths.
+    return toReturn;
+
+}
+
+std::vector<int64_t>
+getIndelLengths(
+    std::vector<std::vector<stPinchEnd>> components
+) {
+
+    Log::info() << "Getting indel lengths from " << components.size() << 
+        " components..." << std::endl;
+
+    // Make the vector of lengths we will populate.
+    std::vector<int64_t> toReturn;
+    
+    for(auto component : components) {
+        // Look at every component
+        
+        if(component.size() != 2) {
+            // Complain we got a bad sized component in here
+            throw std::runtime_error(
+                std::string("Component has incorrect size ") + 
+                std::to_string(component.size()) + " for an indel.");
+        }
+        
+        if(stPinchBlock_getDegree(stPinchEnd_getBlock(&component[0])) != 2 ||
+            stPinchBlock_getDegree(stPinchEnd_getBlock(&component[1])) != 2) {
+            // If there aren't exactly two segments on both ends, this isn't a
+            // nice simple indel/substitution. Skip it.
+            
+            Log::error() << "Skipping component; Degrees are " << 
+                stPinchBlock_getDegree(stPinchEnd_getBlock(&component[0])) << 
+                " and " << 
+                stPinchBlock_getDegree(stPinchEnd_getBlock(&component[1])) << 
+                std::endl;
+            continue;
+            
+            // TODO: account for ends of contigs lining up across from things
+            // and having no paths across.
+        }
+        
+        // Get two paths of 0 or more segments
+        std::vector<std::vector<stPinchSegment*>> paths = 
+            getAllPaths(&component[0], &component[1]);
+            
+        if(paths.size() != 2) {
+            // This isn't just an indel. It might be an indel within a
+            // duplication, or an indel for one out of a set of merged genomes,
+            // but without just 2 paths we can't really define indel length.
+            // TODO: Handle the case where all paths but one are one length, and
+            // one is another length.
+            Log::error() << "Skipping component; got " << paths.size() << 
+                " paths instead of 2" << std::endl;
+            continue;
+        }
+        
+        // Keep the length of the segments on each path. There will always be 2
+        // paths.
+        std::vector<int64_t> pathLengths;
+        
+        for(auto path : paths) {
+            // For each path, we want to track the length
+            int64_t pathLength = 0;
+            for(size_t i = 0; i < path.size(); i++) {
+                // Add in each segment
+                pathLength += stPinchSegment_getLength(path[i]);
+                
+                if(stPinchSegment_getLength(path[i]) > 100000000000000) {
+                    // I saw some pretty wrong indel lengths.
+                    throw std::runtime_error("Segment stupidly long");
+                }
+            }
+            
+            Log::debug() << "Path length: " << pathLength << std::endl;
+            
+            // Record the length of this path.
+            pathLengths.push_back(pathLength);
+        }
+        
+        if(pathLengths[0] < 0 || pathLengths[1] < 0) {
+            // Maybe wrong indel lengths are from negative path lengths?
+            throw std::runtime_error("Negative length path");
+        }
+        
+        if(pathLengths[0] > 100000000000000 || 
+            pathLengths[1] > 100000000000000) {
+            // Maybe wrong indel lengths are from huge path lengths?
+            throw std::runtime_error("Path stupidly long");
+        }
+        
+        if(pathLengths[0] > pathLengths[1]) {
+            // This is the way the indel goes
+            toReturn.push_back(pathLengths[0] - pathLengths[1]);
+        } else {
+            // It goes the other way around.
+            toReturn.push_back(pathLengths[1] - pathLengths[0]);
+        }
+    }
+    
+    return toReturn;
+
+}
+
+size_t
+countTandemDuplications(
+    std::vector<std::vector<stPinchEnd>> components
+) {
+
+    Log::info() << "Counting tandem duplications in " << components.size() << 
+        " components..." << std::endl;
+
+    // How many have we found so far?
+    size_t tandemDuplications = 0;
+
+    for(auto component : components) {
+        for(size_t i = 0; i < component.size(); i++) {
+            // Go through all the ends
+            stPinchEnd end1 = component[i];
+            
+            Log::debug() << "End " << stPinchEnd_getOrientation(&end1) << 
+                " of block " << stPinchEnd_getBlock(&end1) << std::endl;
+            
+            for(size_t j = 0; j < i; j++) {
+                // And all the other ends
+                stPinchEnd end2 = component[j];
+                
+                if(stPinchEnd_getBlock(&end1) == stPinchEnd_getBlock(&end2)) {
+                    // We have two ends that share a block.
+                    
+                    Log::debug() << "We have two ends of block " << 
+                        stPinchEnd_getBlock(&end1) << std::endl;
+                    
+                    // Get the ends attached to end 1
+                    stSet* connectedEnds = 
+                        stPinchEnd_getConnectedPinchEnds(&end1);
+                        
+                    // These ends are in there by address, so we have to scan
+                    // for ours.
+                    
+                    // Get an iterator over the set.
+                    stSetIterator* iterator = stSet_getIterator(connectedEnds);
+                    
+                    stPinchEnd* other = (stPinchEnd*) stSet_getNext(iterator);
+                    while(other != NULL) {
+                        // Go through all the things attached to end1
+                        
+                        Log::debug() << "Connection to block " << 
+                            stPinchEnd_getBlock(other) << " end " << 
+                            stPinchEnd_getOrientation(other) << std::endl;
+                        
+                        if(stPinchEnd_getBlock(other) == 
+                            stPinchEnd_getBlock(&end2) && 
+                            stPinchEnd_getOrientation(other) == 
+                            stPinchEnd_getOrientation(&end2)) {
+                            
+                            Log::debug() << "...which counts!" << std::endl;
+                            
+                            // This end that the first end is connected to looks
+                            // exactly like the second end. Call this a tandem
+                            // duplication.
+                            tandemDuplications++;
+                            
+                            // TODO: Break out of like 3 loops now, so we don't
+                            // check all the other end pairs or somehow call two
+                            // tandem duplications in one component.
+                            
+                        } else {
+                            Log::debug() << "...which isn't block " << 
+                                stPinchEnd_getBlock(&end2) << " end " << 
+                                stPinchEnd_getOrientation(&end2) << std::endl;
+                        }
+                                                
+                        other = (stPinchEnd*) stSet_getNext(iterator);
+                    }
+                    
+                    // Clean up the iterator
+                    stSet_destructIterator(iterator);
+                        
+                    // Clean up our connected ends set.
+                    stSet_destruct(connectedEnds);
+                }
+            }
+        }
+        
+    }
+    
+    Log::info() << "Counted " << tandemDuplications << " duplications" <<
+        std::endl;
+    
+    // We counted up the tandem duplications. Now return.
+    return tandemDuplications;
+
+}
+

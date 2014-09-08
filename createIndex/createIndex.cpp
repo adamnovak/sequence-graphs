@@ -10,8 +10,6 @@
 #include <csignal>
 #include <iterator>
 #include <cstdint> 
-#include <sys/resource.h>
-#include <execinfo.h>
 
 
 #include <boost/filesystem.hpp>
@@ -21,6 +19,7 @@
 #include <stPinchGraphs.h>
 
 // Grab all the libFMD stuff.
+#include <FMDIndex.hpp>
 #include <FMDIndexBuilder.hpp>
 #include <GenericBitVector.hpp>
 #include <FMDIndexIterator.hpp>
@@ -40,69 +39,9 @@
 #include "MappingMergeScheme.hpp"
 #include "MergeApplier.hpp"
 
-
-/**
- * Log current memory usage at INFO level.
- */
-void logMemory() {
-    
-    // We have to interrogate /proc/self/status
-    
-    std::ifstream statusStream("/proc/self/status");
-    
-    std::string line;
-    while(std::getline(statusStream, line)) {
-        if(line.size() >= 2 && line[0] == 'V' && line[1] == 'm') {
-            // This is a virtual memory line. Log it.
-            Log::output() << line << std::endl;
-        }
-    }
-    
-    
-
-}
-
-/**
- * Signal handler to exit with exit(), preserving gprof profiling data if
- * applicable.
- */
-void exitOnSignal(int signalNumber) {
-    // Log the signal.
-    Log::critical() << "Exiting on signal " << signalNumber << std::endl;
-    
-    // Call exit and report the signal.
-    exit(signalNumber);
-}
-
-/**
- * Signal handler for printing a stack trace and exiting on a signal. See
- * <http://stackoverflow.com/a/77336/402891>
- */
-void stacktraceOnSignal(int signalNumber) {
-    // How many frames can we handle?
-    const size_t MAX_FRAMES = 100;
-    
-    // This holds the stack frames
-    void *frames[MAX_FRAMES];
-    
-    // And this holds how many there actually are, which comes out of the
-    // function that gets the frames.
-    size_t framesUsed = backtrace(frames, MAX_FRAMES);
-    
-    // Log the signal.
-    Log::critical() << "Critical signal " << signalNumber << 
-        ", stacktracing." << std::endl;
-        
-    char** traceMessages = backtrace_symbols(frames, framesUsed);
-    
-    for(size_t i = 0; i < framesUsed; i++) {
-        // Log the stack frames.
-        Log::critical() << "Frame " << i << ": " << traceMessages[i] << 
-            std::endl;
-    }
-    
-    exit(signalNumber);
-}
+#include "unixUtil.hpp"
+#include "adjacencyComponentUtil.hpp"
+#include "pinchGraphUtil.hpp"
 
 /**
  * Look at the text of a base to see what arrow it needs to
@@ -161,218 +100,6 @@ buildIndex(
     
     // Return the built index.
     return builder.build();
-}
-
-/**
- * Make a thread set with one thread representing each contig in the index.
- */
-stPinchThreadSet* 
-makeThreadSet(
-    const FMDIndex& index
-) {
-    // Make a ThreadSet with one thread per contig.
-    // Construct the thread set first.
-    stPinchThreadSet* threadSet = stPinchThreadSet_construct();
-    
-    for(size_t i = 0; i < index.getNumberOfContigs(); i++) {
-        // Add a thread for this contig number. The thread starts at base 1 and
-        // has the appropriate length.
-        stPinchThreadSet_addThread(threadSet, i, 1, index.getContigLength(i));
-    }
-    
-    return threadSet;
-}
-
-/**
- * Create a new thread set from the given FMDIndex, and merge it down by the
- * overlap merging scheme, in parallel. Returns the pinched thread set.
- * 
- * If a context is specified, will not merge on fewer than that many bases of
- * context on a side, whether there is a unique mapping or not.
- */
-stPinchThreadSet*
-mergeOverlap(
-    const FMDIndex& index,
-    size_t context = 0
-) {
-
-    Log::info() << "Creating initial pinch thread set" << std::endl;
-    
-    // Make a thread set from our index.
-    stPinchThreadSet* threadSet = makeThreadSet(index);
-    
-    // Make the merge scheme we want to use
-    OverlapMergeScheme scheme(index, context);
-
-    // Set it running and grab the queue where its results come out.
-    ConcurrentQueue<Merge>& queue = scheme.run();
-    
-    // Make a merge applier to apply all those merges, and plug it in.
-    MergeApplier applier(index, queue, threadSet);
-    
-    // Wait for these things to be done.
-    scheme.join();
-    applier.join();
-    
-    // Write a report before joining trivial boundaries.
-    Log::output() << "Before joining boundaries:" << std::endl;
-    Log::output() << "Pinch Blocks: " <<
-        stPinchThreadSet_getTotalBlockNumber(threadSet) << std::endl;
-    logMemory();
-    
-    // Now GC the boundaries in the pinch set
-    Log::info() << "Joining trivial boundaries..." << std::endl;
-    stPinchThreadSet_joinTrivialBoundaries(threadSet);
-    
-    // Write a similar report afterwards.
-    Log::output() << "After joining boundaries:" << std::endl;
-    Log::output() << "Pinch Blocks: " <<
-        stPinchThreadSet_getTotalBlockNumber(threadSet) << std::endl;
-    logMemory();
-    
-    // Now our thread set has been pinched. Return it.
-    return threadSet;
-
-}
-
-/**
- * Turn the given (contig number, 1-based offset from start, orientation)
- * position into the same sort of structure for the canonical base that
- * represents all the bases it has been pinched with.
- */
-std::pair<std::pair<size_t, size_t>, bool>
-canonicalize(
-    stPinchThreadSet* threadSet, 
-    size_t contigNumber,
-    size_t offset,
-    bool strand
-) {
-    
-    Log::debug() << "Canonicalizing " << contigNumber << ":" << offset << 
-        "." << strand << std::endl;
-        
-    // Now we need to look up what the pinch set says is the canonical
-    // position for this base, and what orientation it should be in. All the
-    // bases in this range have the same context and should thus all be
-    // pointing to the canonical base's replacement.
-    
-    // Get the segment (using the 1-based position).
-    stPinchSegment* segment = stPinchThreadSet_getSegment(threadSet, 
-        contigNumber, offset);
-        
-    if(segment == NULL) {
-        throw std::runtime_error("Found position in null segment!");
-    }
-        
-    // How is it oriented in its block?
-    bool segmentOrientation = stPinchSegment_getBlockOrientation(segment);
-    // How far into the segment are we? 0-based, from subtracting 1-based
-    // positions.
-    size_t segmentOffset = offset - stPinchSegment_getStart(segment);
-        
-    // Get the first segment in the segment's block, or just this segment if
-    // it isn't in a block.
-    stPinchSegment* firstSegment = segment;
-    
-    // Get the block that that segment is in
-    stPinchBlock* block = stPinchSegment_getBlock(segment);
-    if(block != NULL) {
-        // Put the first segment in the block as the canonical segment.
-        firstSegment = stPinchBlock_getFirst(block);
-    }
-    
-    // Work out what the official contig number for this block is (the name
-    // of the first segment).
-    size_t canonicalContig = stPinchSegment_getName(firstSegment);
-    // How should it be oriented?
-    bool canonicalOrientation = stPinchSegment_getBlockOrientation(
-        firstSegment);
-    
-    // We need to calculate an offset into the canonical segment. If the
-    // segments are pinched together backwards, this will count in opposite
-    // directions on the two segments, so we'll need to flip the within-sement
-    // offset around.
-    size_t canonicalSegmentOffset = segmentOffset;
-    if(segmentOrientation != canonicalOrientation) {
-        // We really want this many bases in from the end of the segment, not
-        // out from the start of the segment. Keep it 0-based.
-        canonicalSegmentOffset = stPinchSegment_getLength(firstSegment) - 
-            canonicalSegmentOffset - 1;
-    }
-    
-    Log::debug() << "Canonicalized segment offset " << segmentOffset << 
-        " to " << canonicalSegmentOffset << std::endl;
-    
-    // What's the offset into the canonical contig? 1-based because we add a
-    // 0-based offset to a 1-based position.
-    size_t canonicalOffset = stPinchSegment_getStart(firstSegment) + 
-        canonicalSegmentOffset;
-    
-    Log::debug() << "Canonicalized contig " << contigNumber << " offset " <<
-        offset << " to contig " << canonicalContig << " offset " << 
-        canonicalOffset << std::endl;
-    
-    // Return all three values, and be sad about not having real tuples. What
-    // orientation should we use?  Well, we have the canonical position's
-    // orientation within the block, our position's orientation within the
-    // block, and the orientation that this context attaches to the position in.
-    // Flipping any of those will flip the orientation in which we need to map,
-    // so we need to xor them all together, which for bools is done with !=.
-    Log::debug() << "Canonical orientation: " << canonicalOrientation << 
-            std::endl;
-    Log::debug() << "Segment orientation: " << segmentOrientation << 
-            std::endl;
-    Log::debug() << "Strand: " << strand << std::endl;
-
-    if(canonicalOffset <= 0 || 
-        canonicalOffset > stPinchThread_getLength(
-        stPinchSegment_getThread(firstSegment))) {
-        
-        // The answer is supposed to be a 1-based offset. Make sure that is
-        // true.
-        throw std::runtime_error("Canonical offset " + 
-            std::to_string(canonicalOffset) + 
-            " out of range for 1-based position");
-    }
-
-    return std::make_pair(std::make_pair(canonicalContig, canonicalOffset),
-        canonicalOrientation != segmentOrientation != strand);
-}
-
-/**
- * Turn the given (text, 0-based offset offset) pair into a canonical (contig
- * number, 1-based offset from contig start, orientation), using the given
- * FMDIndex and the given thread set. The orientation is which face of the
- * canonical base this (text, offset) pair means.
- */
-std::pair<std::pair<size_t, size_t>, bool>
-canonicalize(
-    const FMDIndex& index, 
-    stPinchThreadSet* threadSet, 
-    TextPosition base
-) {
-    
-    Log::debug() << "Canonicalizing 0-based " << base << std::endl;
-    
-    // What contig corresponds to that text?
-    size_t contigNumber = index.getContigNumber(base);
-    // And what strand corresponds to that text? This tells us what
-    // orientation we're actually looking at the base in.
-    bool strand = (bool) index.getStrand(base);
-    // And what base position is that from the front of the contig? This is
-    // 1-based.
-    size_t offset = index.getOffset(base);
-    
-    if(offset <= 0 || offset > index.getContigLength(contigNumber)) {
-        // Complain that we got an out of bounds offset from this thing.
-        throw std::runtime_error("Tried to canonicalize text" +
-            std::to_string(base.getText()) + " offset " + 
-            std::to_string(base.getOffset()) + " which is out of bounds");
-    }
-    
-    // Canonicalize that pinch thread set position.
-    return canonicalize(threadSet, contigNumber, offset, strand);
-    
 }
 
 /**
@@ -451,307 +178,6 @@ writeDegrees(
     // We wrote out all the degrees
     degrees.flush();
     degrees.close();
-
-}
-
-/**
- * Write the given threadSet on the contigs in the given index out as a multiple
- * alignment. Produces a cactus2hal (.c2h) file as described in
- * <https://github.com/benedictpaten/cactus/blob/development/hal/impl/hal.c>/
- *
- * Such a file looks like this.
- * 
- * s    'event1'   'seq1'    1
- * a    1 10   10
- * s    'event1'    'seq2'  0
- * a    20  10  1    0
- *
- * These files describe trees of sequences, with an alignment of each child onto
- * its parent. Each sequence has two ways of dividing it up into "segments", or
- * blocks: one which applies for alignments mapping upwards, and one which
- * appplies for alignments mapping downwards. 
- * 
- * The s lines define sequences. Sequences can be bottom or not. Each sequence
- * is defined by an event name, a contig name/FASTA header, and a bottom-or-not
- * flag. After each s line there are a series of a lines, which define alignment
- * segments on that sequence.
- * 
- * "Bottom" alignment lines define "bottom" segments, which are mapped down;
- * they consist only of a name (really a number), a start, and a length. Bottom
- * sequences only have bottom segments.
- *
- * "Top" alignment lines define "top" segments, which have a start, a length, a
- * name (which is numerical) of a bottom alignment block which they are aligned
- * to, and a flag for the relative orientation of the alignment (0 for same
- * direction, right for different directions). If the segment is an insertion
- * (i.e. unaligned) it has only a start and a length. Top sequences only have
- * top segments.
- *
- * All segments in a sequence are sorted by position. Each sequence appears only
- * once. Every base in a sequence is part of some segment. All positions are
- * 0-based. Ancestors must come before descendants.
- *
- * Returns the total number of bases in the made-up root node used to tie the
- * actual sequences together.
- */
-size_t
-writeAlignment(
-    stPinchThreadSet* threadSet, 
-    const FMDIndex& index, 
-    std::string filename) 
-{
-
-    // We're going to lay out the segments in our root sequence with some
-    // locality. We're going to scan through all threads, and put each new block
-    // as it is encountered. So we need a set of the encountered blocks.
-    // TODO: When we get c++11, make this an unordered_set
-    std::set<stPinchBlock*> seen;
-    
-    // Open up the file to write.
-    std::ofstream c2h(filename.c_str());
-    
-    // First, make a hacked-up consensus reference sequence to be the root of
-    // the tree. It just has all the pinch blocks in some order.
-    
-    // Write the root sequence line. It is a bottom sequence since it has bottom
-    // segments.
-    c2h << "s\t'rootSeq'\t'rootSeq'\t1" << std::endl;
-    
-    // Keep track of the total root sequence space already used
-    size_t nextBlockStart = 0;
-    
-    // Make an iterator over pinch threads
-    stPinchThreadSetIt threadIterator = stPinchThreadSet_getIt(threadSet);
-    
-    // And a pointer to hold the current thread
-    stPinchThread* thread;
-    while((thread = stPinchThreadSetIt_getNext(&threadIterator)) != NULL) {
-        // For each pinch thread
-        
-        // Go through all its pinch segments in order. There's no iterator so we
-        // have to keep looking 3'
-        
-        // Get the first segment in the thread.
-        stPinchSegment* segment = stPinchThread_getFirst(thread);
-        while(segment != NULL) {
-        
-            stPinchBlock* block;
-            if((block = stPinchSegment_getBlock(segment)) != NULL) {
-                // Look at its block if it has one
-                
-                if(seen.count(block) == 0) {
-                    // This is a new block we haven't allocated a range for yet.
-                    
-                    // For each block, put a bottom segment. Just name the
-                    // segment after the block's address. We need block name
-                    // (number), start, and length.
-                    c2h << "a\t" << (uintptr_t)block << "\t" << 
-                        nextBlockStart << "\t" << 
-                        stPinchBlock_getLength(block) << std::endl;
-                        
-                    // Advance nextBlockStart.
-                    nextBlockStart += stPinchBlock_getLength(block);
-                    
-                    // Record that we have seen this block now.
-                    seen.insert(block);
-                }
-            }
-            
-            // Jump to the next 3' segment. This needs to return NULL if we go
-            // off the end.
-            segment = stPinchSegment_get3Prime(segment);
-        }
-        
-    }
-    
-    // Keep a mapping from scaffold name to event name. Event name will be
-    // either the contig scaffold name if all the contigs are from a single
-    // scaffold, or "genome-<number>" if there are multiple scaffolds involved.
-    std::map<std::string, std::string> eventNames;
-    
-    // Keep track of the original source sequence
-    std::string sourceSequence;
-    
-    // Go through contigs in order. The index spec requires them to be grouped
-    // by original source sequence.
-    for(size_t contig = 0; contig < index.getNumberOfContigs(); contig++) {
-        // Grab the sequence name that the contig is on
-        std::string contigName = index.getContigName(contig);
-        
-        if(eventNames.count(contigName) == 0) {
-            // We need to figure out the event name for this contig.
-            
-            // Start by naming the event after the contig.
-            eventNames[contigName] = contigName;
-            
-            // What genome does it belong to?
-            size_t genomeNumber = index.getContigGenome(contig);
-            
-            // What contigs are in that genome?
-            auto genomeRange = index.getGenomeContigs(genomeNumber);
-            
-            for(size_t i = genomeRange.first; i < genomeRange.second; i++) {
-                // For every contig in that genome
-                if(index.getContigName(i) != contigName) {
-                    // One of them doesn't match this contig's name; they are
-                    // not all from the same scaffold. Re-name the event with a
-                    // new generic name.
-                    
-                    eventNames[contigName] = "genome-" + 
-                        std::to_string(index.getContigGenome(contig));
-                        
-                    // Now we're done
-                    break;
-                }
-            }
-        }
-        
-        if(contigName != sourceSequence || contig == 0) {
-            // This is a new scaffold, not the same as the one we were on last.
-            
-            // Start a new sequence with a sequence line. The sequence is a top
-            // sequence, since it is only connected up.
-            c2h << "s\t'" << eventNames[contigName] << "'\t'" << contigName <<
-                "'\t0" << std::endl;
-            
-            // Remember that we are on this sequence
-            sourceSequence = contigName;
-        } else {
-            // This is the same sequence as before, but we need an unaligned
-            // segment to cover the distance from the last contig to the start
-            // of this one.
-            
-            // What's 1 base after the end of the last contig? Leave as 0-based.
-            size_t prevContigEnd = index.getContigStart(contig - 1) + 
-                index.getContigLength(contig - 1);
-            
-            // Unaligned top segments are "a <start> <length>" only. Leave as
-            // 0-based.
-            c2h << "a\t" << prevContigEnd << "\t" << 
-                index.getContigStart(contig) - prevContigEnd << std::endl;
-            
-        }
-        
-        // Regardless of whether we changed sequence or not, we need an
-        // alignment segment for every segment in this thread.
-        
-        // Each segment has to account for the offset of the contig on the
-        // sequence.
-        size_t contigStart = index.getContigStart(contig);
-        
-        // So first get the thread by name.
-        stPinchThread* thread = stPinchThreadSet_getThread(threadSet, contig);
-        
-        // Go through all its pinch segments in order. There's no iterator so we
-        // have to keep looking 3'
-        
-        // Get the first segment in the thread.
-        stPinchSegment* segment = stPinchThread_getFirst(thread);
-        while(segment != NULL) {
-            
-            // Start where the next segment starts. Convert from 1-based pinch
-            // segments to 0-based HAL.
-            size_t segmentStart = contigStart +
-                stPinchSegment_getStart(segment) - 1;
-            
-            if(stPinchSegment_getBlock(segment) != NULL) {
-                // It actually aligned
-            
-                // Write a top segment mapping to the segment named after the
-                // address of the block this segment belongs to.
-                c2h << "a\t" << segmentStart << "\t" << 
-                    stPinchSegment_getLength(segment) << "\t" << 
-                    (uintptr_t)stPinchSegment_getBlock(segment) << "\t" << 
-                    stPinchSegment_getBlockOrientation(segment) << std::endl;
-            } else {
-                // Write a segment for the unaligned sequence.
-                c2h << "a\t" << segmentStart << "\t" << 
-                    stPinchSegment_getLength(segment) << std::endl;
-            }
-            
-            // Jump to the next 3' segment. This needs to return NULL if we go
-            // off the end.
-            segment = stPinchSegment_get3Prime(segment);
-        }
-        
-    }
-    
-    // Close up the finished file
-    c2h.close();
-    
-    // Return the total length of the made-up root sequence. Later we will
-    // probably need a FASTA with this many Ns in order to turn this c2h into a
-    // HAL file.
-    return nextBlockStart;
-}
-
-/**
- * Write a FASTA file that goes with the .c2h file written by writeAlignment, so
- * that the halAppendCactusSubtree tool can turn both into a HAL file.
- *
- * Strips out newlines so halAppendCactusSubtree will be happy with the
- * resulting FASTA.
- *
- * TODO: Drop this and just use the HAL API directly
- */
-void
-writeAlignmentFasta(
-    std::vector<std::string> inputFastas,
-    size_t rootBases,
-    std::string filename
-) {
-
-    // Open the FASTA to write
-    std::ofstream fasta(filename.c_str());
-    
-    Log::info() << "Generating " << rootBases << 
-        " bases of root node sequence." << std::endl;
-    
-    // First we put the right number of Ns in a sequence named "rootSeq"
-    fasta << ">rootSeq" << std::endl;
-    for(size_t i = 0; i < rootBases; i++) {
-        fasta << "N";
-        // Entire sequence must be on one line.
-    }
-    
-    for(std::vector<std::string>::iterator i = inputFastas.begin(); 
-        i != inputFastas.end(); ++i) {
-        
-        Log::info() << "Copying over " << *i << std::endl;
-        
-        // Then we just copy all the other FASTAs in order.
-        
-        // Open the input FASTA
-        std::ifstream inputFasta((*i).c_str());
-        
-        // Read it line by line. See <http://stackoverflow.com/a/7868998/402891>
-        std::string line;
-        while(std::getline(inputFasta, line)) {
-            // For each line (without trailing newline)
-        
-            if(line.size() == 0) {
-                // Drop blank lines
-                continue;
-            }
-            
-            if(line[0] == '>') {
-                // Make sure there are newlines before and after header lines.
-                fasta << std::endl << line << std::endl;
-            } else {
-                // Don't put any newlines.
-                fasta << line;
-            }
-        }
-            
-        // Close up this input file and move to the next one.
-        inputFasta.close();
-    }
-    
-    // Insert a linebreak at the end of the file.
-    fasta << std::endl;
-    
-    // Now we're done.
-    fasta.close();
 
 }
 
@@ -959,6 +385,58 @@ void saveLevelIndex(
 
 /**
  * Create a new thread set from the given FMDIndex, and merge it down by the
+ * overlap merging scheme, in parallel. Returns the pinched thread set.
+ * 
+ * If a context is specified, will not merge on fewer than that many bases of
+ * context on a side, whether there is a unique mapping or not.
+ */
+stPinchThreadSet*
+mergeOverlap(
+    const FMDIndex& index,
+    size_t context = 0
+) {
+
+    Log::info() << "Creating initial pinch thread set" << std::endl;
+    
+    // Make a thread set from our index.
+    stPinchThreadSet* threadSet = makeThreadSet(index);
+    
+    // Make the merge scheme we want to use
+    OverlapMergeScheme scheme(index, context);
+
+    // Set it running and grab the queue where its results come out.
+    ConcurrentQueue<Merge>& queue = scheme.run();
+    
+    // Make a merge applier to apply all those merges, and plug it in.
+    MergeApplier applier(index, queue, threadSet);
+    
+    // Wait for these things to be done.
+    scheme.join();
+    applier.join();
+    
+    // Write a report before joining trivial boundaries.
+    Log::output() << "Before joining boundaries:" << std::endl;
+    Log::output() << "Pinch Blocks: " <<
+        stPinchThreadSet_getTotalBlockNumber(threadSet) << std::endl;
+    logMemory();
+    
+    // Now GC the boundaries in the pinch set
+    Log::info() << "Joining trivial boundaries..." << std::endl;
+    stPinchThreadSet_joinTrivialBoundaries(threadSet);
+    
+    // Write a similar report afterwards.
+    Log::output() << "After joining boundaries:" << std::endl;
+    Log::output() << "Pinch Blocks: " <<
+        stPinchThreadSet_getTotalBlockNumber(threadSet) << std::endl;
+    logMemory();
+    
+    // Now our thread set has been pinched. Return it.
+    return threadSet;
+
+}
+
+/**
+ * Create a new thread set from the given FMDIndex, and merge it down by the
  * greedy merging scheme, in parallel. Returns the pinched thread set.
  *
  * The greedy merging scheme is to take one genome, map the next genome to it,
@@ -1088,116 +566,6 @@ mergeGreedy(
 }
 
 /**
- * Take a pinch thread set and get the adjacency components in a C++ idiomatic
- * data structure.
- *
- * Returns a vector of adjacency components, which are vectors of pinch ends.
- */
-std::vector<std::vector<stPinchEnd>> 
-getAdjacencyComponents(
-    stPinchThreadSet* threadSet
-) {
-
-    Log::info() << "Making adjacency component list..." << std::endl;
-
-    // Make an empty vector of components to populate.
-    std::vector<std::vector<stPinchEnd>> toReturn;
-    
-    // Get all the adjacency components.
-    stList* adjacencyComponents = stPinchThreadSet_getAdjacencyComponents(
-        threadSet);
-        
-    // Get an iterator over them
-    stListIterator* componentIterator = stList_getIterator(adjacencyComponents);
-    
-    // Grab the first component
-    stList* component = (stList*) stList_getNext(componentIterator);
-    
-    while(component != NULL) {
-        
-        // Make a vector to hold the ends in the component.
-        std::vector<stPinchEnd> ends;
-        
-        // Get an iterator over its contents
-        stListIterator* endIterator = stList_getIterator(component);
-        
-        // Get the first pinch end in the component
-        stPinchEnd* pinchEnd = (stPinchEnd*) stList_getNext(endIterator);
-        
-        while(pinchEnd != NULL) {
-            // For each pinch end in the component
-            
-            Log::trace() << LOG_LAZY("Observed end " << pinchEnd << 
-                " of block " << stPinchEnd_getBlock(pinchEnd) << 
-                " of degree " << 
-                stPinchBlock_getDegree(stPinchEnd_getBlock(pinchEnd)) << 
-                std::endl);
-            
-            // Put it in the vector that represents the component. Make sure to
-            // copy it since the actual ends pointed to here get destroyed when
-            // the list we're iterating over does.
-            ends.push_back(*pinchEnd);
-        
-            // Look at the next end
-            pinchEnd = (stPinchEnd*) stList_getNext(endIterator);
-        }
-        
-        // Clean up the iterator
-        stList_destructIterator(endIterator);
-        
-        // Put this component in the vector of all components.
-        toReturn.push_back(std::move(ends));
-        
-        // Look at the next component
-        component = (stList*) stList_getNext(componentIterator);
-    }
-    
-    // Clean up the iterator
-    stList_destructIterator(componentIterator);
-    
-    // And the entire list while we're at it
-    stList_destruct(adjacencyComponents);
-    
-    // Give back the converted data structure
-    return toReturn;
-
-}
-
-/**
- * Take a vector of adjacency components and get the spectrum of adjacency
- * component sizes. Size 2 components are things like SNPs and indels, while
- * larger components are probably more complex structures.
- */
-std::map<size_t, size_t>
-getAdjacencyComponentSpectrum(
-    std::vector<std::vector<stPinchEnd>> components
-) {
-    
-    Log::info() << "Making adjacency component spectrum..." << std::endl;
-
-    // Make the map we're going to return
-    std::map<size_t, size_t> toReturn;
-
-    for(auto component : components) {
-        
-        // Get its size
-        size_t componentSize = component.size();
-        
-        if(!toReturn.count(componentSize)) {
-            // This is the first component of this size we have found
-            toReturn[componentSize] = 1;
-        } else {
-            // We found another one
-            toReturn[componentSize]++;
-        }
-    }
-    
-    // Give back the map
-    return toReturn;
-    
-}
-
-/**
  * Save an adjacency component spectrum to a file as a <size>\t<count> TSV.
  */
 void
@@ -1221,245 +589,6 @@ writeAdjacencyComponentSpectrum(
 }
 
 /**
- * Get the components of a certain size from a vector of adjacency components.
- * Copies all those components.
- */
-std::vector<std::vector<stPinchEnd>>
-filterComponentsBySize(
-    std::vector<std::vector<stPinchEnd>> components,
-    size_t size
-) {
-    
-    Log::info() << "Selecting size " << size << " components" << std::endl;
-
-    // Make a vector to return
-    std::vector<std::vector<stPinchEnd>> toReturn;
-    
-    std::copy_if(components.begin(), components.end(), 
-        std::back_inserter(toReturn), [&](std::vector<stPinchEnd> v) {
-            // Grab only the vectors that are the correct size.
-            return v.size() == size;
-        });
-        
-    return toReturn;
-}
-
-/**
- * Given a pair of pinch ends, get all the segments on all paths from the first
- * to the second. There must be no paths leaving the first on adjacency edges
- * that do not enter the second on an adjacency edge.
- */
-std::vector<std::vector<stPinchSegment*>>
-getAllPaths(
-    stPinchEnd* start,
-    stPinchEnd* end
-) {
-    
-    Log::debug() << LOG_LAZY("Getting all paths from block " << 
-        stPinchEnd_getBlock(start) << " orientation " << 
-        stPinchEnd_getOrientation(start) << " to block " << 
-        stPinchEnd_getBlock(end) << " orientation " << 
-        stPinchEnd_getOrientation(end) << std::endl);
-
-    // make the vector of paths we are going to return.
-    std::vector<std::vector<stPinchSegment*>> toReturn;
-    
-    // Iterate over the threads in the first end's block
-    stPinchBlockIt segmentsIterator = stPinchBlock_getSegmentIterator(
-        stPinchEnd_getBlock(start));
-        
-    // Grab the first segment
-    stPinchSegment* startSegment = stPinchBlockIt_getNext(&segmentsIterator);
-    
-    while(startSegment != NULL) {
-    
-        // Start a traversal from that segment
-        stPinchSegment* segment = startSegment;
-        
-        // Make a vector to include all the segments except the bookending ones.
-        std::vector<stPinchSegment*> path;
-        
-        // Keep track of the direction we are going. 0 is forwards.
-        bool direction = stPinchEnd_getOrientation(start);
-        
-        Log::trace() << LOG_LAZY("Starting direction " << direction <<
-            " from segment " << startSegment <<  " in block " << 
-            stPinchEnd_getBlock(start) << std::endl);
-        
-        while(true) {
-            // While we haven't made it to the block of the other end
-            
-            if(!direction) {
-                // Go forwards (towards 3')
-                segment = stPinchSegment_get3Prime(segment);
-            } else {
-                // Go backwards (towards 5')
-                segment = stPinchSegment_get5Prime(segment);
-            }
-            
-            
-            if(segment == NULL) {
-                // We ran off the end of the thread without getting to the thing
-                // we were supposed to hit. Don't keep this path, and try the
-                // next start segment.
-                Log::error() << "Path escaped!" << std::endl;
-                break;
-            }
-            
-            // Get the orientation of this segment. 0 is forwards.
-            bool segmentOrientation = stPinchSegment_getBlockOrientation(
-                segment);
-            
-            // We know segments are connected 5' to 3' along a whole thread, so
-            // we never need to change direction.
-            
-            Log::trace() << LOG_LAZY("Visiting segment " << segment << 
-                " orientation " << segmentOrientation << " in block " << 
-                stPinchSegment_getBlock(segment) << std::endl);
-            
-            if(stPinchSegment_getBlock(segment) == end->block && 
-                direction != stPinchEnd_getOrientation(end)) {
-                // We hit the other end. For orientation, if direction is true,
-                // we were going backwards and have hit the 5' end. If direction
-                // is false, we were going forwards and have hit the 3' end. End
-                // orientation is true if it's the 3' end. So we need direction
-                // and end orientation to not match if we are to detect the
-                // correct end.
-                
-                // This might not matter for the size 2 adjacency component case
-                // because any block we hit will be the right one. But if we
-                // ever use this in more complex cases we will care.
-                
-                // Keep our path.
-                toReturn.push_back(path);
-                
-                Log::debug() << LOG_LAZY("Path finished successfully with " << 
-                    path.size() << " segments" << std::endl);
-                
-                // Stop this path.
-                break;
-            }
-            
-            // If we didn't hit the other end yet, keep this new segment on our
-            // path.
-            path.push_back(segment);
-            
-        }
-    
-        // Try the next segment to get the path from it.
-        startSegment = stPinchBlockIt_getNext(&segmentsIterator);
-    }
-    
-    // Return the vector of paths.
-    return toReturn;
-
-}
-
-/**
- * Take a vector of adjacency components all of size 2, and work out the indel
- * length difference for all of them that are simple indels. A straight
- * substitution is a length-0 indel.
- */
-std::vector<int64_t>
-getIndelLengths(
-    std::vector<std::vector<stPinchEnd>> components
-) {
-
-    Log::info() << "Getting indel lengths from " << components.size() << 
-        " components..." << std::endl;
-
-    // Make the vector of lengths we will populate.
-    std::vector<int64_t> toReturn;
-    
-    for(auto component : components) {
-        // Look at every component
-        
-        if(component.size() != 2) {
-            // Complain we got a bad sized component in here
-            throw std::runtime_error(
-                std::string("Component has incorrect size ") + 
-                std::to_string(component.size()) + " for an indel.");
-        }
-        
-        if(stPinchBlock_getDegree(stPinchEnd_getBlock(&component[0])) != 2 ||
-            stPinchBlock_getDegree(stPinchEnd_getBlock(&component[1])) != 2) {
-            // If there aren't exactly two segments on both ends, this isn't a
-            // nice simple indel/substitution. Skip it.
-            
-            Log::error() << "Skipping component; Degrees are " << 
-                stPinchBlock_getDegree(stPinchEnd_getBlock(&component[0])) << 
-                " and " << 
-                stPinchBlock_getDegree(stPinchEnd_getBlock(&component[1])) << 
-                std::endl;
-            continue;
-            
-            // TODO: account for ends of contigs lining up across from things
-            // and having no paths across.
-        }
-        
-        // Get two paths of 0 or more segments
-        std::vector<std::vector<stPinchSegment*>> paths = 
-            getAllPaths(&component[0], &component[1]);
-            
-        if(paths.size() != 2) {
-            // This isn't just an indel. It might be an indel within a
-            // duplication, or an indel for one out of a set of merged genomes,
-            // but without just 2 paths we can't really define indel length.
-            // TODO: Handle the case where all paths but one are one length, and
-            // one is another length.
-            Log::error() << "Skipping component; got " << paths.size() << 
-                " paths instead of 2" << std::endl;
-            continue;
-        }
-        
-        // Keep the length of the segments on each path. There will always be 2
-        // paths.
-        std::vector<int64_t> pathLengths;
-        
-        for(auto path : paths) {
-            // For each path, we want to track the length
-            int64_t pathLength = 0;
-            for(size_t i = 0; i < path.size(); i++) {
-                // Add in each segment
-                pathLength += stPinchSegment_getLength(path[i]);
-                
-                if(stPinchSegment_getLength(path[i]) > 100000000000000) {
-                    // I saw some pretty wrong indel lengths.
-                    throw std::runtime_error("Segment stupidly long");
-                }
-            }
-            
-            Log::debug() << "Path length: " << pathLength << std::endl;
-            
-            // Record the length of this path.
-            pathLengths.push_back(pathLength);
-        }
-        
-        if(pathLengths[0] < 0 || pathLengths[1] < 0) {
-            // Maybe wrong indel lengths are from negative path lengths?
-            throw std::runtime_error("Negative length path");
-        }
-        
-        if(pathLengths[0] > 100000000000000 || 
-            pathLengths[1] > 100000000000000) {
-            // Maybe wrong indel lengths are from huge path lengths?
-            throw std::runtime_error("Path stupidly long");
-        }
-        
-        if(pathLengths[0] > pathLengths[1]) {
-            // This is the way the indel goes
-            toReturn.push_back(pathLengths[0] - pathLengths[1]);
-        } else {
-            // It goes the other way around.
-            toReturn.push_back(pathLengths[1] - pathLengths[0]);
-        }
-    }
-    
-    return toReturn;
-
-}
-
-/**
  * Save a vector of numbers as a single-column TSV.
  */
 template<typename T>
@@ -1478,102 +607,6 @@ writeColumn(
     }    
     
     file.close();
-}
-
-/**
- * Take a vector of adjacency components all of size 4, and count all the tandem
- * duplications. We call it a tandem duplication if two of the ends belong to
- * the same block and are connected.
- */
-size_t
-countTandemDuplications(
-    std::vector<std::vector<stPinchEnd>> components
-) {
-
-    Log::info() << "Counting tandem duplications in " << components.size() << 
-        " components..." << std::endl;
-
-    // How many have we found so far?
-    size_t tandemDuplications = 0;
-
-    for(auto component : components) {
-        for(size_t i = 0; i < component.size(); i++) {
-            // Go through all the ends
-            stPinchEnd end1 = component[i];
-            
-            Log::debug() << "End " << stPinchEnd_getOrientation(&end1) << 
-                " of block " << stPinchEnd_getBlock(&end1) << std::endl;
-            
-            for(size_t j = 0; j < i; j++) {
-                // And all the other ends
-                stPinchEnd end2 = component[j];
-                
-                if(stPinchEnd_getBlock(&end1) == stPinchEnd_getBlock(&end2)) {
-                    // We have two ends that share a block.
-                    
-                    Log::debug() << "We have two ends of block " << 
-                        stPinchEnd_getBlock(&end1) << std::endl;
-                    
-                    // Get the ends attached to end 1
-                    stSet* connectedEnds = 
-                        stPinchEnd_getConnectedPinchEnds(&end1);
-                        
-                    // These ends are in there by address, so we have to scan
-                    // for ours.
-                    
-                    // Get an iterator over the set.
-                    stSetIterator* iterator = stSet_getIterator(connectedEnds);
-                    
-                    stPinchEnd* other = (stPinchEnd*) stSet_getNext(iterator);
-                    while(other != NULL) {
-                        // Go through all the things attached to end1
-                        
-                        Log::debug() << "Connection to block " << 
-                            stPinchEnd_getBlock(other) << " end " << 
-                            stPinchEnd_getOrientation(other) << std::endl;
-                        
-                        if(stPinchEnd_getBlock(other) == 
-                            stPinchEnd_getBlock(&end2) && 
-                            stPinchEnd_getOrientation(other) == 
-                            stPinchEnd_getOrientation(&end2)) {
-                            
-                            Log::debug() << "...which counts!" << std::endl;
-                            
-                            // This end that the first end is connected to looks
-                            // exactly like the second end. Call this a tandem
-                            // duplication.
-                            tandemDuplications++;
-                            
-                            // TODO: Break out of like 3 loops now, so we don't
-                            // check all the other end pairs or somehow call two
-                            // tandem duplications in one component.
-                            
-                        } else {
-                            Log::debug() << "...which isn't block " << 
-                                stPinchEnd_getBlock(&end2) << " end " << 
-                                stPinchEnd_getOrientation(&end2) << std::endl;
-                        }
-                                                
-                        other = (stPinchEnd*) stSet_getNext(iterator);
-                    }
-                    
-                    // Clean up the iterator
-                    stSet_destructIterator(iterator);
-                        
-                    // Clean up our connected ends set.
-                    stSet_destruct(connectedEnds);
-                }
-            }
-        }
-        
-    }
-    
-    Log::info() << "Counted " << tandemDuplications << " duplications" <<
-        std::endl;
-    
-    // We counted up the tandem duplications. Now return.
-    return tandemDuplications;
-
 }
 
 /**
