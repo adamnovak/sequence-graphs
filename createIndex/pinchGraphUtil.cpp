@@ -348,6 +348,9 @@ writeAlignmentWithReference(
     const size_t referenceGenomeNumber
 ) {
     
+    Log::info() << "Serializing star-tree alignment to " << filename <<
+        std::endl;
+    
     // Open up the file to write.
     std::ofstream c2h(filename.c_str());
     
@@ -385,6 +388,9 @@ writeAlignmentWithReference(
         
         // We have now named the event for this genome. Save it
         eventNames[genome] = eventName;
+        
+        Log::info() << "Named genome " << genome << "/" << 
+            index.getNumberOfGenomes() << " event " << eventName << std::endl;
     }
 
     // What contigs are in the reference genome?
@@ -394,6 +400,8 @@ writeAlignmentWithReference(
     std::unordered_set<stPinchBlock*> seen;
     
     for(size_t i = referenceRange.first; i < referenceRange.second; i++) {
+        Log::info() << "Processing reference contig " << i << std::endl;
+        
         // Go through all threads in the reference
         stPinchThread* thread = stPinchThreadSet_getThread(threadSet,
             i);
@@ -412,6 +420,11 @@ writeAlignmentWithReference(
         while(segment != NULL) {
             // Go through all the segments in the thread
             
+            // Work out where this segment starts in the reference. Convert to
+            // 0-based HAL.
+            size_t segmentStart = contigStart +
+                stPinchSegment_getStart(segment) - 1;
+            
             // This holds the block that this segment is in, if any.
             stPinchBlock* block;
             if((block = stPinchSegment_getBlock(segment)) != NULL) {
@@ -420,11 +433,6 @@ writeAlignmentWithReference(
                 if(seen.count(block) == 0) {
                     // This is a new block we haven't seen before on this
                     // thread.
-                    
-                    // Work out where this segment starts in the reference.
-                    // Convert to 0-based HAL.
-                    size_t segmentStart = contigStart +
-                        stPinchSegment_getStart(segment) - 1;
                     
                     // Put a bottom segment for the block. Just name the segment
                     // after the block's address. We need block name (number),
@@ -443,6 +451,13 @@ writeAlignmentWithReference(
                     throw std::runtime_error("Can't make a star-tree due to "
                         "self-alignment in reference!");
                 }
+            } else {
+                // Make a segment named after this segment's address instead.
+                // Nothing will map to it.
+                
+                c2h << "a\t" << (uintptr_t) segment << "\t" << 
+                    segmentStart << "\t" << 
+                    stPinchSegment_getLength(segment) << std::endl;
             }
         
             // Jump to the next 3' segment. This needs will return NULL if we go
@@ -460,6 +475,8 @@ writeAlignmentWithReference(
             continue;
         }
         
+        Log::info() << "Processing query genome " << genome << std::endl;
+        
         // What contigs are in this genome? We assume they are grouped by source
         // scaffold and sorted in order of increasing scaffold position within a
         // scaffold.
@@ -470,6 +487,8 @@ writeAlignmentWithReference(
         std::string lastContigScaffold;
         
         for(size_t i = genomeRange.first; i < genomeRange.second; i++) {
+        
+            Log::info() << "Processing query contig " << i << std::endl;
         
             if(i == genomeRange.first || 
                 index.getContigName(i) != lastContigScaffold) {
@@ -528,8 +547,6 @@ writeAlignmentWithReference(
                     c2h << "a\t" << segmentStart << "\t" << 
                         stPinchSegment_getLength(segment) << std::endl;
                 }
-                // TODO: What about the bits that have no segment at all? Is
-                // just not mentioning those ranges OK?
                 
                 // Jump to the next 3' segment. This will return NULL if we
                 // go off the end.

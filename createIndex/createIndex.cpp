@@ -673,14 +673,14 @@ main(
         ("fastas", boost::program_options::value<std::vector<std::string> >()
             ->multitoken(),
             "FASTA files to load")
-	("credit", "Mapping on credit for greedy scheme")
-	("mapType", boost::program_options::value<std::string>()
+        ("credit", "Mapping on credit for greedy scheme")
+        ("mapType", boost::program_options::value<std::string>()
             ->default_value("LRexact"),
             "Merging scheme (\"centered\" or \"LRexact\")")
-	("mismatches", boost::program_options::value<size_t>()
+        ("mismatches", boost::program_options::value<size_t>()
             ->default_value(0), 
             "Maximum allowed number of mismatches")
-	("mismatch", "Allow for mismatches");
+        ("mismatch", "Allow for mismatches");
         
     // And set up our positional arguments
     boost::program_options::positional_options_description positionals;
@@ -770,7 +770,7 @@ main(
     // Grab a bool for whether we'll map on credit    
     bool creditBool = false;
     if(options.count("credit")) {
-	creditBool = true;
+        creditBool = true;
     }
     
     // Grab the context types we are going to use to merge
@@ -789,7 +789,7 @@ main(
     
     bool mismatchb = false;
     if(options.count("mismatch")) {
-	mismatchb = true;
+        mismatchb = true;
     }
     
     if(mergeScheme == "overlap") {
