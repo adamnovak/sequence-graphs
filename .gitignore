@@ -12,5 +12,10 @@ createIndex/schemas/
 libFMD/jar/
 libFMD/java/
 libFMD/libfmd.jar
+libFMD/testRunner
+speedMap/speedMap
 nbproject/
 data/*
+mhc/*.fa
+mhc/*.txt
+gmon.out

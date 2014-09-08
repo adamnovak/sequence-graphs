@@ -24,18 +24,12 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
     
     """
     
-    def __init__(self, fasta_list, true_maf, seed, coverage_basename,
-        agreement_basename, spectrum_basename, truth_basename, hub_root):
+    def __init__(self, fasta_list, true_maf, seed, stats_dir, hub_root):
         """
         Make a new Target for building a several reference structures from the
         given FASTAs, and comparing against the given truth MAF, using the
-        specified RNG seed, and writing coverage statistics to files with
-        specified coverage base name, a set of adjacency component size spectra
-        to files with the specified spectrum basename, stats for agreement
-        between the schemes to files anmed after the agreement basename, a
-        comparison against the true MAF to files named after the truth_basename,
-        and a directory full of assembly hubs for different pairs of genomes and
-        schemes.
+        specified RNG seed, and writing statistics to one directory, and
+        assembly hubs for different pairs of genomes and schemes to another.
         
         The coverage statistics are just alignment coverage for each pair of
         genomes, in <genome number>\t<coverage fraction> TSVs per scheme.
@@ -55,26 +49,14 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # Save the FASTAs
         self.fasta_list = fasta_list
         
-        # Save the random seed
-        self.seed = seed
-        
-        # Save the concatenated coverage stats file name to use
-        self.coverage_basename = coverage_basename
-        
-        # And the agreement file name
-        self.agreement_basename = agreement_basename
-        
-        # And the concatenated frequency spectrum basename.
-        # TODO: reduce or sum instead of concatenating?
-        # TODO: just use an output directory and dump in it.
-        self.spectrum_basename = spectrum_basename
-        
         # Save the filename of a MAF to compare all our MAFs against (or None)
         self.true_maf = true_maf
         
-        # And the filename to send the results of that comparison to (which also
-        # may be None)
-        self.truth_basename = truth_basename
+        # Save the random seed
+        self.seed = seed
+        
+        # Save the stats directory to populate
+        self.stats_dir = stats_dir
         
         # And the place to put the assembly hubs
         self.hub_root = hub_root
@@ -118,6 +100,143 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                     # args.
                     yield ("{}Min{}Add{}".format(scheme_base, min_context, 
                         add_context), extra_args)
+                        
+    def generateAddContextSchemes(self):
+        """
+        Generate some schemes just for comparing addContext values and hunting
+        credit-only indels.
+        
+        """
+        
+        for mismatch, credit in [(True, True), (True, False)]:
+            # For all combinations of mismatch and credit
+            for min_context in [0]:
+                # And min context length
+                for add_context in [25, 50, 75, 100]:
+                    # And additional context
+                    
+                    # Start out with the context args
+                    extra_args = ["--context", str(min_context), "--addContext",
+                        str(add_context)]
+            
+                    # And give it a name to stick on our output files
+                    scheme_base = "Exact"
+                    if mismatch:
+                        # Add the args and scheme name component for mismatch
+                        extra_args.append("--mismatch")
+                        extra_args.append("--mismatches")
+                        extra_args.append("1")
+                        scheme_base = "Inexact"
+                    if credit:
+                        # Add the args and scheme name component for credit
+                        extra_args.append("--credit")
+                        scheme_base += "Credit"
+                        
+                    # Put together the full scheme name and yield it with the
+                    # args.
+                    yield ("{}Min{}Add{}".format(scheme_base, min_context, 
+                        add_context), extra_args)
+                        
+    def generatePresentationSchemes(self):
+        """
+        Generate some schemes for my presentation.
+        
+        """
+        
+        # Plan out all the schemes as mismatch, credit, min_context,
+        # add_context.
+        scheme_plan = [
+                        (False, False, 100, 0),
+                        (True, False, 100, 0),
+                        (True, True, 100, 0),
+                        (True, True, 0, 25),
+                        (True, True, 0, 50),
+                        (True, True, 0, 75),
+                        (True, True, 0, 100)
+                    ]
+        
+        for mismatch, credit, min_context, add_context in scheme_plan:
+            # Start out with the context args
+            extra_args = ["--context", str(min_context), "--addContext",
+                str(add_context)]
+    
+            # And give it a name to stick on our output files
+            scheme_name = "Exact"
+            if mismatch:
+                # Add the args and scheme name component for mismatch
+                extra_args.append("--mismatch")
+                extra_args.append("--mismatches")
+                extra_args.append("1")
+                scheme_name = "Inexact"
+            if credit:
+                # Add the args and scheme name component for credit
+                extra_args.append("--credit")
+                scheme_name += "Credit"
+                
+            # Always include min cotnext in the name
+            scheme_name += "Min{}".format(min_context)
+            
+            if add_context > 0:
+                # Include additional context if in use. Also pad out so they go
+                # in a sane alphabetical order.
+                scheme_name += "Add{0:03d}".format(add_context)
+                
+            # Yield the name with the args.
+            yield (scheme_name, extra_args)
+            
+    def generateMultSchemes(self):
+        """
+        Generate some schemes for multiplicative context.
+        
+        """
+        
+        # Plan out all the schemes as mismatch, credit, min_context,
+        # add_context, mult_context
+        scheme_plan = [
+                        (True, True, 100, 0, 0),
+                        (True, True, 0, 0, 2.0),
+                        (True, True, 100, 0, 2.0),
+                        (True, True, 0, 0, 0),
+                        (True, False, 0, 0, 0)
+                    ]
+        
+        for mismatch, credit, min_context, add_context, mult_context in \
+            scheme_plan:
+            
+            # Start out with the context args
+            extra_args = ["--context", str(min_context), "--addContext",
+                str(add_context), "--multContext", str(mult_context)]
+    
+            # And give it a name to stick on our output files
+            scheme_name = "Exact"
+            if mismatch:
+                # Add the args and scheme name component for mismatch
+                extra_args.append("--mismatch")
+                extra_args.append("--mismatches")
+                extra_args.append("1")
+                scheme_name = "Inexact"
+            if credit:
+                # Add the args and scheme name component for credit
+                extra_args.append("--credit")
+                scheme_name += "Credit"
+                
+            if min_context > 0:
+                # Include min conext in the name if in use
+                scheme_name += "Min{}".format(min_context)
+            
+            if add_context > 0:
+                # Include additional context if in use. No need for badding
+                # since we can now natural sort.
+                scheme_name += "Add{}".format(add_context)
+                
+            if mult_context > 0:
+                # Include multiplicative context if in use. Don't let any .s
+                # into the scheme name since it needs to be a valid file
+                # extension.
+                scheme_name += "Mult{}".format(mult_context).replace(".", "_")
+                
+            # Yield the name with the args.
+            yield (scheme_name, extra_args)
         
         
         
@@ -127,6 +246,14 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         """
         
         self.logToMaster("Starting SchemeAssessmentTarget")
+        
+        if not os.path.exists(self.stats_dir):
+            # Make our out directory exist
+            os.makedirs(self.stats_dir)
+            
+        if not os.path.exists(self.hub_root):
+            # And our hubs directory
+            os.makedirs(self.hub_root)
         
         # We need a few different follow-on jobs.
         followOns = []    
@@ -146,7 +273,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # And a similar structure for HALs
         hals_by_scheme = {}
         
-        for scheme, extra_args in self.generateSchemes():
+        for scheme, extra_args in self.generateMultSchemes():
             # Work out all the schemes we want to run.
             
             self.logToMaster("Preparing for scheme {}...".format(scheme))
@@ -165,11 +292,11 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             
             # Make a temp file for each of the children with this scheme to
             # write coverage stats to.
-            stats_filenames = [sonLib.bioio.getTempFile(
+            stats_filenames = [sonLib.bioio.getTempFile(suffix=".coverage",
                 rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
                 
             # And another one to hold each child's MAF alignment
-            maf_filenames = [sonLib.bioio.getTempFile(
+            maf_filenames = [sonLib.bioio.getTempFile(suffix=".maf",
                 rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
                 
             # And another one to hold each child's HAL alignment
@@ -186,7 +313,16 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 
             # And another one to hold each child's adjacency component size
             # spectrum
-            spectrum_filenames = [sonLib.bioio.getTempFile(
+            spectrum_filenames = [sonLib.bioio.getTempFile(suffix=".spectrum",
+                rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
+                
+            # And another one to hold each child's indel lengths
+            indel_filenames = [sonLib.bioio.getTempFile(suffix=".indels",
+                rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
+                
+            # And another one to hold the tandem duplication counts.
+            # TODO: these are probably just wrong at the moment.
+            tandem_filenames = [sonLib.bioio.getTempFile(suffix=".tandem",
                 rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
             
             # Save the RNG state before clobbering it with the seed.
@@ -205,6 +341,8 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 maf_filename = maf_filenames[i]
                 hal_filename = hal_filenames[i]
                 spectrum_filename = spectrum_filenames[i]
+                indel_filename = indel_filenames[i]
+                tandem_filename = tandem_filenames[i]
                 
                 # Make a child to produce those, giving it a seed. Make sure to
                 # give it only two FASTAs, reference first, so that when it
@@ -213,26 +351,37 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 self.addChildTarget(ReferenceStructureTarget(
                     [reference_fasta, other_fasta], random.getrandbits(256), 
                     stats_filename, maf_filename, hal_filename=hal_filename,
-                    spectrum_filename=spectrum_filename, extra_args=extra_args))
+                    spectrum_filename=spectrum_filename, 
+                    indel_filename=indel_filename, 
+                    tandem_filename=tandem_filename, extra_args=extra_args))
         
         
                 
             # Make a follow-on job to merge all the child coverage outputs and
             # produce our coverage output file for this scheme.
-            followOns.append(ConcatenateTarget(stats_filenames, 
-                self.coverage_basename + "." + scheme))
+            followOns.append(ConcatenateTarget(stats_filenames, self.stats_dir +
+                "/coverage." + scheme))
                 
             # Make a follow-on job to merge all the child spectrum outputs and
             # produce our spectrum output file for this scheme.
             followOns.append(ConcatenateTarget(spectrum_filenames, 
-                self.spectrum_basename + "." + scheme))
+                self.stats_dir + "/spectrum." + scheme))
+                
+            # Make a follow-on job to merge all the child indel length outputs.
+            followOns.append(ConcatenateTarget(indel_filenames, 
+                self.stats_dir + "/indels." + scheme))
+                
+            # Make a follow-on job to merge all the child tandem duplication
+            # count outputs.
+            followOns.append(ConcatenateTarget(tandem_filenames, 
+                self.stats_dir + "/tandem." + scheme))
             
             if self.true_maf is not None:
                 # We also need another target for comparing all these MAFs
                 # against the truth, which we have been given.
                 followOns.append(AlignmentTruthComparisonTarget(self.true_maf, 
                 maf_filenames, random.getrandbits(256), 
-                self.truth_basename + "." + scheme))
+                self.stats_dir + "/truth." + scheme))
         
         
         
@@ -246,8 +395,8 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # corresponding MAFs from the same FASTA pair with different schemes,
         # for all combinations of schemes.
         agreement_target = AlignmentSchemeAgreementTarget(alignments_by_scheme,
-            genome_pairs, random.getrandbits(256), self.agreement_basename,
-            bed_root)
+            genome_pairs, random.getrandbits(256), 
+            self.stats_dir + "/agreement", bed_root)
             
         # After that though, we need to take the BED files and the HAL files and
         # make assembly hubs in hub_root.
@@ -501,9 +650,12 @@ class BedSplitTarget(jobTree.scriptTree.target.Target):
                     raise RuntimeError("Could not sort " + temp_filename)
                 
                 # Merge the BED file and write to the pre-calculate output file
-                # (in the above directory) for this genome.
+                # (in the above directory) for this genome. Make sure to
+                # preserve feature names with
+                # <https://www.biostars.org/p/109041/#109046>
                 handle = subprocess.Popen(["bedtools", "merge", "-i", 
-                    intermediate], stdout=open(out_filename, "w"))
+                    intermediate, "-c", "4", "-o", "distinct"], 
+                    stdout=open(out_filename, "w"))
                 if handle.wait() != 0:
                     raise RuntimeError("Could not merge " + intermediate) 
                     
@@ -583,6 +735,10 @@ class AssemblyHubsTarget(jobTree.scriptTree.target.Target):
                 # Determine the directory for the assembly hub.
                 hub_dir = scheme_root + "/" + genome_string
                 
+                if not os.path.exists(hub_dir):
+                    # Don't let something else try making these in parallel.
+                    os.makedirs(hub_dir)
+                
                 # Make a child target to make this actual hub
                 self.addChildTarget(AssemblyHubTarget(
                     self.hals_by_scheme[scheme][i], scheme, 
@@ -649,9 +805,10 @@ class AssemblyHubTarget(jobTree.scriptTree.target.Target):
         self.logToMaster("Starting AssemblyHubTarget")
         
                 
-        # Make a temporary directory for the jobTree tree
-        tree_dir = sonLib.bioio.getTempDirectory(
-            rootDir=self.getLocalTempDir())
+        # Make a temporary directory for the jobTree tree. Make sure it's
+        # absolute.
+        tree_dir = os.path.abspath(sonLib.bioio.getTempDirectory(
+            rootDir=self.getLocalTempDir()))
             
         # Make sure it doesn't exist yet
         os.rmdir(tree_dir)
@@ -666,12 +823,14 @@ class AssemblyHubTarget(jobTree.scriptTree.target.Target):
             
         # Get the directory each pair of schemes would produce for this pair of
         # genomes
-        bed_dirs = [self.bed_root + "/{}-{}-{}".format(scheme1, scheme2,
-            self.genome_pair) for (scheme1, scheme2) in possible_bed_pairs]
+        bed_dirs = [self.bed_root + "/{}-{}-{}-{}".format(scheme1, scheme2,
+            self.genome_pair[0], self.genome_pair[1]) 
+            for (scheme1, scheme2) in possible_bed_pairs]
             
-        # Keep the ones that exist and make a string of them.
-        bed_dirs_string = ",".join([directory for directory in bed_dirs
-            if os.path.exists(directory)])
+        # Keep the ones that exist and make a string of them. Make sure they are
+        # absolute paths.
+        bed_dirs_string = ",".join([os.path.abspath(directory) 
+            for directory in bed_dirs if os.path.exists(directory)])
             
         if bed_dirs_string == "":
             bed_args = []
@@ -684,10 +843,30 @@ class AssemblyHubTarget(jobTree.scriptTree.target.Target):
         # hal2assemblyHub.py data/alignment1.hal data/alignment1.hub
         # --jobTree data/tree --bedDirs data/beddir --hub=nocredit
         # --shortLabel="No Credit" --lod --cpHalFileToOut --noUcscNames
+        
+        # We need to do it in its own directory since it makes temp files in the
+        # current directory.
+        working_directory = sonLib.bioio.getTempDirectory(
+            rootDir=self.getLocalTempDir())
+            
+        # Where should we come back to when done?
+        original_directory = os.getcwd()
+            
+        # Turn our arguments into absolute paths (beddirs is already done).
+        # May or may not be necessary.
+        hal_abspath = os.path.abspath(self.hal)
+        hub_abspath = os.path.abspath(self.hub)
+        
+        # Go in the temp directory and run the script
+        os.chdir(working_directory)
         check_call(self, ["hal2assemblyHub.py", 
-            self.hal, self.hub, "--jobTree", 
+            hal_abspath, hub_abspath, "--jobTree", 
             tree_dir] + bed_args + ["--shortLabel", 
             self.scheme, "--lod", "--cpHalFileToOut", "--noUcscNames"])
+        
+        # Go back to the original directory
+        os.chdir(original_directory)
+            
         
         self.logToMaster("AssemblyHubTarget Finished")
 
@@ -710,22 +889,14 @@ def parse_args(args):
         formatter_class=argparse.RawDescriptionHelpFormatter)
     
     # General options
-    parser.add_argument("coverageBasename", 
-        help="filename prefix to save the coverage stats output to")
-    parser.add_argument("agreementBasename",
-        help="filename prefix to save the alignment agreement stats output to")
-    parser.add_argument("spectrumBasename", 
-        help="filename prefix to save the adjacency component sizes to")
-    parser.add_argument("hubRoot", 
-        help="directory to populate with assembly hubs")
+    parser.add_argument("outDir", 
+        help="directory to fill with statistics files and hubs")
     parser.add_argument("fastas", nargs="+",
         help="FASTA files to index")
     parser.add_argument("--seed", default=random.getrandbits(256),
         help="seed for a particular deterministic run")
     parser.add_argument("--trueMaf", default=None,
         help="filename of a MAF to compare all generated MAFs against")
-    parser.add_argument("--truthBasename", default=None,
-        help="filename prefix to output comparison against the truth to")
         
     
     
@@ -748,11 +919,6 @@ def main(args):
     
     options = parse_args(args) # This holds the nicely-parsed options object
     
-    if (options.trueMaf is None) != (options.truthBasename is None):
-        # Make sure they gave us a place to put it if they want a truth
-        # comparison.
-        raise Exception("--truthBasename and --trueMaf are corequisites.")
-    
     # Make sure we've given everything an absolute module name.
     # Don't try to import * because that's illegal.
     if __name__ == "__main__":
@@ -762,9 +928,8 @@ def main(args):
         
     # Make a stack of jobs to run
     stack = jobTree.scriptTree.stack.Stack(SchemeAssessmentTarget(
-        options.fastas, options.trueMaf, options.seed, options.coverageBasename, 
-        options.agreementBasename, options.spectrumBasename,
-        options.truthBasename, options.hubRoot))
+        options.fastas, options.trueMaf, options.seed, options.outDir,
+        options.outDir + "/hubs"))
     
     print "Starting stack"
     

@@ -11,6 +11,7 @@
 #include <iterator>
 #include <cstdint> 
 #include <sys/resource.h>
+#include <execinfo.h>
 
 
 #include <boost/filesystem.hpp>
@@ -40,38 +41,6 @@
 #include "MergeApplier.hpp"
 
 
-// TODO: replace with cppunit!
-
-// Define a read to use for testing. 200 bp perfect match.
-const std::string TEST_READ(std::string("GACGGGACTCGCCGCCGCCCAGCCGGGGTTCCCGC") +
-    "TGGCGCAATTGAAAACTTTCGTCGATCAGGAATTTGCCCAAATAAAACATGTCCTGCATGGCATTAGTTTGT" +
-    "TGGGGCAGTGCCCGGATAGCATCAACGCTGCGCTGATTTGCCGTGGCGAGAAAATGTCGATCGCCATTATGG" +
-    "CCGGCGTATTAGAAGCGCG");
-    
-// 200 bp 5 changes
-const std::string TEST_READ2(std::string("GACGGGACTCGCCGCCGCACAGCCGGGGTTCCCGC") +
-    "TGGCGCAATTGAAAACTTTCGTCGACAGGAATTTGCCCAAATAAAACATGTCCTGCATGGCATTAGTTTGT" +
-    "TGGGGCAGTGACCGGATAGCATCAACGCTGCGCTGATTTGCCGTGGCCGAGAAAATGTCGATCGCCATTATGG" +
-    "CCGGCGTATTCGAAGCGCG");
-
-// 200 bp 10 changes
-const std::string TEST_READ3(std::string("GACGGGAATCGCCGACGCCCAGCCGGGTTTCCGC") +
-    "TGGCGCAATTTGAAAACTTTCGTCGATCAGGAATTTGCCCAAACAAAACATGTCCTGCATGGCGTTAGTTTGT" +
-    "TGGGGCAGTGCCCGGTAGCATCAACGCTGCGCTGATTTGCCGTGGCGTAGAAAATGTCGATCGCCATTATGG" +
-    "CCGGCGTATTCGAAGCGCG");
-    
-// 200bp unrelated
-// >hg19_dna range=chr21:33031597-33031797 5'pad=0 3'pad=0 strand=+ repeatMasking=none
-const std::string TEST_READ4(std::string("GCATCCATCTTGGGGCGTCCCAATTGCTGAGTAACAAATGAGACGCTGTG") +
-    "GCCAAACTCAGTCATAACTAATGACATTTCTAGACAAAGTGACTTCAGAT" +
-    "TTTCAAAGCGTACCCTGTTTACATCATTTTGCCAATTTCGCGTACTGCAA" +
-    "CCGGCGGGCCACGCCCCCGTGAAAAGAAGGTTGTTTTCTCCACATTTCGG" +
-    "G");
-
-    
-// How many times to try mapping this read?
-const int TEST_ITERATIONS = 1000;
-
 /**
  * Log current memory usage at INFO level.
  */
@@ -99,9 +68,39 @@ void logMemory() {
  */
 void exitOnSignal(int signalNumber) {
     // Log the signal.
-    Log::info() << "Exiting on signal " << signalNumber << std::endl;
+    Log::critical() << "Exiting on signal " << signalNumber << std::endl;
     
     // Call exit and report the signal.
+    exit(signalNumber);
+}
+
+/**
+ * Signal handler for printing a stack trace and exiting on a signal. See
+ * <http://stackoverflow.com/a/77336/402891>
+ */
+void stacktraceOnSignal(int signalNumber) {
+    // How many frames can we handle?
+    const size_t MAX_FRAMES = 100;
+    
+    // This holds the stack frames
+    void *frames[MAX_FRAMES];
+    
+    // And this holds how many there actually are, which comes out of the
+    // function that gets the frames.
+    size_t framesUsed = backtrace(frames, MAX_FRAMES);
+    
+    // Log the signal.
+    Log::critical() << "Critical signal " << signalNumber << 
+        ", stacktracing." << std::endl;
+        
+    char** traceMessages = backtrace_symbols(frames, framesUsed);
+    
+    for(size_t i = 0; i < framesUsed; i++) {
+        // Log the stack frames.
+        Log::critical() << "Frame " << i << ": " << traceMessages[i] << 
+            std::endl;
+    }
+    
     exit(signalNumber);
 }
 
@@ -971,12 +970,17 @@ void saveLevelIndex(
  *
  * If an addContext is specified, will require contexts extended out that far
  * beyond where a unique result is obtained in order to map.
+ *
+ * If multContext is specified, a base will only map if it has a maximum context
+ * as long as or longer than multContext times the length of its minimum unique
+ * context.
  */
 stPinchThreadSet*
 mergeGreedy(
     const FMDIndex& index,
     size_t context = 0,
     size_t addContext = 0,
+    double multContext = 0,
     bool credit = false,
     std::string mapType = "LRexact",
     bool mismatch = false,
@@ -1010,8 +1014,8 @@ mergeGreedy(
         // and also the bitmask of what bottom-level things to count. We also
         // need to tell it what genome to map the contigs of.
         MappingMergeScheme scheme(index, *mergedRuns.first, mergedRuns.second,
-            *includedPositions, genome, context, addContext, credit, mapType,
-	    mismatch, z_max);
+            *includedPositions, genome, context, addContext, multContext, 
+            credit, mapType, mismatch, z_max);
 
         // Set it running and grab the queue where its results come out.
         ConcurrentQueue<Merge>& queue = scheme.run();
@@ -1084,68 +1088,20 @@ mergeGreedy(
 }
 
 /**
- * Map a read repeatedly to the bottom level.
+ * Take a pinch thread set and get the adjacency components in a C++ idiomatic
+ * data structure.
+ *
+ * Returns a vector of adjacency components, which are vectors of pinch ends.
  */
-void
-testBottomMapping(
-    const FMDIndex& index
-) {
-    // Start the timer
-    clock_t start = clock();
-    for(int i = 0; i < TEST_ITERATIONS; i++) {
-        // Map repeatedly
-        index.mapRight(TEST_READ);
-    }
-    // Stop the timer
-    clock_t end = clock();
-    
-    // Work out how many milliseconds each call took
-    double msPerCall = ((double)(end - start)) / 
-        (CLOCKS_PER_SEC / 1000.0) / TEST_ITERATIONS;
-        
-    Log::output() << "Mapping to bottom level: " << msPerCall << 
-        " ms per call" << std::endl;
-}
-
-/**
- * Map a read repeatedly to the merged level.
- */
-void
-testMergedMapping(
-    const FMDIndex& index, const GenericBitVector* ranges
-) {
-    // Start the timer
-    clock_t start = clock();
-    for(int i = 0; i < TEST_ITERATIONS; i++) {
-        // Map repeatedly
-        index.mapRight(*ranges, TEST_READ);
-    }
-    // Stop the timer
-    clock_t end = clock();
-    
-    // Work out how many milliseconds each call took
-    double msPerCall = ((double)(end - start)) / 
-        (CLOCKS_PER_SEC / 1000.0) / TEST_ITERATIONS;
-        
-    Log::output() << "Mapping to merged level: " << msPerCall <<
-        " ms per call" << std::endl;
-}
-
-/**
- * Take a pinch thread set and get the spectrum of adjacency component sizes.
- * Size 2 components are things like SNPs and indels, while larger components
- * are probably more complex structures.
- */
-std::map<size_t, size_t>
-getAdjacencyComponentSpectrum(
+std::vector<std::vector<stPinchEnd>> 
+getAdjacencyComponents(
     stPinchThreadSet* threadSet
 ) {
-    
-    Log::info() << "Making adjacency component spectrum..." << std::endl;
 
+    Log::info() << "Making adjacency component list..." << std::endl;
 
-    // Make an empty map to populate.
-    std::map<size_t, size_t> toReturn;
+    // Make an empty vector of components to populate.
+    std::vector<std::vector<stPinchEnd>> toReturn;
     
     // Get all the adjacency components.
     stList* adjacencyComponents = stPinchThreadSet_getAdjacencyComponents(
@@ -1159,16 +1115,38 @@ getAdjacencyComponentSpectrum(
     
     while(component != NULL) {
         
-        // Get its size
-        size_t componentSize = stList_length(component);
+        // Make a vector to hold the ends in the component.
+        std::vector<stPinchEnd> ends;
         
-        if(!toReturn.count(componentSize)) {
-            // This is the first component of this size we have found
-            toReturn[componentSize] = 1;
-        } else {
-            // We found another one
-            toReturn[componentSize]++;
+        // Get an iterator over its contents
+        stListIterator* endIterator = stList_getIterator(component);
+        
+        // Get the first pinch end in the component
+        stPinchEnd* pinchEnd = (stPinchEnd*) stList_getNext(endIterator);
+        
+        while(pinchEnd != NULL) {
+            // For each pinch end in the component
+            
+            Log::trace() << LOG_LAZY("Observed end " << pinchEnd << 
+                " of block " << stPinchEnd_getBlock(pinchEnd) << 
+                " of degree " << 
+                stPinchBlock_getDegree(stPinchEnd_getBlock(pinchEnd)) << 
+                std::endl);
+            
+            // Put it in the vector that represents the component. Make sure to
+            // copy it since the actual ends pointed to here get destroyed when
+            // the list we're iterating over does.
+            ends.push_back(*pinchEnd);
+        
+            // Look at the next end
+            pinchEnd = (stPinchEnd*) stList_getNext(endIterator);
         }
+        
+        // Clean up the iterator
+        stList_destructIterator(endIterator);
+        
+        // Put this component in the vector of all components.
+        toReturn.push_back(std::move(ends));
         
         // Look at the next component
         component = (stList*) stList_getNext(componentIterator);
@@ -1179,6 +1157,40 @@ getAdjacencyComponentSpectrum(
     
     // And the entire list while we're at it
     stList_destruct(adjacencyComponents);
+    
+    // Give back the converted data structure
+    return toReturn;
+
+}
+
+/**
+ * Take a vector of adjacency components and get the spectrum of adjacency
+ * component sizes. Size 2 components are things like SNPs and indels, while
+ * larger components are probably more complex structures.
+ */
+std::map<size_t, size_t>
+getAdjacencyComponentSpectrum(
+    std::vector<std::vector<stPinchEnd>> components
+) {
+    
+    Log::info() << "Making adjacency component spectrum..." << std::endl;
+
+    // Make the map we're going to return
+    std::map<size_t, size_t> toReturn;
+
+    for(auto component : components) {
+        
+        // Get its size
+        size_t componentSize = component.size();
+        
+        if(!toReturn.count(componentSize)) {
+            // This is the first component of this size we have found
+            toReturn[componentSize] = 1;
+        } else {
+            // We found another one
+            toReturn[componentSize]++;
+        }
+    }
     
     // Give back the map
     return toReturn;
@@ -1209,6 +1221,362 @@ writeAdjacencyComponentSpectrum(
 }
 
 /**
+ * Get the components of a certain size from a vector of adjacency components.
+ * Copies all those components.
+ */
+std::vector<std::vector<stPinchEnd>>
+filterComponentsBySize(
+    std::vector<std::vector<stPinchEnd>> components,
+    size_t size
+) {
+    
+    Log::info() << "Selecting size " << size << " components" << std::endl;
+
+    // Make a vector to return
+    std::vector<std::vector<stPinchEnd>> toReturn;
+    
+    std::copy_if(components.begin(), components.end(), 
+        std::back_inserter(toReturn), [&](std::vector<stPinchEnd> v) {
+            // Grab only the vectors that are the correct size.
+            return v.size() == size;
+        });
+        
+    return toReturn;
+}
+
+/**
+ * Given a pair of pinch ends, get all the segments on all paths from the first
+ * to the second. There must be no paths leaving the first on adjacency edges
+ * that do not enter the second on an adjacency edge.
+ */
+std::vector<std::vector<stPinchSegment*>>
+getAllPaths(
+    stPinchEnd* start,
+    stPinchEnd* end
+) {
+    
+    Log::debug() << LOG_LAZY("Getting all paths from block " << 
+        stPinchEnd_getBlock(start) << " orientation " << 
+        stPinchEnd_getOrientation(start) << " to block " << 
+        stPinchEnd_getBlock(end) << " orientation " << 
+        stPinchEnd_getOrientation(end) << std::endl);
+
+    // make the vector of paths we are going to return.
+    std::vector<std::vector<stPinchSegment*>> toReturn;
+    
+    // Iterate over the threads in the first end's block
+    stPinchBlockIt segmentsIterator = stPinchBlock_getSegmentIterator(
+        stPinchEnd_getBlock(start));
+        
+    // Grab the first segment
+    stPinchSegment* startSegment = stPinchBlockIt_getNext(&segmentsIterator);
+    
+    while(startSegment != NULL) {
+    
+        // Start a traversal from that segment
+        stPinchSegment* segment = startSegment;
+        
+        // Make a vector to include all the segments except the bookending ones.
+        std::vector<stPinchSegment*> path;
+        
+        // Keep track of the direction we are going. 0 is forwards.
+        bool direction = stPinchEnd_getOrientation(start);
+        
+        Log::trace() << LOG_LAZY("Starting direction " << direction <<
+            " from segment " << startSegment <<  " in block " << 
+            stPinchEnd_getBlock(start) << std::endl);
+        
+        while(true) {
+            // While we haven't made it to the block of the other end
+            
+            if(!direction) {
+                // Go forwards (towards 3')
+                segment = stPinchSegment_get3Prime(segment);
+            } else {
+                // Go backwards (towards 5')
+                segment = stPinchSegment_get5Prime(segment);
+            }
+            
+            
+            if(segment == NULL) {
+                // We ran off the end of the thread without getting to the thing
+                // we were supposed to hit. Don't keep this path, and try the
+                // next start segment.
+                Log::error() << "Path escaped!" << std::endl;
+                break;
+            }
+            
+            // Get the orientation of this segment. 0 is forwards.
+            bool segmentOrientation = stPinchSegment_getBlockOrientation(
+                segment);
+            
+            // We know segments are connected 5' to 3' along a whole thread, so
+            // we never need to change direction.
+            
+            Log::trace() << LOG_LAZY("Visiting segment " << segment << 
+                " orientation " << segmentOrientation << " in block " << 
+                stPinchSegment_getBlock(segment) << std::endl);
+            
+            if(stPinchSegment_getBlock(segment) == end->block && 
+                direction != stPinchEnd_getOrientation(end)) {
+                // We hit the other end. For orientation, if direction is true,
+                // we were going backwards and have hit the 5' end. If direction
+                // is false, we were going forwards and have hit the 3' end. End
+                // orientation is true if it's the 3' end. So we need direction
+                // and end orientation to not match if we are to detect the
+                // correct end.
+                
+                // This might not matter for the size 2 adjacency component case
+                // because any block we hit will be the right one. But if we
+                // ever use this in more complex cases we will care.
+                
+                // Keep our path.
+                toReturn.push_back(path);
+                
+                Log::debug() << LOG_LAZY("Path finished successfully with " << 
+                    path.size() << " segments" << std::endl);
+                
+                // Stop this path.
+                break;
+            }
+            
+            // If we didn't hit the other end yet, keep this new segment on our
+            // path.
+            path.push_back(segment);
+            
+        }
+    
+        // Try the next segment to get the path from it.
+        startSegment = stPinchBlockIt_getNext(&segmentsIterator);
+    }
+    
+    // Return the vector of paths.
+    return toReturn;
+
+}
+
+/**
+ * Take a vector of adjacency components all of size 2, and work out the indel
+ * length difference for all of them that are simple indels. A straight
+ * substitution is a length-0 indel.
+ */
+std::vector<int64_t>
+getIndelLengths(
+    std::vector<std::vector<stPinchEnd>> components
+) {
+
+    Log::info() << "Getting indel lengths from " << components.size() << 
+        " components..." << std::endl;
+
+    // Make the vector of lengths we will populate.
+    std::vector<int64_t> toReturn;
+    
+    for(auto component : components) {
+        // Look at every component
+        
+        if(component.size() != 2) {
+            // Complain we got a bad sized component in here
+            throw std::runtime_error(
+                std::string("Component has incorrect size ") + 
+                std::to_string(component.size()) + " for an indel.");
+        }
+        
+        if(stPinchBlock_getDegree(stPinchEnd_getBlock(&component[0])) != 2 ||
+            stPinchBlock_getDegree(stPinchEnd_getBlock(&component[1])) != 2) {
+            // If there aren't exactly two segments on both ends, this isn't a
+            // nice simple indel/substitution. Skip it.
+            
+            Log::error() << "Skipping component; Degrees are " << 
+                stPinchBlock_getDegree(stPinchEnd_getBlock(&component[0])) << 
+                " and " << 
+                stPinchBlock_getDegree(stPinchEnd_getBlock(&component[1])) << 
+                std::endl;
+            continue;
+            
+            // TODO: account for ends of contigs lining up across from things
+            // and having no paths across.
+        }
+        
+        // Get two paths of 0 or more segments
+        std::vector<std::vector<stPinchSegment*>> paths = 
+            getAllPaths(&component[0], &component[1]);
+            
+        if(paths.size() != 2) {
+            // This isn't just an indel. It might be an indel within a
+            // duplication, or an indel for one out of a set of merged genomes,
+            // but without just 2 paths we can't really define indel length.
+            // TODO: Handle the case where all paths but one are one length, and
+            // one is another length.
+            Log::error() << "Skipping component; got " << paths.size() << 
+                " paths instead of 2" << std::endl;
+            continue;
+        }
+        
+        // Keep the length of the segments on each path. There will always be 2
+        // paths.
+        std::vector<int64_t> pathLengths;
+        
+        for(auto path : paths) {
+            // For each path, we want to track the length
+            int64_t pathLength = 0;
+            for(size_t i = 0; i < path.size(); i++) {
+                // Add in each segment
+                pathLength += stPinchSegment_getLength(path[i]);
+                
+                if(stPinchSegment_getLength(path[i]) > 100000000000000) {
+                    // I saw some pretty wrong indel lengths.
+                    throw std::runtime_error("Segment stupidly long");
+                }
+            }
+            
+            Log::debug() << "Path length: " << pathLength << std::endl;
+            
+            // Record the length of this path.
+            pathLengths.push_back(pathLength);
+        }
+        
+        if(pathLengths[0] < 0 || pathLengths[1] < 0) {
+            // Maybe wrong indel lengths are from negative path lengths?
+            throw std::runtime_error("Negative length path");
+        }
+        
+        if(pathLengths[0] > 100000000000000 || 
+            pathLengths[1] > 100000000000000) {
+            // Maybe wrong indel lengths are from huge path lengths?
+            throw std::runtime_error("Path stupidly long");
+        }
+        
+        if(pathLengths[0] > pathLengths[1]) {
+            // This is the way the indel goes
+            toReturn.push_back(pathLengths[0] - pathLengths[1]);
+        } else {
+            // It goes the other way around.
+            toReturn.push_back(pathLengths[1] - pathLengths[0]);
+        }
+    }
+    
+    return toReturn;
+
+}
+
+/**
+ * Save a vector of numbers as a single-column TSV.
+ */
+template<typename T>
+void
+writeColumn(
+    std::vector<T> numbers,
+    std::string filename
+) {
+
+    // Open up the file to write.
+    std::ofstream file(filename.c_str());
+    
+    for(auto number : numbers) {
+        // Write each number on its own line
+        file << number << std::endl;
+    }    
+    
+    file.close();
+}
+
+/**
+ * Take a vector of adjacency components all of size 4, and count all the tandem
+ * duplications. We call it a tandem duplication if two of the ends belong to
+ * the same block and are connected.
+ */
+size_t
+countTandemDuplications(
+    std::vector<std::vector<stPinchEnd>> components
+) {
+
+    Log::info() << "Counting tandem duplications in " << components.size() << 
+        " components..." << std::endl;
+
+    // How many have we found so far?
+    size_t tandemDuplications = 0;
+
+    for(auto component : components) {
+        for(size_t i = 0; i < component.size(); i++) {
+            // Go through all the ends
+            stPinchEnd end1 = component[i];
+            
+            Log::debug() << "End " << stPinchEnd_getOrientation(&end1) << 
+                " of block " << stPinchEnd_getBlock(&end1) << std::endl;
+            
+            for(size_t j = 0; j < i; j++) {
+                // And all the other ends
+                stPinchEnd end2 = component[j];
+                
+                if(stPinchEnd_getBlock(&end1) == stPinchEnd_getBlock(&end2)) {
+                    // We have two ends that share a block.
+                    
+                    Log::debug() << "We have two ends of block " << 
+                        stPinchEnd_getBlock(&end1) << std::endl;
+                    
+                    // Get the ends attached to end 1
+                    stSet* connectedEnds = 
+                        stPinchEnd_getConnectedPinchEnds(&end1);
+                        
+                    // These ends are in there by address, so we have to scan
+                    // for ours.
+                    
+                    // Get an iterator over the set.
+                    stSetIterator* iterator = stSet_getIterator(connectedEnds);
+                    
+                    stPinchEnd* other = (stPinchEnd*) stSet_getNext(iterator);
+                    while(other != NULL) {
+                        // Go through all the things attached to end1
+                        
+                        Log::debug() << "Connection to block " << 
+                            stPinchEnd_getBlock(other) << " end " << 
+                            stPinchEnd_getOrientation(other) << std::endl;
+                        
+                        if(stPinchEnd_getBlock(other) == 
+                            stPinchEnd_getBlock(&end2) && 
+                            stPinchEnd_getOrientation(other) == 
+                            stPinchEnd_getOrientation(&end2)) {
+                            
+                            Log::debug() << "...which counts!" << std::endl;
+                            
+                            // This end that the first end is connected to looks
+                            // exactly like the second end. Call this a tandem
+                            // duplication.
+                            tandemDuplications++;
+                            
+                            // TODO: Break out of like 3 loops now, so we don't
+                            // check all the other end pairs or somehow call two
+                            // tandem duplications in one component.
+                            
+                        } else {
+                            Log::debug() << "...which isn't block " << 
+                                stPinchEnd_getBlock(&end2) << " end " << 
+                                stPinchEnd_getOrientation(&end2) << std::endl;
+                        }
+                                                
+                        other = (stPinchEnd*) stSet_getNext(iterator);
+                    }
+                    
+                    // Clean up the iterator
+                    stSet_destructIterator(iterator);
+                        
+                    // Clean up our connected ends set.
+                    stSet_destruct(connectedEnds);
+                }
+            }
+        }
+        
+    }
+    
+    Log::info() << "Counted " << tandemDuplications << " duplications" <<
+        std::endl;
+    
+    // We counted up the tandem duplications. Now return.
+    return tandemDuplications;
+
+}
+
+/**
  * createIndex: command-line tool to create a multi-level reference structure.
  */
 int 
@@ -1219,8 +1587,11 @@ main(
 
     // Register ctrl+c handler. See
     // <http://www.yolinux.com/TUTORIALS/C++Signals.html>
-    signal(SIGINT, exitOnSignal);
-
+    signal(SIGINT, stacktraceOnSignal);
+    
+    // Register segfaults with the stack trace handler
+    signal(SIGSEGV, stacktraceOnSignal);
+    
     // Parse options with boost::programOptions. See
     // <http://www.radmangames.com/programming/how-to-use-boost-program_options>
 
@@ -1233,7 +1604,6 @@ main(
     // Add all the options
     description.add_options() 
         ("help", "Print help messages") 
-        ("test", "Run a mapping speed test")
         ("noMerge", "Don't compute merged level, only make lowest-level index")
         ("scheme", boost::program_options::value<std::string>()
             ->default_value("overlap"),
@@ -1246,12 +1616,19 @@ main(
             "File in which to save degrees of pinch graph nodes")
         ("spectrum", boost::program_options::value<std::string>(), 
             "File in which to save graph adjacency component size spectrum")
+        ("indelLengths", boost::program_options::value<std::string>(), 
+            "File in which to save indel lengths between a pair of genomes")
+        ("tandemDuplications", boost::program_options::value<std::string>(), 
+            "File in which to save the number of tandem duplications")
         ("context", boost::program_options::value<size_t>()
             ->default_value(0), 
             "Minimum required context length to merge on")
         ("addContext", boost::program_options::value<size_t>()
             ->default_value(0), 
             "Extra context beyond that needed to be unique for greedy LR")
+        ("multContext", boost::program_options::value<double>()
+            ->default_value(0), 
+            "Minimum context length as a fraction of uniqueness distance")
         ("sampleRate", boost::program_options::value<unsigned int>()
             ->default_value(64), 
             "Set the suffix array sample rate to use")
@@ -1389,7 +1766,8 @@ main(
     } else if(mergeScheme == "greedy") {
         // Use the greedy merge instead.
         threadSet = mergeGreedy(index, options["context"].as<size_t>(), 
-            options["addContext"].as<size_t>(), creditBool, mapType, mismatchb,
+            options["addContext"].as<size_t>(), 
+            options["multContext"].as<double>(), creditBool, mapType, mismatchb,
             options["mismatches"].as<size_t>());
     } else {
         // Complain that's not a real merge scheme. TODO: Can we make the
@@ -1439,27 +1817,43 @@ main(
     // Write it out, deleting the bit vector in the process
     saveLevelIndex(levelIndex, indexDirectory + "/level1");
     
-    // Now, while we still have the threadSet, we can work out how many
-    // adjacency components of each size there are. Adjacency components of size
-    // 2 are just SNPs or indels, while adjacency components of larger sizes are
-    // generally more complex rearrangements.
-    auto spectrum = getAdjacencyComponentSpectrum(threadSet);
-    
-    // Clean up the thread set
-    stPinchThreadSet_destruct(threadSet);
+    // Now, while we still have the threadSet, we can work out the adjacency
+    // components. 
+    auto components = getAdjacencyComponents(threadSet);
     
     if(options.count("spectrum")) {
+        // How many adjacency components are what size? Adjacency components of
+        // size 2 are just SNPs or indels, while adjacency components of larger
+        // sizes are generally more complex rearrangements.
+        auto spectrum = getAdjacencyComponentSpectrum(components);
+    
         // Save a dump of pinch graph adjacency component sizes
         writeAdjacencyComponentSpectrum(spectrum,
             options["spectrum"].as<std::string>());
     }
     
-    // Run the speed tests if we want to
-    if(options.count("test")) {
-        Log::output() << "Running performance tests..." << std::endl;
-        testBottomMapping(index);
-        testMergedMapping(index, levelIndex.first);
+    if(options.count("indelLengths")) {
+        // Get all the size-2 components, determine indel lengths for them, and
+        // save them to the file the user wanted them in.
+        writeColumn(getIndelLengths(filterComponentsBySize(components, 2)),
+            options["indelLengths"].as<std::string>()); 
     }
+    
+    if(options.count("tandemDuplications")) {
+        // Get all the size-4 components, and count tandem duplications.
+        size_t tandemDuplications = countTandemDuplications(
+            filterComponentsBySize(components, 4));
+          
+        // Hack the count into a 1-element vector and write it to the file.  
+        std::vector<size_t> tandemDupeVector {tandemDuplications};
+        writeColumn(tandemDupeVector,
+            options["tandemDuplications"].as<std::string>()); 
+    }
+    
+    // Clean up the thread set after we analyze everything about it.
+    stPinchThreadSet_destruct(threadSet);
+    
+    
     
     // Get rid of the range vector
     delete levelIndex.first;

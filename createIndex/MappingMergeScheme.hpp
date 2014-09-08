@@ -29,8 +29,8 @@ public:
     MappingMergeScheme(const FMDIndex& index, const GenericBitVector& rangeVector, 
         const std::vector<std::pair<std::pair<size_t, size_t>, bool> >&
         rangeBases, const GenericBitVector& includedPositions, size_t genome,
-        size_t minContext = 0, size_t addContext = 0, bool credit = false, 
-        std::string mapType = "LRexact",
+        size_t minContext = 0, size_t addContext = 0, double multContext = 0, 
+        bool credit = false, std::string mapType = "LRexact",
 	    bool mismatch = false, size_t z_max = 0);
     
     /**
@@ -99,6 +99,10 @@ protected:
     // Minimum distance you have to go out past where a context is unique in
     // order to actually map.
     size_t addContext;
+    
+    // Minimum length of the context as a fraction of the portion before
+    // uniqueness.
+    double multContext;
     
     // Flag whether to use mapping on credit scheme   
     bool credit;

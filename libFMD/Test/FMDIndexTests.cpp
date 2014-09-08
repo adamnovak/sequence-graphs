@@ -506,6 +506,99 @@ void FMDIndexTests::testAddContext() {
 }
 
 /**
+ * Make sure additional context multiplier is working.
+ */
+void FMDIndexTests::testMultContext() {
+
+    // Grab all of the first contig. It becomes unique at "ACTCT" from the right
+    // end, since "ACT" is unique, and it then has 2 extra context.
+    // "GCGACTCT" has 3 extra context on the right.
+    // "CGACTCT" has only 2 extra context on the right.
+    std::string query = "CATGCTTCGGCGATTCGACGCTCATCTGCGACTCT";
+    
+    // Declare everything to be a range
+    GenericBitVector bv;
+    for(size_t i = 0; i < index->getBWTLength(); i++) {
+        bv.addBit(i);
+    }
+    bv.finish(index->getBWTLength());
+    
+    // Grab (range number, context length) pairs for mapping with 0 additional
+    // context and 0 mismatches.
+    std::vector<std::pair<int64_t,size_t>> mappings = index->misMatchMap(bv,
+        query, (GenericBitVector*)NULL, 0, 0, 0.0, 0);
+        
+    std::vector<std::pair<int64_t,size_t>> mappingsExact = index->map(bv, query,
+        (GenericBitVector*)NULL, 0, 0, 0.0);
+        
+    for(size_t i = 0; i < mappings.size(); i++) {
+        Log::debug() << "Mapping " << i << ": " << mappings[i].first << "," <<
+            mappings[i].second << " vs " << mappingsExact[i].first  << "," << 
+            mappingsExact[i].second << std::endl;
+        CPPUNIT_ASSERT(mappings[i] == mappingsExact[i]);
+    }
+        
+    // The A in ACTCT should be the last mapped thing
+    CPPUNIT_ASSERT(mappings[30].first != -1);
+    CPPUNIT_ASSERT(mappings[31].first == -1);
+    
+    // Try again with 2x multiplier.
+    mappings = index->misMatchMap(bv, query, (GenericBitVector*)NULL, 0, 0, 2.0,
+        0);
+    
+    mappingsExact = index->map(bv, query, (GenericBitVector*)NULL, 0, 0, 2.0);
+    
+    for(size_t i = 0; i < mappings.size(); i++) {
+        Log::debug() << "Mapping " << i << ": " << mappings[i].first << "," <<
+            mappings[i].second << " vs " << mappingsExact[i].first  << "," << 
+            mappingsExact[i].second << std::endl;
+        CPPUNIT_ASSERT(mappings[i] == mappingsExact[i]);
+    }
+    
+    // The C in CTGCGACTCT should be the last mapped thing
+    CPPUNIT_ASSERT(mappings[25].first != -1);
+    CPPUNIT_ASSERT(mappings[26].first == -1);
+    
+    // And a nonzero min context
+    mappings = index->misMatchMap(bv, query, (GenericBitVector*)NULL, 10, 0, 0);
+    
+    mappingsExact = index->map(bv, query, (GenericBitVector*)NULL, 10, 0);
+    
+    for(size_t i = 0; i < mappings.size(); i++) {
+        Log::debug() << "Mapping " << i << ": " << mappings[i].first << "," <<
+            mappings[i].second << " vs " << mappingsExact[i].first  << "," << 
+            mappingsExact[i].second << std::endl;
+        CPPUNIT_ASSERT(mappings[i] == mappingsExact[i]);
+    }
+    
+    // The first C in CTGCGACTCT should be the last mapped thing, because it's
+    // at the start of a length-10 string.
+    CPPUNIT_ASSERT(mappings[25].first != -1);
+    CPPUNIT_ASSERT(mappings[26].first == -1);
+
+    // And a nonzero min context with a multContext
+    mappings = index->misMatchMap(bv, query, (GenericBitVector*)NULL, 10, 0, 
+        2.0, 0);
+    
+    mappingsExact = index->map(bv, query, (GenericBitVector*)NULL, 10, 0,
+        2.0);
+    
+    for(size_t i = 0; i < mappings.size(); i++) {
+        Log::debug() << "Mapping " << i << ": " << mappings[i].first << "," <<
+            mappings[i].second << " vs " << mappingsExact[i].first  << "," << 
+            mappingsExact[i].second << std::endl;
+        CPPUNIT_ASSERT(mappings[i] == mappingsExact[i]);
+    }
+    
+    // CTG is unique, and then CGACTCT after it is 7 extra characters (which
+    // more than exceeds 2 * 3 total), and we have 10 total characters, so that
+    // first C should be the last thing to map.
+    CPPUNIT_ASSERT(mappings[25].first != -1);
+    CPPUNIT_ASSERT(mappings[26].first == -1);
+
+}
+
+/**
  * Make sure the LCP array is not lying.
  */
 void FMDIndexTests::testLCP() {
