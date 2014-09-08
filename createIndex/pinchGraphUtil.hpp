@@ -118,6 +118,8 @@ writeAlignmentWithReference(
  * resulting FASTA.
  *
  * TODO: Drop this and just use the HAL API directly
+ *
+ * TODO: Move to another file since this doesn't touch pinch graphs.
  */
 void
 writeAlignmentFasta(

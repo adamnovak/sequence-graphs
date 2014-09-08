@@ -819,17 +819,36 @@ main(
     }
     
     if(options.count("alignment")) {
-        // Save the alignment defined by the pinched pinch graph to the file the
-        // user specified. Save the number of bases of root sequence that were
-        // used in the center of the star tree.
-        size_t rootBases = writeAlignment(threadSet, index,
-            options["alignment"].as<std::string>());
+        if(mergeScheme == "overlap") {
+            // We can have self-alignment in the first sequence, so we need to
+            // use this serializer.
+        
+            // Save the alignment defined by the pinched pinch graph to the file the
+            // user specified. Save the number of bases of root sequence that were
+            // used in the center of the star tree.
+            size_t rootBases = writeAlignment(threadSet, index,
+                options["alignment"].as<std::string>());
+                
+            if(options.count("alignmentFasta")) {
+                // Also save a FASTA with the sequences necessary to generate a HAL
+                // from the above.
+                writeAlignmentFasta(fastas, rootBases,
+                    options["alignmentFasta"].as<std::string>());
+            }
+        } else {
+            // We are using the greedy scheme and can't have self-alignment in
+            // the first genome, so we can use this star tree serializer.
             
-        if(options.count("alignmentFasta")) {
-            // Also save a FASTA with the sequences necessary to generate a HAL
-            // from the above.
-            writeAlignmentFasta(fastas, rootBases,
-                options["alignmentFasta"].as<std::string>());
+            writeAlignmentWithReference(threadSet, index, 
+                options["alignment"].as<std::string>(), 0);
+                
+            if(options.count("alignmentFasta")) {
+                // Also save a FASTA, with 0 extra rootSeq bases. TODO: Don't
+                // stick in an extra sequence when not needed.
+                writeAlignmentFasta(fastas, 0,
+                    options["alignmentFasta"].as<std::string>());
+            }
+            
         }
     }
     
