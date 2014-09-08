@@ -1,6 +1,7 @@
 #include "pinchGraphUtil.hpp"
 
 #include <Log.hpp>
+#include <unordered_set>
 
 
 stPinchThreadSet* 
@@ -153,14 +154,13 @@ size_t
 writeAlignment(
     stPinchThreadSet* threadSet, 
     const FMDIndex& index, 
-    std::string filename
+    const std::string& filename
 ) {
 
     // We're going to lay out the segments in our root sequence with some
     // locality. We're going to scan through all threads, and put each new block
     // as it is encountered. So we need a set of the encountered blocks.
-    // TODO: When we get c++11, make this an unordered_set
-    std::set<stPinchBlock*> seen;
+    std::unordered_set<stPinchBlock*> seen;
     
     // Open up the file to write.
     std::ofstream c2h(filename.c_str());
@@ -338,6 +338,211 @@ writeAlignment(
     // probably need a FASTA with this many Ns in order to turn this c2h into a
     // HAL file.
     return nextBlockStart;
+}
+
+void
+writeAlignmentWithReference(
+    stPinchThreadSet* threadSet, 
+    const FMDIndex& index, 
+    const std::string& filename, 
+    const size_t referenceGenomeNumber
+) {
+    
+    // Open up the file to write.
+    std::ofstream c2h(filename.c_str());
+    
+    // Keep a mapping from genome number to event name. Event name will be
+    // either the contig scaffold name if all the contigs in the genome are from
+    // a single scaffold, or "genome-<number>" if there are multiple scaffolds
+    // involved.
+    std::map<size_t, std::string> eventNames;
+    
+    for(size_t genome = 0; genome < index.getNumberOfGenomes(); genome++) {
+        // Go through genomes in order and assign them all event names.
+        
+        // What contigs are in this genome?
+        auto genomeRange = index.getGenomeContigs(genome);
+        
+        // This is the event name we are going to use.
+        std::string eventName;
+        
+        for(size_t i = genomeRange.first; i < genomeRange.second; i++) {
+            if(i == genomeRange.first) {
+                // Grab the name of the first contig
+                eventName = index.getContigName(i);
+            } else if(index.getContigName(i) != eventName) {
+                // This contig doesn't match the first contig's name; they are
+                // not all from the same scaffold. Re-name the event with a new
+                // generic name.
+                
+                eventName = "genome-" + 
+                    std::to_string(index.getContigGenome(i));
+                    
+                // Now we're done
+                break;
+            }
+        }
+        
+        // We have now named the event for this genome. Save it
+        eventNames[genome] = eventName;
+    }
+
+    // What contigs are in the reference genome?
+    auto referenceRange = index.getGenomeContigs(referenceGenomeNumber);
+    
+    // What blocks have we seen the reference genome be part of?
+    std::unordered_set<stPinchBlock*> seen;
+    
+    for(size_t i = referenceRange.first; i < referenceRange.second; i++) {
+        // Go through all threads in the reference
+        stPinchThread* thread = stPinchThreadSet_getThread(threadSet,
+            i);
+            
+        // Start a new sequence for the reference nwith a sequence line. The
+        // sequence is not top sequence.
+        c2h << "s\t'" << eventNames[referenceGenomeNumber] << "'\t'" << 
+            index.getContigName(i) << "'\t1" << std::endl;
+            
+        // Get the start offset fom 0 on the scaffold for the first block in the
+        // thread.
+        size_t contigStart = index.getContigStart(i);
+        
+        // Get the first segment in the thread.
+        stPinchSegment* segment = stPinchThread_getFirst(thread);
+        while(segment != NULL) {
+            // Go through all the segments in the thread
+            
+            // This holds the block that this segment is in, if any.
+            stPinchBlock* block;
+            if((block = stPinchSegment_getBlock(segment)) != NULL) {
+                // Look at its block if it has one
+                
+                if(seen.count(block) == 0) {
+                    // This is a new block we haven't seen before on this
+                    // thread.
+                    
+                    // Work out where this segment starts in the reference.
+                    // Convert to 0-based HAL.
+                    size_t segmentStart = contigStart +
+                        stPinchSegment_getStart(segment) - 1;
+                    
+                    // Put a bottom segment for the block. Just name the segment
+                    // after the block's address. We need block name (number),
+                    // start, and length.
+                    c2h << "a\t" << (uintptr_t)block << "\t" << 
+                        segmentStart << "\t" << 
+                        stPinchBlock_getLength(block) << std::endl;
+                        
+                    // Record that we have seen this block now.
+                    seen.insert(block);
+                } else {
+                    // The reference is going back though a block we already saw
+                    // reading along the reference. We can't peoperly serialize
+                    // as a star tree due to self-alignment in the reference.
+                    
+                    throw std::runtime_error("Can't make a star-tree due to "
+                        "self-alignment in reference!");
+                }
+            }
+        
+            // Jump to the next 3' segment. This needs will return NULL if we go
+            // off the end.
+            segment = stPinchSegment_get3Prime(segment);
+        }
+    }
+    
+    // Now we've made all the bottom segments for the reference. For all the
+    // other genomes it's just like what we do when we have no reference.
+    
+    for(size_t genome = 0; genome < index.getNumberOfGenomes(); genome++) {
+        if(genome == referenceGenomeNumber) {
+            // Don't do the reference since it is already the root.
+            continue;
+        }
+        
+        // What contigs are in this genome? We assume they are grouped by source
+        // scaffold and sorted in order of increasing scaffold position within a
+        // scaffold.
+        auto genomeRange = index.getGenomeContigs(genome);
+        
+        // What scaffold was the last contig in this genome on? We can only have
+        // one sequence line and coordinate space per scaffold, remember.
+        std::string lastContigScaffold;
+        
+        for(size_t i = genomeRange.first; i < genomeRange.second; i++) {
+        
+            if(i == genomeRange.first || 
+                index.getContigName(i) != lastContigScaffold) {
+                
+                // We are starting on the contigs for a new scaffold.
+                
+                // Start a new sequence with a sequence line. The sequence is a
+                // top sequence, since it is only connected up.
+                c2h << "s\t'" << eventNames[genome] << "'\t'" << 
+                    index.getContigName(i) << "'\t0" << std::endl;
+                    
+                // Remember not to make a sequence line for this scaffold again.
+                lastContigScaffold = index.getContigName(i);
+            }
+        
+            // Each segment has to account for the offset of the contig on the
+            // sequence.
+            size_t contigStart = index.getContigStart(i);
+            
+            // So first get the thread by name.
+            stPinchThread* thread = stPinchThreadSet_getThread(threadSet, i);
+            
+            // Go through all its pinch segments in order. There's no iterator
+            // so we have to keep looking 3'
+            
+            // Get the first segment in the thread.
+            stPinchSegment* segment = stPinchThread_getFirst(thread);
+            while(segment != NULL) {
+                
+                // Start where the next segment starts. Convert from 1-based
+                // pinch segments to 0-based HAL.
+                size_t segmentStart = contigStart +
+                    stPinchSegment_getStart(segment) - 1;
+                
+                stPinchBlock* block = stPinchSegment_getBlock(segment);
+                
+                if(block != NULL) {
+                    // It actually aligned
+                
+                    if(seen.count(block) == 0) {
+                        // This aligned block wasn't in the reference. Complain
+                        // we can't represent it.
+                        throw std::runtime_error("Star tree can't represent "
+                            "alignment of sequence not aligned to reference");
+                    }
+                
+                    // Write a top segment mapping to the segment named after
+                    // the address of the block this segment belongs to.
+                    c2h << "a\t" << segmentStart << "\t" << 
+                        stPinchSegment_getLength(segment) << "\t" << 
+                        (uintptr_t) block << "\t" << 
+                        stPinchSegment_getBlockOrientation(segment) << 
+                        std::endl;
+                } else {
+                    // Write a segment for the unaligned sequence.
+                    c2h << "a\t" << segmentStart << "\t" << 
+                        stPinchSegment_getLength(segment) << std::endl;
+                }
+                // TODO: What about the bits that have no segment at all? Is
+                // just not mentioning those ranges OK?
+                
+                // Jump to the next 3' segment. This will return NULL if we
+                // go off the end.
+                segment = stPinchSegment_get3Prime(segment);
+            }
+                
+        }
+    
+    }
+    
+    // Now that we did every segment of every contig of every genome, we are
+    // done and can close up the file.
+    c2h.close();
 }
 
 void

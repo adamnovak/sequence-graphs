@@ -94,7 +94,20 @@ size_t
 writeAlignment(
     stPinchThreadSet* threadSet, 
     const FMDIndex& index, 
-    std::string filename
+    const std::string& filename
+);
+
+/*
+ * Write the alignment represented by this pinch graph and index as a star tree
+ * alignment where the given refrence sequence is used as the root. Saves in c2h
+ * format, as described above, to the given file.
+ */
+void
+writeAlignmentWithReference(
+    stPinchThreadSet* threadSet, 
+    const FMDIndex& index, 
+    const std::string& filename, 
+    const size_t referenceGenomeNumber
 );
 
 /**
