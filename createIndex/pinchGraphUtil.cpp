@@ -667,7 +667,7 @@ writeTopSegments(
         
         // Start with the common part between aligned and unaligned blocks.
         c2h << "a\t" << segmentStart << "\t" << 
-                stPinchSegment_getLength(segment)
+            stPinchSegment_getLength(segment);
         
         if(block != NULL) {
             // Write the bit for aligning
@@ -706,15 +706,16 @@ writeAlignmentWithReference(
         std::endl;
         
     // Grab the reference thread.
-    stPinchThread* reference = stPinchThreadSet_getThread(threadSet, i);
+    stPinchThread* reference = stPinchThreadSet_getThread(threadSet,
+        referenceThreadNumber);
     
     // Start a new sequence for the reference with a sequence line. The
     // sequence is not a top sequence.
     c2h << "s\t'" << threadEvents[referenceThreadNumber] << "'\t'" << 
         threadNames[referenceThreadNumber] << "'\t1" << std::endl;
         
-    // Write all the bottom segments for the thread.
-    writeBottomSegments(c2h, thread);
+    // Write all the bottom segments for the reference.
+    writeBottomSegments(c2h, reference);
     
     
     for(size_t threadNumber = 0; 
@@ -731,7 +732,8 @@ writeAlignmentWithReference(
             threadNames[threadNumber] << "'\t0" << std::endl;        
         
         // Write the top segments for the thread
-        writeTopSegments(c2h, thread);
+        writeTopSegments(c2h, stPinchThreadSet_getThread(threadSet,
+            threadNumber));
         
     }
     

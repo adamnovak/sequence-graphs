@@ -1,4 +1,5 @@
 #include <csignal>
+#include <unordered_set>
 
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
@@ -20,7 +21,7 @@ struct C2hMerge {
     size_t start2;
     size_t length;
     bool orientation;
-}
+};
 
 /**
  * cactusMerge.cpp: merge two pairs of c2h and FASTA files into one pair. The
@@ -163,14 +164,14 @@ main(
         // each thread, and to collect merges.
         
         // Open the file
-        std::istream c2h(c2hFiles[fileIndex]);
+        std::ifstream c2h(c2hFiles[fileIndex]);
         
         // This maps block name to (sequence number, start location) pairs for
         // this file. We use it to compose merges for our list in global
         // sequence number space.
         std::map<size_t, std::pair<size_t, size_t>> nameMap;
         
-        for(std::string line; std::getline(c2h, line)) {
+        for(std::string line; std::getline(c2h, line);) {
             // This is a new sequence. Split it up on \t.
             std::vector<std::string> parts;
             boost::split(parts, line, boost::is_any_of("\t"));
@@ -261,13 +262,14 @@ main(
                             std::string("Invalid field count in ") + line);
                     }
                     
-                    std::string blockName = parts[1];
+                    size_t blockName = std::stoi(parts[1]);
                     size_t blockStart = std::stoi(parts[2]);
                     size_t blockLength = std::stoi(parts[3]);
                     
                     // Look up the sequence number we actually want to merge
                     // against when we come get this block.
-                    auto namePair = std::make_pair(eventName, sequenceName);
+                    auto namePair = std::make_pair(eventNames[sequenceNumber], 
+                        sequenceNames[sequenceNumber]);
                     size_t mergeSequenceNumber = firstBottomSequence[namePair];
                     
                     // We need to associate the block name with the thread
@@ -348,9 +350,11 @@ main(
     
     for(auto merge : merges) {
         // Apply all the merges, converting merges to 1-based
-        stPinchThread_pinch(stPinchThreadSet_getThread(merge.sequence1), 
-            stPinchThreadSet_getThread(merge.sequence2), merge.start1 + 1, 
-            merge.start2 + 1, merge.length, merge.orientation);
+        stPinchThread_pinch(
+            stPinchThreadSet_getThread(threadSet, merge.sequence1),
+            stPinchThreadSet_getThread(threadSet, merge.sequence2),
+            merge.start1 + 1, merge.start2 + 1, merge.length, 
+            merge.orientation);
     }
     
     // Write out a new c2h file, with the 0th thread as the reference.
@@ -368,8 +372,8 @@ main(
         options["fasta2"].as<std::string>()
     };
     
-    // We'll do the FASTA output ourselfes. Open the file.
-    fastaOut = std::ostream(options["fastaOut"].as<std::string>());
+    // We'll do the FASTA output ourselves. Open the file.
+    std::ofstream fastaOut(options["fastaOut"].as<std::string>());
     
     // This holds the IDs of all the sequences we already wrote. Only write
     // sequences if they aren't duplicates after renaming (which is how we
