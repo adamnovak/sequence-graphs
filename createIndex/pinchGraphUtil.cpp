@@ -444,7 +444,7 @@ writeAlignmentWithReference(
                 // named after 1 less than this segment's address, where no
                 // other segment could possibly fit.
 
-                c2h << "a\t" << ((uintptr_t) segment) - 1 << "\t" << 
+                c2h << "a\t" << ((size_t)(uintptr_t) segment) - 1 << "\t" << 
                     lastSegmentEnd << "\t" << segmentStart - lastSegmentEnd <<
                     std::endl;
                 
@@ -559,10 +559,7 @@ writeAlignmentWithReference(
                     stPinchSegment_getStart(segment) - 1;
                     
                 if(segmentStart > lastSegmentEnd) {
-                    // We need an unaligned segment padding out to here. Make it
-                    // named after 1 less than this segment's address, where no
-                    // other segment could possibly fit. Fields are a, start,
-                    // length.
+                    // We need an unaligned segment padding out to here.
                     c2h << "a\t" << lastSegmentEnd << "\t" << 
                         segmentStart - lastSegmentEnd << std::endl;
                 }
@@ -671,7 +668,7 @@ writeTopSegments(
         
         if(block != NULL) {
             // Write the bit for aligning
-            c2h << (uintptr_t) block << "\t" << 
+            c2h << "\t" << (uintptr_t) block << "\t" << 
                 stPinchSegment_getBlockOrientation(segment);
         }
         
@@ -702,7 +699,7 @@ writeAlignmentWithReference(
     // Open up the file to write.
     std::ofstream c2h(filename.c_str());
     
-    Log::info() << "Processing reference contig " << referenceThreadNumber <<
+    Log::info() << "Processing reference thread " << referenceThreadNumber <<
         std::endl;
         
     // Grab the reference thread.
@@ -735,6 +732,9 @@ writeAlignmentWithReference(
             // Already did this one; it's the reference
             continue;
         }
+        
+        Log::info() << "Processing query thread " << threadNumber <<
+            std::endl;
         
         // Write the top sequence header
         c2h << "s\t'" << threadEvents[threadNumber] << "'\t'" << 

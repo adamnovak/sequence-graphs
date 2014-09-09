@@ -25,6 +25,23 @@ struct C2hMerge {
 };
 
 /**
+ * Remove single quotes quoting the given string, if any. Only sees quotes if
+ * they are the first and last character.
+ */
+std::string unquote(const std::string& input) {
+
+    if(input.size() > 0 && input[0] == '\'' && 
+        input[input.size() - 1] == '\'') {
+        
+        // It's quoted.
+        return input.substr(1, input.size() - 2);
+    }
+    
+    return input;
+
+}
+
+/**
  * cactusMerge.cpp: merge two pairs of c2h and FASTA files into one pair. The
  * files must be star trees with the same root sequence.
  */
@@ -126,7 +143,7 @@ main(
     // Make a list of the c2h files to use
     std::vector<std::string> c2hFiles {
         options["c2h1"].as<std::string>(),
-        options["c2h1"].as<std::string>()
+        options["c2h2"].as<std::string>()
     };
     
     // This holds the suffix applied to all the top sequences and events in each
@@ -167,6 +184,9 @@ main(
         // Scan through the c2h files to get the event, sequence, and length of
         // each thread, and to collect merges.
         
+        Log::output() << "Reading alignment " << c2hFiles[fileIndex] << 
+            std::endl;
+        
         // Open the file
         std::ifstream c2h(c2hFiles[fileIndex]);
         
@@ -197,8 +217,8 @@ main(
                 }
                 
                 // Grab the parts
-                std::string eventName = parts[1];
-                std::string sequenceName = parts[2];
+                std::string eventName = unquote(parts[1]);
+                std::string sequenceName = unquote(parts[2]);
                 bool bottomFlag = std::stoi(parts[3]);
                 
                 Log::info() << "Read sequence " << eventName << "." << 
@@ -335,7 +355,7 @@ main(
                         // Grab the info from the bottom segment we are talking
                         // about earlier in this file.
                         merge.sequence2 = nameMap[blockName].first;
-                        merge.start2 = nameMap[blockName].first;
+                        merge.start2 = nameMap[blockName].second;
                         
                         Log::info() << "Going to merge " << segmentStart << 
                             " length " << segmentLength << " to " <<
@@ -379,6 +399,11 @@ main(
             stPinchThreadSet_getThread(threadSet, merge.sequence2),
             merge.start1 + 1, merge.start2 + 1, merge.length, 
             merge.orientation);
+            
+        Log::info() << "Applied merge between threads " << merge.sequence1 << 
+            ":" << merge.start1 << "-" << merge.start1 + merge.length << 
+            " and " << merge.sequence2 << ":" << merge.start2 << "-" << 
+            merge.start2 + merge.length << std::endl;
     }
     
     // Write out a new c2h file, with the 0th thread as the reference.
