@@ -823,15 +823,15 @@ main(
             // We can have self-alignment in the first sequence, so we need to
             // use this serializer.
         
-            // Save the alignment defined by the pinched pinch graph to the file the
-            // user specified. Save the number of bases of root sequence that were
-            // used in the center of the star tree.
+            // Save the alignment defined by the pinched pinch graph to the file
+            // the user specified. Save the number of bases of root sequence
+            // that were used in the center of the star tree.
             size_t rootBases = writeAlignment(threadSet, index,
                 options["alignment"].as<std::string>());
                 
             if(options.count("alignmentFasta")) {
-                // Also save a FASTA with the sequences necessary to generate a HAL
-                // from the above.
+                // Also save a FASTA with the sequences necessary to generate a
+                // HAL from the above.
                 writeAlignmentFasta(fastas, rootBases,
                     options["alignmentFasta"].as<std::string>());
             }
@@ -843,9 +843,8 @@ main(
                 options["alignment"].as<std::string>(), 0);
                 
             if(options.count("alignmentFasta")) {
-                // Also save a FASTA, with 0 extra rootSeq bases. TODO: Don't
-                // stick in an extra sequence when not needed.
-                writeAlignmentFasta(fastas, 0,
+                // Also save a FASTA, without the rootSeq sequence at all.
+                writeAlignmentFasta(fastas, -1,
                     options["alignmentFasta"].as<std::string>());
             }
             

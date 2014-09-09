@@ -111,11 +111,50 @@ writeAlignmentWithReference(
 );
 
 /**
+ * Write the bottom segments for a single-thread scaffold.
+ */
+void 
+writeBottomSegments(
+    std::ofstream& c2h, 
+    stPinchThread* thread
+);
+
+/**
+ * Write the top segments for a single-thread scaffold.
+ */
+void 
+writeTopSegments(
+    std::ofstream& c2h, 
+    stPinchThread* thread
+);
+
+/*
+ * Write the alignment represented by this pinch graph alone as a star where the
+ * given refrence thread is used as the root. Saves in c2h format, as
+ * described above, to the given file.
+ *
+ * threadNames gives the sequence name for each pinch graph thread, and
+ * threadEvents gives the event name for each thread.
+ *
+ * TODO: Multiple reference threads.
+ */
+void
+writeAlignmentWithReference(
+    stPinchThreadSet* threadSet, 
+    std::vector<std::string> threadNames,
+    std::vector<std::string> threadEvents,
+    const std::string& filename, 
+    const size_t referenceThreadNumber
+);
+
+/**
  * Write a FASTA file that goes with the .c2h file written by writeAlignment, so
  * that the halAppendCactusSubtree tool can turn both into a HAL file.
  *
  * Strips out newlines so halAppendCactusSubtree will be happy with the
  * resulting FASTA.
+ *
+ * If rootBases < 0, don't actually generate a rootSeq record.
  *
  * TODO: Drop this and just use the HAL API directly
  *
@@ -124,7 +163,7 @@ writeAlignmentWithReference(
 void
 writeAlignmentFasta(
     std::vector<std::string> inputFastas,
-    size_t rootBases,
+    int64_t rootBases,
     std::string filename
 );
 

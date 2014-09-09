@@ -612,10 +612,137 @@ writeAlignmentWithReference(
     c2h.close();
 }
 
+void 
+writeBottomSegments(
+    std::ofstream& c2h, 
+    stPinchThread* thread
+) {
+    // Get the first segment in the thread.
+    stPinchSegment* segment = stPinchThread_getFirst(thread);
+    while(segment != NULL) {
+        // Go through all the segments in the thread
+        
+        // Work out where this segment starts in the reference. Convert to
+        // 0-based HAL.
+        size_t segmentStart = stPinchSegment_getStart(segment) - 1;
+        
+        // No part of the thread is not covered by a segment.
+        
+        // This holds the block that this segment is in, if any.
+        stPinchBlock* block = stPinchSegment_getBlock(segment);
+        
+        // This holds the name of the segment we're adding. Name it after the
+        // block if we have one, and the unaligned segment otherwise.
+        uintptr_t segmentName = (block != NULL) ? (uintptr_t) block : 
+            (uintptr_t) segment;
+        
+                
+        // Put a bottom segment in the c2h
+        c2h << "a\t" << segmentName << "\t" << segmentStart << "\t" << 
+            stPinchSegment_getLength(segment) << std::endl;
+    
+        // Jump to the next 3' segment. This needs will return NULL if we go
+        // off the end.
+        segment = stPinchSegment_get3Prime(segment);
+    }
+}
+
+void 
+writeTopSegments(
+    std::ofstream& c2h, 
+    stPinchThread* thread
+) {
+    // Get the first segment in the thread.
+    stPinchSegment* segment = stPinchThread_getFirst(thread);
+    while(segment != NULL) {
+        // Go through all the segments in the thread
+        
+        // Work out where this segment starts. Convert to 0-based HAL.
+        size_t segmentStart = stPinchSegment_getStart(segment) - 1;
+        
+        // No part of the thread is not covered by a segment.
+        
+        // This holds the block that this segment is in, if any.
+        stPinchBlock* block = stPinchSegment_getBlock(segment);
+        
+        // Start with the common part between aligned and unaligned blocks.
+        c2h << "a\t" << segmentStart << "\t" << 
+                stPinchSegment_getLength(segment)
+        
+        if(block != NULL) {
+            // Write the bit for aligning
+            c2h << (uintptr_t) block << "\t" << 
+                stPinchSegment_getBlockOrientation(segment);
+        }
+        
+        // Finish the line
+        c2h << std::endl;
+        
+        // Jump to the next 3' segment. This needs will return NULL if we go
+        // off the end.
+        segment = stPinchSegment_get3Prime(segment);
+    }
+}
+
+void
+writeAlignmentWithReference(
+    stPinchThreadSet* threadSet, 
+    std::vector<std::string> threadNames,
+    std::vector<std::string> threadEvents,
+    const std::string& filename, 
+    const size_t referenceThreadNumber
+) {
+
+    // The same as above but without all that code to manage contigs spanning
+    // multiple threads or to calculate names for things.
+    
+    Log::info() << "Serializing star-tree alignment to " << filename <<
+        std::endl;
+    
+    // Open up the file to write.
+    std::ofstream c2h(filename.c_str());
+    
+    Log::info() << "Processing reference contig " << referenceThreadNumber <<
+        std::endl;
+        
+    // Grab the reference thread.
+    stPinchThread* reference = stPinchThreadSet_getThread(threadSet, i);
+    
+    // Start a new sequence for the reference with a sequence line. The
+    // sequence is not a top sequence.
+    c2h << "s\t'" << threadEvents[referenceThreadNumber] << "'\t'" << 
+        threadNames[referenceThreadNumber] << "'\t1" << std::endl;
+        
+    // Write all the bottom segments for the thread.
+    writeBottomSegments(c2h, thread);
+    
+    
+    for(size_t threadNumber = 0; 
+        threadNumber < stPinchThreadSet_getSize(threadSet); threadNumber++) {
+        // Now go through all the other threads.
+        
+        if(threadNumber == referenceThreadNumber) {
+            // Already did this one; it's the reference
+            continue;
+        }
+        
+        // Write the top sequence header
+        c2h << "s\t'" << threadEvents[threadNumber] << "'\t'" << 
+            threadNames[threadNumber] << "'\t0" << std::endl;        
+        
+        // Write the top segments for the thread
+        writeTopSegments(c2h, thread);
+        
+    }
+    
+    // And we're done.
+    c2h.close();
+}
+
 void
 writeAlignmentFasta(
     std::vector<std::string> inputFastas,
-    size_t rootBases,
+    int64_t rootBases,
     std::string filename
 ) {
 
@@ -625,11 +752,15 @@ writeAlignmentFasta(
     Log::info() << "Generating " << rootBases << 
         " bases of root node sequence." << std::endl;
     
-    // First we put the right number of Ns in a sequence named "rootSeq"
-    fasta << ">rootSeq" << std::endl;
-    for(size_t i = 0; i < rootBases; i++) {
-        fasta << "N";
-        // Entire sequence must be on one line.
+    
+    if(rootBases >= 0) {
+        // First we put the right number of Ns in a sequence named "rootSeq", if
+        // the caller didn't ask to not have it.
+        fasta << ">rootSeq" << std::endl;
+        for(size_t i = 0; i < rootBases; i++) {
+            fasta << "N";
+            // Entire sequence must be on one line.
+        }
     }
     
     for(std::vector<std::string>::iterator i = inputFastas.begin(); 
