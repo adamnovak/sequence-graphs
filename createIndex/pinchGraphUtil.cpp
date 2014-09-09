@@ -399,17 +399,29 @@ writeAlignmentWithReference(
     // What blocks have we seen the reference genome be part of?
     std::unordered_set<stPinchBlock*> seen;
     
+    // Keep track of where the last segment ended, across contigs on a scaffold.
+    size_t lastSegmentEnd;
+    
+    // And the sequence name for the last contig we did
+    std::string lastContigName;
+    
     for(size_t i = referenceRange.first; i < referenceRange.second; i++) {
         Log::info() << "Processing reference contig " << i << std::endl;
         
         // Go through all threads in the reference
         stPinchThread* thread = stPinchThreadSet_getThread(threadSet,
             i);
+        
+        if(i == referenceRange.first || index.getContigName(i) != lastContigName) {
+            // Start a new sequence for the reference with a sequence line. The
+            // sequence is not a top sequence.
+            c2h << "s\t'" << eventNames[referenceGenomeNumber] << "'\t'" << 
+                index.getContigName(i) << "'\t1" << std::endl;
             
-        // Start a new sequence for the reference nwith a sequence line. The
-        // sequence is not top sequence.
-        c2h << "s\t'" << eventNames[referenceGenomeNumber] << "'\t'" << 
-            index.getContigName(i) << "'\t1" << std::endl;
+            // Start over at 0 on a new scaffold
+            lastContigName = index.getContigName(i);
+            lastSegmentEnd = 0;
+        }
             
         // Get the start offset fom 0 on the scaffold for the first block in the
         // thread.
@@ -424,6 +436,17 @@ writeAlignmentWithReference(
             // 0-based HAL.
             size_t segmentStart = contigStart +
                 stPinchSegment_getStart(segment) - 1;
+            
+            if(segmentStart > lastSegmentEnd) {
+                // We need an unaligned segment padding out to here. Make it
+                // named after 1 less than this segment's address, where no
+                // other segment could possibly fit.
+
+                c2h << "a\t" << ((uintptr_t) segment) - 1 << "\t" << 
+                    lastSegmentEnd << "\t" << segmentStart - lastSegmentEnd <<
+                    std::endl;
+                
+            }
             
             // This holds the block that this segment is in, if any.
             stPinchBlock* block;
@@ -460,6 +483,9 @@ writeAlignmentWithReference(
                     stPinchSegment_getLength(segment) << std::endl;
             }
         
+            // Keep track of where this segment ended
+            lastSegmentEnd = segmentStart + stPinchSegment_getLength(segment);
+        
             // Jump to the next 3' segment. This needs will return NULL if we go
             // off the end.
             segment = stPinchSegment_get3Prime(segment);
@@ -486,6 +512,10 @@ writeAlignmentWithReference(
         // one sequence line and coordinate space per scaffold, remember.
         std::string lastContigScaffold;
         
+        // Keep track of where the last segment ended, across contigs on a
+        // scaffold.
+        size_t lastSegmentEnd;
+        
         for(size_t i = genomeRange.first; i < genomeRange.second; i++) {
         
             Log::info() << "Processing query contig " << i << std::endl;
@@ -502,6 +532,9 @@ writeAlignmentWithReference(
                     
                 // Remember not to make a sequence line for this scaffold again.
                 lastContigScaffold = index.getContigName(i);
+                
+                // Start over from 0 on the scaffold.
+                lastSegmentEnd = 0;
             }
         
             // Each segment has to account for the offset of the contig on the
@@ -522,6 +555,17 @@ writeAlignmentWithReference(
                 // pinch segments to 0-based HAL.
                 size_t segmentStart = contigStart +
                     stPinchSegment_getStart(segment) - 1;
+                    
+                if(segmentStart > lastSegmentEnd) {
+                    // We need an unaligned segment padding out to here. Make it
+                    // named after 1 less than this segment's address, where no
+                    // other segment could possibly fit.
+
+                    c2h << "a\t" << ((uintptr_t) segment) - 1 << "\t" << 
+                        lastSegmentEnd << "\t" << 
+                        segmentStart - lastSegmentEnd << std::endl;
+                    
+                }
                 
                 stPinchBlock* block = stPinchSegment_getBlock(segment);
                 
@@ -547,6 +591,10 @@ writeAlignmentWithReference(
                     c2h << "a\t" << segmentStart << "\t" << 
                         stPinchSegment_getLength(segment) << std::endl;
                 }
+                
+                // Keep track of where this segment ended
+                lastSegmentEnd = segmentStart + stPinchSegment_getLength(
+                    segment);
                 
                 // Jump to the next 3' segment. This will return NULL if we
                 // go off the end.

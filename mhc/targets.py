@@ -201,14 +201,14 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         self.fasta_list = [fasta_first] + fasta_rest
         
         # Make a temp directory for the index
-        index_dir = sonLib.bioio.getTempFile(rootDir=self.getLocalTempDir())
+        index_dir = sonLib.bioio.getTempFile(rootDir=self.getGlobalTempDir())
         
         # Make a file for the cactus2hal
-        c2h_filename = sonLib.bioio.getTempFile(rootDir=self.getLocalTempDir())
+        c2h_filename = sonLib.bioio.getTempFile(rootDir=self.getGlobalTempDir())
         
         # Make a file for the FASTA that we need to use the cactus2hal
         fasta_filename = sonLib.bioio.getTempFile(
-            rootDir=self.getLocalTempDir())
+            rootDir=self.getGlobalTempDir())
         
         # Put together the arguments to invoke
         args = ["../createIndex/createIndex", "--scheme", "greedy", 
@@ -295,8 +295,9 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
             for fasta in self.fasta_list]
         
         # What tree should we use? Assume the genome names are the same as the
-        # FASTA names without their extensions. 
-        tree = "(" + ",".join(genomes) + ")rootSeq;"
+        # FASTA names without their extensions. Set up for a star tree rooted at
+        # genome 0.
+        tree = "(" + ",".join(genomes[1:]) + ")" + genomes[0] + ";"
         
         if self.hal_filename is None:
             # Where should we save it? ("" isn't a filename so this or is OK)
