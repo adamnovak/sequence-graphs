@@ -412,7 +412,9 @@ writeAlignmentWithReference(
         stPinchThread* thread = stPinchThreadSet_getThread(threadSet,
             i);
         
-        if(i == referenceRange.first || index.getContigName(i) != lastContigName) {
+        if(i == referenceRange.first || 
+            index.getContigName(i) != lastContigName) {
+            
             // Start a new sequence for the reference with a sequence line. The
             // sequence is not a top sequence.
             c2h << "s\t'" << eventNames[referenceGenomeNumber] << "'\t'" << 
@@ -559,12 +561,10 @@ writeAlignmentWithReference(
                 if(segmentStart > lastSegmentEnd) {
                     // We need an unaligned segment padding out to here. Make it
                     // named after 1 less than this segment's address, where no
-                    // other segment could possibly fit.
-
-                    c2h << "a\t" << ((uintptr_t) segment) - 1 << "\t" << 
-                        lastSegmentEnd << "\t" << 
+                    // other segment could possibly fit. Fields are a, start,
+                    // length.
+                    c2h << "a\t" << lastSegmentEnd << "\t" << 
                         segmentStart - lastSegmentEnd << std::endl;
-                    
                 }
                 
                 stPinchBlock* block = stPinchSegment_getBlock(segment);
@@ -580,7 +580,9 @@ writeAlignmentWithReference(
                     }
                 
                     // Write a top segment mapping to the segment named after
-                    // the address of the block this segment belongs to.
+                    // the address of the block this segment belongs to. Fields
+                    // are a, start, length, aligned bottom segment,
+                    // orientation.
                     c2h << "a\t" << segmentStart << "\t" << 
                         stPinchSegment_getLength(segment) << "\t" << 
                         (uintptr_t) block << "\t" << 
