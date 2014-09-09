@@ -9,6 +9,7 @@
 #include "pinchGraphUtil.hpp"
 
 #include <Fasta.hpp>
+#include <Log.hpp>
 
 /**
  * Represents a merge to be executed later after we build the pinch graph and
@@ -100,7 +101,10 @@ main(
             return 0; 
         }
         
-        if(!options.count("indexDirectory") || !options.count("fastas")) {
+        if(!options.count("c2h1") || !options.count("fasta1") ||
+            !options.count("c2h2") || !options.count("fasta2") ||
+            !options.count("c2hOut") || !options.count("fastaOut")) {
+            
             throw boost::program_options::error("Missing important arguments!");
         }
             
@@ -197,6 +201,10 @@ main(
                 std::string sequenceName = parts[2];
                 bool bottomFlag = std::stoi(parts[3]);
                 
+                Log::info() << "Read sequence " << eventName << "." << 
+                    sequenceName << (bottomFlag ? " (bottom)" : " (top)") << 
+                    std::endl;
+                
                 if(!bottomFlag) {
                     // We need to rename this event (possibly to the same thing)
                     renames[fileIndex][eventName] = eventName + 
@@ -207,6 +215,10 @@ main(
                     renames[fileIndex][sequenceName] = sequenceName + 
                         suffixes[fileIndex];
                     sequenceName = renames[fileIndex][sequenceName];
+                    
+                    Log::info() << "Canonical name: " << eventName << "." << 
+                        sequenceName << std::endl;
+                    
                 }
                 
                 // Save the names
@@ -233,6 +245,9 @@ main(
                         // Later instances of this event and sequence name as a
                         // bottom sequence should redirect here.
                         firstBottomSequence[namePair] = isBottom.size() - 1;
+                        
+                        Log::info() << "This is the first time we have seen "
+                            "this bottom sequence." << std::endl;
                     }
                     
                     // Otherwise we will count up length and stuff as normal,
@@ -262,9 +277,9 @@ main(
                             std::string("Invalid field count in ") + line);
                     }
                     
-                    size_t blockName = std::stoi(parts[1]);
-                    size_t blockStart = std::stoi(parts[2]);
-                    size_t blockLength = std::stoi(parts[3]);
+                    size_t blockName = std::stoll(parts[1]);
+                    size_t blockStart = std::stoll(parts[2]);
+                    size_t blockLength = std::stoll(parts[3]);
                     
                     // Look up the sequence number we actually want to merge
                     // against when we come get this block.
@@ -277,6 +292,10 @@ main(
                     // start location it specifies, for merging later.
                     nameMap[blockName] = std::make_pair(mergeSequenceNumber,
                         blockStart);
+                    
+                    Log::info() << "Bottom block " << blockName << " is " << 
+                        blockStart << " on sequence " << mergeSequenceNumber << 
+                        std::endl;
                     
                     // Also record the additional length on this sequence
                     sequenceLengths[sequenceNumber] += blockLength;
@@ -292,8 +311,8 @@ main(
                     }
                     
                     // Parse out the start and length
-                    size_t segmentStart = std::stoi(parts[2]);
-                    size_t segmentLength = std::stoi(parts[3]);
+                    size_t segmentStart = std::stoll(parts[1]);
+                    size_t segmentLength = std::stoll(parts[2]);
                     
                     // Add in the length
                     sequenceLengths[sequenceNumber] += segmentLength;
@@ -301,8 +320,8 @@ main(
                     if(parts.size() == 5) {
                         // If it has a name and orientation, remember a merge.
                         
-                        size_t blockName = std::stoi(parts[4]);
-                        bool orientation = std::stoi(parts[5]);
+                        size_t blockName = std::stoll(parts[3]);
+                        bool orientation = std::stoi(parts[4]);
                         
                         // Make a merge and populate it with everything we can
                         // get from this segment.
@@ -317,6 +336,11 @@ main(
                         // about earlier in this file.
                         merge.sequence2 = nameMap[blockName].first;
                         merge.start2 = nameMap[blockName].first;
+                        
+                        Log::info() << "Going to merge " << segmentStart << 
+                            " length " << segmentLength << " to " <<
+                            blockName << " orientation " << orientation << 
+                            std::endl;
                         
                         // Save the merge for doing later.
                         merges.push_back(merge);

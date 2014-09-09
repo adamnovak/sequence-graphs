@@ -44,7 +44,8 @@ clean:
 	rm -Rf *.o speedMap
 	
 # We can automagically get header dependencies.
-dependencies.mk: *.cpp *.hpp
+# TODO: When .hpp files are added, add *.hpp here.
+dependencies.mk: *.cpp
 	g++ $(CXXFLAGS) -MM *.cpp > dependencies.mk
 	
 # Include auto-generated dependencies.

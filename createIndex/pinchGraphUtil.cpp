@@ -717,10 +717,19 @@ writeAlignmentWithReference(
     // Write all the bottom segments for the reference.
     writeBottomSegments(c2h, reference);
     
+    // Get an iterator over the thread set, since thread numbers may have gaps.
+    stPinchThreadSetIt iterator = stPinchThreadSet_getIt(threadSet);
     
-    for(size_t threadNumber = 0; 
-        threadNumber < stPinchThreadSet_getSize(threadSet); threadNumber++) {
-        // Now go through all the other threads.
+    // This holds each thread we're going to look at.
+    stPinchThread* thread;
+    while((thread = stPinchThreadSetIt_getNext(&iterator)) 
+        != NULL) {
+        
+        // Go through all the threads.
+        // TODO: assumes we hit them in increasing numerical order.
+    
+        // Get the name number of the thread.
+        size_t threadNumber = stPinchThread_getName(thread);
         
         if(threadNumber == referenceThreadNumber) {
             // Already did this one; it's the reference
