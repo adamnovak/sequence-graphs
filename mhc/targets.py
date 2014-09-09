@@ -114,7 +114,8 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
     
     def __init__(self, fasta_list, seed, coverage_filename, alignment_filename,
         hal_filename=None, spectrum_filename=None, indel_filename=None,
-        tandem_filename=None, extra_args=[]):
+        tandem_filename=None, c2h_filename=None, fasta_filename=None,
+        extra_args=[]):
         """
         Make a new Target for building a reference structure from the given
         FASTAs, using the specified RNG seed, and writing coverage statistics to
@@ -139,6 +140,12 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         If tandem_filename is specified, save the count of tandem duplications
         detected (4-end rearrangements that involve two connected ends of the
         same block) to that file.
+        
+        If c2h_filename is specified, the c2h intermediate alignment file is
+        saved to that location.
+        
+        If fasta_filename is specified, the FASTA that goes with the c2h file is
+        saved there.
         
         If extra_args is specified, it should be a list of additional command-
         line arguments to createIndex, for specifying things like inexact
@@ -175,6 +182,10 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         # And the tandem duplication count filename, if any
         self.tandem_filename = tandem_filename
         
+        self.c2h_filename = c2h_filename
+        
+        self.fasta_filename = fasta_filename
+        
         # And the extra args
         self.extra_args = extra_args
         
@@ -203,12 +214,14 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         # Make a temp directory for the index
         index_dir = sonLib.bioio.getTempFile(rootDir=self.getGlobalTempDir())
         
-        # Make a file for the cactus2hal
-        c2h_filename = sonLib.bioio.getTempFile(rootDir=self.getGlobalTempDir())
+        # Make a file for the cactus2hal, if not specified
+        c2h_filename = self.c2h_filename or sonLib.bioio.getTempFile(
+            rootDir=self.getLocalTempDir())
         
-        # Make a file for the FASTA that we need to use the cactus2hal
-        fasta_filename = sonLib.bioio.getTempFile(
-            rootDir=self.getGlobalTempDir())
+        # Make a file for the FASTA that we need to use the cactus2hal, if not
+        # specified
+        fasta_filename = self.fasta_filename or sonLib.bioio.getTempFile(
+            rootDir=self.getLocalTempDir())
         
         # Put together the arguments to invoke
         args = ["../createIndex/createIndex", "--scheme", "greedy", 

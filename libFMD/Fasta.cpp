@@ -1,6 +1,7 @@
 #include "Fasta.hpp"
 
 #include <cctype>
+#include <stdexcept>
 
 Fasta::Fasta(std::string filename): stream(filename.c_str()) {
     // Nothing to do; file is open.
@@ -42,8 +43,22 @@ std::pair<std::string, std::string> Fasta::getNextRecord() {
     // First we have to read the header
     std::string header;
     
-    // Keep track of the character we just got
+    // Grab the '>'
     int got = stream.get();
+    if(got != '>') {
+        // Complain about an error in the FASTA
+        throw std::runtime_error(std::string(
+            "FASTA parser expected: '>', got '") + (char)got + "'");
+    }
+    
+    if(!stream.good()) {
+        // Complain if something happens to the stream after that character.
+        throw std::runtime_error(
+            "Ran out of data after parsing record start character");
+    }
+    
+    // Keep track of the character we just got
+    got = stream.get();
     while(stream.good() && got != '\n') {
         // Get characters until we hit the end of the first (header) line.
         header.push_back(got);

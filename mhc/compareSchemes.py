@@ -273,6 +273,15 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # And a similar structure for HALs
         hals_by_scheme = {}
         
+        # This holds pairs of c2h and FASTA files
+        c2h_fasta_pairs = []
+        
+        # This holds the genomes to which those pairs correspond
+        pair_genomes = []
+        
+        # And this holds the schemes they are for
+        pair_schemes = []
+        
         for scheme, extra_args in self.generateMultSchemes():
             # Work out all the schemes we want to run.
             
@@ -299,8 +308,18 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             maf_filenames = [sonLib.bioio.getTempFile(suffix=".maf",
                 rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
                 
-            # And another one to hold each child's HAL alignment
+            # And another one to hold each child's hal alignment. We still need
+            # individual hals because we need to have individual mafs for
+            # comparison.
             hal_filenames = [sonLib.bioio.getTempFile(suffix=".hal",
+                rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
+                
+            # And another one to hold each child's c2h alignment
+            c2h_filenames = [sonLib.bioio.getTempFile(suffix=".c2h",
+                rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
+                
+            # And another one to hold each child's fasta output for the c2h
+            fasta_filenames = [sonLib.bioio.getTempFile(suffix=".fa",
                 rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
                 
             for hal in hal_filenames:
@@ -343,6 +362,8 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 spectrum_filename = spectrum_filenames[i]
                 indel_filename = indel_filenames[i]
                 tandem_filename = tandem_filenames[i]
+                c2h_filename = c2h_filenames[i]
+                fasta_filename = fasta_filenames[i]
                 
                 # Make a child to produce those, giving it a seed. Make sure to
                 # give it only two FASTAs, reference first, so that when it
@@ -353,7 +374,8 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                     stats_filename, maf_filename, hal_filename=hal_filename,
                     spectrum_filename=spectrum_filename, 
                     indel_filename=indel_filename, 
-                    tandem_filename=tandem_filename, extra_args=extra_args))
+                    tandem_filename=tandem_filename, c2h_filename=c2h_filename, 
+                    fasta_filename=fasta_filename, extra_args=extra_args))
         
         
                 
@@ -382,6 +404,16 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 followOns.append(AlignmentTruthComparisonTarget(self.true_maf, 
                 maf_filenames, random.getrandbits(256), 
                 self.stats_dir + "/truth." + scheme))
+                
+            # Save the c2h and FASTA files we made along with the scheme and
+            # genomes we used.
+            c2h_fasta_pairs += zip(c2h_filenames, fasta_filenames)
+            # And the genomes they were for. TODO: consolidate with
+            # pair_genomes.
+            pair_genomes += [os.path.splitext(fasta)[0] 
+                for fasta in self.fasta_list[1:]]
+            # And record that each came from this scheme.
+            pair_schemes += [scheme for _ in pair_genomes]
         
         
         
@@ -404,8 +436,27 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             self.hub_root)
             
         # Do those two things in order.
-        followOns.append(SequenceTarget([agreement_target, hubs_target]))
+        # TODO: These no longer work with unary-tree HALs.
+        #followOns.append(SequenceTarget([agreement_target, hubs_target]))
+        
+        # We also want to combine all our c2h files into one massive hub.
+        
+        # What HAL will we use?
+        merged_hal = sonLib.bioio.getTempFile(suffix=".hal",
+                rootDir=self.getGlobalTempDir())
+        os.unlink(merged_hal)
+        
+        # Make a target to make that merged hal
+        merged_hal_target = C2hMergeTarget(c2h_fasta_pairs, 
+            os.path.splitext(self.fasta_list[0])[0], 
+            pair_genomes, ["-" + scheme for scheme in pair_schemes], merged_hal)
             
+        # And a target to make a hub from that
+        merged_hub_target = AssemblyHubOnlyTarget(merged_hal, self.hub_root + 
+            "/all")
+            
+        # Do those last two in order.
+        followOns.append(SequenceTarget([merged_hal_target, merged_hub_target]))
             
         # So we need to run all of the follow-ons in parallel after this job
         self.setFollowOnTarget(RunTarget(followOns))
@@ -531,6 +582,101 @@ class AlignmentSchemeAgreementTarget(jobTree.scriptTree.target.Target):
         self.setFollowOnTarget(RunTarget(followOns))
                 
         self.logToMaster("AlignmentSchemeAgreementTarget Finished")
+        
+class C2hMergeTarget(jobTree.scriptTree.target.Target):
+    """
+    A target that merges a list of c2h/FASTA pairs on a shared reference, where
+    each is a unary tree of the given reference and a genome from the given list
+    of genomes. The corresponding suffix from the list of suffixes is assigned
+    to each genome. Saves a hal file to the given filename.
+    
+    """
+    
+    def __init__(self, c2h_fasta_pairs, reference_name, genome_names, suffixes, hal):
+        """
+        
+        
+        """
+        
+        # Make the base Target. Ask for 2gb of memory since this is easy.
+        super(C2hMergeTarget, self).__init__(memory=2147483648)
+        
+        # Save the files to merge
+        self.c2h_fasta_pairs = c2h_fasta_pairs
+        
+        # And the name of the reference to root the hal with.
+        self.reference = reference_name
+        
+        # And the genome names (without suffixes) that the c2h/fasta pairs came
+        # from.
+        self.genomes = genome_names
+        
+        # And the suffixes to apply to all the genomes
+        self.suffixes = suffixes
+        
+        # And the hal to write
+        self.hal = hal
+        
+        self.logToMaster("Creating C2hMergeTarget")
+        
+        
+    def run(self):
+        """
+        Do all the merges.
+        """
+        
+        self.logToMaster("Starting C2hMergeTarget")
+        
+        if len(self.c2h_fasta_pairs) == 0:
+            raise Exception("No alignments at all!")
+        
+        if len(self.c2h_fasta_pairs) == 1:
+            # Nothing to merge
+            merged_c2h, merged_fasta = self.c2h_fasta_pairs[0]
+        else:
+            # Make some filenames where the final answers go
+            merged_c2h = sonLib.bioio.getTempFile(suffix=".c2h",
+                rootDir=self.getGlobalTempDir())
+            merged_fasta = sonLib.bioio.getTempFile(suffix=".fa",
+                rootDir=self.getGlobalTempDir())
+                
+            # Merge the first two pairs
+            check_call(self, ["../createIndex/cactusMerge", 
+                self.c2h_fasta_pairs[0][0], self.c2h_fasta_pairs[0][1], 
+                self.c2h_fasta_pairs[1][0], self.c2h_fasta_pairs[1][1],
+                merged_c2h, merged_fasta, 
+                "--suffix1", self.suffixes[0], "--suffix2", self.suffixes[1]])
+                
+        for (next_c2h, next_fasta), next_suffix in itertools.izip(
+            self.c2h_fasta_pairs[2:], self.suffixes[2:]):
+            
+            # For each other pair to merge in, and the suffix to put on it
+            
+            # Move the final output files back to some temp files.
+            temp_c2h = sonLib.bioio.getTempFile(suffix=".c2h",
+                rootDir=self.getGlobalTempDir())
+            temp_fasta = sonLib.bioio.getTempFile(suffix=".fa",
+                rootDir=self.getGlobalTempDir())
+                
+            os.rename(merged_c2h, temp_c2h)
+            os.rename(merged_fasta, temp_fasta)
+            
+            # Merge in the next pair
+            check_call(self, ["../createIndex/cactusMerge", 
+                temp_c2h, temp_fasta, next_c2h, next_fasta, merged_c2h, 
+                merged_fasta, "--suffix2", next_suffix])
+          
+        # Compose the tree.      
+        tree_nodes = [genome + suffix 
+            for genome, suffix in itertools.izip(self.genomes, self.suffixes)]
+        tree = "(" + ",".join(tree_nodes) + ")" + self.reference + ";"
+                
+        # Now we have the final c2h and fasta. Make the HAL.
+        check_call(self, ["halAppendCactusSubtree", merged_c2h, 
+            merged_fasta, tree, self.hal])
+            
+                
+        self.logToMaster("C2hMergeTarget Finished")
         
 class BedSplitTarget(jobTree.scriptTree.target.Target):
     """
@@ -794,7 +940,7 @@ class AssemblyHubTarget(jobTree.scriptTree.target.Target):
         # And the hub directory
         self.hub = hub
         
-        self.logToMaster("Creating AssemblyHubsTarget")
+        self.logToMaster("Creating AssemblyHubTarget")
         
         
     def run(self):
@@ -869,6 +1015,71 @@ class AssemblyHubTarget(jobTree.scriptTree.target.Target):
             
         
         self.logToMaster("AssemblyHubTarget Finished")
+        
+class AssemblyHubOnlyTarget(jobTree.scriptTree.target.Target):
+    """
+    A target that makes a single assembly hub showing just a HAL.
+    
+    """
+    
+    def __init__(self, hal, hub):
+        """
+        Takes a hal alignment and makes a hub.
+        
+        """
+        
+        # Make the base Target. Ask for 2gb of memory since this is easy.
+        super(AssemblyHubOnlyTarget, self).__init__(memory=2147483648)
+        
+        # Save the alignment file
+        self.hal = hal
+        
+        # And the hub directory
+        self.hub = hub
+        
+        self.logToMaster("Creating AssemblyHubOnlyTarget")
+        
+        
+    def run(self):
+        """
+        Make the assembly hubs.
+        """
+        
+        self.logToMaster("Starting AssemblyHubOnlyTarget")
+        
+                
+        # Make a temporary directory for the jobTree tree. Make sure it's
+        # absolute.
+        tree_dir = os.path.abspath(sonLib.bioio.getTempDirectory(
+            rootDir=self.getLocalTempDir()))
+            
+        # Make sure it doesn't exist yet
+        os.rmdir(tree_dir)
+        
+        # We need to do the hal2assemblyHub.py call in its own directory since
+        # it makes temp files in the current directory.
+        working_directory = sonLib.bioio.getTempDirectory(
+            rootDir=self.getLocalTempDir())
+            
+        # Where should we come back to when done?
+        original_directory = os.getcwd()
+            
+        # Turn our arguments into absolute paths (beddirs is already done).
+        # May or may not be necessary.
+        hal_abspath = os.path.abspath(self.hal)
+        hub_abspath = os.path.abspath(self.hub)
+        
+        # Go in the temp directory and run the script
+        os.chdir(working_directory)
+        check_call(self, ["hal2assemblyHub.py", 
+            hal_abspath, hub_abspath, "--jobTree", 
+            tree_dir, "--lod", "--cpHalFileToOut", "--noUcscNames"])
+        
+        # Go back to the original directory
+        os.chdir(original_directory)
+            
+        
+        self.logToMaster("AssemblyHubOnlyTarget Finished")
 
 def parse_args(args):
     """
