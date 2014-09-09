@@ -7,7 +7,7 @@ CXX=g++
 OBJS=
     
 # What objects do we need for our speedMap binary?
-SPEEDMAP_OBJS=speedMap.o Fasta.o
+SPEEDMAP_OBJS=speedMap.o
 
 # What projects do we depend on? We have rules for each of these.
 DEPS=libsuffixtools libfmd

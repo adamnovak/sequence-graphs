@@ -1,12 +1,14 @@
 CXX=g++
 
 # What are our generic objects?
-OBJS=
+OBJS=pinchGraphUtil.o unixUtil.o
     
 # What objects do we need for our createIndex binary?
 CREATEINDEX_OBJS=createIndex.o MergeApplier.o MergeScheme.o \
-OverlapMergeScheme.o MappingMergeScheme.o pinchGraphUtil.o \
-adjacencyComponentUtil.o unixUtil.o
+OverlapMergeScheme.o MappingMergeScheme.o adjacencyComponentUtil.o
+
+# And for our cactusMerge binary?
+CACTUSMERGE_OBJS = cactusMerge.o 
 
 # What projects do we depend on? We have rules for each of these.
 DEPS=pinchesAndCacti sonLib libsuffixtools libfmd
@@ -30,7 +32,7 @@ CXXFLAGS += -std=c++11 -O3 -g -rdynamic -I../deps \
 # Re-do things every time
 .PHONY: clean $(DEPS)
 
-all: createIndex
+all: createIndex cactusMerge
 
 # pinchesAndCacti dependency
 pinchesAndCacti: sonLib
@@ -50,6 +52,9 @@ libfmd: libsuffixtools
 
 createIndex: $(CREATEINDEX_OBJS) $(OBJS) $(DEPS)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(CREATEINDEX_OBJS) $(OBJS) $(LDLIBS)
+	
+cactusMerge: $(CACTUSMERGE_OBJS) $(OBJS) $(DEPS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(CACTUSMERGE_OBJS) $(OBJS) $(LDLIBS)
 	
 clean:
 	rm -Rf *.o createIndex

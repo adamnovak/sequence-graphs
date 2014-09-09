@@ -35,15 +35,23 @@ bool Fasta::hasNext() {
 }
 
 std::string Fasta::getNext() {
+    return getNextRecord().second;
+}
+
+std::pair<std::string, std::string> Fasta::getNextRecord() {
+    // First we have to read the header
+    std::string header;
+    
     // Keep track of the character we just got
     int got = stream.get();
     while(stream.good() && got != '\n') {
         // Get characters until we hit the end of the first (header) line.
+        header.push_back(got);
         got = stream.get();
     }
     
     // We're going to fill up this string.
-    std::string toReturn = "";
+    std::string sequence = "";
     
     // Keep track of the next character.
     int peeked = stream.peek();
@@ -57,7 +65,7 @@ std::string Fasta::getNext() {
         
         if(!isspace(got)) {
             // Put it in the record string, skipping whitespace
-            toReturn.push_back((char) got);
+            sequence.push_back((char) got);
         }
         
         // Look at the next character.
@@ -65,6 +73,5 @@ std::string Fasta::getNext() {
     }
     
     // Return our built record string.
-    return toReturn;
-    
+    return std::make_pair(header, sequence);
 }

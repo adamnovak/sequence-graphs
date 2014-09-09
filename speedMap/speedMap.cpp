@@ -27,7 +27,7 @@
 
 #include <FMDIndex.hpp>
  
-#include "Fasta.hpp"
+#include <Fasta.hpp>
  
 /**
  * createIndex: command-line tool to create a multi-level reference structure.

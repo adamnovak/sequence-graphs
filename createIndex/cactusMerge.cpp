@@ -7,6 +7,8 @@
 #include "unixUtil.hpp"
 #include "pinchGraphUtil.hpp"
 
+#include <Fasta.hpp>
+
 /**
  * Represents a merge to be executed later after we build the pinch graph and
  * know how long all the threads are.
@@ -122,6 +124,22 @@ main(
         options["c2h1"].as<std::string>()
     };
     
+    // This holds the suffix applied to all the top sequences and events in each
+    // file.
+    std::vector<std::string> suffixes {
+       "-0", "-1"
+    };
+    
+    // This will hold all of the renames that have to happen for each file.
+    // These are generated when we go through the file by renaming top sequences
+    // with suffixes.
+    std::vector<std::map<std::string, std::string>> renames;
+    
+    for(size_t i = 0; i < c2hFiles.size(); i++) {
+        // Make sure it has an empty map of renames for each file.
+        renames.push_back(std::map<std::string, std::string>());
+    }
+    
     // This will hold the event names for the two c2h files in order
     std::vector<std::string> eventNames;
     
@@ -135,17 +153,17 @@ main(
     std::vector<size_t> sequenceLengths;
     
     // This will hold the first bottom sequence for any event and sequence name
-    std::map<std::pair<std::string, sts::string>, size_t> firstBottomSequence;
+    std::map<std::pair<std::string, std::string>, size_t> firstBottomSequence;
     
     // Holds Merge structs to be executed later.
     std::vector<C2hMerge> merges;
     
-    for(auto c2hFile : c2hFiles) {
+    for(size_t fileIndex = 0; fileIndex < c2hFiles.size(); fileIndex++) {
         // Scan through the c2h files to get the event, sequence, and length of
         // each thread, and to collect merges.
         
         // Open the file
-        std::istream c2h(c2hFile);
+        std::istream c2h(c2hFiles[fileIndex]);
         
         // This maps block name to (sequence number, start location) pairs for
         // this file. We use it to compose merges for our list in global
@@ -177,6 +195,18 @@ main(
                 std::string eventName = parts[1];
                 std::string sequenceName = parts[2];
                 bool bottomFlag = std::stoi(parts[3]);
+                
+                if(!bottomFlag) {
+                    // We need to rename this event (possibly to the same thing)
+                    renames[fileIndex][eventName] = eventName + 
+                        suffixes[fileIndex];
+                    eventName = renames[fileIndex][eventName];
+                    
+                    // And the sequence
+                    renames[fileIndex][sequenceName] = sequenceName + 
+                        suffixes[fileIndex];
+                    sequenceName = renames[fileIndex][sequenceName];
+                }
                 
                 // Save the names
                 eventNames.push_back(eventName);
@@ -326,8 +356,54 @@ main(
     // Write out a new c2h file, with the 0th thread as the reference.
     writeAlignmentWithReference(threadSet, sequenceNames, eventNames, 
         options["c2hOut"].as<std::string>(), 0);
+        
+    // Clean up thread set.
+    stPinchThreadSet_destruct(threadSet);
     
     // Merge the FASTAs, applying any renaming that needs to happen.
+    
+    // Make a list of the FASTA files to use
+    std::vector<std::string> fastaFiles {
+        options["fasta1"].as<std::string>(),
+        options["fasta2"].as<std::string>()
+    };
+    
+    // We'll do the FASTA output ourselfes. Open the file.
+    fastaOut = std::ostream(options["fastaOut"].as<std::string>());
+    
+    // This holds the IDs of all the sequences we already wrote. Only write
+    // sequences if they aren't duplicates after renaming (which is how we
+    // deduplicate the shared root)
+    std::unordered_set<std::string> alreadyWritten;
+    
+    for(size_t fileIndex = 0; fileIndex < fastaFiles.size(); fileIndex++) {
+        // Open up the FASTA for reading
+        Fasta fasta(fastaFiles[fileIndex]);
+        
+        while(fasta.hasNext()) {
+            // Go through all the FASTA records.
+            // TODO: assumes FASTA headers have nothing but IDs.
+            std::pair<std::string, std::string> record = fasta.getNextRecord();
+            
+            if(renames[fileIndex].count(record.first)) {
+                // Rename them if necessary
+                record.first = renames[fileIndex][record.first];
+            }
+            
+            if(!alreadyWritten.count(record.first)) {
+            
+                // Save the record to the output FASTA file.
+                fastaOut << ">" << record.first << std::endl << record.second <<
+                    std::endl;
+                
+                // Remember that we have written a record by this name.
+                alreadyWritten.insert(record.first);
+            }
+            
+        }
+    }
+    
+    fastaOut.close();
     
     // Now we're done!
     return 0;

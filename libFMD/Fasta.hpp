@@ -5,6 +5,7 @@
 #include <iostream>
 #include <istream>
 #include <fstream>
+#include <utility>
 
 /**
  * Defines a FASTA file which can be read from disk and iterated over (in a
@@ -24,9 +25,15 @@ public:
     bool hasNext();
     
     /**
-     * Returns the next FASTAS record. May not be called if getNext is false.
+     * Returns the next FASTA sequence. May not be called if hasNext is false.
      */
     std::string getNext();
+    
+    /**
+     * Returns the next FASTA record (header and sequence). May not be called if
+     * hasNext is false.
+     */
+    std::pair<std::string, std::string> getNextRecord();
     
 protected:
     // Keeps track of the open file.
