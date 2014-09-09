@@ -71,10 +71,16 @@ main(
     // Add all the options
     description.add_options() 
         ("help", "Print help messages")
+        ("suffix1", boost::program_options::value<std::string>()
+            ->default_value(""),
+            "Suffix for sequence and event names from file 1")
         ("c2h1", boost::program_options::value<std::string>()->required(),
             "First c2h file to merge")
         ("fasta1", boost::program_options::value<std::string>()->required(),
             "FASTA for first c2h file")
+        ("suffix2", boost::program_options::value<std::string>()
+            ->default_value(""),
+            "Suffix for sequence and event names from file 2")
         ("c2h2", boost::program_options::value<std::string>()->required(),
             "Second c2h file to merge")
         ("fasta2", boost::program_options::value<std::string>()->required(),
@@ -149,7 +155,8 @@ main(
     // This holds the suffix applied to all the top sequences and events in each
     // file.
     std::vector<std::string> suffixes {
-       "-0", "-1"
+       options["suffix1"].as<std::string>(),
+       options["suffix2"].as<std::string>()
     };
     
     // This will hold all of the renames that have to happen for each file.
@@ -313,7 +320,7 @@ main(
                     nameMap[blockName] = std::make_pair(mergeSequenceNumber,
                         blockStart);
                     
-                    Log::info() << "Bottom block " << blockName << " is " << 
+                    Log::debug() << "Bottom block " << blockName << " is " << 
                         blockStart << " on sequence " << mergeSequenceNumber << 
                         std::endl;
                     
@@ -357,7 +364,7 @@ main(
                         merge.sequence2 = nameMap[blockName].first;
                         merge.start2 = nameMap[blockName].second;
                         
-                        Log::info() << "Going to merge " << segmentStart << 
+                        Log::debug() << "Going to merge " << segmentStart << 
                             " length " << segmentLength << " to " <<
                             blockName << " orientation " << orientation << 
                             std::endl;
@@ -400,7 +407,7 @@ main(
             merge.start1 + 1, merge.start2 + 1, merge.length, 
             merge.orientation);
             
-        Log::info() << "Applied merge between threads " << merge.sequence1 << 
+        Log::debug() << "Applied merge between threads " << merge.sequence1 << 
             ":" << merge.start1 << "-" << merge.start1 + merge.length << 
             " and " << merge.sequence2 << ":" << merge.start2 << "-" << 
             merge.start2 + merge.length << std::endl;
