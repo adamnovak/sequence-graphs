@@ -705,6 +705,12 @@ writeAlignmentWithReference(
     // Grab the reference thread.
     stPinchThread* reference = stPinchThreadSet_getThread(threadSet,
         referenceThreadNumber);
+        
+    if(reference == NULL) {
+        // We may have gotten empty inputs or something.
+        throw std::runtime_error(std::string("Reference ") + 
+            std::to_string(referenceThreadNumber) + " does not exist");
+    }
     
     // Start a new sequence for the reference with a sequence line. The
     // sequence is not a top sequence.

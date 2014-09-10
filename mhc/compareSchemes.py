@@ -200,6 +200,8 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                         (True, False, 0, 0, 0)
                     ]
         
+        scheme_number = 0
+        
         for mismatch, credit, min_context, add_context, mult_context in \
             scheme_plan:
             
@@ -232,8 +234,14 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             if mult_context > 0:
                 # Include multiplicative context if in use. Don't let any .s
                 # into the scheme name since it needs to be a valid file
-                # extension.
-                scheme_name += "Mult{}".format(mult_context).replace(".", "_")
+                # extension. It also can't contain underscores if it goes into
+                # FASTA sequence names because it makes halAppendCactusSubtree
+                # upset.
+                scheme_name += "Mult{}".format(mult_context).replace(".", "p")
+                
+            # Hack to limit scheme name length
+            scheme_name = "Scheme{}".format(scheme_number)
+            scheme_number += 1
                 
             # Yield the name with the args.
             yield (scheme_name, extra_args)
@@ -594,7 +602,10 @@ class C2hMergeTarget(jobTree.scriptTree.target.Target):
     
     def __init__(self, c2h_fasta_pairs, reference_name, genome_names, suffixes, hal):
         """
-        
+        Make a merged c2h/fasta pair from the given pairs. The reference is the
+        genome with the given name, and the other genome in each pair is in the
+        corresponding entry in genome_names. Suffixes is a list of suffixes to
+        add to the leaves from each file when merging it in.
         
         """
         
@@ -639,6 +650,8 @@ class C2hMergeTarget(jobTree.scriptTree.target.Target):
                 rootDir=self.getGlobalTempDir())
             merged_fasta = sonLib.bioio.getTempFile(suffix=".fa",
                 rootDir=self.getGlobalTempDir())
+            
+            print("Merging first two pairs")
                 
             # Merge the first two pairs
             check_call(self, ["../createIndex/cactusMerge", 
@@ -651,6 +664,8 @@ class C2hMergeTarget(jobTree.scriptTree.target.Target):
             self.c2h_fasta_pairs[2:], self.suffixes[2:]):
             
             # For each other pair to merge in, and the suffix to put on it
+            
+            print("Adding in alignment {}".format(next_c2h))
             
             # Move the final output files back to some temp files.
             temp_c2h = sonLib.bioio.getTempFile(suffix=".c2h",
@@ -677,6 +692,56 @@ class C2hMergeTarget(jobTree.scriptTree.target.Target):
             
                 
         self.logToMaster("C2hMergeTarget Finished")
+        
+class HalTarget(jobTree.scriptTree.target.Target):
+    """
+    A target that makes a c2h/fasta pair with a root and a list of leaves into a
+    hal file.
+    
+    """
+    
+    def __init__(self, c2h_file, fasta_file, reference_name, genome_names, hal):
+        """
+        
+        
+        """
+        
+        # Make the base Target. Ask for 2gb of memory since this is easy.
+        super(HalTarget, self).__init__(memory=2147483648)
+        
+        # Save the files to merge
+        self.c2h_file = c2h_file
+        self.fasta_file = fasta_file
+        
+        # And the name of the reference to root the hal with.
+        self.reference = reference_name
+        
+        # And the genome names that are used
+        self.genomes = genome_names
+        
+        # And the hal to write
+        self.hal = hal
+        
+        self.logToMaster("Creating HalTarget")
+        
+        
+    def run(self):
+        """
+        Do all the merges.
+        """
+        
+        self.logToMaster("Starting HalTarget")
+        
+        # Compose the tree.      
+        tree = "(" + ",".join(self.genomes) + ")" + self.reference + ";"
+                
+        # Now we have the final c2h and fasta. Make the HAL.
+        check_call(self, ["halAppendCactusSubtree", merged_c2h, 
+            merged_fasta, tree, self.hal])
+            
+                
+        self.logToMaster("HalTarget Finished")
+        
         
 class BedSplitTarget(jobTree.scriptTree.target.Target):
     """

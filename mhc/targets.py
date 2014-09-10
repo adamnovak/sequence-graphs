@@ -19,6 +19,7 @@ def check_call(target, args):
     Make a subprocess call, announcing that we are doing it.
     """
     print("Calling: {}".format(" ".join(args)))
+    sys.stdout.flush()
     target.logToMaster("Calling: {}".format(" ".join(args)))
     return subprocess.check_call(args)
 
@@ -330,10 +331,6 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         check_call(self, ["halAppendCactusSubtree", c2h_filename, 
             fasta_filename, tree, hal_filename])
             
-        # Clean up the temp files we needed to make the HAL
-        os.unlink(c2h_filename)
-        os.unlink(fasta_filename)
-            
         self.logToMaster("Creating MAF")
             
         # Now we need to make that HAL into a MAF, saving to the file where
@@ -346,10 +343,6 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
             "--targetGenomes", ",".join(genomes[1:]), hal_filename,
             self.alignment_filename])
             
-        # Get rid of the intermediate HAL if it wasn't sent somewhere specific
-        if self.hal_filename is None:
-            os.unlink(hal_filename)
-        
         self.logToMaster("ReferenceStructureTarget Finished")
         
 class StructureAssessmentTarget(jobTree.scriptTree.target.Target):
