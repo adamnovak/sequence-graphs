@@ -454,17 +454,37 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 rootDir=self.getGlobalTempDir())
         os.unlink(merged_hal)
         
-        # Make a target to make that merged hal
-        merged_hal_target = C2hMergeTarget(c2h_fasta_pairs, 
-            os.path.splitext(self.fasta_list[0])[0], 
-            pair_genomes, ["-" + scheme for scheme in pair_schemes], merged_hal)
+        # What merged c2h and fasta files will we use?
+        merged_c2h = sonLib.bioio.getTempFile(suffix=".c2h",
+                rootDir=self.getGlobalTempDir())
+        merged_fasta = sonLib.bioio.getTempFile(suffix=".fa",
+                rootDir=self.getGlobalTempDir())
+        
+        # What suffixes should we put on genomes?
+        suffixes = ["-" + scheme for scheme in pair_schemes]
+        
+        # And what are the genomes with suffixes?
+        genomes_with_suffixes = [genome + suffix for genome, suffix in 
+            itertools.izip(pair_genomes, suffixes)]
+        
+        # What genome is the reference?
+        reference = os.path.splitext(self.fasta_list[0])[0]
+        
+        # Make a target to make the merged c2h/fasta files
+        merged_c2h_target = C2hMergeTarget(c2h_fasta_pairs, suffixes, 
+            merged_c2h, merged_fasta)
+            
+        # And a target to make the hal from them
+        merged_hal_target = HalTarget(merged_c2h, merged_fasta, reference, 
+            genomes_with_suffixes, merged_hal)
             
         # And a target to make a hub from that
         merged_hub_target = AssemblyHubOnlyTarget(merged_hal, self.hub_root + 
             "/all")
             
         # Do those last two in order.
-        followOns.append(SequenceTarget([merged_hal_target, merged_hub_target]))
+        followOns.append(SequenceTarget([merged_c2h_target, merged_hal_target,
+            merged_hub_target]))
             
         # So we need to run all of the follow-ons in parallel after this job
         self.setFollowOnTarget(RunTarget(followOns))
@@ -596,11 +616,11 @@ class C2hMergeTarget(jobTree.scriptTree.target.Target):
     A target that merges a list of c2h/FASTA pairs on a shared reference, where
     each is a unary tree of the given reference and a genome from the given list
     of genomes. The corresponding suffix from the list of suffixes is assigned
-    to each genome. Saves a hal file to the given filename.
+    to each genome. Saves a merged c2h/fasta pair.
     
     """
     
-    def __init__(self, c2h_fasta_pairs, reference_name, genome_names, suffixes, hal):
+    def __init__(self, c2h_fasta_pairs, suffixes, merged_c2h, merged_fasta):
         """
         Make a merged c2h/fasta pair from the given pairs. The reference is the
         genome with the given name, and the other genome in each pair is in the
@@ -615,18 +635,12 @@ class C2hMergeTarget(jobTree.scriptTree.target.Target):
         # Save the files to merge
         self.c2h_fasta_pairs = c2h_fasta_pairs
         
-        # And the name of the reference to root the hal with.
-        self.reference = reference_name
-        
-        # And the genome names (without suffixes) that the c2h/fasta pairs came
-        # from.
-        self.genomes = genome_names
-        
         # And the suffixes to apply to all the genomes
         self.suffixes = suffixes
         
-        # And the hal to write
-        self.hal = hal
+        # And the merged files to write
+        self.merged_c2h = merged_c2h
+        self.merged_fasta = merged_fasta
         
         self.logToMaster("Creating C2hMergeTarget")
         
@@ -642,14 +656,10 @@ class C2hMergeTarget(jobTree.scriptTree.target.Target):
             raise Exception("No alignments at all!")
         
         if len(self.c2h_fasta_pairs) == 1:
-            # Nothing to merge
-            merged_c2h, merged_fasta = self.c2h_fasta_pairs[0]
+            # Nothing to merge. Just pass the only pair through.
+            os.copy(self.c2h_fasta_pairs[0][0], self.merged_c2h)
+            os.copy(self.c2h_fasta_pairs[0][1], self.merged_fasta)
         else:
-            # Make some filenames where the final answers go
-            merged_c2h = sonLib.bioio.getTempFile(suffix=".c2h",
-                rootDir=self.getGlobalTempDir())
-            merged_fasta = sonLib.bioio.getTempFile(suffix=".fa",
-                rootDir=self.getGlobalTempDir())
             
             print("Merging first two pairs")
                 
@@ -657,7 +667,7 @@ class C2hMergeTarget(jobTree.scriptTree.target.Target):
             check_call(self, ["../createIndex/cactusMerge", 
                 self.c2h_fasta_pairs[0][0], self.c2h_fasta_pairs[0][1], 
                 self.c2h_fasta_pairs[1][0], self.c2h_fasta_pairs[1][1],
-                merged_c2h, merged_fasta, 
+                self.merged_c2h, self.merged_fasta, 
                 "--suffix1", self.suffixes[0], "--suffix2", self.suffixes[1]])
                 
         for (next_c2h, next_fasta), next_suffix in itertools.izip(
@@ -673,24 +683,14 @@ class C2hMergeTarget(jobTree.scriptTree.target.Target):
             temp_fasta = sonLib.bioio.getTempFile(suffix=".fa",
                 rootDir=self.getGlobalTempDir())
                 
-            os.rename(merged_c2h, temp_c2h)
-            os.rename(merged_fasta, temp_fasta)
+            os.rename(self.merged_c2h, temp_c2h)
+            os.rename(self.merged_fasta, temp_fasta)
             
             # Merge in the next pair
             check_call(self, ["../createIndex/cactusMerge", 
-                temp_c2h, temp_fasta, next_c2h, next_fasta, merged_c2h, 
-                merged_fasta, "--suffix2", next_suffix])
+                temp_c2h, temp_fasta, next_c2h, next_fasta, self.merged_c2h, 
+                self.merged_fasta, "--suffix2", next_suffix])
           
-        # Compose the tree.      
-        tree_nodes = [genome + suffix 
-            for genome, suffix in itertools.izip(self.genomes, self.suffixes)]
-        tree = "(" + ",".join(tree_nodes) + ")" + self.reference + ";"
-                
-        # Now we have the final c2h and fasta. Make the HAL.
-        check_call(self, ["halAppendCactusSubtree", merged_c2h, 
-            merged_fasta, tree, self.hal])
-            
-                
         self.logToMaster("C2hMergeTarget Finished")
         
 class HalTarget(jobTree.scriptTree.target.Target):
@@ -727,7 +727,7 @@ class HalTarget(jobTree.scriptTree.target.Target):
         
     def run(self):
         """
-        Do all the merges.
+        Make a hal from a c2h and fasta.
         """
         
         self.logToMaster("Starting HalTarget")
@@ -735,9 +735,9 @@ class HalTarget(jobTree.scriptTree.target.Target):
         # Compose the tree.      
         tree = "(" + ",".join(self.genomes) + ")" + self.reference + ";"
                 
-        # Now we have the final c2h and fasta. Make the HAL.
-        check_call(self, ["halAppendCactusSubtree", merged_c2h, 
-            merged_fasta, tree, self.hal])
+        # Make the HAL.
+        check_call(self, ["halAppendCactusSubtree", self.c2h_file, 
+            self.fasta_file, tree, self.hal])
             
                 
         self.logToMaster("HalTarget Finished")
