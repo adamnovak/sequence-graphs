@@ -416,14 +416,13 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             # Save the c2h and FASTA files we made along with the scheme and
             # genomes we used.
             c2h_fasta_pairs += zip(c2h_filenames, fasta_filenames)
-            # And the genomes they were for. TODO: consolidate with
-            # pair_genomes.
+            # And the genomes they were for.
             pair_genomes += [os.path.splitext(fasta)[0] 
                 for fasta in self.fasta_list[1:]]
-            # And record that each came from this scheme.
-            pair_schemes += [scheme for _ in pair_genomes]
-        
-        
+            # And record that each came from this scheme. Needs to keep the same
+            # lenght as pair_genomes.
+            pair_schemes += [scheme for _ in self.fasta_list[1:]]
+            
         
         # What genome pairs did we run, in order? Make sure to strip extensions.
         genome_pairs = [(os.path.splitext(self.fasta_list[0])[0], 
