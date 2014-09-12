@@ -308,16 +308,25 @@ writeAlignment(
             // segments to 0-based HAL.
             size_t segmentStart = contigStart +
                 stPinchSegment_getStart(segment) - 1;
-            
-            if(stPinchSegment_getBlock(segment) != NULL) {
+                
+            stPinchBlock* block = stPinchSegment_getBlock(segment);
+            if(block != NULL) {
                 // It actually aligned
             
                 // Write a top segment mapping to the segment named after the
                 // address of the block this segment belongs to.
                 c2h << "a\t" << segmentStart << "\t" << 
                     stPinchSegment_getLength(segment) << "\t" << 
-                    (uintptr_t)stPinchSegment_getBlock(segment) << "\t" << 
+                    (uintptr_t)block << "\t" << 
                     stPinchSegment_getBlockOrientation(segment) << std::endl;
+                    
+                Log::debug() << "Bottom segment orientation: " << 
+                    stPinchSegment_getBlockOrientation(segment) << std::endl;
+                
+                Log::debug() << "First segment orientation: " << 
+                    stPinchSegment_getBlockOrientation(
+                    stPinchBlock_getFirst(block)) << std::endl;
+                        
             } else {
                 // Write a segment for the unaligned sequence.
                 c2h << "a\t" << segmentStart << "\t" << 
@@ -468,6 +477,11 @@ writeAlignmentWithReference(
                         
                     // Record that we have seen this block now.
                     seen.insert(block);
+                    
+                    // Make sure the reference segments are first in their
+                    // blocks.
+                    stPinchSegment_putSegmentFirstInBlock(segment);
+                    
                 } else {
                     // The reference is going back though a block we already saw
                     // reading along the reference. We can't peoperly serialize
@@ -576,15 +590,30 @@ writeAlignmentWithReference(
                             "alignment of sequence not aligned to reference");
                     }
                 
+                    // Are we in the same orientation as the root?
+                    bool orientation = 
+                        (stPinchSegment_getBlockOrientation(segment) == 
+                        stPinchSegment_getBlockOrientation(
+                        stPinchBlock_getFirst(block)));
+                        
+                    Log::debug() << "Bottom segment (" << segment << 
+                        ") orientation: " << 
+                        stPinchSegment_getBlockOrientation(segment) << 
+                        std::endl;
+                        
+                    Log::debug() << "First segment (" << 
+                        stPinchBlock_getFirst(block) << ") orientation: " <<
+                        stPinchSegment_getBlockOrientation(
+                        stPinchBlock_getFirst(block)) << std::endl;
+                
                     // Write a top segment mapping to the segment named after
                     // the address of the block this segment belongs to. Fields
                     // are a, start, length, aligned bottom segment,
                     // orientation.
                     c2h << "a\t" << segmentStart << "\t" << 
                         stPinchSegment_getLength(segment) << "\t" << 
-                        (uintptr_t) block << "\t" << 
-                        stPinchSegment_getBlockOrientation(segment) << 
-                        std::endl;
+                        (uintptr_t) block << "\t" << orientation << std::endl;
+                        
                 } else {
                     // Write a segment for the unaligned sequence.
                     c2h << "a\t" << segmentStart << "\t" << 
@@ -632,11 +661,17 @@ writeBottomSegments(
         // block if we have one, and the unaligned segment otherwise.
         uintptr_t segmentName = (block != NULL) ? (uintptr_t) block : 
             (uintptr_t) segment;
-        
-                
+            
         // Put a bottom segment in the c2h
         c2h << "a\t" << segmentName << "\t" << segmentStart << "\t" << 
             stPinchSegment_getLength(segment) << std::endl;
+            
+        if(block != NULL) {
+            // Make sure these segments are first, so we can easily check the
+            // orientations of the top segments against them.
+            // TODO: Assumes these are the root.
+            stPinchSegment_putSegmentFirstInBlock(segment);
+        }
     
         // Jump to the next 3' segment. This needs will return NULL if we go
         // off the end.
@@ -667,9 +702,22 @@ writeTopSegments(
             stPinchSegment_getLength(segment);
         
         if(block != NULL) {
+            // Are we in the same orientation as the root?
+            // TODO: This assumes root is the first segment.
+            bool orientation = 
+                (stPinchSegment_getBlockOrientation(segment) == 
+                stPinchSegment_getBlockOrientation(
+                stPinchBlock_getFirst(block)));
+        
             // Write the bit for aligning
-            c2h << "\t" << (uintptr_t) block << "\t" << 
-                stPinchSegment_getBlockOrientation(segment);
+            c2h << "\t" << (uintptr_t) block << "\t" << orientation;
+                
+            Log::debug() << "Bottom segment orientation: " << 
+                stPinchSegment_getBlockOrientation(segment) << std::endl;
+                
+            Log::debug() << "First segment orientation: " << 
+                stPinchSegment_getBlockOrientation(
+                stPinchBlock_getFirst(block)) << std::endl;
         }
         
         // Finish the line
