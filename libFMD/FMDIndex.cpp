@@ -2299,7 +2299,9 @@ MisMatchAttemptResults FMDIndex::misMatchMapPosition(const GenericBitVector& ran
             // And we just need to be unique to map
         
             result.is_mapped = true;
-            return result;
+            
+            // But we don't want to return yet; we need to go out to the maximal
+            // context so that credit works correctly.
         }
     }
     

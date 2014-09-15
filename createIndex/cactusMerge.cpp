@@ -407,10 +407,11 @@ main(
             merge.start1 + 1, merge.start2 + 1, merge.length, 
             merge.orientation);
             
-        Log::debug() << "Applied merge between threads " << merge.sequence1 << 
+        Log::info() << "Applied merge between threads " << merge.sequence1 << 
             ":" << merge.start1 << "-" << merge.start1 + merge.length << 
             " and " << merge.sequence2 << ":" << merge.start2 << "-" << 
-            merge.start2 + merge.length << std::endl;
+            merge.start2 + merge.length << " orientation " << 
+            merge.orientation << std::endl;
     }
     
     // Write out a new c2h file, with the 0th thread as the reference.

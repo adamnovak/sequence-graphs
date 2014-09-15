@@ -200,8 +200,6 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                         (True, False, 0, 0, 0)
                     ]
         
-        scheme_number = 0
-        
         for mismatch, credit, min_context, add_context, mult_context in \
             scheme_plan:
             
@@ -239,9 +237,57 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 # upset.
                 scheme_name += "Mult{}".format(mult_context).replace(".", "p")
                 
-            # Hack to limit scheme name length
-            scheme_name = "Scheme{}".format(scheme_number)
-            scheme_number += 1
+            # Yield the name with the args.
+            yield (scheme_name, extra_args)
+            
+    def generateAdvancementSchemes(self):
+        """
+        Schemes for my advancement presentation
+        
+        """
+        
+        # Plan out all the schemes as mismatch, credit, min_context,
+        # add_context, mult_context
+        scheme_plan = [
+                        (True, True, 100, 0, 0)
+                    ]
+        
+        for mismatch, credit, min_context, add_context, mult_context in \
+            scheme_plan:
+            
+            # Start out with the context args
+            extra_args = ["--context", str(min_context), "--addContext",
+                str(add_context), "--multContext", str(mult_context)]
+    
+            # And give it a name to stick on our output files
+            scheme_name = "Exact"
+            if mismatch:
+                # Add the args and scheme name component for mismatch
+                extra_args.append("--mismatch")
+                extra_args.append("--mismatches")
+                extra_args.append("1")
+                scheme_name = "Inexact"
+            if credit:
+                # Add the args and scheme name component for credit
+                extra_args.append("--credit")
+                scheme_name += "Credit"
+                
+            if min_context > 0:
+                # Include min conext in the name if in use
+                scheme_name += "Min{}".format(min_context)
+            
+            if add_context > 0:
+                # Include additional context if in use. No need for badding
+                # since we can now natural sort.
+                scheme_name += "Add{}".format(add_context)
+                
+            if mult_context > 0:
+                # Include multiplicative context if in use. Don't let any .s
+                # into the scheme name since it needs to be a valid file
+                # extension. It also can't contain underscores if it goes into
+                # FASTA sequence names because it makes halAppendCactusSubtree
+                # upset.
+                scheme_name += "Mult{}".format(mult_context).replace(".", "p")
                 
             # Yield the name with the args.
             yield (scheme_name, extra_args)
@@ -416,14 +462,13 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             # Save the c2h and FASTA files we made along with the scheme and
             # genomes we used.
             c2h_fasta_pairs += zip(c2h_filenames, fasta_filenames)
-            # And the genomes they were for. TODO: consolidate with
-            # pair_genomes.
+            # And the genomes they were for.
             pair_genomes += [os.path.splitext(fasta)[0] 
                 for fasta in self.fasta_list[1:]]
-            # And record that each came from this scheme.
-            pair_schemes += [scheme for _ in pair_genomes]
-        
-        
+            # And record that each came from this scheme. Needs to keep the same
+            # lenght as pair_genomes.
+            pair_schemes += [scheme for _ in self.fasta_list[1:]]
+            
         
         # What genome pairs did we run, in order? Make sure to strip extensions.
         genome_pairs = [(os.path.splitext(self.fasta_list[0])[0], 
