@@ -692,6 +692,74 @@ class C2hMergeTarget(jobTree.scriptTree.target.Target):
                 self.merged_fasta, "--suffix2", next_suffix])
           
         self.logToMaster("C2hMergeTarget Finished")
+
+class C2hChangeRootTarget(jobTree.scriptTree.target.Target):
+    """
+    A target that changes the root sequence of star tree a c2h/fasta pair.
+    
+    """
+    
+    def __init__(self, c2h_file, fasta_file, new_event, new_sequence, 
+        new_root_fasta, old_root_offset, c2h_out, fasta_out):
+        """
+        Change the root sequence in the c2h/fasta pair to have the new event and
+        sequence names, and add the new root fasta to the paired fasta. Also
+        adapts block coordinates on the root to accomplish a lift-over.
+        
+        """
+        
+        # Make the base Target. Ask for 2gb of memory since this is easy.
+        super(C2hChangeRootTarget, self).__init__(memory=2147483648)
+        
+        # Save everything
+        # C2H file to adjust
+        self.c2h_file = c2h_file
+        # And its associated fasta
+        self.fasta_file = fasta_file
+        # The new event name to use for the root
+        self.new_event = new_event
+        # The new sequence name to use for the root (we assume one root
+        # sequence, and that it is first)
+        self.new_sequence = new_sequence
+        # The FASTA of the sequence for the new root, with ID event.sequence
+        self.new_root_fasta = new_root_fasta
+        # The offset of the old root's first base in the new root, in 0-based
+        # coordinates
+        self.old_root_offset = old_root_offset
+        # The c2h file to write
+        self.c2h_out = c2h_out
+        # The fasta file to go with it
+        self.fasta_out = fasta_out
+        
+        self.logToMaster("Creating C2hChangeRootTarget")
+        
+        
+    def run(self):
+        """
+        Do the liftover and rewriting.
+        """
+        
+        self.logToMaster("Starting C2hChangeRootTarget")
+        
+        # Put the old FASTA as the output
+        
+        # Copy the new one, counting bases
+        
+        # Open up the old c2h file
+        
+        # The first line gets ammended with our new event and sequnce names in
+        # columns 1 and 2
+        
+        # Then we do a bottom block up to the offset we are supposed to add
+        
+        # Then for each subsequent bottom block we up the start position
+        
+        # Then at the end position of the last one (next line is another s line)
+        # we put a block out to the end of the FASTA sequence we read before.
+        
+        # Then we copy all remaining lines as normal.
+                
+        self.logToMaster("C2hChangeRootTarget Finished")
         
 class HalTarget(jobTree.scriptTree.target.Target):
     """
@@ -702,7 +770,8 @@ class HalTarget(jobTree.scriptTree.target.Target):
     
     def __init__(self, c2h_file, fasta_file, reference_name, genome_names, hal):
         """
-        
+        Make a hal file from a star tree c2h/fasta pair, given the name of the
+        root and the names of all the leaves.
         
         """
         
