@@ -1132,6 +1132,8 @@ def parse_args(args):
         help="seed for a particular deterministic run")
     parser.add_argument("--trueMaf", default=None,
         help="filename of a MAF to compare all generated MAFs against")
+    parser.add_argument("--markovModel", default=None,
+        help="filename of a Markov model to model query sequences with")
         
     
     
@@ -1163,8 +1165,8 @@ def main(args):
         
     # Make a stack of jobs to run
     stack = jobTree.scriptTree.stack.Stack(SchemeAssessmentTarget(
-        options.fastas, options.trueMaf, options.seed, options.outDir,
-        options.outDir + "/hubs"))
+        options.fastas, options.trueMaf, options.markovModel, options.seed,
+        options.outDir, options.outDir + "/hubs"))
     
     print "Starting stack"
     
