@@ -313,12 +313,17 @@ writeAlignment(
             if(block != NULL) {
                 // It actually aligned
             
+                // Are we in the same orientation as the root?
+                bool orientation = 
+                    (stPinchSegment_getBlockOrientation(segment) == 
+                    stPinchSegment_getBlockOrientation(
+                    stPinchBlock_getFirst(block)));
+            
                 // Write a top segment mapping to the segment named after the
                 // address of the block this segment belongs to.
                 c2h << "a\t" << segmentStart << "\t" << 
                     stPinchSegment_getLength(segment) << "\t" << 
-                    (uintptr_t)block << "\t" << 
-                    stPinchSegment_getBlockOrientation(segment) << std::endl;
+                    (uintptr_t)block << "\t" << orientation << std::endl;
                     
                 Log::debug() << "Bottom segment orientation: " << 
                     stPinchSegment_getBlockOrientation(segment) << std::endl;

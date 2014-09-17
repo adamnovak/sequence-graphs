@@ -336,7 +336,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # And this holds the schemes they are for
         pair_schemes = []
         
-        for scheme, extra_args in self.generateMultSchemes():
+        for scheme, extra_args in self.generateAdvancementSchemes():
             # Work out all the schemes we want to run.
             
             self.logToMaster("Preparing for scheme {}...".format(scheme))
