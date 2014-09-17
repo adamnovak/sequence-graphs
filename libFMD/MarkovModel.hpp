@@ -28,6 +28,12 @@ public:
      */
     double encodingCost(const std::string& prefix, char next);
     
+    /**
+     * Get the encoding cost for a subtext (which may not nexessarily begin
+     * or end at sequence beginnign or ending points).
+     */
+    double encodingCost(const std::string& subtext);
+    
     // What's the start/stop character?
     static const std::string START_STOP;
     
@@ -37,6 +43,9 @@ protected:
     // kmer. The probability of a kmer is defined as its count over the total
     // count of all kmers that match its first k-1 characters.
     std::map<std::string, double> logProbabilities;
+    
+    // What order is the model (1 less than kmer length)
+    size_t order;
 
 };
 

@@ -9,7 +9,7 @@
 #include <cmath>
 #include <boost/algorithm/string.hpp>
 
-MarkovModel::MarkovModel(std::string filename): logProbabilities() {
+MarkovModel::MarkovModel(std::string filename): logProbabilities(), order() {
 
     // We need to load up the kmers file, store all the counts, and calculate
     // all the log probabilities for the last characters.
@@ -41,6 +41,16 @@ MarkovModel::MarkovModel(std::string filename): logProbabilities() {
             // Don't take empty kmers. TODO: make sure they all have constant
             // length.
             throw std::runtime_error("Got a too-short kmer!");
+        }
+        
+        if(kmerCounts.size() == 0) {
+            // This is our very first item. Autodetect the order.
+            order = parts[0].size() - 1;
+        } else {
+            if(parts[0].size() - 1 != order) {
+                // Complain that the model doesn't know what order it is.
+                throw std::runtime_error("Model order is inconsistent");
+            }
         }
         
         // Grab the prefix from the kmer (possibly "")
@@ -85,10 +95,24 @@ MarkovModel::MarkovModel(std::string filename): logProbabilities() {
 }
 
 double MarkovModel::encodingCost(const std::string& prefix, char next) {
-    // Look it up in the map
-    auto found = logProbabilities.find(prefix + next);
+    if(prefix.size() < order) {
+        // We would need to go into start cahracters here, and that doesn't
+        // actually make sense for the way we want to use this model (i.e.
+        // sequences/reads can start in the middle of what we trained on). TODO:
+        // train on a bunch of reads and/or add pseudocounts so all starts are
+        // possible.
+        
+        // For now just say we don't cost anything until we can really check.
+        return 0;
+    }
+    
+    // Pull off the right number of characters from the end of the string, tack
+    // on the next character, and work out how probable this combination is.
+    auto found = logProbabilities.find(prefix.substr(prefix.size() - order, 
+        order) + next);
     
     if(found == logProbabilities.end()) {
+        // We never saw this at all.
         // Log probability would be -inf for impossible, it costs inf to encode.
         return std::numeric_limits<double>::infinity();
     } else {
@@ -96,6 +120,19 @@ double MarkovModel::encodingCost(const std::string& prefix, char next) {
         // negative bits, and the encoding costs are positive bits).
         return -(found->second);
     }
+}
+
+double MarkovModel::encodingCost(const std::string& subtext) {
+    // We're going to total up the cost here.
+    double total = 0;
+    
+    for(size_t i = order; i < subtext.size(); i++) {
+        // Sum up the encoding cost for each character in turn. We don't look
+        // before we have at least order characters to use.
+        total += encodingCost(subtext.substr(i - order, order), subtext[i]);
+    }
+    
+    return total;
 }
 
 // What start/stop character is used?
