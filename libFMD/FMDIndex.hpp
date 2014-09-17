@@ -8,6 +8,7 @@
 #include "BWT.h"
 #include "SampledSuffixArray.h"
 #include "SuffixArray.h"
+#include "MarkovModel.hpp"
 
 #include "TextPosition.hpp"
 #include "FMDIndexIterator.hpp"
@@ -38,9 +39,12 @@ public:
     /**
      * Load an FMD and metadata from the given basename. Optionally, specify a
      * complete suffix array that the index can use. The index takes ownership
-     * of that suffix array, and will free it on destruction.
+     * of that suffix array, and will free it on destruction. Also optionally
+     * takes a MarkovModel to allow enforcing a minimum coding cost for mapping.
+     * The index takes ownership of the Markov model too.
      */
-    FMDIndex(std::string basename, SuffixArray* fullSuffixArray = NULL);
+    FMDIndex(std::string basename, SuffixArray* fullSuffixArray = NULL, 
+        MarkovModel* markovModel = NULL);
     
     ~FMDIndex();
     
@@ -462,7 +466,7 @@ public:
     // options and constraints we want to be able to tack on.
     MisMatchAttemptResults misMatchMapPosition(const GenericBitVector& ranges, 
         const std::string& pattern, size_t index, size_t minContext, 
-        size_t addContext, double multContext, double minCodingCost, 
+        size_t addContext, double multContext, 
         int64_t* extraContext, size_t z_max, 
         const GenericBitVector* mask = NULL) const;
     
@@ -581,6 +585,11 @@ protected:
      * instead. Owned by this object, if not null.
      */
     SuffixArray* fullSuffixArray;
+    
+    /**
+     * Holds a MarkovModel for calculating the coding costs of search strings.
+     */
+    MarkovModel* markovModel;
     
     /**
      * Holds the longest common prefix array.

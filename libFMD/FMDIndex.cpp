@@ -12,10 +12,11 @@
 #include "Log.hpp"
 
 
-FMDIndex::FMDIndex(std::string basename, SuffixArray* fullSuffixArray): 
-    names(), starts(), lengths(), cumulativeLengths(), genomeAssignments(),
-    endIndices(), genomeRanges(), genomeMasks(), bwt(basename + ".bwt"), 
-    suffixArray(basename + ".ssa"), fullSuffixArray(fullSuffixArray), 
+FMDIndex::FMDIndex(std::string basename, SuffixArray* fullSuffixArray, 
+    MarkovModel* markovModel): names(), starts(), lengths(), 
+    cumulativeLengths(), genomeAssignments(), endIndices(), genomeRanges(), 
+    genomeMasks(), bwt(basename + ".bwt"), suffixArray(basename + ".ssa"), 
+    fullSuffixArray(fullSuffixArray), markovModel(markovModel),
     lcpArray(basename + ".lcp") {
     
     // TODO: Too many initializers
@@ -175,6 +176,11 @@ FMDIndex::~FMDIndex() {
     if(fullSuffixArray != NULL) {
         // If we were holding a full SuffixArray, throw it out.
         delete fullSuffixArray;
+    }
+    
+    if(markovModel != NULL) {
+        // If we were holding a markovModel, throw it out.
+        delete markovModel;
     }
     
     for(std::vector<GenericBitVector*>::iterator i = genomeMasks.begin(); 
@@ -1390,18 +1396,27 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
         }
         
         
-
+        double codingCost;
+        if(markovModel != NULL) {
+            // Calculate the coding cost if we have a model.
+            codingCost = markovModel->encodingCost(reverseComplement(
+                query.substr(i, location.characters)));
+        }
         
             
         if(location.is_mapped && !location.position.isEmpty(mask) &&
             range != -1 && location.characters >= minContext &&
             extraContext >= addContext && location.characters >= 
-            (location.characters - extraContext) * multContext) {
+            (location.characters - extraContext) * multContext &&
+            (markovModel == NULL || codingCost >= minCodingCost)) {
             // We have sufficient context to be confident (greater than the
             // minimum, with extraContext greater than the required additional
             // context, and the total context greater than the context
             // multiplier times the context taken to be unique), and our
-            // interval is nonempty and subsumed by a range.
+            // interval is nonempty and subsumed by a range. And if we have a
+            // Markov model the coding cost of everything in the context
+            // (reverse complemented so it ends with what we just added) is
+            // sufficiently high.
 
             Log::debug() << "Mapped " << location.characters << 
                 " context (" << extraContext << "/" << addContext << 
@@ -2035,7 +2050,8 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
         
     Log::debug() << "Mapping inexact (" << z_max << 
         " mismatches) with minimum " << minContext << " and additional +" << 
-        addContext << ", *" << multContext << " context." << std::endl;
+        addContext << ", *" << multContext << " context, min coding cost " << 
+        minCodingCost << " bits." << std::endl;
         
     // We need a vector to return.
     std::vector<std::pair<int64_t,size_t>> mappings;
@@ -2074,16 +2090,24 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
         if(search.positions.size() == 1 && search.positions.front().first.isEmpty()) {
             Log::debug() << "Starting over by mapping position " << i << std::endl;
             // We do not currently have a non-empty FMDPosition to extend. Start
-            // over by mapping this character by itself.
+            // over by mapping this character by itself. TODO: We're responsible
+            // for checking coding cost, but it does everything else.
             search = this->misMatchMapPosition(ranges, query, i, minContext, 
-                addContext, multContext, minCodingCost, &extraContext, z_max,
-                mask);
+                addContext, multContext, &extraContext, z_max, mask);
+                
+            double codingCost;
+            if(markovModel != NULL) {
+                // Calculate the coding cost if we have a model.
+                codingCost = markovModel->encodingCost(reverseComplement(
+                    query.substr(i, search.maxCharacters)));
+            }
                 
             if(search.is_mapped && search.maxCharacters >= minContext && 
                 extraContext >= addContext && search.maxCharacters >= 
                 (search.maxCharacters - extraContext) * multContext &&
                 !search.positions.front().first.isEmpty(mask) && range != -1
-                && search.positions.size() == 1) {
+                && search.positions.size() == 1 && 
+                (markovModel == NULL || codingCost > minCodingCost)) {
 
                 // It mapped. We didn't do a re-start and fail, we have sufficient
                 // context to be confident, and our interval is nonempty and
@@ -2158,6 +2182,13 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
                 search.characters++;
                 search.maxCharacters++;
                 
+                double codingCost;
+                if(markovModel != NULL) {
+                    // Calculate the coding cost if we have a model.
+                    codingCost = markovModel->encodingCost(reverseComplement(
+                        query.substr(i, search.maxCharacters)));
+                }
+                
                 // What range index does our current left-side position (the one we just
                 // moved) correspond to, if any?
                 range = search.positions.front().first.range(ranges, mask);
@@ -2167,7 +2198,8 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
                     && search.positions.size() == 1 && 
                     search.maxCharacters >= minContext && 
                     extraContext >= addContext && search.maxCharacters >= 
-                    (search.maxCharacters - extraContext) * multContext) {
+                    (search.maxCharacters - extraContext) * multContext &&
+                    (markovModel == NULL || codingCost > minCodingCost)) {
                 
                     // It mapped after extending. We didn't do a re-start and
                     // fail, we have sufficient context to be confident, and our
@@ -2259,12 +2291,13 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
     
     // Get the appropriate mask, or NULL if given the special all-genomes value.
     return misMatchMap(ranges, query, genome == -1 ? NULL : genomeMasks[genome], 
-        minContext, addContext, multContext, z_max, start, length);    
+        minContext, addContext, multContext, minCodingCost, z_max, start,
+        length);    
 }
 
 MisMatchAttemptResults FMDIndex::misMatchMapPosition(const GenericBitVector& ranges, 
     const std::string& pattern, size_t index, size_t minContext, 
-    size_t addContext, double multContext, double minCodingCost, 
+    size_t addContext, double multContext, 
     int64_t* extraContext, size_t z_max, const GenericBitVector* mask) const {
     
     // We're going to right-map so ranges match up with the things we can map to
