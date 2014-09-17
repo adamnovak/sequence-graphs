@@ -23,6 +23,7 @@ public:
      * merge with, and maps each contig in the given genome to it. Only maps on
      * contexts provided by the positions marked in includedPositions, and
      * requires at least the given minimum number of bases of context to map.
+     * Also takes a minimum coding cost for contexts to map on.
      *
      * TODO: Make this function take a less absurd number of things.
      */
@@ -30,8 +31,9 @@ public:
         const std::vector<std::pair<std::pair<size_t, size_t>, bool> >&
         rangeBases, const GenericBitVector& includedPositions, size_t genome,
         size_t minContext = 0, size_t addContext = 0, double multContext = 0, 
-        bool credit = false, std::string mapType = "LRexact",
-	    bool mismatch = false, size_t z_max = 0);
+        double minCodingCost = 0, bool credit = false, 
+        std::string mapType = "LRexact", bool mismatch = false, 
+        size_t z_max = 0);
     
     /**
      * Get rid of a MappingMergeScheme (and delete its queue, if it has one).
@@ -103,6 +105,9 @@ protected:
     // Minimum length of the context as a fraction of the portion before
     // uniqueness.
     double multContext;
+    
+    // Minimum coding cost, in bits, of a context to map on
+    double minCodingCost;
     
     // Flag whether to use mapping on credit scheme   
     bool credit;

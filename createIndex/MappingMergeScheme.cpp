@@ -11,12 +11,13 @@ MappingMergeScheme::MappingMergeScheme(const FMDIndex& index,
     const GenericBitVector& rangeVector, 
     const std::vector<std::pair<std::pair<size_t, size_t>, bool> >& rangeBases, 
     const GenericBitVector& includedPositions, size_t genome, size_t minContext, 
-    size_t addContext, double multContext, bool credit, std::string mapType, 
-    bool mismatch, size_t z_max) : MergeScheme(index), threads(), queue(NULL), 
-    rangeVector(rangeVector), rangeBases(rangeBases), 
+    size_t addContext, double multContext, double minCodingCost, bool credit, 
+    std::string mapType, bool mismatch, size_t z_max) : MergeScheme(index), 
+    threads(), queue(NULL), rangeVector(rangeVector), rangeBases(rangeBases), 
     includedPositions(includedPositions), genome(genome), 
     minContext(minContext), addContext(addContext), multContext(multContext),
-    credit(credit), mapType(mapType), mismatch(mismatch), z_max(z_max) {
+    minCodingCost(minCodingCost), credit(credit), mapType(mapType), 
+    mismatch(mismatch), z_max(z_max) {
     
     // Nothing to do
     
@@ -625,22 +626,24 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
         
         // Map it on the right
         rightMappings = index.misMatchMap(rangeVector, contig,
-            &includedPositions, minContext, addContext, multContext, z_max);
+            &includedPositions, minContext, addContext, multContext, 
+            minCodingCost, z_max);
         
         // Map it on the left
         leftMappings = index.misMatchMap(rangeVector, 
             reverseComplement(contig), &includedPositions, minContext, 
-            addContext, multContext, z_max); 
+            addContext, multContext, minCodingCost, z_max); 
                 
     } else {
                 
         // Map it on the right
         rightMappings = index.map(rangeVector, contig, &includedPositions, 
-            minContext, addContext, multContext);
+            minContext, addContext, multContext, minCodingCost);
     
         // Map it on the left
         leftMappings = index.map(rangeVector, reverseComplement(contig), 
-            &includedPositions, minContext, addContext, multContext);
+            &includedPositions, minContext, addContext, multContext,
+            minCodingCost);
     
     }
     

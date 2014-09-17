@@ -49,6 +49,17 @@ public:
     ~FMDIndex();
     
     /***************************************************************************
+     * Index Component Update Functions
+     **************************************************************************/
+    
+    /** 
+     * Use the given Markov model to model the probabilities of query sequences.
+     * Takes ownership of the model (which may be NULL);
+     */
+    void setMarkovModel(MarkovModel* model);
+    
+    
+    /***************************************************************************
      * Metadata Access Functions
      **************************************************************************/
     

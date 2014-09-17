@@ -28,6 +28,7 @@
 #include <Mapping.hpp>
 #include <SmallSide.hpp>
 #include <Log.hpp>
+#include <MarkovModel.hpp>
 
 // Grab timers from libsuffixtools
 #include <Timer.h>
@@ -452,6 +453,9 @@ mergeOverlap(
  * If multContext is specified, a base will only map if it has a maximum context
  * as long as or longer than multContext times the length of its minimum unique
  * context.
+ *
+ * If minCodingCost is specified, don't map on any contexts that have a coding
+ * cost under the index's Markov model less than that (in bits).
  */
 stPinchThreadSet*
 mergeGreedy(
@@ -459,6 +463,7 @@ mergeGreedy(
     size_t context = 0,
     size_t addContext = 0,
     double multContext = 0,
+    double minCodingCost = 0,
     bool credit = false,
     std::string mapType = "LRexact",
     bool mismatch = false,
@@ -493,7 +498,7 @@ mergeGreedy(
         // need to tell it what genome to map the contigs of.
         MappingMergeScheme scheme(index, *mergedRuns.first, mergedRuns.second,
             *includedPositions, genome, context, addContext, multContext, 
-            credit, mapType, mismatch, z_max);
+            minCodingCost, credit, mapType, mismatch, z_max);
 
         // Set it running and grab the queue where its results come out.
         ConcurrentQueue<Merge>& queue = scheme.run();
@@ -653,6 +658,8 @@ main(
             "File in which to save indel lengths between a pair of genomes")
         ("tandemDuplications", boost::program_options::value<std::string>(), 
             "File in which to save the number of tandem duplications")
+        ("markovModel", boost::program_options::value<std::string>(), 
+            "File to load a Markov model of query sequences from")
         ("context", boost::program_options::value<size_t>()
             ->default_value(0), 
             "Minimum required context length to merge on")
@@ -662,6 +669,9 @@ main(
         ("multContext", boost::program_options::value<double>()
             ->default_value(0), 
             "Minimum context length as a fraction of uniqueness distance")
+        ("minCodingCost", boost::program_options::value<double>()
+            ->default_value(0), 
+            "Minimum encoding cost of mapped context in bits")
         ("sampleRate", boost::program_options::value<unsigned int>()
             ->default_value(64), 
             "Set the suffix array sample rate to use")
@@ -714,7 +724,15 @@ main(
         }
         
         if(!options.count("indexDirectory") || !options.count("fastas")) {
+            // These are required.
             throw boost::program_options::error("Missing important arguments!");
+        }
+        
+        if(options.count("minCodingCost") > options.count("markovModel")) {
+            // We can't do a min coding cost without a Markov model, since we
+            // can't measure coding cost.
+            throw boost::program_options::error(
+                "--minCodingCost needs --markovModel");
         }
             
     } catch(boost::program_options::error& error) {
@@ -767,6 +785,13 @@ main(
         return 0;
     }
     
+    if(options.count("markovModel")) {
+        // Load up a Markov model to model query sequences and give it to the
+        // index.
+        index.setMarkovModel(new MarkovModel(
+            options["markovModel"].as<std::string>()));
+    }
+    
     // Grab a bool for whether we'll map on credit    
     bool creditBool = false;
     if(options.count("credit")) {
@@ -800,8 +825,9 @@ main(
         // Use the greedy merge instead.
         threadSet = mergeGreedy(index, options["context"].as<size_t>(), 
             options["addContext"].as<size_t>(), 
-            options["multContext"].as<double>(), creditBool, mapType, mismatchb,
-            options["mismatches"].as<size_t>());
+            options["multContext"].as<double>(), 
+            options["minCodingCost"].as<double>(), 
+            creditBool, mapType, mismatchb, options["mismatches"].as<size_t>());
     } else {
         // Complain that's not a real merge scheme. TODO: Can we make the
         // options parser parse an enum or something instead of this?

@@ -191,6 +191,16 @@ FMDIndex::~FMDIndex() {
     }
 }
 
+void FMDIndex::setMarkovModel(MarkovModel* model) {
+    if(markovModel != NULL) {
+        // Get rid of any Markov model we already had
+        delete markovModel;
+    }
+    
+    // Take ownership of this one
+    markovModel = model;
+}
+
 size_t FMDIndex::getContigNumber(TextPosition base) const {
     // What contig corresponds to that text? Contigs all have both strands.
     return base.getText() / 2;
