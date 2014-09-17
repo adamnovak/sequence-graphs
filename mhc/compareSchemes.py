@@ -24,20 +24,21 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
     
     """
     
-    def __init__(self, fasta_list, true_maf, seed, stats_dir, hub_root):
+    def __init__(self, fasta_list, true_maf, markov_model, seed, stats_dir,
+        hub_root):
         """
         Make a new Target for building a several reference structures from the
-        given FASTAs, and comparing against the given truth MAF, using the
-        specified RNG seed, and writing statistics to one directory, and
-        assembly hubs for different pairs of genomes and schemes to another.
+        given FASTAs, and comparing against the given truth MAF, using the given
+        Markov model to measure coding costs, using the specified RNG seed, and
+        writing statistics to one directory, and assembly hubs for different
+        pairs of genomes and schemes to another.
         
         The coverage statistics are just alignment coverage for each pair of
         genomes, in <genome number>\t<coverage fraction> TSVs per scheme.
         
         The alignment statistics are just <precision>\t<recall> TSVs per scheme.
         
-        true_maf and truth_filename may be None, but if one is None then both
-        need to be None.
+        true_maf and markov_model may be None.
         
         Runs each subsequent FASTA against the first in each scheme.
         
@@ -51,6 +52,9 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         
         # Save the filename of a MAF to compare all our MAFs against (or None)
         self.true_maf = true_maf
+        
+        # Save the Markov model file
+        self.markov_model = markov_model
         
         # Save the random seed
         self.seed = seed
@@ -67,145 +71,35 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
    
     def generateSchemes(self):
         """
-        Yield tuples of (scheme name, extra args list) for all the schemes we
-        want to do.
-        
-        """
-        
-        for mismatch, credit in itertools.product([False, True], repeat=2):
-            # For all combinations of mismatch and credit
-            for min_context in [50, 100]:
-                # And min context length
-                for add_context in [0, 30]:
-                    # And additional context
-                    
-                    # Start out with the context args
-                    extra_args = ["--context", str(min_context), "--addContext",
-                        str(add_context)]
-            
-                    # And give it a name to stick on our output files
-                    scheme_base = "Exact"
-                    if mismatch:
-                        # Add the args and scheme name component for mismatch
-                        extra_args.append("--mismatch")
-                        extra_args.append("--mismatches")
-                        extra_args.append("1")
-                        scheme_base = "Inexact"
-                    if credit:
-                        # Add the args and scheme name component for credit
-                        extra_args.append("--credit")
-                        scheme_base += "Credit"
-                        
-                    # Put together the full scheme name and yield it with the
-                    # args.
-                    yield ("{}Min{}Add{}".format(scheme_base, min_context, 
-                        add_context), extra_args)
-                        
-    def generateAddContextSchemes(self):
-        """
-        Generate some schemes just for comparing addContext values and hunting
-        credit-only indels.
-        
-        """
-        
-        for mismatch, credit in [(True, True), (True, False)]:
-            # For all combinations of mismatch and credit
-            for min_context in [0]:
-                # And min context length
-                for add_context in [25, 50, 75, 100]:
-                    # And additional context
-                    
-                    # Start out with the context args
-                    extra_args = ["--context", str(min_context), "--addContext",
-                        str(add_context)]
-            
-                    # And give it a name to stick on our output files
-                    scheme_base = "Exact"
-                    if mismatch:
-                        # Add the args and scheme name component for mismatch
-                        extra_args.append("--mismatch")
-                        extra_args.append("--mismatches")
-                        extra_args.append("1")
-                        scheme_base = "Inexact"
-                    if credit:
-                        # Add the args and scheme name component for credit
-                        extra_args.append("--credit")
-                        scheme_base += "Credit"
-                        
-                    # Put together the full scheme name and yield it with the
-                    # args.
-                    yield ("{}Min{}Add{}".format(scheme_base, min_context, 
-                        add_context), extra_args)
-                        
-    def generatePresentationSchemes(self):
-        """
-        Generate some schemes for my presentation.
+        Whatever schemes I want to test at the moment
         
         """
         
         # Plan out all the schemes as mismatch, credit, min_context,
-        # add_context.
+        # add_context, mult_context, min_coding_cost
         scheme_plan = [
-                        (False, False, 100, 0),
-                        (True, False, 100, 0),
-                        (True, True, 100, 0),
-                        (True, True, 0, 25),
-                        (True, True, 0, 50),
-                        (True, True, 0, 75),
-                        (True, True, 0, 100)
+                        (True, True, 100, 0, 0, 0),
+                        (True, True, 0, 0, 0, 10),
+                        (True, True, 0, 0, 0, 20),
+                        (True, True, 0, 0, 0, 30),
+                        (True, True, 0, 0, 0, 40)
                     ]
         
-        for mismatch, credit, min_context, add_context in scheme_plan:
-            # Start out with the context args
-            extra_args = ["--context", str(min_context), "--addContext",
-                str(add_context)]
-    
-            # And give it a name to stick on our output files
-            scheme_name = "Exact"
-            if mismatch:
-                # Add the args and scheme name component for mismatch
-                extra_args.append("--mismatch")
-                extra_args.append("--mismatches")
-                extra_args.append("1")
-                scheme_name = "Inexact"
-            if credit:
-                # Add the args and scheme name component for credit
-                extra_args.append("--credit")
-                scheme_name += "Credit"
-                
-            # Always include min cotnext in the name
-            scheme_name += "Min{}".format(min_context)
-            
-            if add_context > 0:
-                # Include additional context if in use. Also pad out so they go
-                # in a sane alphabetical order.
-                scheme_name += "Add{0:03d}".format(add_context)
-                
-            # Yield the name with the args.
-            yield (scheme_name, extra_args)
-            
-    def generateMultSchemes(self):
-        """
-        Generate some schemes for multiplicative context.
-        
-        """
-        
-        # Plan out all the schemes as mismatch, credit, min_context,
-        # add_context, mult_context
-        scheme_plan = [
-                        (True, True, 100, 0, 0),
-                        (True, True, 0, 0, 2.0),
-                        (True, True, 100, 0, 2.0),
-                        (True, True, 0, 0, 0),
-                        (True, False, 0, 0, 0)
-                    ]
-        
-        for mismatch, credit, min_context, add_context, mult_context in \
-            scheme_plan:
+        for mismatch, credit, min_context, add_context, mult_context, \
+            min_coding_cost in scheme_plan:
             
             # Start out with the context args
             extra_args = ["--context", str(min_context), "--addContext",
-                str(add_context), "--multContext", str(mult_context)]
+                str(add_context), "--multContext", str(mult_context), 
+                "--minCodingCost", str(min_coding_cost)]
+                
+            # Make sure we have a Markov model
+            if self.markov_model is None:
+                raise Exception("We need a Markov model for coding cost!")
+                
+            # Send it along to the merger
+            extra_args.append("--markovModel")
+            extra_args.append(self.markov_model)
     
             # And give it a name to stick on our output files
             scheme_name = "Exact"
@@ -232,62 +126,13 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             if mult_context > 0:
                 # Include multiplicative context if in use. Don't let any .s
                 # into the scheme name since it needs to be a valid file
-                # extension. It also can't contain underscores if it goes into
-                # FASTA sequence names because it makes halAppendCactusSubtree
-                # upset.
+                # extension.
                 scheme_name += "Mult{}".format(mult_context).replace(".", "p")
                 
-            # Yield the name with the args.
-            yield (scheme_name, extra_args)
-            
-    def generateAdvancementSchemes(self):
-        """
-        Schemes for my advancement presentation
-        
-        """
-        
-        # Plan out all the schemes as mismatch, credit, min_context,
-        # add_context, mult_context
-        scheme_plan = [
-                        (True, True, 100, 0, 0)
-                    ]
-        
-        for mismatch, credit, min_context, add_context, mult_context in \
-            scheme_plan:
-            
-            # Start out with the context args
-            extra_args = ["--context", str(min_context), "--addContext",
-                str(add_context), "--multContext", str(mult_context)]
-    
-            # And give it a name to stick on our output files
-            scheme_name = "Exact"
-            if mismatch:
-                # Add the args and scheme name component for mismatch
-                extra_args.append("--mismatch")
-                extra_args.append("--mismatches")
-                extra_args.append("1")
-                scheme_name = "Inexact"
-            if credit:
-                # Add the args and scheme name component for credit
-                extra_args.append("--credit")
-                scheme_name += "Credit"
-                
-            if min_context > 0:
-                # Include min conext in the name if in use
-                scheme_name += "Min{}".format(min_context)
-            
-            if add_context > 0:
-                # Include additional context if in use. No need for badding
-                # since we can now natural sort.
-                scheme_name += "Add{}".format(add_context)
-                
-            if mult_context > 0:
-                # Include multiplicative context if in use. Don't let any .s
-                # into the scheme name since it needs to be a valid file
-                # extension. It also can't contain underscores if it goes into
-                # FASTA sequence names because it makes halAppendCactusSubtree
-                # upset.
-                scheme_name += "Mult{}".format(mult_context).replace(".", "p")
+            if min_coding_cost > 0:
+                # Similarly for the min coding cost, replace the decimal.
+                scheme_name += "Bits{}".format(min_coding_cost).replace(".",
+                    "p")
                 
             # Yield the name with the args.
             yield (scheme_name, extra_args)
@@ -336,7 +181,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # And this holds the schemes they are for
         pair_schemes = []
         
-        for scheme, extra_args in self.generateAdvancementSchemes():
+        for scheme, extra_args in self.generateSchemes():
             # Work out all the schemes we want to run.
             
             self.logToMaster("Preparing for scheme {}...".format(scheme))
@@ -702,8 +547,8 @@ class C2hMergeTarget(jobTree.scriptTree.target.Target):
         
         if len(self.c2h_fasta_pairs) == 1:
             # Nothing to merge. Just pass the only pair through.
-            os.copy(self.c2h_fasta_pairs[0][0], self.merged_c2h)
-            os.copy(self.c2h_fasta_pairs[0][1], self.merged_fasta)
+            shutil.copyfile(self.c2h_fasta_pairs[0][0], self.merged_c2h)
+            shutil.copyfile(self.c2h_fasta_pairs[0][1], self.merged_fasta)
         else:
             
             print("Merging first two pairs")
