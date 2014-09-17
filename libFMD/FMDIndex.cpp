@@ -1274,7 +1274,7 @@ std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> FMDIndex::Cmap(const Ge
 std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
     const GenericBitVector& ranges, const std::string& query, 
     const GenericBitVector* mask, int minContext, int addContext, 
-    double multContext, int start, int length) const {
+    double multContext, double minCodingCost, int start, int length) const {
     
     // RIGHT-map to a range.
     
@@ -1286,7 +1286,7 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
     
     Log::debug() << "Mapping exactly with minimum " << minContext << 
         " and additional +" << addContext << ", *" << multContext << 
-        " context." << std::endl;
+        " context, min coding cost " << minCodingCost << " bits." << std::endl;
 
     // We need a vector to return.
     std::vector<std::pair<int64_t,size_t>> mappings;
@@ -1618,12 +1618,12 @@ std::vector<int64_t> FMDIndex::mapRight(const GenericBitVector& ranges,
 
 std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
     const GenericBitVector& ranges, const std::string& query, int64_t genome, 
-    int minContext, int addContext, double multContext, int start, 
-    int length) const {
+    int minContext, int addContext, double multContext, double minCodingCost,
+    int start, int length) const {
     
     // Get the appropriate mask, or NULL if given the special all-genomes value.
     return map(ranges, query, genome == -1 ? NULL : genomeMasks[genome], 
-        minContext, addContext, multContext, start, length);    
+        minContext, addContext, multContext, minCodingCost, start, length);    
 }
 
 std::vector<int64_t> FMDIndex::mapRight(const GenericBitVector& ranges, 
@@ -2024,7 +2024,8 @@ MisMatchAttemptResults FMDIndex::misMatchExtend(MisMatchAttemptResults& prevMisM
 std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
     const GenericBitVector& ranges, const std::string& query, 
     const GenericBitVector* mask, int minContext, int addContext,
-    double multContext, size_t z_max, int start, int length) const {
+    double multContext, double minCodingCost, size_t z_max, int start,
+    int length) const {
     
     if(length == -1) {
         // Fix up the length parameter if it is -1: that means the whole rest of
@@ -2075,7 +2076,8 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
             // We do not currently have a non-empty FMDPosition to extend. Start
             // over by mapping this character by itself.
             search = this->misMatchMapPosition(ranges, query, i, minContext, 
-                addContext, multContext, &extraContext, z_max, mask);
+                addContext, multContext, minCodingCost, &extraContext, z_max,
+                mask);
                 
             if(search.is_mapped && search.maxCharacters >= minContext && 
                 extraContext >= addContext && search.maxCharacters >= 
@@ -2252,8 +2254,8 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
 
 std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
     const GenericBitVector& ranges, const std::string& query, int64_t genome, 
-    int minContext, int addContext, double multContext, size_t z_max, int start,
-    int length) const {
+    int minContext, int addContext, double multContext, double minCodingCost,
+    size_t z_max, int start, int length) const {
     
     // Get the appropriate mask, or NULL if given the special all-genomes value.
     return misMatchMap(ranges, query, genome == -1 ? NULL : genomeMasks[genome], 
@@ -2262,8 +2264,8 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
 
 MisMatchAttemptResults FMDIndex::misMatchMapPosition(const GenericBitVector& ranges, 
     const std::string& pattern, size_t index, size_t minContext, 
-    size_t addContext, double multContext, int64_t* extraContext, size_t z_max,
-    const GenericBitVector* mask) const {
+    size_t addContext, double multContext, double minCodingCost, 
+    int64_t* extraContext, size_t z_max, const GenericBitVector* mask) const {
     
     // We're going to right-map so ranges match up with the things we can map to
     // (downstream contexts)

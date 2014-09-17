@@ -3,9 +3,9 @@ CXX=g++
 # What are our generic objects?
 OBJS=FMDIndex.o FMDIndexBuilder.o util.o FMDIndexIterator.o Mapping.o \
 	FMDPosition.o LCPArray.o CSA/BitBuffer.o CSA/BitVectorBase.o \
-	CSA/BitVector.o Log.o GenericBitVector.o ResultRange.o Fasta.o
+	CSA/BitVector.o Log.o GenericBitVector.o ResultRange.o Fasta.o MarkovModel.o
 	
-# Waht are our SWIG JNI wrapper objects?
+# What are our SWIG JNI wrapper objects?
 SWIG_OBJS=swigbindings_wrap.o
     
 # What do we need for our test runner binary?

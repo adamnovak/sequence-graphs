@@ -355,8 +355,8 @@ public:
      */
     std::vector<std::pair<int64_t,size_t>> map(const GenericBitVector& ranges,
         const std::string& query, const GenericBitVector* mask, 
-        int minContext = 0, int addContext = 0, double multContext = 0,
-        int start = 0, int length = -1) const;
+        int minContext = 0, int addContext = 0, double multContext = 0, 
+        double minCodingCost = 0, int start = 0, int length = -1) const;
         
     /**
      * Exact left-map with ranges to a genome by original restart-based
@@ -371,11 +371,15 @@ public:
      * multContext is the minimum fraction of the context length at which the
      * context became unique that is required in order to map. So if it is 2 and
      * you were unique at 70 bases, you would need at least 140 bases to map.
+     *
+     * minCodingCost is the minimum coding cost under this FMIndex's Markov
+     * model for potential input sequences required for a context to map a base,
+     * in bits.
      */
     std::vector<std::pair<int64_t,size_t>> map(const GenericBitVector& ranges,
         const std::string& query, int64_t genome = -1, int minContext = 0, 
-        int addContext = 0, double multContext = 0, int start = 0, 
-        int length = -1) const;
+        int addContext = 0, double multContext = 0, double minCodingCost = 0,
+        int start = 0, int length = -1) const;
 
     /**
      * CENTERED VERSIONS of the functions described above
@@ -444,21 +448,23 @@ public:
                  
     std::vector<std::pair<int64_t,size_t>> misMatchMap(const GenericBitVector& ranges,
         const std::string& query, const GenericBitVector* mask, 
-        int minContext = 0, int addContext = 0, double multContext = 0,
-        size_t z_max = 0, int start = 0, int length = -1) const;
+        int minContext = 0, int addContext = 0, double multContext = 0, 
+        double minCodingCost = 0, size_t z_max = 0, int start = 0, 
+        int length = -1) const;
         
     std::vector<std::pair<int64_t,size_t>> misMatchMap(const GenericBitVector& ranges, 
         const std::string& query, int64_t genome = -1, int minContext = 0, 
-        int addContext = 0, double multContext = 0, size_t z_max = 0,
-        int start = 0, int length = -1) const;
+        int addContext = 0, double multContext = 0, double minCodingCost = 0,
+        size_t z_max = 0, int start = 0, int length = -1) const;
         
     // We have to pass back the extra context after uniqueness through a
     // pointer, because this design is not really suitable for all the extra
     // options and constraints we want to be able to tack on.
     MisMatchAttemptResults misMatchMapPosition(const GenericBitVector& ranges, 
         const std::string& pattern, size_t index, size_t minContext, 
-        size_t addContext, double multContext, int64_t* extraContext, 
-        size_t z_max, const GenericBitVector* mask = NULL) const;
+        size_t addContext, double multContext, double minCodingCost, 
+        int64_t* extraContext, size_t z_max, 
+        const GenericBitVector* mask = NULL) const;
     
     /**
      * Centered search versions of all the mismatch mapping functions
