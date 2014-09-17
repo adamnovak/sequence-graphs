@@ -41,7 +41,9 @@ protected:
     
     // Holds log probability (negative, base 2, so measured in bits) for each
     // kmer. The probability of a kmer is defined as its count over the total
-    // count of all kmers that match its first k-1 characters.
+    // count of all kmers that match its first k-1 characters. TODO: Use a
+    // suffix tree or something so we don't have to keep making string objects
+    // for every lookup.
     std::map<std::string, double> logProbabilities;
     
     // What order is the model (1 less than kmer length)

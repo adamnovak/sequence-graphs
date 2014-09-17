@@ -132,9 +132,21 @@ double MarkovModel::encodingCost(const std::string& subtext) {
     double total = 0;
     
     for(size_t i = order; i < subtext.size(); i++) {
-        // Sum up the encoding cost for each character in turn. We don't look
-        // before we have at least order characters to use.
-        total += encodingCost(subtext.substr(i - order, order), subtext[i]);
+        // Grab the string to look up. TODO: use some sort of 4-ary tree or
+        // something instead.
+        std::string toCheck = subtext.substr(i - order, order + 1);
+        
+        auto found = logProbabilities.find(toCheck);
+        
+        if(found == logProbabilities.end()) {
+            // We never saw this at all. Log probability would be -inf for
+            // impossible, it costs inf to encode.
+            total += std::numeric_limits<double>::infinity();
+        } else {
+            // Add in the negation of what we found (since the log probs are
+            // negative bits, and the encoding costs are positive bits).
+            total += -(found->second);
+        }
     }
     
     return total;

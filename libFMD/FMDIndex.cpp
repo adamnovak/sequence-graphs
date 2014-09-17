@@ -1300,6 +1300,9 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
         length = query.length() - start;
     }
     
+    // Track the largest coding cost seen since restart.
+    double codingCost;
+    
     Log::debug() << "Mapping exactly with minimum " << minContext << 
         " and additional +" << addContext << ", *" << multContext << 
         " context, min coding cost " << minCodingCost << " bits." << std::endl;
@@ -1348,6 +1351,9 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
             
             // Reset the extra-context-after-uniqueness counter.
             extraContext = -1;
+            
+            // And the coding cost
+            codingCost = 0;
             
             // Look to see if we happen to be unique
             range = location.position.range(ranges, mask);
@@ -1406,8 +1412,10 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
         }
         
         
-        double codingCost;
-        if(markovModel != NULL) {
+        
+        if(markovModel != NULL && codingCost < minCodingCost) {
+            // We still want a higher coding cost.
+            
             // Calculate the coding cost if we have a model.
             codingCost = markovModel->encodingCost(reverseComplement(
                 query.substr(i, location.characters)));
@@ -2089,6 +2097,9 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
     // us to 0.
     int64_t extraContext = -1;
     
+    // Track the highest coding cost since restart.
+    double codingCost = 0;
+    
     int64_t range;
     
     for(int i = start + length - 1; i >= start; i--) {
@@ -2105,8 +2116,12 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
             search = this->misMatchMapPosition(ranges, query, i, minContext, 
                 addContext, multContext, &extraContext, z_max, mask);
                 
-            double codingCost;
-            if(markovModel != NULL) {
+            // We restarted
+            codingCost = 0;
+            
+            if(markovModel != NULL && codingCost < minCodingCost) {
+                // We're still trying to get a high enough coding cost.
+                
                 // Calculate the coding cost if we have a model.
                 codingCost = markovModel->encodingCost(reverseComplement(
                     query.substr(i, search.maxCharacters)));
@@ -2117,7 +2132,7 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
                 (search.maxCharacters - extraContext) * multContext &&
                 !search.positions.front().first.isEmpty(mask) && range != -1
                 && search.positions.size() == 1 && 
-                (markovModel == NULL || codingCost > minCodingCost)) {
+                (markovModel == NULL || codingCost >= minCodingCost)) {
 
                 // It mapped. We didn't do a re-start and fail, we have sufficient
                 // context to be confident, and our interval is nonempty and
@@ -2192,7 +2207,6 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
                 search.characters++;
                 search.maxCharacters++;
                 
-                double codingCost;
                 if(markovModel != NULL) {
                     // Calculate the coding cost if we have a model.
                     codingCost = markovModel->encodingCost(reverseComplement(
@@ -2209,7 +2223,7 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
                     search.maxCharacters >= minContext && 
                     extraContext >= addContext && search.maxCharacters >= 
                     (search.maxCharacters - extraContext) * multContext &&
-                    (markovModel == NULL || codingCost > minCodingCost)) {
+                    (markovModel == NULL || codingCost >= minCodingCost)) {
                 
                     // It mapped after extending. We didn't do a re-start and
                     // fail, we have sufficient context to be confident, and our
