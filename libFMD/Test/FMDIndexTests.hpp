@@ -1,5 +1,5 @@
-#ifndef FMDINDEXBUILDERTESTS_HPP
-#define FMDINDEXBUILDERTESTS_HPP
+#ifndef FMDINDEXTESTS_HPP
+#define FMDINDEXTESTS_HPP
 
 #include <cppunit/extensions/HelperMacros.h>
 #include "../FMDIndex.hpp"

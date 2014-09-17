@@ -31,6 +31,11 @@ MarkovModel::MarkovModel(std::string filename): logProbabilities(), order() {
         // Split on spaces of any kind
         boost::split(parts, line, boost::is_space());
         
+        if(parts.size() == 1 && parts[0] == "") {
+            // Skip blank lines
+            continue;
+        }
+        
         if(parts.size() != 2) {
             // Complain we got a bad input file.
             throw std::runtime_error(std::string("Invalid number of parts: ") +
