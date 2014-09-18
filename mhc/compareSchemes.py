@@ -81,11 +81,18 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                         (False, False, 100, 0, 0, 0),
                         (True, True, 100, 0, 0, 0),
                         (True, True, 0, 0, 0, 10),
-                        (True, True, 0, 0, 0, 50),
+                        (True, True, 0, 0, 0, 20),
+                        (True, True, 0, 0, 0, 40),
+                        (True, True, 0, 0, 0, 60),
+                        (True, True, 0, 0, 0, 80),
                         (True, True, 0, 0, 0, 100),
-                        (True, True, 0, 0, 0, 150),
+                        (True, True, 0, 0, 0, 120),
+                        (True, True, 0, 0, 0, 140),
+                        (True, True, 0, 0, 0, 160),
+                        (True, True, 0, 0, 0, 180),
                         (True, True, 0, 0, 0, 200),
-                        (True, True, 0, 0, 0, 250)
+                        (True, True, 0, 0, 0, 220),
+                        (True, True, 0, 0, 0, 240)
                     ]
         
         for mismatch, credit, min_context, add_context, mult_context, \
