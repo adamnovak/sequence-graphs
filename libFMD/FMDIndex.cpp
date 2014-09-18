@@ -1302,6 +1302,8 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
     
     // Track the largest coding cost seen since restart.
     double codingCost;
+    // And the state of the Markov model for calculating more coding costs.
+    MarkovModel::iterator state = NULL;
     
     Log::debug() << "Mapping exactly with minimum " << minContext << 
         " and additional +" << addContext << ", *" << multContext << 
@@ -1352,8 +1354,13 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
             // Reset the extra-context-after-uniqueness counter.
             extraContext = -1;
             
-            // And the coding cost
-            codingCost = 0;
+            if(markovModel != NULL) {
+                // Get the coding cost of having what we've searched so far. We
+                // searched from i out location.characters to the right. Also
+                // updates the Markov state.
+                codingCost = markovModel->backfill(state, reverseComplement(
+                    query.substr(i, location.characters)));
+            }
             
             // Look to see if we happen to be unique
             range = location.position.range(ranges, mask);
@@ -1381,9 +1388,17 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
                         
                     if(!nextPosition.isEmpty(mask)) {
                         // Extension was successful
+                        
+                        if(markovModel != NULL) {
+                            // Record the cost of this extension.
+                            codingCost = markovModel->encodingCost(state, 
+                                complement(query[i + location.characters]));
+                        }
+                        
                         location.position = nextPosition;
                         location.characters++;
                         extraContext++;
+                        
                     } else {
                         // Extension was not successful, so we've hit maximal
                         // context.
@@ -1400,8 +1415,13 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
             location.position = this->extend(location.position, query[i], true);
             location.characters++;
             
-            range = location.position.range(ranges, mask);
+            if(markovModel != NULL) {
+                // We need to update coding cost and advance the Markov model
+                codingCost = markovModel->encodingCost(state, 
+                    complement(query[i]));
+            }
             
+            range = location.position.range(ranges, mask);
             if(range != -1 && extraContext == -1) {
                 // We've just become unique. That will only ever happen here if
                 // we aren't setting a minimum extra context, but we still need
@@ -1411,17 +1431,6 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
             
         }
         
-        
-        
-        if(markovModel != NULL && codingCost < minCodingCost) {
-            // We still want a higher coding cost.
-            
-            // Calculate the coding cost if we have a model.
-            codingCost = markovModel->encodingCost(reverseComplement(
-                query.substr(i, location.characters)));
-        }
-        
-            
         if(location.is_mapped && !location.position.isEmpty(mask) &&
             range != -1 && location.characters >= minContext &&
             extraContext >= addContext && location.characters >= 
@@ -1453,7 +1462,7 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
                 " options for " << location.characters << " context, " << 
                 extraContext << " extra, " << 
                 (location.characters - extraContext) * multContext << 
-                " scaled)." << std::endl;
+                " scaled, " << codingCost << " bits)." << std::endl;
                 
             if(location.is_mapped && location.position.isEmpty(mask)) {
                 // We extended right until we got no results. We need to try
@@ -2099,6 +2108,8 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
     
     // Track the highest coding cost since restart.
     double codingCost = 0;
+    // And the state in the Markov model
+    MarkovModel::iterator state = NULL;
     
     int64_t range;
     
@@ -2116,14 +2127,10 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
             search = this->misMatchMapPosition(ranges, query, i, minContext, 
                 addContext, multContext, &extraContext, z_max, mask);
                 
-            // We restarted
-            codingCost = 0;
-            
-            if(markovModel != NULL && codingCost < minCodingCost) {
-                // We're still trying to get a high enough coding cost.
-                
-                // Calculate the coding cost if we have a model.
-                codingCost = markovModel->encodingCost(reverseComplement(
+            if(markovModel != NULL) {
+                // Calculate the coding cost and current state if we have a
+                // model.
+                codingCost = markovModel->backfill(state, reverseComplement(
                     query.substr(i, search.maxCharacters)));
             }
                 
@@ -2208,9 +2215,9 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
                 search.maxCharacters++;
                 
                 if(markovModel != NULL) {
-                    // Calculate the coding cost if we have a model.
-                    codingCost = markovModel->encodingCost(reverseComplement(
-                        query.substr(i, search.maxCharacters)));
+                    // Update the encoding cost and model state.
+                    codingCost = markovModel->encodingCost(state, 
+                        complement(query[i]));
                 }
                 
                 // What range index does our current left-side position (the one we just

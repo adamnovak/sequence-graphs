@@ -69,6 +69,13 @@ public:
     iterator start(const std::string& history);
     
     /**
+     * Get the coding cost for the given string, and return the state we would
+     * be in at the end through the state parameter. That state may be NULL if
+     * history is too short.
+     */
+    double backfill(MarkovModel::iterator& state, const std::string& history);
+    
+    /**
      * Retrun the encoding cost in bits for encoding the given character when in
      * the given state.
      */

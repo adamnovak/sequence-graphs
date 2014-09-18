@@ -175,6 +175,30 @@ MarkovModel::iterator MarkovModel::start(const std::string& history) {
     }
 }
 
+double MarkovModel::backfill(MarkovModel::iterator& state,
+    const std::string& history) {
+    
+    if(order > history.size()) {
+        // No transitions observed. Give up now.
+        state = NULL;
+        return 0;
+    }
+    
+    // We're going to total up the cost here.
+    double total = 0;
+    
+    // Start now that we know we have enough state
+    state = start(history.substr(0, order));
+    
+    for(size_t i = order; i < history.size(); i++) {
+        // Encode all the characters, advancing the state
+        total += encodingCost(state, history[i]);
+    }
+
+    // Give back the total, leaving the state where it should be.
+    return total;
+}
+
 double MarkovModel::encodingCost(MarkovModel::iterator& state, char next) {
     // Remember where we are
     iterator oldState = state;
