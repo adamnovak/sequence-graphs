@@ -1354,14 +1354,6 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
             // Reset the extra-context-after-uniqueness counter.
             extraContext = -1;
             
-            if(markovModel != NULL) {
-                // Get the coding cost of having what we've searched so far. We
-                // searched from i out location.characters to the right. Also
-                // updates the Markov state.
-                codingCost = markovModel->backfill(state, reverseComplement(
-                    query.substr(i, location.characters)));
-            }
-            
             // Look to see if we happen to be unique
             range = location.position.range(ranges, mask);
             
@@ -1389,15 +1381,12 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
                     if(!nextPosition.isEmpty(mask)) {
                         // Extension was successful
                         
-                        if(markovModel != NULL) {
-                            // Record the cost of this extension.
-                            codingCost = markovModel->encodingCost(state, 
-                                complement(query[i + location.characters]));
-                        }
-                        
                         location.position = nextPosition;
                         location.characters++;
                         extraContext++;
+                        
+                        // We can't do incremental coding cost updates here
+                        // because we are going forwards.
                         
                     } else {
                         // Extension was not successful, so we've hit maximal
@@ -1406,6 +1395,17 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
                     }
                 }
             }
+            
+            // Now we have a maximal context. Get its coding cost.
+            
+            if(markovModel != NULL) {
+                // Get the coding cost of having what we've searched so far. We
+                // searched from i out location.characters to the right. Also
+                // updates the Markov state.
+                codingCost = markovModel->backfill(state, reverseComplement(
+                    query.substr(i, location.characters)));
+            }
+            
         } else {
             Log::debug() << "Extending with position " << i << std::endl;
             lastRestarted = false;
@@ -1416,9 +1416,16 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
             location.characters++;
             
             if(markovModel != NULL) {
-                // We need to update coding cost and advance the Markov model
-                codingCost = markovModel->encodingCost(state, 
-                    complement(query[i]));
+                if(state == NULL) {
+                    // We need to find a Markov state to start in.
+                    codingCost = markovModel->backfill(state, reverseComplement(
+                        query.substr(i, location.characters)));
+                } else {
+                    // We are already in a Markov state. Continue from there.
+                    // Record the cost of this extension.
+                    codingCost = markovModel->encodingCost(state, 
+                        complement(query[i]));
+                }
             }
             
             range = location.position.range(ranges, mask);
@@ -2215,9 +2222,18 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
                 search.maxCharacters++;
                 
                 if(markovModel != NULL) {
-                    // Update the encoding cost and model state.
-                    codingCost = markovModel->encodingCost(state, 
-                        complement(query[i]));
+                    if(state == NULL) {
+                        // Get the coding cost for everything we have searched
+                        // so far, and set our state.
+                        codingCost = markovModel->backfill(state, 
+                            reverseComplement(query.substr(i, 
+                            search.maxCharacters)));
+                    } else {
+                        // We have a valid Markov state already. Update the
+                        // encoding cost and model state.
+                        codingCost = markovModel->encodingCost(state, 
+                            complement(query[i]));
+                    }
                 }
                 
                 // What range index does our current left-side position (the one we just
