@@ -9,7 +9,7 @@
 #include <cmath>
 #include <boost/algorithm/string.hpp>
 
-MarkovModel::MarkovModel(std::string filename): logProbabilities(), order() {
+MarkovModel::MarkovModel(std::string filename): nodes(), order() {
 
     // We need to load up the kmers file, store all the counts, and calculate
     // all the log probabilities for the last characters.
@@ -82,19 +82,41 @@ MarkovModel::MarkovModel(std::string filename): logProbabilities(), order() {
         // We'll sum up the counts.
         double total = 0;
         
+        // Make sure there is a node for each state that actually happens
+        nodes[prefixPair.first] = MarkovNode();
+        
         for(auto nextCharPair : prefixPair.second) {
             // Sum up the total probability
             total += nextCharPair.second;
+            
         }
         
         
         for(auto nextCharPair : prefixPair.second) {
-            // Fill in the log probabilities
+            // Work out the log probability for going to this node
             double logProbability = std::log2(nextCharPair.second / total);
-            logProbabilities[prefixPair.first + nextCharPair.first] = 
+            
+            // And fill it in
+            nodes[prefixPair.first].logProbability[nextCharPair.first] = 
                 logProbability;
         }
         
+    }
+    
+    for(auto prefixPair : kmerCounts) {
+        // Now we need to fill in the pointers to the next states for each node.
+        MarkovNode& node = nodes[prefixPair.first];
+        
+        for(auto nextCharPair : prefixPair.second) {
+            // What does our memory look like when we add on this next
+            // character?
+            std::string nextStateName = prefixPair.first.substr(1, order) + 
+                nextCharPair.first;
+                
+            // Make a pointer right there so we don't have to bother building
+            // that string.
+            node.nextState[nextCharPair.first] = &nodes[nextStateName];
+        }
     }
     
 }
@@ -111,45 +133,57 @@ double MarkovModel::encodingCost(const std::string& prefix, char next) {
         return 0;
     }
     
-    // Pull off the right number of characters from the end of the string, tack
-    // on the next character, and work out how probable this combination is.
-    auto found = logProbabilities.find(prefix.substr(prefix.size() - order, 
-        order) + next);
+    // What does our memory look like at the end of the string?
+    std::string memory = prefix.substr(prefix.size() - order, order);
     
-    if(found == logProbabilities.end()) {
-        // We never saw this at all.
-        // Log probability would be -inf for impossible, it costs inf to encode.
-        return std::numeric_limits<double>::infinity();
-    } else {
-        // Return the negation of what we found (since the log probs are
-        // negative bits, and the encoding costs are positive bits).
-        return -(found->second);
-    }
+    // Jump to that node and get the log probability for this next character.
+    // Negate it before returning.
+    return -nodes[memory].logProbability[next];
 }
 
 double MarkovModel::encodingCost(const std::string& subtext) {
+    if(order >= subtext.size()) {
+        // No transitions observed. Give up now.
+        return 0;
+    }
+    
     // We're going to total up the cost here.
     double total = 0;
     
-    for(size_t i = order; i < subtext.size(); i++) {
-        // Grab the string to look up. TODO: use some sort of 4-ary tree or
-        // something instead.
-        std::string toCheck = subtext.substr(i - order, order + 1);
-        
-        auto found = logProbabilities.find(toCheck);
-        
-        if(found == logProbabilities.end()) {
-            // We never saw this at all. Log probability would be -inf for
-            // impossible, it costs inf to encode.
-            total += std::numeric_limits<double>::infinity();
-        } else {
-            // Add in the negation of what we found (since the log probs are
-            // negative bits, and the encoding costs are positive bits).
-            total += -(found->second);
-        }
-    }
+    // Start now that we know we have enough state
+    iterator state = start(subtext.substr(0, order));
     
+    for(size_t i = order; i < subtext.size(); i++) {
+        // Encode all the characters
+        total += encodingCost(state, subtext[i]);
+    }
+
     return total;
+}
+
+MarkovModel::iterator MarkovModel::start(const std::string& history) {
+    if(history.size() < order) {
+        // Can't get a state
+        return NULL;
+    } else if(history.size() == order) {
+        // Just use this string for the lookup
+        return &nodes[history];
+    } else {
+        // We need to pull off the end piece and use that
+        std::string memory = history.substr(history.size() - order, order);
+        return &nodes[memory];
+    }
+}
+
+double MarkovModel::encodingCost(MarkovModel::iterator& state, char next) {
+    // Remember where we are
+    iterator oldState = state;
+    
+    // Go to the next state
+    state = state->nextState[next];
+    
+    // Return the encoding cost to do so (negative log probability)
+    return -oldState->logProbability[next];
 }
 
 // What start/stop character is used?
