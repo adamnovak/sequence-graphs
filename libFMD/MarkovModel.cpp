@@ -180,6 +180,7 @@ double MarkovModel::backfill(MarkovModel::iterator& state,
     
     if(order > history.size()) {
         // No transitions observed. Give up now.
+        Log::debug() << "History " << history << " too short." << std::endl;
         state = NULL;
         return 0;
     }
@@ -187,13 +188,19 @@ double MarkovModel::backfill(MarkovModel::iterator& state,
     // We're going to total up the cost here.
     double total = 0;
     
+    Log::debug() << "Backfilling from " << history.substr(0, order) <<
+        std::endl;
+    
     // Start now that we know we have enough state
     state = start(history.substr(0, order));
     
     for(size_t i = order; i < history.size(); i++) {
         // Encode all the characters, advancing the state
-        total += encodingCost(state, history[i]);
+        double cost = encodingCost(state, history[i]);
+        total += cost;
     }
+
+    Log::debug() << "Backfilled " << total << " bits" << std::endl;
 
     // Give back the total, leaving the state where it should be.
     return total;
@@ -207,7 +214,10 @@ double MarkovModel::encodingCost(MarkovModel::iterator& state, char next) {
     state = state->nextState[next];
     
     // Return the encoding cost to do so (negative log probability)
-    return -oldState->logProbability[next];
+    double cost =-oldState->logProbability[next];
+    Log::debug() << "Encoding " << next << " costs " << cost  << " bits" <<
+        std::endl;
+    return cost;
 }
 
 // What start/stop character is used?

@@ -1423,7 +1423,7 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
                 } else {
                     // We are already in a Markov state. Continue from there.
                     // Record the cost of this extension.
-                    codingCost = markovModel->encodingCost(state, 
+                    codingCost += markovModel->encodingCost(state, 
                         complement(query[i]));
                 }
             }
@@ -2139,6 +2139,8 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
                 // model.
                 codingCost = markovModel->backfill(state, reverseComplement(
                     query.substr(i, search.maxCharacters)));
+                Log::debug() << "Total coding cost: " << codingCost << "/" << 
+                    minCodingCost << std::endl;
             }
                 
             if(search.is_mapped && search.maxCharacters >= minContext && 
@@ -2231,9 +2233,12 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
                     } else {
                         // We have a valid Markov state already. Update the
                         // encoding cost and model state.
-                        codingCost = markovModel->encodingCost(state, 
+                        codingCost += markovModel->encodingCost(state, 
                             complement(query[i]));
                     }
+                    
+                    Log::debug() << "Total coding cost: " << codingCost << 
+                        "/" << minCodingCost << std::endl;
                 }
                 
                 // What range index does our current left-side position (the one we just

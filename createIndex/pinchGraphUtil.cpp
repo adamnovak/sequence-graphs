@@ -29,7 +29,7 @@ canonicalize(
     bool strand
 ) {
     
-    Log::debug() << "Canonicalizing " << contigNumber << ":" << offset << 
+    Log::trace() << "Canonicalizing " << contigNumber << ":" << offset << 
         "." << strand << std::endl;
         
     // Now we need to look up what the pinch set says is the canonical
@@ -81,7 +81,7 @@ canonicalize(
             canonicalSegmentOffset - 1;
     }
     
-    Log::debug() << "Canonicalized segment offset " << segmentOffset << 
+    Log::trace() << "Canonicalized segment offset " << segmentOffset << 
         " to " << canonicalSegmentOffset << std::endl;
     
     // What's the offset into the canonical contig? 1-based because we add a
@@ -89,7 +89,7 @@ canonicalize(
     size_t canonicalOffset = stPinchSegment_getStart(firstSegment) + 
         canonicalSegmentOffset;
     
-    Log::debug() << "Canonicalized contig " << contigNumber << " offset " <<
+    Log::trace() << "Canonicalized contig " << contigNumber << " offset " <<
         offset << " to contig " << canonicalContig << " offset " << 
         canonicalOffset << std::endl;
     
@@ -99,11 +99,11 @@ canonicalize(
     // block, and the orientation that this context attaches to the position in.
     // Flipping any of those will flip the orientation in which we need to map,
     // so we need to xor them all together, which for bools is done with !=.
-    Log::debug() << "Canonical orientation: " << canonicalOrientation << 
+    Log::trace() << "Canonical orientation: " << canonicalOrientation << 
             std::endl;
-    Log::debug() << "Segment orientation: " << segmentOrientation << 
+    Log::trace() << "Segment orientation: " << segmentOrientation << 
             std::endl;
-    Log::debug() << "Strand: " << strand << std::endl;
+    Log::trace() << "Strand: " << strand << std::endl;
 
     if(canonicalOffset <= 0 || 
         canonicalOffset > stPinchThread_getLength(
@@ -127,7 +127,7 @@ canonicalize(
     TextPosition base
 ) {
     
-    Log::debug() << "Canonicalizing 0-based " << base << std::endl;
+    Log::trace() << "Canonicalizing 0-based " << base << std::endl;
     
     // What contig corresponds to that text?
     size_t contigNumber = index.getContigNumber(base);

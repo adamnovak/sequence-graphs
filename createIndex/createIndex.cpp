@@ -262,7 +262,7 @@ identifyMergedRuns(
                 // off from the stop characters since they can't ever be
                 // searched.
                 encoder->addBit(j);
-                Log::debug() << "Set bit " << j << std::endl;
+                Log::trace() << "Set bit " << j << std::endl;
             }
             
             

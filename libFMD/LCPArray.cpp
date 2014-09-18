@@ -60,7 +60,7 @@ LCPArray::LCPArray(const SuffixArray& suffixArray, const ReadTable& strings): va
         // Get the suffix before this one
         SAElem prevSuffix = suffixArray.get(entry.second - 1);
         
-        Log::debug() << "LCP of " << currentSuffix << " @ " << entry.second << 
+        Log::trace() << "LCP of " << currentSuffix << " @ " << entry.second << 
             " and " << prevSuffix <<  " @ " << entry.second - 1 << " is: " <<
             std::endl;
         
@@ -88,7 +88,7 @@ LCPArray::LCPArray(const SuffixArray& suffixArray, const ReadTable& strings): va
         // Store the LCP value
         values[entry.second] = height;
         
-        Log::debug() << "LCP[" << entry.second << "]=" << height << std::endl;
+        Log::trace() << "LCP[" << entry.second << "]=" << height << std::endl;
         
         if(height > 0) {
             // If height isn't 0, dial it back. Not really sure how that
