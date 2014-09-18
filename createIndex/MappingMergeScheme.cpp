@@ -1051,8 +1051,8 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
 
     // Report that we're done.
     // Report that we're done.
-    Log::info() << taskName << " finished (" << mappedBases << "|" << 
-        unmappedBases << ")" << std::endl;
+    Log::info() << taskName << " finished (" << mappedBases << " mapped|" << 
+        unmappedBases << " unmapped)" << std::endl;
     if(conflictedBases != 0) {
         Log::info() << conflictedBases << " unmapped on account of " <<
             "conflicting left and right context matches." << std::endl;

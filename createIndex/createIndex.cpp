@@ -728,9 +728,10 @@ main(
             throw boost::program_options::error("Missing important arguments!");
         }
         
-        if(options.count("minCodingCost") > options.count("markovModel")) {
-            // We can't do a min coding cost without a Markov model, since we
-            // can't measure coding cost.
+        if(options.count("minCodingCost") > options.count("markovModel") && 
+            options["minCodingCost"].as<double>() > 0) {
+            // We can't do a nonzero min coding cost without a Markov model,
+            // since we can't measure coding cost.
             throw boost::program_options::error(
                 "--minCodingCost needs --markovModel");
         }

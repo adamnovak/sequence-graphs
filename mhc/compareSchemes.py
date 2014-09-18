@@ -78,11 +78,14 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # Plan out all the schemes as mismatch, credit, min_context,
         # add_context, mult_context, min_coding_cost
         scheme_plan = [
+                        (False, False, 100, 0, 0, 0),
                         (True, True, 100, 0, 0, 0),
                         (True, True, 0, 0, 0, 10),
-                        (True, True, 0, 0, 0, 20),
-                        (True, True, 0, 0, 0, 30),
-                        (True, True, 0, 0, 0, 40)
+                        (True, True, 0, 0, 0, 50),
+                        (True, True, 0, 0, 0, 100),
+                        (True, True, 0, 0, 0, 150),
+                        (True, True, 0, 0, 0, 200),
+                        (True, True, 0, 0, 0, 250)
                     ]
         
         for mismatch, credit, min_context, add_context, mult_context, \
