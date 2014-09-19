@@ -693,8 +693,8 @@ class HalTarget(jobTree.scriptTree.target.Target):
         
         """
         
-        # Make the base Target. Ask for 2gb of memory since this is easy.
-        super(HalTarget, self).__init__(memory=2147483648)
+        # Make the base Target. Ask for 8gb of memory since this is hard.
+        super(HalTarget, self).__init__(memory=8589934592)
         
         # Save the files to merge
         self.c2h_file = c2h_file
@@ -971,8 +971,8 @@ class AssemblyHubTarget(jobTree.scriptTree.target.Target):
         
         """
         
-        # Make the base Target. Ask for 2gb of memory since this is easy.
-        super(AssemblyHubTarget, self).__init__(memory=2147483648)
+        # Make the base Target. Ask for 8gb of memory since this is hard.
+        super(AssemblyHubTarget, self).__init__(memory=8589934592)
         
         # Save the alignment file
         self.hal = hal
@@ -1080,8 +1080,8 @@ class AssemblyHubOnlyTarget(jobTree.scriptTree.target.Target):
         
         """
         
-        # Make the base Target. Ask for 2gb of memory since this is easy.
-        super(AssemblyHubOnlyTarget, self).__init__(memory=2147483648)
+        # Make the base Target. Ask for 8gb of memory since this is hard.
+        super(AssemblyHubOnlyTarget, self).__init__(memory=8589934592)
         
         # Save the alignment file
         self.hal = hal
