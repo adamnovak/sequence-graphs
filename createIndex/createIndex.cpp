@@ -934,7 +934,7 @@ main(
     if(options.count("nontrivialRearrangements")) {
         // Get all size>2 things and dump them.
         writeAdjacencyComponents(filterComponentsBySize(components, 2, 
-            [](auto a, auto b) { return a > b; }), 
+            [](size_t a, size_t b) { return a > b; }), 
             options["nontrivialRearrangements"].as<std::string>());
     }
     

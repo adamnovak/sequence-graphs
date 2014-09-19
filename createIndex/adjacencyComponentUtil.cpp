@@ -2,6 +2,8 @@
 #include <Log.hpp>
 
 #include <algorithm>
+#include <unordered_set>
+#include <fstream>
 
 std::vector<std::vector<stPinchEnd>> 
 getAdjacencyComponents(
@@ -432,11 +434,11 @@ writeAdjacencyComponents(
         out << "Component size " << component.size() << ":" << std::endl;
         
         // For each component, make a set of involved blocks.
-        std::unordered_set blocks;
+        std::unordered_set<stPinchBlock*> blocks;
         
         for(auto end: component) {
             // Fill it in with all involved blocks
-            blocks.insert(stPinchEnd_getBlock(end));
+            blocks.insert(stPinchEnd_getBlock(&end));
         }
         
         for(auto block: blocks) {
