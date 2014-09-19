@@ -75,6 +75,11 @@ MarkovModel::MarkovModel(std::string filename): nodes(), order() {
         
     }
     
+    if(kmerCounts.size() == 0) {
+        // Complain we read no states.
+        throw std::runtime_error("Tried to load empty Markov model");
+    }
+    
     // OK now we loaded the kmer counts, do the by-prefix normalization.
     for(auto prefixPair : kmerCounts) {
         Log::debug() << "Normalizing prefix " << prefixPair.first << std::endl;
