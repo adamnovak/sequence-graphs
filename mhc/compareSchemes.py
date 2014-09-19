@@ -555,13 +555,25 @@ class C2hMergeTarget(jobTree.scriptTree.target.Target):
         if len(self.c2h_fasta_pairs) == 0:
             raise Exception("No alignments at all!")
         
-        if len(self.c2h_fasta_pairs) == 1:
-            # Nothing to merge. Just pass the only pair through.
-            shutil.copyfile(self.c2h_fasta_pairs[0][0], self.merged_c2h)
-            shutil.copyfile(self.c2h_fasta_pairs[0][1], self.merged_fasta)
-        else:
+        elif len(self.c2h_fasta_pairs) == 1:
+            # Merge the singleton against an empty file pair to add the prefix.
             
-            print("Merging first two pairs")
+            # Make the empty pair
+            c2h_empty = sonLib.bioio.getTempFile(suffix=".c2h",
+                    rootDir=self.getGlobalTempDir())
+            fasta_empty = sonLib.bioio.getTempFile(suffix=".fa",
+                    rootDir=self.getGlobalTempDir())
+            
+            # Request the merge.
+            self.addChildTarget(C2hMergeTarget(self.c2h_fasta_pairs + 
+                [(c2h_empty, fasta_empty)], self.suffixes + [""], 
+                self.merged_c2h, self.merged_fasta))
+                
+            # TODO: Do this whenever odd instead of at the leaves.
+            
+        elif len(self.c2h_fasta_pairs) == 2:
+            
+            print("Merging two pairs")
                 
             # Merge the first two pairs
             check_call(self, ["../createIndex/cactusMerge", 
@@ -569,27 +581,32 @@ class C2hMergeTarget(jobTree.scriptTree.target.Target):
                 self.c2h_fasta_pairs[1][0], self.c2h_fasta_pairs[1][1],
                 self.merged_c2h, self.merged_fasta, 
                 "--suffix1", self.suffixes[0], "--suffix2", self.suffixes[1]])
+        else:
+            # Delegate to two children
+            
+            # What merged c2h and fasta files will we use for each?
+            c2h_files = [sonLib.bioio.getTempFile(suffix=".c2h",
+                    rootDir=self.getGlobalTempDir()) for i in xrange(2)]
+            fasta_files = [sonLib.bioio.getTempFile(suffix=".fa",
+                    rootDir=self.getGlobalTempDir()) for i in xrange(2)]
+            
+            # What should the first child get?
+            split = len(self.c2h_fasta_pairs) / 2
+            
+            print("Splitting {} pairs at {}".format(
+                len(self.c2h_fasta_pairs), split))
+            
+            # Tell it to go
+            self.addChildTarget(C2hMergeTarget(self.c2h_fasta_pairs[0:split], 
+                self.suffixes[0:split], c2h_files[0], fasta_files[0]))
                 
-        for (next_c2h, next_fasta), next_suffix in itertools.izip(
-            self.c2h_fasta_pairs[2:], self.suffixes[2:]):
-            
-            # For each other pair to merge in, and the suffix to put on it
-            
-            print("Adding in alignment {}".format(next_c2h))
-            
-            # Move the final output files back to some temp files.
-            temp_c2h = sonLib.bioio.getTempFile(suffix=".c2h",
-                rootDir=self.getGlobalTempDir())
-            temp_fasta = sonLib.bioio.getTempFile(suffix=".fa",
-                rootDir=self.getGlobalTempDir())
+            # And the second one
+            self.addChildTarget(C2hMergeTarget(self.c2h_fasta_pairs[split:], 
+                self.suffixes[split:], c2h_files[1], fasta_files[1]))
                 
-            os.rename(self.merged_c2h, temp_c2h)
-            os.rename(self.merged_fasta, temp_fasta)
-            
-            # Merge in the next pair
-            check_call(self, ["../createIndex/cactusMerge", 
-                temp_c2h, temp_fasta, next_c2h, next_fasta, self.merged_c2h, 
-                self.merged_fasta, "--suffix2", next_suffix])
+            # And merge their results when done, giving our result.
+            self.setFollowOnTarget(C2hMergeTarget(zip(c2h_files, fasta_files), 
+                ["", ""], self.merged_c2h, self.merged_fasta))
           
         self.logToMaster("C2hMergeTarget Finished")
 
