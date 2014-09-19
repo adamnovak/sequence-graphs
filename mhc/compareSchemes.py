@@ -361,7 +361,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 rootDir=self.getGlobalTempDir())
         
         # What suffixes should we put on genomes?
-        suffixes = ["-" + scheme for scheme in pair_schemes]
+        suffixes = ["_" + scheme for scheme in pair_schemes]
         
         # And what are the genomes with suffixes?
         genomes_with_suffixes = [genome + suffix for genome, suffix in 
