@@ -105,7 +105,8 @@ getAdjacencyComponentSpectrum(
 std::vector<std::vector<stPinchEnd>>
 filterComponentsBySize(
     std::vector<std::vector<stPinchEnd>> components,
-    size_t size
+    size_t size,
+    std::function<bool(size_t, size_t)> comparison
 ) {
     
     Log::info() << "Selecting size " << size << " components" << std::endl;
@@ -115,8 +116,9 @@ filterComponentsBySize(
     
     std::copy_if(components.begin(), components.end(), 
         std::back_inserter(toReturn), [&](std::vector<stPinchEnd> v) {
-            // Grab only the vectors that are the correct size.
-            return v.size() == size;
+            // Grab only the vectors that compare correctly to size (according
+            // to the passed predicate, which defaults to equality.
+            return comparison(v.size(), size);
         });
         
     return toReturn;
@@ -417,4 +419,42 @@ countTandemDuplications(
     return tandemDuplications;
 
 }
+
+void
+writeAdjacencyComponents(
+    std::vector<std::vector<stPinchEnd>> components,
+    const std::string& filename
+) {
+    // Open file for writing
+    std::ofstream out(filename);
+
+    for(auto component: components) {
+        out << "Component size " << component.size() << ":" << std::endl;
+        
+        // For each component, make a set of involved blocks.
+        std::unordered_set blocks;
+        
+        for(auto end: component) {
+            // Fill it in with all involved blocks
+            blocks.insert(stPinchEnd_getBlock(end));
+        }
+        
+        for(auto block: blocks) {
+            // Grab the first segment
+            auto segment = stPinchBlock_getFirst(block);
+            
+            // Report in its coordinates
+            out << "\t" << stPinchSegment_getStart(segment) << "-" << 
+                stPinchSegment_getStart(segment) + 
+                stPinchSegment_getLength(segment) << " on thread #" << 
+                stPinchThread_getName(stPinchSegment_getThread(segment)) <<
+                std::endl;
+        }
+        
+    }
+    
+    // Close up
+    out.close();
+}
+
 

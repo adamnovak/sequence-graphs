@@ -4,6 +4,7 @@
 #include <vector>
 #include <cstdint> 
 #include <map>
+#include <functional>
 
 // Grab pinchesAndCacti dependency.
 #include <stPinchGraphs.h>
@@ -41,7 +42,10 @@ getAdjacencyComponentSpectrum(
 std::vector<std::vector<stPinchEnd>>
 filterComponentsBySize(
     std::vector<std::vector<stPinchEnd>> components,
-    size_t size
+    size_t size,
+    std::function<bool(size_t, size_t)> = [](size_t a, size_t b) { 
+        return a == b;
+    }
 );
 
 /**
@@ -73,6 +77,15 @@ getIndelLengths(
 size_t
 countTandemDuplications(
     std::vector<std::vector<stPinchEnd>> components
+);
+
+/**
+ * Save the given list of adjacency components to the given filename.
+ */
+void
+writeAdjacencyComponents(
+    std::vector<std::vector<stPinchEnd>> components,
+    const std::string& filename
 );
 
 

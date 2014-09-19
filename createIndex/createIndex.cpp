@@ -658,6 +658,9 @@ main(
             "File in which to save indel lengths between a pair of genomes")
         ("tandemDuplications", boost::program_options::value<std::string>(), 
             "File in which to save the number of tandem duplications")
+        ("nontrivialRearrangements", 
+            boost::program_options::value<std::string>(), 
+            "File in which to dump nontrivial rearrangements")
         ("markovModel", boost::program_options::value<std::string>(), 
             "File to load a Markov model of query sequences from")
         ("context", boost::program_options::value<size_t>()
@@ -926,6 +929,13 @@ main(
         std::vector<size_t> tandemDupeVector {tandemDuplications};
         writeColumn(tandemDupeVector,
             options["tandemDuplications"].as<std::string>()); 
+    }
+    
+    if(options.count("nontrivialRearrangements")) {
+        // Get all size>2 things and dump them.
+        writeAdjacencyComponents(filterComponentsBySize(components, 2, 
+            [](auto a, auto b) { return a > b; }), 
+            options["nontrivialRearrangements"].as<std::string>());
     }
     
     // Clean up the thread set after we analyze everything about it.
