@@ -971,8 +971,9 @@ class AssemblyHubTarget(jobTree.scriptTree.target.Target):
         
         """
         
-        # Make the base Target. Ask for 8gb of memory since this is hard.
-        super(AssemblyHubTarget, self).__init__(memory=8589934592)
+        # Make the base Target. Ask for 8gb of memory since this is hard. And
+        # ask for 32 CPUs so we can split up LOD.
+        super(AssemblyHubTarget, self).__init__(memory=8589934592, cpu=32)
         
         # Save the alignment file
         self.hal = hal
@@ -1060,7 +1061,8 @@ class AssemblyHubTarget(jobTree.scriptTree.target.Target):
         check_call(self, ["hal2assemblyHub.py", 
             hal_abspath, hub_abspath, "--jobTree", 
             tree_dir] + bed_args + ["--shortLabel", 
-            self.scheme, "--lod", "--cpHalFileToOut", "--noUcscNames"])
+            self.scheme, "--lod", "--lodInMemory", "--lodNumProc=32",
+            "--cpHalFileToOut", "--noUcscNames"])
         
         # Go back to the original directory
         os.chdir(original_directory)
@@ -1080,8 +1082,9 @@ class AssemblyHubOnlyTarget(jobTree.scriptTree.target.Target):
         
         """
         
-        # Make the base Target. Ask for 8gb of memory since this is hard.
-        super(AssemblyHubOnlyTarget, self).__init__(memory=8589934592)
+        # Make the base Target. Ask for 8gb of memory since this is hard. And
+        # ask for 32 CPUs so we can speed up LOD.
+        super(AssemblyHubOnlyTarget, self).__init__(memory=8589934592, cpu=32)
         
         # Save the alignment file
         self.hal = hal
@@ -1125,7 +1128,8 @@ class AssemblyHubOnlyTarget(jobTree.scriptTree.target.Target):
         os.chdir(working_directory)
         check_call(self, ["hal2assemblyHub.py", 
             hal_abspath, hub_abspath, "--jobTree", 
-            tree_dir, "--lod", "--cpHalFileToOut", "--noUcscNames"])
+            tree_dir, "--lod", "--lodInMemory", "--lodNumProc=32",
+            "--cpHalFileToOut", "--noUcscNames"])
         
         # Go back to the original directory
         os.chdir(original_directory)
