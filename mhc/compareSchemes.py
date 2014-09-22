@@ -79,20 +79,31 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # add_context, mult_context, min_coding_cost
         scheme_plan = [
                         (False, False, 100, 0, 0, 0),
+                        # Specified Min
+                        (True, True, 60, 0, 0, 0),
+                        (True, True, 80, 0, 0, 0),
                         (True, True, 100, 0, 0, 0),
-                        (True, True, 0, 0, 0, 10),
+                        (True, True, 120, 0, 0, 0),
+                        # Specified add
+                        (True, True, 0, 25, 0, 0),
+                        (True, True, 0, 50, 0, 0),
+                        (True, True, 0, 75, 0, 0),
+                        (True, True, 0, 100, 0, 0),
+                        # Coding cost context
                         (True, True, 0, 0, 0, 20),
-                        (True, True, 0, 0, 0, 40),
-                        (True, True, 0, 0, 0, 60),
                         (True, True, 0, 0, 0, 80),
-                        (True, True, 0, 0, 0, 100),
-                        (True, True, 0, 0, 0, 120),
                         (True, True, 0, 0, 0, 140),
-                        (True, True, 0, 0, 0, 160),
-                        (True, True, 0, 0, 0, 180),
                         (True, True, 0, 0, 0, 200),
-                        (True, True, 0, 0, 0, 220),
-                        (True, True, 0, 0, 0, 240)
+                        (True, True, 0, 0, 0, 260),
+                        # MultContext
+                        (True, True, 0, 0, 1.25, 0),
+                        (True, True, 0, 0, 1.5, 0),
+                        (True, True, 0, 0, 1.75, 0),
+                        (True, True, 0, 0, 2.0, 0),
+                        (True, True, 0, 0, 2.25, 0),
+                        (True, True, 0, 0, 2.50, 0),
+                        (True, True, 0, 0, 2.75, 0),
+                        (True, True, 0, 0, 3.0, 0)
                     ]
         
         for mismatch, credit, min_context, add_context, mult_context, \
@@ -361,7 +372,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 rootDir=self.getGlobalTempDir())
         
         # What suffixes should we put on genomes?
-        suffixes = ["-" + scheme for scheme in pair_schemes]
+        suffixes = [scheme for scheme in pair_schemes]
         
         # And what are the genomes with suffixes?
         genomes_with_suffixes = [genome + suffix for genome, suffix in 
