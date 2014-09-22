@@ -668,8 +668,8 @@ class HalTarget(jobTree.scriptTree.target.Target):
         
         """
         
-        # Make the base Target. Ask for 8gb of memory since this is hard.
-        super(HalTarget, self).__init__(memory=8589934592)
+        # Make the base Target. Ask for 16gb of memory since this is hard.
+        super(HalTarget, self).__init__(memory=17179869184)
         
         # Save the files to merge
         self.c2h_file = c2h_file
@@ -697,8 +697,8 @@ class HalTarget(jobTree.scriptTree.target.Target):
         # Compose the tree.      
         tree = "(" + ",".join(self.genomes) + ")" + self.reference + ";"
                 
-        # Make the HAL.
-        check_call(self, ["halAppendCactusSubtree", self.c2h_file, 
+        # Make the HAL. Do it in memory to be faster.
+        check_call(self, ["halAppendCactusSubtree", "--inMemory", self.c2h_file,
             self.fasta_file, tree, self.hal])
             
                 
