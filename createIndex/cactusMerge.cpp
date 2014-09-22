@@ -63,28 +63,20 @@ main(
 
     std::string appDescription = 
         std::string("Merge c2h/FASTA file pairs.\n" 
-        "Usage: cactusMerge <c2h1> <fasta1> <c2h2> <fasta2> "
-        "<c2hOut> <fastaOut>");
+        "Usage: cactusMerge <c2hOut> <fastaOut> --c2h <c2h files...> "
+            "--fasta <fasta files...> --suffix <suffixes...>");
 
     // Make an options description for our program's options.
     boost::program_options::options_description description("Options");
     // Add all the options
     description.add_options() 
         ("help", "Print help messages")
-        ("suffix1", boost::program_options::value<std::string>()
-            ->default_value(""),
-            "Suffix for sequence and event names from file 1")
-        ("c2h1", boost::program_options::value<std::string>()->required(),
-            "First c2h file to merge")
-        ("fasta1", boost::program_options::value<std::string>()->required(),
-            "FASTA for first c2h file")
-        ("suffix2", boost::program_options::value<std::string>()
-            ->default_value(""),
-            "Suffix for sequence and event names from file 2")
-        ("c2h2", boost::program_options::value<std::string>()->required(),
-            "Second c2h file to merge")
-        ("fasta2", boost::program_options::value<std::string>()->required(),
-            "FASTA for second c2h file")
+        ("c2h", boost::program_options::value<std::vector<std::string>>(),
+            "List of c2h files to merge")
+        ("fasta", boost::program_options::value<std::vector<std::string>>(),
+            "List of FASTA files for the given c2h files")
+        ("suffix", boost::program_options::value<std::vector<std::string>>(),
+            "List of suffixes to add on to event names")
         ("c2hOut", boost::program_options::value<std::string>()->required(), 
             "File to save .c2h-format alignment in")
         ("fastaOut", boost::program_options::value<std::string>()->required(), 
@@ -93,10 +85,6 @@ main(
         
     // And set up our positional arguments
     boost::program_options::positional_options_description positionals;
-    positionals.add("c2h1", 1);
-    positionals.add("fasta1", 1);
-    positionals.add("c2h2", 1);
-    positionals.add("fasta2", 1);
     positionals.add("c2hOut", 1);
     positionals.add("fastaOut", 1);
     
@@ -124,11 +112,26 @@ main(
             return 0; 
         }
         
-        if(!options.count("c2h1") || !options.count("fasta1") ||
-            !options.count("c2h2") || !options.count("fasta2") ||
-            !options.count("c2hOut") || !options.count("fastaOut")) {
-            
+        if(!options.count("c2h") || !options.count("fasta")) {
+            // We need both of these
             throw boost::program_options::error("Missing important arguments!");
+        }
+        
+        if(options["c2h"].as<std::vector<std::string>>().size() != 
+            options["fasta"].as<std::vector<std::string>>().size()) {
+            
+            // Counts need to match up here, because these are pairs
+            throw boost::program_options::error(
+                "c2h/fasta counts don't match!");
+        }
+        
+        if(options.count("suffix") && 
+            options["c2h"].as<std::vector<std::string>>().size() != 
+            options["suffix"].as<std::vector<std::string>>().size()) {
+        
+            // If we have any suffixes we must have the right number
+            throw boost::program_options::error(
+                "c2h/suffix counts don't match!");
         }
             
     } catch(boost::program_options::error& error) {
@@ -147,17 +150,17 @@ main(
     // If we get here, we have the right arguments.
     
     // Make a list of the c2h files to use
-    std::vector<std::string> c2hFiles {
-        options["c2h1"].as<std::string>(),
-        options["c2h2"].as<std::string>()
-    };
+    std::vector<std::string> c2hFiles(
+        options["c2h"].as<std::vector<std::string>>());
     
     // This holds the suffix applied to all the top sequences and events in each
     // file.
-    std::vector<std::string> suffixes {
-       options["suffix1"].as<std::string>(),
-       options["suffix2"].as<std::string>()
-    };
+    std::vector<std::string> suffixes(
+        options["suffix"].as<std::vector<std::string>>());
+        
+    // Make a list of the FASTA files to use
+    std::vector<std::string> fastaFiles(
+        options["fasta"].as<std::vector<std::string>>());
     
     // This will hold all of the renames that have to happen for each file.
     // These are generated when we go through the file by renaming top sequences
@@ -422,12 +425,6 @@ main(
     stPinchThreadSet_destruct(threadSet);
     
     // Merge the FASTAs, applying any renaming that needs to happen.
-    
-    // Make a list of the FASTA files to use
-    std::vector<std::string> fastaFiles {
-        options["fasta1"].as<std::string>(),
-        options["fasta2"].as<std::string>()
-    };
     
     // We'll do the FASTA output ourselves. Open the file.
     std::ofstream fastaOut(options["fastaOut"].as<std::string>());

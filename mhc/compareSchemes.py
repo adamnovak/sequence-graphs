@@ -566,60 +566,24 @@ class C2hMergeTarget(jobTree.scriptTree.target.Target):
         
         if len(self.c2h_fasta_pairs) == 0:
             raise Exception("No alignments at all!")
+            
+        # Start preparing arguments
+        args = ["../createIndex/cactusMerge", self.merged_c2h, self.merged_fasta]
         
-        elif len(self.c2h_fasta_pairs) == 1:
-            # Merge the singleton against an empty file pair to add the prefix.
+        for (c2h, fasta), suffix in itertools.izip(self.c2h_fasta_pairs,
+            self.suffixes):
             
-            # Make the empty pair
-            c2h_empty = sonLib.bioio.getTempFile(suffix=".c2h",
-                    rootDir=self.getGlobalTempDir())
-            fasta_empty = sonLib.bioio.getTempFile(suffix=".fa",
-                    rootDir=self.getGlobalTempDir())
-            
-            # Request the merge.
-            self.addChildTarget(C2hMergeTarget(self.c2h_fasta_pairs + 
-                [(c2h_empty, fasta_empty)], self.suffixes + [""], 
-                self.merged_c2h, self.merged_fasta))
-                
-            # TODO: Do this whenever odd instead of at the leaves.
-            
-        elif len(self.c2h_fasta_pairs) == 2:
-            
-            print("Merging two pairs")
-                
-            # Merge the first two pairs
-            check_call(self, ["../createIndex/cactusMerge", 
-                self.c2h_fasta_pairs[0][0], self.c2h_fasta_pairs[0][1], 
-                self.c2h_fasta_pairs[1][0], self.c2h_fasta_pairs[1][1],
-                self.merged_c2h, self.merged_fasta, 
-                "--suffix1", self.suffixes[0], "--suffix2", self.suffixes[1]])
-        else:
-            # Delegate to two children
-            
-            # What merged c2h and fasta files will we use for each?
-            c2h_files = [sonLib.bioio.getTempFile(suffix=".c2h",
-                    rootDir=self.getGlobalTempDir()) for i in xrange(2)]
-            fasta_files = [sonLib.bioio.getTempFile(suffix=".fa",
-                    rootDir=self.getGlobalTempDir()) for i in xrange(2)]
-            
-            # What should the first child get?
-            split = len(self.c2h_fasta_pairs) / 2
-            
-            print("Splitting {} pairs at {}".format(
-                len(self.c2h_fasta_pairs), split))
-            
-            # Tell it to go
-            self.addChildTarget(C2hMergeTarget(self.c2h_fasta_pairs[0:split], 
-                self.suffixes[0:split], c2h_files[0], fasta_files[0]))
-                
-            # And the second one
-            self.addChildTarget(C2hMergeTarget(self.c2h_fasta_pairs[split:], 
-                self.suffixes[split:], c2h_files[1], fasta_files[1]))
-                
-            # And merge their results when done, giving our result.
-            self.setFollowOnTarget(C2hMergeTarget(zip(c2h_files, fasta_files), 
-                ["", ""], self.merged_c2h, self.merged_fasta))
-          
+            # Make args for each thing you want to merge in
+            args.append("--c2h")
+            args.append(c2h)
+            args.append("--fasta")
+            args.append(fasta)
+            args.append("--suffix")
+            args.append(suffix)
+        
+        # Make the call
+        check_call(self, args)
+        
         self.logToMaster("C2hMergeTarget Finished")
 
 class C2hChangeRootTarget(jobTree.scriptTree.target.Target):
