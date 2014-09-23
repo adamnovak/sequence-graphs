@@ -69,59 +69,85 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             "Creating SchemeAssessmentTarget with seed {}".format(seed))
         
    
+    def getSchemePlan(self):
+        """
+        Return a list of tuples describing schemes.
+        
+        """
+        
+        # Plan out all the schemes as mismatch, credit, min_context,
+        # add_context, mult_context, min_coding_cost
+        return [
+            (False, False, 100, 0, 0, 0),
+            # Specified Min
+            (True, True, 60, 0, 0, 0),
+            (True, True, 80, 0, 0, 0),
+            (True, True, 100, 0, 0, 0),
+            (True, True, 120, 0, 0, 0),
+            # Specified add
+            (True, True, 0, 25, 0, 0),
+            (True, True, 0, 50, 0, 0),
+            (True, True, 0, 75, 0, 0),
+            (True, True, 0, 100, 0, 0),
+            # Coding cost context
+            (True, True, 0, 0, 0, 20),
+            (True, True, 0, 0, 0, 80),
+            (True, True, 0, 0, 0, 140),
+            (True, True, 0, 0, 0, 200),
+            (True, True, 0, 0, 0, 260),
+            # MultContext
+            (True, True, 0, 0, 1.25, 0),
+            (True, True, 0, 0, 1.5, 0),
+            (True, True, 0, 0, 1.75, 0),
+            (True, True, 0, 0, 2.0, 0),
+            (True, True, 0, 0, 2.25, 0),
+            (True, True, 0, 0, 2.50, 0),
+            (True, True, 0, 0, 2.75, 0),
+            (True, True, 0, 0, 3.0, 0)
+        ]
+
+    def getMonotonicSchemePlan(self):
+        """
+        Return a list of different tuples describing schemes.
+        
+        We want to look at addContext schemes without credit to try and catch
+        nonmonotonicity.
+        
+        """
+        
+        # Plan out all the schemes as mismatch, credit, min_context,
+        # add_context, mult_context, min_coding_cost
+        return [
+            # No credit
+            (True, False, 0, 25, 0, 0),
+            (True, False, 0, 50, 0, 0),
+            (True, False, 0, 75, 0, 0),
+            (True, False, 0, 100, 0, 0),
+            # Credit
+            (True, True, 0, 25, 0, 0),
+            (True, True, 0, 50, 0, 0),
+            (True, True, 0, 75, 0, 0),
+            (True, True, 0, 100, 0, 0)
+        ]
+
+        
+   
     def generateSchemes(self):
         """
         Whatever schemes I want to test at the moment
         
         """
         
-        # Plan out all the schemes as mismatch, credit, min_context,
-        # add_context, mult_context, min_coding_cost
-        scheme_plan = [
-                        (False, False, 100, 0, 0, 0),
-                        # Specified Min
-                        (True, True, 60, 0, 0, 0),
-                        (True, True, 80, 0, 0, 0),
-                        (True, True, 100, 0, 0, 0),
-                        (True, True, 120, 0, 0, 0),
-                        # Specified add
-                        (True, True, 0, 25, 0, 0),
-                        (True, True, 0, 50, 0, 0),
-                        (True, True, 0, 75, 0, 0),
-                        (True, True, 0, 100, 0, 0),
-                        # Coding cost context
-                        (True, True, 0, 0, 0, 20),
-                        (True, True, 0, 0, 0, 80),
-                        (True, True, 0, 0, 0, 140),
-                        (True, True, 0, 0, 0, 200),
-                        (True, True, 0, 0, 0, 260),
-                        # MultContext
-                        (True, True, 0, 0, 1.25, 0),
-                        (True, True, 0, 0, 1.5, 0),
-                        (True, True, 0, 0, 1.75, 0),
-                        (True, True, 0, 0, 2.0, 0),
-                        (True, True, 0, 0, 2.25, 0),
-                        (True, True, 0, 0, 2.50, 0),
-                        (True, True, 0, 0, 2.75, 0),
-                        (True, True, 0, 0, 3.0, 0)
-                    ]
+        
+        scheme_plan = self.getMonotonicSchemePlan()
         
         for mismatch, credit, min_context, add_context, mult_context, \
             min_coding_cost in scheme_plan:
             
             # Start out with the context args
             extra_args = ["--context", str(min_context), "--addContext",
-                str(add_context), "--multContext", str(mult_context), 
-                "--minCodingCost", str(min_coding_cost)]
-                
-            # Make sure we have a Markov model
-            if self.markov_model is None:
-                raise Exception("We need a Markov model for coding cost!")
-                
-            # Send it along to the merger
-            extra_args.append("--markovModel")
-            extra_args.append(self.markov_model)
-    
+                str(add_context), "--multContext", str(mult_context)]
+            
             # And give it a name to stick on our output files
             scheme_name = "E"
             if mismatch:
@@ -154,7 +180,19 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 scheme_name += "Mult{}".format(mult_context).replace(".", "p")
                 
             if min_coding_cost > 0:
-                # Similarly for the min coding cost, replace the decimal.
+                # Say we're going to use a min coding cost
+                extra_args.append("--minCodingCost")
+                extra_args.append(str(min_coding_cost))
+                    
+                # Make sure we have a Markov model
+                if self.markov_model is None:
+                    raise Exception("We need a Markov model for coding cost!")
+                    
+                # Send it along to the merger
+                extra_args.append("--markovModel")
+                extra_args.append(self.markov_model)
+            
+                # Also, replace the decimal in the scheme name
                 scheme_name += "Bits{}".format(min_coding_cost).replace(".",
                     "p")
                 
@@ -949,9 +987,8 @@ class AssemblyHubTarget(jobTree.scriptTree.target.Target):
         
         """
         
-        # Make the base Target. Ask for 8gb of memory since this is hard. And
-        # ask for 32 CPUs so we can split up LOD.
-        super(AssemblyHubTarget, self).__init__(memory=8589934592, cpu=32)
+        # Make the base Target. Ask for 8gb of memory since this is hard.
+        super(AssemblyHubTarget, self).__init__(memory=8589934592, cpu=1)
         
         # Save the alignment file
         self.hal = hal
@@ -1039,7 +1076,7 @@ class AssemblyHubTarget(jobTree.scriptTree.target.Target):
         check_call(self, ["hal2assemblyHub.py", 
             hal_abspath, hub_abspath, "--jobTree", 
             tree_dir] + bed_args + ["--shortLabel", 
-            self.scheme, "--lod", "--lodInMemory", "--lodNumProc=32",
+            self.scheme, # No LOD
             "--cpHalFileToOut", "--noUcscNames"])
         
         # Go back to the original directory
@@ -1060,9 +1097,8 @@ class AssemblyHubOnlyTarget(jobTree.scriptTree.target.Target):
         
         """
         
-        # Make the base Target. Ask for 8gb of memory since this is hard. And
-        # ask for 32 CPUs so we can speed up LOD.
-        super(AssemblyHubOnlyTarget, self).__init__(memory=8589934592, cpu=32)
+        # Make the base Target. Ask for 8gb of memory since this is hard.
+        super(AssemblyHubOnlyTarget, self).__init__(memory=8589934592)
         
         # Save the alignment file
         self.hal = hal
@@ -1106,7 +1142,7 @@ class AssemblyHubOnlyTarget(jobTree.scriptTree.target.Target):
         os.chdir(working_directory)
         check_call(self, ["hal2assemblyHub.py", 
             hal_abspath, hub_abspath, "--jobTree", 
-            tree_dir, "--lod", "--lodInMemory", "--lodNumProc=32",
+            tree_dir, # No LOD
             "--cpHalFileToOut", "--noUcscNames"])
         
         # Go back to the original directory
