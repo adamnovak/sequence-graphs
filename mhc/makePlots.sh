@@ -111,13 +111,39 @@ do
     # Type is whatever's before that (ICMult)
     SCHEME_TYPE=${SCHEME%${SCHEME_PARAMETER}}
     
+    # Fix up fractional values
+    SCHEME_PARAMETER=$(printf "${SCHEME_PARAMETER}" | sed s/p/./)
+    
     echo "Scheme ${SCHEME_TYPE} parameter ${SCHEME_PARAMETER}"
     
-    cat ${FILE} | while read LINE
+    # We want totals
+    TOTAL_PRECISION=0
+    TOTAL_RECALL=0
+    LINE_COUNT=0
+    
+    while read LINE || [[ -n $LINE ]]
     do
-        # Tag each entry with its scheme
-        printf "${SCHEME_TYPE}\t${LINE}\n" >> ${OUTFILE}
-    done
+        # Split on spaces
+        PARTS=(${LINE})
+        
+        # Add in everything. Float math needs the bc tool.
+        TOTAL_PRECISION=$(echo ${TOTAL_PRECISION} + ${PARTS[0]} | bc -l)
+        TOTAL_RECALL=$(echo ${TOTAL_RECALL} + ${PARTS[1]} | bc -l)
+        LINE_COUNT=$((${LINE_COUNT} + 1))
+        
+        #echo "At line ${LINE_COUNT} totals ${TOTAL_PRECISION}, ${TOTAL_RECALL}"
+        
+    done < ${FILE}
+    
+    # Calculate averages. We seem to get integer division unless we pass -l?
+    MEAN_PRECISION=$(echo ${TOTAL_PRECISION} / ${LINE_COUNT} | bc -l)
+    MEAN_RECALL=$(echo ${TOTAL_RECALL} / ${LINE_COUNT} | bc -l)
+    
+    #echo "Means ${MEAN_PRECISION}, ${MEAN_RECALL}"
+    
+    # Write a mean precision/recall point for this type of scheme. We'll get one
+    # per parameter value.
+    printf "${SCHEME_TYPE}\t${MEAN_PRECISION}\t${MEAN_RECALL}\n" >> ${OUTFILE}
     
 done
 
