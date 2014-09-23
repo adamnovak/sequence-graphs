@@ -437,22 +437,20 @@ writeAdjacencyComponents(
         std::unordered_set<stPinchBlock*> blocks;
         
         for(auto end: component) {
-            // Fill it in with all involved blocks
-            blocks.insert(stPinchEnd_getBlock(&end));
-        }
-        
-        for(auto block: blocks) {
-            // Grab the first segment
-            auto segment = stPinchBlock_getFirst(block);
+            // Get the segment the end belongs to
+            auto segment = stPinchBlock_getFirst(stPinchEnd_getBlock(&end));
             
-            // Report in its coordinates
-            out << "\t" << stPinchSegment_getStart(segment) << "-" << 
+            // Report the end
+            out << "\t" << "End " << stPinchEnd_getOrientation(&end) <<
+                " of block " << stPinchEnd_getBlock(&end) << std::endl;
+            // Report the coordinates of that end's block on the reference
+            out << "\t\t" << stPinchSegment_getStart(segment) << "-" << 
                 stPinchSegment_getStart(segment) + 
                 stPinchSegment_getLength(segment) << " on thread #" << 
                 stPinchThread_getName(stPinchSegment_getThread(segment)) <<
                 std::endl;
+            
         }
-        
     }
     
     // Close up
