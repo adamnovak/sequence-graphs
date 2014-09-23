@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -e
+shopt -s extglob
 
 # makePlots.sh: make plots in a directory of scheme comparison stats output.
 
@@ -104,10 +105,18 @@ do
     # Grab the scheme
     SCHEME=${FILE##*.}
     
+    # Break it into scheme proper and parameter setting
+    # Parameter is whatever's after all the alpha stuff (2p0)
+    SCHEME_PARAMETER=${SCHEME##*([A-Za-z])}
+    # Type is whatever's before that (ICMult)
+    SCHEME_TYPE=${SCHEME%${SCHEME_PARAMETER}}
+    
+    echo "Scheme ${SCHEME_TYPE} parameter ${SCHEME_PARAMETER}"
+    
     cat ${FILE} | while read LINE
     do
         # Tag each entry with its scheme
-        printf "${SCHEME}\t${LINE}\n" >> ${OUTFILE}
+        printf "${SCHEME_TYPE}\t${LINE}\n" >> ${OUTFILE}
     done
     
 done

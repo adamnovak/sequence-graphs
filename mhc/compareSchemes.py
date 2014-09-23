@@ -123,17 +123,20 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             extra_args.append(self.markov_model)
     
             # And give it a name to stick on our output files
-            scheme_name = "Exact"
+            scheme_name = "E"
             if mismatch:
                 # Add the args and scheme name component for mismatch
                 extra_args.append("--mismatch")
                 extra_args.append("--mismatches")
                 extra_args.append("1")
-                scheme_name = "Inexact"
+                scheme_name = "I"
             if credit:
                 # Add the args and scheme name component for credit
                 extra_args.append("--credit")
-                scheme_name += "Credit"
+                scheme_name += "C"
+            else:
+                # Add an N for no credit
+                scheme_name += "N"
                 
             if min_context > 0:
                 # Include min conext in the name if in use
