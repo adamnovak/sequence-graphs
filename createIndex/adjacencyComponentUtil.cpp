@@ -436,7 +436,7 @@ writeAdjacencyComponents(
         // For each component, make a set of involved blocks.
         std::unordered_set<stPinchBlock*> blocks;
         
-        for(auto end: component) {
+        for(auto end : component) {
             // Get and store the block the end belongs to
             auto block = stPinchEnd_getBlock(&end);
             blocks.insert(block);
@@ -444,13 +444,17 @@ writeAdjacencyComponents(
             // Get the segment the end belongs to
             auto segment = stPinchBlock_getFirst(block);
             
-            // Report the end
-            out << "\t" << "End " << stPinchEnd_getOrientation(&end) <<
-                " of block " << stPinchEnd_getBlock(&end) << std::endl;
+            // Name it
+            std::string segmentName =
+                std::to_string(stPinchSegment_getStart(segment) + 1) +
+                 "-" + std::to_string(stPinchSegment_getStart(segment) + 
+                 stPinchSegment_getLength(segment) + 1);
+            
+            // And get which end we're on
+            char endName = stPinchEnd_getOrientation(&end) ? 'R' : 'L';
+            
             // Report the coordinates of that end's block on the reference
-            out << "\t\t" << stPinchSegment_getStart(segment) << "-" << 
-                stPinchSegment_getStart(segment) + 
-                stPinchSegment_getLength(segment) << " on thread #" << 
+            out << "\t" << segmentName << " " << endName << " on thread #" << 
                 stPinchThread_getName(stPinchSegment_getThread(segment)) <<
                 std::endl;
             
@@ -458,17 +462,76 @@ writeAdjacencyComponents(
         
         // Do some graphviz
         out << "\tgraph {" << std::endl;
-        for(auto end: component) {
-            // Put the end
-            out << "\t\tn" << stPinchEnd_getBlock(&end) << "s" << 
-                stPinchEnd_getOrientation(&end) << ";" << std::endl;
-        }
         
         for(auto block : blocks) {
-            // Put the edge for the block
-            out << "\t\tn" << block << "s0" << " -> n" << block << "s1;" << 
-                std::endl;
+            // Get the segment the end belongs to
+            auto segment = stPinchBlock_getFirst(block);
+            
+            // Go through all the segments in the block in total
+            stPinchBlockIt iterator = stPinchBlock_getSegmentIterator(block);
+            // And count up the number of them
+            size_t count = 0;
+            while(stPinchBlockIt_getNext(&iterator) != NULL) {
+                count++;
+            }
+            
+            // Make an edge with the info from the first segment, annotated with
+            // copy number
+            out << "\t\t{rank=same; n" <<
+                (stPinchSegment_getStart(segment) + 1) << "L -- n" <<
+                std::to_string(stPinchSegment_getStart(segment) + 
+                stPinchSegment_getLength(segment)) << 
+                "R[color=blue,label=\"" << count << "\"];}" << std::endl;
+            
         }
+        
+        for(auto end : component) {
+            // Get the block and segment
+            auto block = stPinchEnd_getBlock(&end);
+            auto segment = stPinchBlock_getFirst(block);
+            
+            // Pick left end L or right end R to represent this end
+            std::string node = stPinchEnd_getOrientation(&end) ? 
+                std::to_string(stPinchSegment_getStart(segment) + 1) + "L" :
+                std::to_string(stPinchSegment_getStart(segment) + 
+                stPinchSegment_getLength(segment)) + "R";
+            
+            // Go through all the other ends and connect them to this one
+            stSet* otherEnds = stPinchEnd_getConnectedPinchEnds(&end);
+            
+            // Make an iterator to loop over all the other ends we connect to.
+            stSetIterator* iterator = stSet_getIterator(otherEnds); 
+            
+            stPinchEnd* otherEnd = (stPinchEnd*) stSet_getNext(iterator);
+            while(otherEnd != NULL) {
+                // For each other end
+                
+                // Get the block and segment
+                auto otherBlock = stPinchEnd_getBlock(otherEnd);
+                auto otherSegment = stPinchBlock_getFirst(otherBlock);
+                
+                // Pick left end L or right end R to represent this other end
+                std::string otherNode = stPinchEnd_getOrientation(otherEnd) ? 
+                    std::to_string(stPinchSegment_getStart(otherSegment) + 1) +
+                    "L" : std::to_string(stPinchSegment_getStart(otherSegment) +
+                    stPinchSegment_getLength(otherSegment)) + "R";
+                
+                if(node < otherNode) {
+                    // Only draw these edges going in one direction, so copy
+                    // number represents actual copy number.
+                    out << "\t\tn" << node << " -- n" << otherNode << 
+                        "[color=red];" << std::endl;
+                }
+                
+                otherEnd = (stPinchEnd*) stSet_getNext(iterator);
+            }
+    
+    
+            // Clean up sonLib stuff            
+            stSet_destructIterator(iterator);
+            stSet_destruct(otherEnds);
+        }
+        
         out << "\t}" << std::endl;
         
     }
