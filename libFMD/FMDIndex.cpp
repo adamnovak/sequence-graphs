@@ -207,8 +207,8 @@ size_t FMDIndex::getContigNumber(TextPosition base) const {
 }
 
 bool FMDIndex::getStrand(TextPosition base) const {
-    // What strand corresponds to that text? Strands are forward, then reverse.
-    return base.getText() % 2 == 1;
+    // What strand corresponds to that text?
+    return base.getStrand();
 }
 
 size_t FMDIndex::getOffset(TextPosition base) const {

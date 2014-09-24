@@ -35,6 +35,13 @@ public:
     }
     
     /**
+     * Return which strand our text is: 0 (forward) or 1 (reverse)
+     */
+    inline bool getStrand() const {
+        return getText() % 2 == 1;
+    }
+    
+    /**
      * Get the 0-based offset in that text that is being referred to.
      */
     inline size_t getOffset() const {
@@ -46,6 +53,32 @@ public:
      */
     inline void setOffset(size_t value) {
         offset = value;        
+    }
+    
+    /**
+     * Shift forwards along the forward strand, or backwards along the reverse
+     * strand, by this amount.
+     */
+    inline void addOffset(int64_t offset) {
+        // make the new location
+        TextPosition newLocation = location;
+        // Offset it in the correct direction depending on its strand.
+        newLocation.setOffset(newLocation.getOffset() + 
+            (index.getStrand(newLocation) ? 1 : -1) * offset);
+        
+        // Keep all our features and just slide up
+        return Mapping(newLocation, is_mapped, context);
+    }
+    
+    /**
+     * Flip to the other text that belongs to the same contig, converting offset
+     * with the given contig length.
+     */
+    inline void flip(size_t textLength) {
+        // Flip the LSB of the text
+        text ^= 1;
+        // Compute the offset from the other end. -1 since end is exclusive.
+        offset = (int64_t) textLength - (int64_t) offset - 1;
     }
     
     /**

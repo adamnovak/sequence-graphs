@@ -63,6 +63,8 @@ public:
      * Metadata Access Functions
      **************************************************************************/
     
+    // TODO: TextPositions can already do like all of these themsleves.
+    
     /**
      * Get the contig number (not the text number) from a (text, offset) pair.
      */

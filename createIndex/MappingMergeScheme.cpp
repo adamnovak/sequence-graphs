@@ -827,15 +827,17 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
         std::pair<std::pair<size_t,size_t>,bool> firstBaseL; 
         int64_t LROffset;
         
-        size_t maxRContext = 0; // The maximum-length right context a candidate needs to worry about.
-        size_t maxLContext = 0; // The maximum-length left context a candidate needs to worry about.
+        // The maximum-length right context a candidate needs to worry about.
+        size_t maxRContext = 0; 
+        // The maximum-length left context a candidate needs to worry about.
+        size_t maxLContext = 0; 
         
         Log::info() << "Checking " << creditCandidates.size() << 
             " unmapped positions \"in the middle\"" << std::endl;
         
-        // Scan for the maximum 
-        
         for(size_t i; i < rightMappings.size(); i++) {
+            // Scan for the maximum context lengths used, so we can limit how
+            // far out we have to check for consistency.
             if(rightMappings[i].second > maxRContext) {
                 maxRContext = rightMappings[i].second;
             }
@@ -1006,9 +1008,9 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
                         }
                       
                     }
-                } else if(firstL == -1) {
-                    // We are placed by a consistent right mapping, and no
-                    // inconsistent left mapping.
+                } else {
+                    // We are not placed by a consistent left-mapping, only by a
+                    // consistent right mapping.
                     
                     // TODO: Given that left mappings might have been existent
                     // but inconsistent, shouldn't we not map in that case?
@@ -1047,10 +1049,8 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
                     }
                       
                 }
-            } else if (firstR == -1 && firstL != -1 && contextMappedL) {
-                // Only the left-mapped bases are there and consistent. There is
-                // no right-mapped base (since we already checked for present &
-                // consistent right-mapped bases).
+            } else if (firstL != -1 && contextMappedL) {
+                // Only the left-mapped bases are there and consistent.
             
                 //Log::info() << "Before " << firstBaseL.first.second << 
                 //    std::endl;
