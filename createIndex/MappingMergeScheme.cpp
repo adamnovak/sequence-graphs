@@ -811,16 +811,24 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
       
         // Iterate across all possible positions for mapping on credit
         
-        int64_t firstR;
-        bool contextMappedR;
-        int64_t firstL;
-        bool contextMappedL;
-        std::pair<std::pair<size_t,size_t>,bool> firstBaseR;
-        std::pair<std::pair<size_t,size_t>,bool> firstBaseL;    
+        // Right-most right-mapped position with a candidate in its context.
+        int64_t firstR; 
+        // True if a candidate is placed consistently by right contexts.
+        bool contextMappedR; 
+        // Left-most left-mapped position with a candidate in its context.
+        int64_t firstL; 
+        // True if a candidate is placed consistently by left contexts.
+        bool contextMappedL; 
+        // Holds the right-most base with a right context that places a
+        // candidate, as contig, base, face.
+        std::pair<std::pair<size_t,size_t>,bool> firstBaseR; 
+        // Holds the left-most base with a left context that places a candidate,
+        // as contig, base, face.
+        std::pair<std::pair<size_t,size_t>,bool> firstBaseL; 
         int64_t LROffset;
         
-        size_t maxRContext = 0;
-        size_t maxLContext = 0;
+        size_t maxRContext = 0; // The maximum-length right context a candidate needs to worry about.
+        size_t maxLContext = 0; // The maximum-length left context a candidate needs to worry about.
         
         Log::info() << "Checking " << creditCandidates.size() << 
             " unmapped positions \"in the middle\"" << std::endl;
@@ -892,6 +900,9 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
             leftMappings.size() && 
                 j - creditCandidates[i] < maxLContext; j++) {
                 
+                // Do the same thing as above looking right at mapped bases and
+                // their left contexts.
+                
                 if(firstL == -1) {
                     if(leftMappings[j].second > j - creditCandidates[i]) {
                         firstBaseL = rangeBases[leftMappings[j].first];
@@ -914,25 +925,48 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
             }
                   
             if(firstR != -1 && contextMappedR) {
+                // Right-contexts include this candidate and are consistent.
+            
                 if(firstBaseR.second) {
+                    // Work out the distance from the nearest right-mapped base.
                     LROffset = firstR - (int64_t)creditCandidates[i];
                 } else {
+                    // Work out the distance from the nearest right-mapped base,
+                    // in the other direction, since we mapped to the other
+                    // strand.
                     LROffset = (int64_t)creditCandidates[i] - firstR;
                 }
+                
+                // Apply the offset to the (contig, base, face) position for the
+                // nearest right-mapped base.
                 int64_t temp = (int64_t)firstBaseR.first.second + LROffset;
                 firstBaseR.first.second = (size_t)temp;
 
                 if(firstL != -1 && contextMappedL) {
+                    // Left contexts include this candidate and are consistent,
+                    // too.
+                    
                     if(!firstBaseL.second) {
+                        // Work out the offset we need to go from the mapped
+                        // base to the candidate.
                         LROffset = firstL - (int64_t)creditCandidates[i];
                     } else {
+                        // Do the same thing but given that the coordinates run
+                        // backwards since we mapped to the other strand.
                         LROffset = (int64_t)creditCandidates[i] - firstL;
                     }
+                    
+                    // Apply the offset to the (contig, base, face) position of
+                    // the nearest left-mapped base.
                     int64_t temp = (int64_t)firstBaseL.first.second + LROffset;
                     firstBaseL.first.second = (size_t)temp;
                                     
                     if(firstBaseR.first == firstBaseL.first &&
                         firstBaseR.second != firstBaseL.second) {
+                        // If the right- and left-mapped bases put us at the
+                        // same place with opposite orientation flags (due to
+                        // right/left mapping semantics?)
+                            
                         
                         // TODO: Understand this credit code so I don't have to
                         // repeat the same check 3 times.
@@ -973,6 +1007,11 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
                       
                     }
                 } else {
+                    // We are not placed by a consistent left-mapping, only by a
+                    // consistent right mapping.
+                    
+                    // TODO: Given that left mappings might have been existent
+                    // but inconsistent, shouldn't we not map in that case?
                 
                     // Grab the bases we are thinking of merging
                     char queryBase = contig[creditCandidates[i]];
@@ -999,7 +1038,7 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
                         // when oriented right.
                 
                         generateMerge(queryContig, creditCandidates[i] + 1,
-                             firstBaseR.first.first,firstBaseR.first.second,
+                             firstBaseR.first.first, firstBaseR.first.second,
                              firstBaseR.second);
                              
                         mappedBases++;
@@ -1009,13 +1048,21 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
                       
                 }
             } else if (firstL != -1 && contextMappedL) {
+                // Only the left-mapped bases are there and consistent.
+            
                 //Log::info() << "Before " << firstBaseL.first.second << 
                 //    std::endl;
                 if(!firstBaseL.second) {
+                    // Work out the offset from the closest left-mapped base
+                    // placing the candidate.
                     LROffset = firstL - (int64_t)creditCandidates[i];
                 } else {
+                    // Same offset but going the other way on the other strand.
                     LROffset = (int64_t)creditCandidates[i] - firstL;
                 }
+                
+                // Correct the base's position with that offset, to put it where
+                // the candidate was placed
                 int64_t temp = (int64_t)firstBaseL.first.second + LROffset;
                 firstBaseL.first.second = (size_t)temp;
                 
