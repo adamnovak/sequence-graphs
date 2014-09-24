@@ -60,14 +60,8 @@ public:
      * strand, by this amount.
      */
     inline void addOffset(int64_t offset) {
-        // make the new location
-        TextPosition newLocation = location;
-        // Offset it in the correct direction depending on its strand.
-        newLocation.setOffset(newLocation.getOffset() + 
-            (index.getStrand(newLocation) ? 1 : -1) * offset);
-        
-        // Keep all our features and just slide up
-        return Mapping(newLocation, is_mapped, context);
+        // Offset in the correct direction depending on its strand.
+        setOffset(getOffset() + (getStrand() ? 1 : -1) * offset);
     }
     
     /**

@@ -21,8 +21,8 @@ std::ostream& operator<< (std::ostream& o, Mapping const& mapping) {
     if(mapping.is_mapped) {
         o << "Text " << mapping.location.getText() << " offset " <<
         mapping.location.getOffset();
-        if(context > 0) {
-            o << "(+" << context << ")";
+        if(mapping.context > 0) {
+            o << "(+" << mapping.context << ")";
         }
     } else {
         o << "-----------------";

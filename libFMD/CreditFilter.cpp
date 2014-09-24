@@ -1,7 +1,7 @@
 #include "CreditFilter.hpp"
 #include <algorithm>
 
-CreditFilter::CreditFilter(FMDIndex& index): index(index) {
+CreditFilter::CreditFilter(FMDIndex& index): index(index), disambiguate(index) {
     // Nothing to do!
 }
 
@@ -39,7 +39,7 @@ std::vector<Mapping> CreditFilter::apply(
         }
     }
     
-    if(leftSentinel == -1 || rigthSentinel == -1) {
+    if(leftSentinel == -1 || rightSentinel == -1) {
         // We didn't find one of the sentinels, so we can't do credit between
         // them. Just disambiguate without applying credit.
         return std::move(disambiguated);
@@ -52,9 +52,9 @@ std::vector<Mapping> CreditFilter::apply(
     
     for(size_t i = 0; i < leftMappings.size(); i++) {
         // Take the max left and right context when we find them.
-        maxLeftContext = std::max(maxLeftContext, leftMappings[i].geContext());
+        maxLeftContext = std::max(maxLeftContext, leftMappings[i].getContext());
         maxRightContext = std::max(maxRightContext, 
-            rightMappings[i].geContext());
+            rightMappings[i].getContext());
     }
     
     // This is going to hold our output
@@ -78,7 +78,7 @@ std::vector<Mapping> CreditFilter::apply(
             // this one by its right context.
             bool rightFound = false;
             // This is where that base would place this one
-            TextPosition rightCreditPosition;
+            TextPosition rightCreditPosition(0, 0);
             // Set this if right contexts all place this base in one spot
             bool rightConsistent = true;
         
@@ -122,7 +122,7 @@ std::vector<Mapping> CreditFilter::apply(
             // this one by its left context.
             bool leftFound = false;
             // This is where that base would place this one
-            TextPosition leftCreditPosition;
+            TextPosition leftCreditPosition(0, 0);
             // Set this if left contexts all place this base in one spot
             bool leftConsistent = true;
         
@@ -168,9 +168,9 @@ std::vector<Mapping> CreditFilter::apply(
                     
                     // Flip the text position we got from the right using the
                     // index.
-                    TextPosition rightFlipped = rightCreditPosition.flip(
-                        index.getContigLength(index.getContigNumber(
-                        rightCreditPosition)));
+                    TextPosition rightFlipped = rightCreditPosition;
+                    rightFlipped.flip(index.getContigLength(
+                        index.getContigNumber(rightFlipped)));
                         
                     if(leftCreditPosition == rightFlipped) {
                         // They agree! Record a successful mapping.
@@ -187,9 +187,9 @@ std::vector<Mapping> CreditFilter::apply(
                 // We have credit only from the right
                 
                 // We need to flip it into left semantics.
-                TextPosition rightFlipped = rightCreditPosition.flip(
-                    index.getContigLength(index.getContig(
-                    rightCreditPosition)));
+                TextPosition rightFlipped = rightCreditPosition;
+                rightFlipped.flip(index.getContigLength(
+                    index.getContigNumber(rightFlipped)));
             
                 toReturn.push_back(Mapping(rightFlipped));
             } else {

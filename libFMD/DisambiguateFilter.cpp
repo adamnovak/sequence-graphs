@@ -22,14 +22,14 @@
                 
                 if(leftMappings[i].getLocation() == rightPosition) {
                     // They agree. Take either.
-                    toReturn.append(Mapping(rightPosition));
+                    toReturn.push_back(Mapping(rightPosition));
                 } else {
                     // They disagree. Say unmapped.
-                    toReturn.append(Mapping());
+                    toReturn.push_back(Mapping());
                 }
             } else {
                 // Only left is mapped. Take it.
-                toReturn.append(leftMappings[i].getLocation());
+                toReturn.push_back(leftMappings[i].getLocation());
             }
         } else if(rightMappings[i].isMapped()) {
             // Flip the right mapping and take that
@@ -37,11 +37,11 @@
             rightPosition.flip(index.getContigLength(index.getContigNumber(
                 rightPosition)));
                 
-            toReturn.append(Mapping(rightPosition))
+            toReturn.push_back(Mapping(rightPosition));
             
         } else {
             // No mapping, say unmapped.
-            toReturn.append(Mapping());
+            toReturn.push_back(Mapping());
         }
     }
     
