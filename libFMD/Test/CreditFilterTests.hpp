@@ -2,7 +2,7 @@
 #define CREDITFILTERTESTS_HPP
 
 #include <cppunit/extensions/HelperMacros.h>
-#include "../DisambiguateFilter.hpp"
+#include "../CreditFilter.hpp"
 
 /**
  * Tests for the CreditFilter.

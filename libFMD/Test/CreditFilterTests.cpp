@@ -11,7 +11,7 @@
 #include "../FMDIndexBuilder.hpp"
 #include "../util.hpp"
 
-#include "DisambiguateFilterTests.hpp"
+#include "CreditFilterTests.hpp"
 
 
 // Register the fixture to be run.
@@ -84,17 +84,17 @@ void CreditFilterTests::testApply() {
     };
     
     // Make the filter to test.
-    DisambiguateFilter filter(*index);
+    CreditFilter filter(*index);
     
     // Apply the filter
     std::vector<Mapping> result = filter.apply(leftMappings, rightMappings);
         
     // Check all the results
-    CPPUNIT_ASSERT_EQUAL(result[0].getPosition(), TextPosition(0, 0));
-    CPPUNIT_ASSERT_EQUAL(result[1].getPosition(), TextPosition(0, 1));
-    CPPUNIT_ASSERT_EQUAL(result[2].getPosition(), TextPosition(0, 2));
-    CPPUNIT_ASSERT_EQUAL(result[3].getPosition(), TextPosition(0, 3));
-    CPPUNIT_ASSERT_EQUAL(result[3].getPosition(), TextPosition(0, 4));
+    CPPUNIT_ASSERT_EQUAL(TextPosition(0, 0), result[0].getLocation());
+    CPPUNIT_ASSERT_EQUAL(TextPosition(0, 1), result[1].getLocation());
+    CPPUNIT_ASSERT_EQUAL(TextPosition(0, 2), result[2].getLocation());
+    CPPUNIT_ASSERT_EQUAL(TextPosition(0, 3), result[3].getLocation());
+    CPPUNIT_ASSERT_EQUAL(TextPosition(0, 4), result[3].getLocation());
     
 }
 
@@ -122,7 +122,7 @@ void CreditFilterTests::testDisagreement() {
     };
     
     // Make the filter to test.
-    DisambiguateFilter filter(*index);
+    CreditFilter filter(*index);
     
     // Apply the filter
     std::vector<Mapping> result = filter.apply(leftMappings, rightMappings);
@@ -131,7 +131,7 @@ void CreditFilterTests::testDisagreement() {
     for(size_t i = 0; i < 5; i++) {
         // Nothing should map, because neither of the bases that could provide
         // credit mapped, because there was disagreement at each.
-        CPPUNIT_ASSERT_EQUAL(result[i], Mapping());
+        CPPUNIT_ASSERT_EQUAL(false, result[i].isMapped());
     }
     
 }
