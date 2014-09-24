@@ -1,6 +1,6 @@
  #include "DisambiguateFilter.hpp"
  
- DisambiguateFilter::DisambiguateFilter(FMDIndex& index): index(index) {
+ DisambiguateFilter::DisambiguateFilter(const FMDIndex& index): index(index) {
     // Nothing to do!
  }
  

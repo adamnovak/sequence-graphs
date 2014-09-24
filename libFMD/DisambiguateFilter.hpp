@@ -16,7 +16,7 @@ public:
     /**
      * Make a new DisambiguateAFilter using the given index for contig lengths.
      */
-    DisambiguateFilter(FMDIndex& index);
+    DisambiguateFilter(const FMDIndex& index);
 
     /**
      * Apply the filter. If only mapped on the left, take that. If only mapped
@@ -29,7 +29,7 @@ public:
 protected:
 
     // What index knows how long all our contigs are?
-    FMDIndex& index;
+    const FMDIndex& index;
         
 };
 

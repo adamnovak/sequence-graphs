@@ -1,7 +1,8 @@
 #include "CreditFilter.hpp"
 #include <algorithm>
 
-CreditFilter::CreditFilter(FMDIndex& index): index(index), disambiguate(index) {
+CreditFilter::CreditFilter(const FMDIndex& index): index(index), 
+    disambiguate(index) {
     // Nothing to do!
 }
 

@@ -18,7 +18,7 @@ public:
      * Make a new credit filter that uses the given index to get context
      * lengths.
      */
-    CreditFilter(FMDIndex& index);
+    CreditFilter(const FMDIndex& index);
     
     /**
      * Given a vector of left mappings and an equal-length vector of right
@@ -32,7 +32,7 @@ public:
 protected:
 
     // What index knows how long all our contigs are?
-    FMDIndex& index;
+    const FMDIndex& index;
     
     // We need to be able to disambiguate things.
     DisambiguateFilter disambiguate;
