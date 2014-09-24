@@ -1006,9 +1006,9 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
                         }
                       
                     }
-                } else {
-                    // We are not placed by a consistent left-mapping, only by a
-                    // consistent right mapping.
+                } else if(firstL == -1) {
+                    // We are placed by a consistent right mapping, and no
+                    // inconsistent left mapping.
                     
                     // TODO: Given that left mappings might have been existent
                     // but inconsistent, shouldn't we not map in that case?
@@ -1047,8 +1047,10 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
                     }
                       
                 }
-            } else if (firstL != -1 && contextMappedL) {
-                // Only the left-mapped bases are there and consistent.
+            } else if (firstR == -1 && firstL != -1 && contextMappedL) {
+                // Only the left-mapped bases are there and consistent. There is
+                // no right-mapped base (since we already checked for present &
+                // consistent right-mapped bases).
             
                 //Log::info() << "Before " << firstBaseL.first.second << 
                 //    std::endl;
