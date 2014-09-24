@@ -133,7 +133,7 @@ protected:
     virtual void generateMerges(ConcurrentQueue<size_t>* contigs) const;
     
     /**
-     * Generate laft-right merges from one particular contig.
+     * Generate left-right merges from one particular contig.
      */
     virtual void generateSomeMerges(size_t queryContig) const;
 

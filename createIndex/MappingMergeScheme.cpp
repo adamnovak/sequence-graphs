@@ -701,6 +701,8 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
         }
     }
 
+    // TODO: What if sentinels aren't initialized/found (i.e. nothing maps on
+    // that side)? Looks like we would use uninitialized memory.
     
     Log::debug() << "Left sentinel is " << leftSentinel << 
         ", right sentinel is " << rightSentinel << std::endl;
@@ -756,7 +758,7 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
                     }
                     Log::debug() << "Conflicted " << i << " " << contig[i] << 
                         std::endl;
-                    }
+                }
             
             } else {
                 // Left mapped and right didn't.
@@ -862,6 +864,13 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
                 // longer has our base in its right context. It is not possible
                 // that a position farther to the left has our base in its right
                 // context and continues to map to the same place as before
+                
+                // TODO: With inexact match mapping this isn't quite true; we
+                // could have a mismatched unmapping base that lefter bases read
+                // through.
+                
+                // But it's OK, we actually only terminate at the first base
+                // that does right-map but disagrees.
                     
                 } else {
                     if(rightMappings[j].second > creditCandidates[i] - j) {
