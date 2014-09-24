@@ -13,7 +13,7 @@ SWIG_OBJS=swigbindings_wrap.o
 TEST_OBJS=Test/TestRunner.o Test/GenericBitVectorTests.o \
 	Test/BWTTests.o Test/FMDIndexBuilderTests.o \
 	Test/FMDIndexTests.o Test/SmallSideTests.o Test/MarkovModelTests.o \
-	Test/DisambiguateFilterTests.o
+	Test/DisambiguateFilterTests.o Test/CredtiFilterTests.o
 
 # What projects do we depend on? We have rules for each of these.
 DEPS=libsuffixtools
