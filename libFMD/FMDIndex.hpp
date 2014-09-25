@@ -77,7 +77,8 @@ public:
     
     /**
      * Given a TextPosition representing a base, determine the specified base's
-     * offset from the left of its contig, 1-based.
+     * offset from the left of its contig, 1-based. Not to be confuised with the
+     * position's internal offset along its text, from base.getOffset().
      */
     size_t getOffset(TextPosition base) const;
     
@@ -91,6 +92,12 @@ public:
      * of that base on that contig out of all bases on all contigs.
      */
     size_t getBaseID(TextPosition base) const;
+    
+    /**
+     * Convert a (contig, base, face) to a TextPosition.
+     */
+    TextPosition getTextPosition(
+        std::pair<std::pair<size_t, size_t>, bool> base) const;
     
     /**
      * Get the total length of all contigs, on both strands.

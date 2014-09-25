@@ -203,7 +203,7 @@ void FMDIndex::setMarkovModel(MarkovModel* model) {
 
 size_t FMDIndex::getContigNumber(TextPosition base) const {
     // What contig corresponds to that text? Contigs all have both strands.
-    return base.getText() / 2;
+    return base.getContigNumber();
 }
 
 bool FMDIndex::getStrand(TextPosition base) const {
@@ -289,6 +289,28 @@ bool FMDIndex::isInGenome(int64_t bwtIndex, size_t genome) const {
 
 const GenericBitVector& FMDIndex::getGenomeMask(size_t genome) const {
     return *genomeMasks[genome];
+}
+
+TextPosition FMDIndex::getTextPosition(
+    std::pair<std::pair<size_t, size_t>, bool> base) const {
+    
+    // Convert contig and face to text.
+    size_t text = base.first.first * 2 + base.second;
+    
+    // Work out the offset.
+    size_t offset;
+    if(base.second) {
+        // Convert to an offset from the start of the reverse strand, converting
+        // to 0-based in the process.
+        offset = getContigLength(base.first.first) - base.first.second;
+    } else {
+        // Just make 0-based.
+        offset = base.first.second - 1;
+    }
+    
+    // Return the conversion result.
+    return TextPosition(text, offset);
+        
 }
 
 int64_t FMDIndex::getTotalLength() const {

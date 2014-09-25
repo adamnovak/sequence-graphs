@@ -42,6 +42,13 @@ public:
     }
     
     /**
+     * Return which contig our text is.
+     */
+    inline bool getContigNumber() const {
+        return getText() / 2;
+    }
+    
+    /**
      * Get the 0-based offset in that text that is being referred to.
      */
     inline size_t getOffset() const {

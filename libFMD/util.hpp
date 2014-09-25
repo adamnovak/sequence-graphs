@@ -2,6 +2,9 @@
 #define CREATEINDEX_UTIL_HPP
 
 #include <string>
+#include <functional>
+#include <iterator>
+#include <algorithm>
 
 /**
  * File of useful utility functions.
@@ -37,6 +40,25 @@ inline bool isBase(char input) {
         }
     }
     return false;
+}
+
+/**
+ * Apply a lambda to everything in a vector and return a vector of results.
+ */
+template <typename Tin, typename Tout>
+std::vector<Tout> transform(const std::vector<Tin>& input,
+    const std::function<Tout(Tin)>& function) {
+    
+    // Make a vector of results
+    std::vector<Tout> toReturn;
+    
+    // Populate it
+    std::transform(input.begin(), input.end(), std::back_inserter(toReturn), 
+        function);
+        
+    // Return the transformed vector.
+    return toReturn;
+    
 }
 
 // We provide a complement(char) and reverseComplement(std::string&) from

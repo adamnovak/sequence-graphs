@@ -137,17 +137,6 @@ protected:
      */
     virtual void generateSomeMerges(size_t queryContig) const;
 
-    /**
-     * Run as a thread. Generates merges by mapping a query contig to the target
-     * genome; centered contexts
-     */
-    virtual void CgenerateMerges(ConcurrentQueue<size_t>* contigs) const;
-    
-    /**
-     * Generate centered-context merges for one particular contig.
-     */
-    virtual void CgenerateSomeMerges(size_t queryContig) const;
-    
 };
 
 #endif
