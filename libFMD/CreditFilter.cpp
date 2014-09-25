@@ -1,5 +1,6 @@
 #include "CreditFilter.hpp"
 #include <algorithm>
+#include "Log.hpp"
 
 CreditFilter::CreditFilter(const FMDIndex& index): index(index), 
     disambiguate(index) {
@@ -26,6 +27,8 @@ std::vector<Mapping> CreditFilter::apply(
             disambiguated[i].isMapped()) {
             // This is the first mapped thing we have found mapped on the left.
             leftSentinel = i;
+            Log::debug() << "Left sentinel found at " << leftSentinel << 
+                std::endl;
             break;
         }
     }
@@ -36,13 +39,20 @@ std::vector<Mapping> CreditFilter::apply(
             disambiguated[i].isMapped()) {
             // This is the first mapped thing we have found mapped on the right.
             rightSentinel = i;
+            Log::debug() << "Right sentinel found at " << rightSentinel << 
+                std::endl;
             break;
         }
     }
     
-    if(leftSentinel == -1 || rightSentinel == -1) {
-        // We didn't find one of the sentinels, so we can't do credit between
-        // them. Just disambiguate without applying credit.
+    if(leftSentinel == -1 || rightSentinel == -1 || 
+        rightSentinel <= leftSentinel) {
+        
+        // We didn't find one of the sentinels, or there is no space between
+        // them. We can't do credit between them. Just disambiguate without
+        // applying credit.
+        Log::debug() << "No sequence between sentinels. No credit applied." <<
+            std::endl;
         return std::move(disambiguated);
     }
     

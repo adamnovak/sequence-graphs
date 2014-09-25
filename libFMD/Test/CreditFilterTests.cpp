@@ -88,10 +88,13 @@ void CreditFilterTests::testApply() {
     
     // Apply the filter
     std::vector<Mapping> result = filter.apply(leftMappings, rightMappings);
-        
+    
     for(auto x : result) {
         Log::info() << x << std::endl;
     }
+    
+    // Make sure the result is the right length.
+    CPPUNIT_ASSERT_EQUAL((size_t)5, result.size());
         
     // Check all the results
     CPPUNIT_ASSERT_EQUAL(TextPosition(0, 0), result[0].getLocation());
@@ -130,6 +133,9 @@ void CreditFilterTests::testDisagreement() {
     
     // Apply the filter
     std::vector<Mapping> result = filter.apply(leftMappings, rightMappings);
+    
+    // Make sure the result is the right length.
+    CPPUNIT_ASSERT_EQUAL((size_t)5, result.size());
         
     // Check all the results
     for(size_t i = 0; i < 5; i++) {
