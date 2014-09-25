@@ -102,11 +102,11 @@ void CreditFilterTests::testApply() {
     }
         
     // Check all the results
-    CPPUNIT_ASSERT_EQUAL(TextPosition(0, 0), result[0].getLocation());
-    CPPUNIT_ASSERT_EQUAL(TextPosition(0, 1), result[1].getLocation());
-    CPPUNIT_ASSERT_EQUAL(TextPosition(0, 2), result[2].getLocation());
-    CPPUNIT_ASSERT_EQUAL(TextPosition(0, 3), result[3].getLocation());
-    CPPUNIT_ASSERT_EQUAL(TextPosition(0, 4), result[4].getLocation());
+    CPPUNIT_ASSERT_EQUAL(TextPosition(1, 34), result[0].getLocation());
+    CPPUNIT_ASSERT_EQUAL(TextPosition(1, 33), result[1].getLocation());
+    CPPUNIT_ASSERT_EQUAL(TextPosition(1, 32), result[2].getLocation());
+    CPPUNIT_ASSERT_EQUAL(TextPosition(1, 31), result[3].getLocation());
+    CPPUNIT_ASSERT_EQUAL(TextPosition(1, 30), result[4].getLocation());
     
 }
 
@@ -117,20 +117,20 @@ void CreditFilterTests::testDisagreement() {
     
     // Make some left mappings
     std::vector<Mapping> leftMappings {
-        Mapping(TextPosition(0, 0)),
+        Mapping(TextPosition(1, 34)),
         Mapping(),
         Mapping(),
         Mapping(),
-        Mapping(TextPosition(2, 4), 5)
+        Mapping(TextPosition(3, 30), 5)
     };
     
     // Make some right mappings
     std::vector<Mapping> rightMappings {
-        Mapping(TextPosition(3, 34), 5),
+        Mapping(TextPosition(2, 0), 5),
         Mapping(),
         Mapping(),
         Mapping(),
-        Mapping(TextPosition(1, 30))
+        Mapping(TextPosition(0, 4))
     };
     
     // Make the filter to test.
@@ -191,11 +191,11 @@ void CreditFilterTests::testConflictingCredit() {
     CPPUNIT_ASSERT(result[3].isMapped());
     CPPUNIT_ASSERT(result[4].isMapped());
     
-    CPPUNIT_ASSERT_EQUAL(TextPosition(0, 0), result[0].getLocation());
-    CPPUNIT_ASSERT_EQUAL(TextPosition(2, 1), result[1].getLocation());
+    CPPUNIT_ASSERT_EQUAL(TextPosition(1, 34), result[0].getLocation());
+    CPPUNIT_ASSERT_EQUAL(TextPosition(3, 33), result[1].getLocation());
     // Middle base didn't map
-    CPPUNIT_ASSERT_EQUAL(TextPosition(2, 3), result[3].getLocation());
-    CPPUNIT_ASSERT_EQUAL(TextPosition(0, 4), result[4].getLocation());
+    CPPUNIT_ASSERT_EQUAL(TextPosition(3, 31), result[3].getLocation());
+    CPPUNIT_ASSERT_EQUAL(TextPosition(1, 30), result[4].getLocation());
     
 }
 
@@ -239,14 +239,14 @@ void CreditFilterTests::testConflictingCreditOneSideOnly() {
     CPPUNIT_ASSERT(result[3].isMapped());
     CPPUNIT_ASSERT(result[4].isMapped());
     
-    CPPUNIT_ASSERT_EQUAL(TextPosition(0, 0), result[0].getLocation());
-    CPPUNIT_ASSERT_EQUAL(TextPosition(2, 1), result[1].getLocation());
+    CPPUNIT_ASSERT_EQUAL(TextPosition(1, 34), result[0].getLocation());
+    CPPUNIT_ASSERT_EQUAL(TextPosition(3, 33), result[1].getLocation());
     // These two bases with no mappings should map on credit fom left contexts,
     // even though right contexts disagree about them.
-    CPPUNIT_ASSERT_EQUAL(TextPosition(0, 2), result[2].getLocation());
-    CPPUNIT_ASSERT_EQUAL(TextPosition(0, 3), result[3].getLocation());
+    CPPUNIT_ASSERT_EQUAL(TextPosition(1, 32), result[2].getLocation());
+    CPPUNIT_ASSERT_EQUAL(TextPosition(1, 31), result[3].getLocation());
     
-    CPPUNIT_ASSERT_EQUAL(TextPosition(0, 4), result[4].getLocation());
+    CPPUNIT_ASSERT_EQUAL(TextPosition(1, 30), result[4].getLocation());
     
 }
 
@@ -292,11 +292,11 @@ void CreditFilterTests::testDistance() {
     CPPUNIT_ASSERT(result[3].isMapped());
     CPPUNIT_ASSERT(result[4].isMapped());
     
-    CPPUNIT_ASSERT_EQUAL(TextPosition(0, 0), result[0].getLocation());
-    CPPUNIT_ASSERT_EQUAL(TextPosition(0, 1), result[1].getLocation());
+    CPPUNIT_ASSERT_EQUAL(TextPosition(1, 34), result[0].getLocation());
+    CPPUNIT_ASSERT_EQUAL(TextPosition(1, 33), result[1].getLocation());
     // Middle base didn't map
-    CPPUNIT_ASSERT_EQUAL(TextPosition(0, 3), result[3].getLocation());
-    CPPUNIT_ASSERT_EQUAL(TextPosition(0, 4), result[4].getLocation());
+    CPPUNIT_ASSERT_EQUAL(TextPosition(1, 31), result[3].getLocation());
+    CPPUNIT_ASSERT_EQUAL(TextPosition(1, 30), result[4].getLocation());
     
 }
 

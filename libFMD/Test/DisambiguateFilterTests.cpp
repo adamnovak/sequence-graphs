@@ -61,7 +61,7 @@ void DisambiguateFilterTests::tearDown() {
 }
 
 /**
- * Test appylying the filter and disambiguating stuff.
+ * Test applying the filter and disambiguating stuff.
  */
 void DisambiguateFilterTests::testApply() {
     
@@ -91,13 +91,13 @@ void DisambiguateFilterTests::testApply() {
         
     // Check all the results
     // Both agree
-    CPPUNIT_ASSERT_EQUAL(result[0], Mapping(TextPosition(0, 0)));
+    CPPUNIT_ASSERT_EQUAL(result[0], Mapping(TextPosition(1, 34)));
     // Left only
-    CPPUNIT_ASSERT_EQUAL(result[1], Mapping(TextPosition(0, 1)));
+    CPPUNIT_ASSERT_EQUAL(result[1], Mapping(TextPosition(1, 33)));
     // Neither
     CPPUNIT_ASSERT_EQUAL(result[2], Mapping());
     // Right only
-    CPPUNIT_ASSERT_EQUAL(result[3], Mapping(TextPosition(0, 3)));
+    CPPUNIT_ASSERT_EQUAL(result[3], Mapping(TextPosition(1, 31)));
     // Disagree
     CPPUNIT_ASSERT_EQUAL(result[4], Mapping());
     

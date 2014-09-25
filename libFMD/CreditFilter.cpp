@@ -209,32 +209,33 @@ std::vector<Mapping> CreditFilter::apply(
                     // We have credit from both the left and the right. Do they
                     // agree?
                     
-                    // Flip the text position we got from the right using the
+                    // Flip the text position we got from the left using the
                     // index.
-                    TextPosition rightFlipped = rightCreditPosition;
-                    rightFlipped.flip(index.getContigLength(
-                        index.getContigNumber(rightFlipped)));
+                    TextPosition leftFlipped = leftCreditPosition;
+                    leftFlipped.flip(index.getContigLength(
+                        index.getContigNumber(leftFlipped)));
                         
-                    if(leftCreditPosition == rightFlipped) {
+                    if(leftFlipped == rightCreditPosition) {
                         // They agree! Record a successful mapping.
-                        toReturn.push_back(Mapping(leftCreditPosition));
+                        toReturn.push_back(Mapping(leftFlipped));
                     } else {
                         // They disagree. Fail the mapping
                         toReturn.push_back(Mapping());
                     }
                 } else {
                     // We have credit only from the left.
-                    toReturn.push_back(Mapping(leftCreditPosition));
+                    
+                    // We need to flip it into right semantics.
+                    TextPosition leftFlipped = leftCreditPosition;
+                    leftFlipped.flip(index.getContigLength(
+                        index.getContigNumber(leftFlipped)));
+                    
+                    toReturn.push_back(Mapping(leftFlipped));
                 }
             } else if(rightFound && rightConsistent) {
                 // We have credit only from the right
                 
-                // We need to flip it into left semantics.
-                TextPosition rightFlipped = rightCreditPosition;
-                rightFlipped.flip(index.getContigLength(
-                    index.getContigNumber(rightFlipped)));
-            
-                toReturn.push_back(Mapping(rightFlipped));
+                toReturn.push_back(Mapping(rightCreditPosition));
             } else {
                 // We have credit from nowhere
                 toReturn.push_back(Mapping());
