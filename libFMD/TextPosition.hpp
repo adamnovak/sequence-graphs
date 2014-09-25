@@ -44,7 +44,7 @@ public:
     /**
      * Return which contig our text is.
      */
-    inline bool getContigNumber() const {
+    inline size_t getContigNumber() const {
         return getText() / 2;
     }
     

@@ -140,9 +140,12 @@ canonicalize(
     
     if(offset <= 0 || offset > index.getContigLength(contigNumber)) {
         // Complain that we got an out of bounds offset from this thing.
-        throw std::runtime_error("Tried to canonicalize text" +
+        throw std::runtime_error("Tried to canonicalize text " +
             std::to_string(base.getText()) + " offset " + 
-            std::to_string(base.getOffset()) + " which is out of bounds");
+            std::to_string(base.getOffset()) + 
+            " which is out of bounds on length " + 
+            std::to_string(index.getContigLength(contigNumber)) + " contig " + 
+            std::to_string(contigNumber));
     }
     
     // Canonicalize that pinch thread set position.
