@@ -15,29 +15,28 @@
             if(rightMappings[i].isMapped()) {
                 // Both are mapped.
                 
-                // Flip the right one.
-                TextPosition rightPosition = rightMappings[i].getLocation();
-                rightPosition.flip(index.getContigLength(index.getContigNumber(
-                    rightPosition)));
+                // Flip the left one.
+                TextPosition leftPosition = leftMappings[i].getLocation();
+                leftPosition.flip(index.getContigLength(index.getContigNumber(
+                    leftPosition)));
                 
-                if(leftMappings[i].getLocation() == rightPosition) {
+                if(rightMappings[i].getLocation() == leftPosition) {
                     // They agree. Take either.
-                    toReturn.push_back(Mapping(rightPosition));
+                    toReturn.push_back(Mapping(leftPosition));
                 } else {
                     // They disagree. Say unmapped.
                     toReturn.push_back(Mapping());
                 }
             } else {
-                // Only left is mapped. Take it.
-                toReturn.push_back(leftMappings[i].getLocation());
+                // Only left is mapped. Flip it and take it.
+                TextPosition leftPosition = leftMappings[i].getLocation();
+                leftPosition.flip(index.getContigLength(index.getContigNumber(
+                    leftPosition)));
+                toReturn.push_back(leftPosition);
             }
         } else if(rightMappings[i].isMapped()) {
-            // Flip the right mapping and take that
-            TextPosition rightPosition = rightMappings[i].getLocation();
-            rightPosition.flip(index.getContigLength(index.getContigNumber(
-                rightPosition)));
-                
-            toReturn.push_back(Mapping(rightPosition));
+            // Take the right mapping.
+            toReturn.push_back(rightMappings[i]);
             
         } else {
             // No mapping, say unmapped.

@@ -334,10 +334,13 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
         filteredMappings = DisambiguateFilter(index).apply(leftMappings,
             rightMappings);
     }
-        
+    
     for(size_t i = 0; i < filteredMappings.size(); i++) {
         // Now go through all the bases and make sure they have matching
         // characters before merging them. TODO: make this another filter.
+        
+        Log::info() << leftMappings[i] << "\t" << filteredMappings[i] << "\t" <<
+            rightMappings[i] << std::endl;
             
         TextPosition candidate = filteredMappings[i].getLocation();
         
@@ -372,6 +375,8 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
             referenceBase = contigCache[candidate.getContigNumber()][
             candidate.getOffset()];
         }
+        
+        Log::info() << queryBase << " vs. " << referenceBase << std::endl;
         
         if(queryBase == referenceBase) {
             // Only merge them if they will be the same base
