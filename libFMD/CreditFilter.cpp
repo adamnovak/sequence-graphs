@@ -27,7 +27,7 @@ std::vector<Mapping> CreditFilter::apply(
             disambiguated[i].isMapped()) {
             // This is the first mapped thing we have found mapped on the left.
             leftSentinel = i;
-            Log::debug() << "Left sentinel found at " << leftSentinel << 
+            Log::info() << "Left sentinel found at " << leftSentinel << 
                 std::endl;
             break;
         }
@@ -39,7 +39,7 @@ std::vector<Mapping> CreditFilter::apply(
             disambiguated[i].isMapped()) {
             // This is the first mapped thing we have found mapped on the right.
             rightSentinel = i;
-            Log::debug() << "Right sentinel found at " << rightSentinel << 
+            Log::info() << "Right sentinel found at " << rightSentinel << 
                 std::endl;
             break;
         }
@@ -51,7 +51,7 @@ std::vector<Mapping> CreditFilter::apply(
         // We didn't find one of the sentinels, or there is no space between
         // them. We can't do credit between them. Just disambiguate without
         // applying credit.
-        Log::debug() << "No sequence between sentinels. No credit applied." <<
+        Log::info() << "No sequence between sentinels. No credit applied." <<
             std::endl;
         return std::move(disambiguated);
     }
@@ -91,7 +91,7 @@ std::vector<Mapping> CreditFilter::apply(
             toReturn.push_back(disambiguated[i]);   
         } else {
         
-            Log::trace() << "Trying to credit map base " << i << std::endl;
+            Log::debug() << "Trying to credit map base " << i << std::endl;
         
             // Set this to true if you find a base that implies a position for
             // this one by its right context.
