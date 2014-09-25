@@ -179,8 +179,8 @@ std::vector<Mapping> CreditFilter::apply(
                 // (since left contexts reach backward).
                 TextPosition implied = leftMappings[j].getLocation();
                 // As i increases and j stays the same, we want offset to
-                // become more negative. For some reason.
-                implied.addOffset((int64_t) j - (int64_t) i);
+                // become less negative.
+                implied.addOffset((int64_t) i - (int64_t) j);
                 
                 Log::trace() << "Base " << j << " places base " << i << 
                     " at " << implied << " by left context" << std::endl;

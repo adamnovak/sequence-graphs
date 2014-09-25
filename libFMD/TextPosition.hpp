@@ -62,7 +62,7 @@ public:
     inline void addOffset(int64_t offset) {
         // Offset in the correct direction depending on its strand. Go backwards
         // on reverse strands and forwards on forwards strands.
-        setOffset(getOffset() + (getStrand() ? -1 : -1) * offset);
+        setOffset(getOffset() + (getStrand() ? -1 : 1) * offset);
     }
     
     /**
