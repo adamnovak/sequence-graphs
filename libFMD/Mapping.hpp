@@ -17,7 +17,7 @@ struct Mapping
 {
 public:
     Mapping();
-    Mapping(TextPosition location, bool is_mapped=true, size_t context=0);
+    Mapping(TextPosition location, size_t context=0);
     
     /**
      * Provide equality comparison for testing.

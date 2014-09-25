@@ -27,7 +27,7 @@
 // Debug: Messages about the internals of the program.
 #define DEBUG_STREAM OutStream
 // Trace: Messages that pedantically describe what the program is doing.
-#define TRACE_STREAM NullStream
+#define TRACE_STREAM OutStream
 
 // Also we have some macros to facilitate lazy logging. If you use these, your
 // things you log are not evaluated unless that log level is enabled.

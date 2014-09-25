@@ -1,10 +1,10 @@
 #include "Mapping.hpp"
 
-Mapping::Mapping(): location(0, 0), is_mapped(false) {
+Mapping::Mapping(): location(0, 0), is_mapped(false), context(0) {
 }
 
-Mapping::Mapping(TextPosition location, bool is_mapped, size_t context): 
-    location(location), is_mapped(is_mapped), context(context) {
+Mapping::Mapping(TextPosition location, size_t context): 
+    location(location), is_mapped(true), context(context) {
 }
 
 bool Mapping::operator==(const Mapping& other) const {

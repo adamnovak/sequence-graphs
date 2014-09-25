@@ -65,22 +65,22 @@ void CreditFilterTests::tearDown() {
  */
 void CreditFilterTests::testApply() {
     
-    // Make some left mappings
+    // Make some left mappings. Make sure we have a sentinel first.
     std::vector<Mapping> leftMappings {
-        Mapping(),
+        Mapping(TextPosition(0, 0)),
         Mapping(),
         Mapping(),
         Mapping(),
         Mapping(TextPosition(0, 4), 5)
     };
     
-    // Make some right mappings
+    // Make some right mappings. Make sure we have a sentinel last.
     std::vector<Mapping> rightMappings {
         Mapping(TextPosition(1, 34), 5),
         Mapping(),
         Mapping(),
         Mapping(),
-        Mapping()
+        Mapping(TextPosition(1, 30))
     };
     
     // Make the filter to test.
@@ -101,7 +101,7 @@ void CreditFilterTests::testApply() {
     CPPUNIT_ASSERT_EQUAL(TextPosition(0, 1), result[1].getLocation());
     CPPUNIT_ASSERT_EQUAL(TextPosition(0, 2), result[2].getLocation());
     CPPUNIT_ASSERT_EQUAL(TextPosition(0, 3), result[3].getLocation());
-    CPPUNIT_ASSERT_EQUAL(TextPosition(0, 4), result[3].getLocation());
+    CPPUNIT_ASSERT_EQUAL(TextPosition(0, 4), result[4].getLocation());
     
 }
 

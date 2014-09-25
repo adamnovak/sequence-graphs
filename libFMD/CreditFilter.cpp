@@ -63,10 +63,16 @@ std::vector<Mapping> CreditFilter::apply(
     
     for(size_t i = 0; i < leftMappings.size(); i++) {
         // Take the max left and right context when we find them.
+        
+        Log::debug() << leftMappings[i].getContext() << ", " << rightMappings[i].getContext() << std::endl;
+        
         maxLeftContext = std::max(maxLeftContext, leftMappings[i].getContext());
         maxRightContext = std::max(maxRightContext, 
             rightMappings[i].getContext());
     }
+    
+    Log::debug() << "Max context sizes: " << maxLeftContext << "|" << 
+        maxRightContext << std::endl;
     
     // This is going to hold our output
     std::vector<Mapping> toReturn;
@@ -85,6 +91,8 @@ std::vector<Mapping> CreditFilter::apply(
             toReturn.push_back(disambiguated[i]);   
         } else {
         
+            Log::trace() << "Trying to credit map base " << i << std::endl;
+        
             // Set this to true if you find a base that implies a position for
             // this one by its right context.
             bool rightFound = false;
@@ -93,10 +101,13 @@ std::vector<Mapping> CreditFilter::apply(
             // Set this if right contexts all place this base in one spot
             bool rightConsistent = true;
         
-            for(size_t j = i - 1; j != (size_t) -1 && j >= i - maxRightContext;
-                j--) {
+            for(size_t j = i - 1; j != (size_t) -1 && 
+                (int64_t) j >= (int64_t) i - (int64_t) maxRightContext; j--) {
                 // Look left from here until you find a base that maps and
                 // places us.
+                
+                Log::trace() << "Checking base " << j << " on right" << 
+                    std::endl;
                 
                 if(!rightMappings[j].isMapped()) {
                     // This base never mapped, so it can't give credit.
@@ -113,7 +124,12 @@ std::vector<Mapping> CreditFilter::apply(
                 // Grab the mapped base and go forwards on the forward strand
                 // (since right contexts reach forward).
                 TextPosition implied = rightMappings[j].getLocation();
-                implied.addOffset(i - j);
+                // As i increases and j stays the same, we want offset to
+                // become more positive.
+                implied.addOffset((int64_t) i - (int64_t) j);
+                
+                Log::trace() << "Base " << j << " places base " << i << 
+                    " at " << implied << " by right context" << std::endl;
                 
                 if(!rightFound) {
                     // This is the first one. Make sure all the others match.
@@ -123,6 +139,7 @@ std::vector<Mapping> CreditFilter::apply(
                     // There are two or more implied locations from right
                     // contexts.
                     rightConsistent = false;
+                    break;
                 }
                 
             }
@@ -137,9 +154,14 @@ std::vector<Mapping> CreditFilter::apply(
             // Set this if left contexts all place this base in one spot
             bool leftConsistent = true;
         
-            for(size_t j = i + 1; j < i + maxLeftContext; j++) {
+            for(size_t j = i + 1; j < leftMappings.size() && 
+                j < i + maxLeftContext; j++) {
+                
                 // Look right from here until you find a base that maps and
                 // places us.
+                
+                Log::trace() << "Checking base " << j << " on left" << 
+                    std::endl;
                 
                 if(!leftMappings[j].isMapped()) {
                     // This base never mapped, so it can't give credit.
@@ -156,7 +178,12 @@ std::vector<Mapping> CreditFilter::apply(
                 // Grab the mapped base and go backward on the forward strand
                 // (since left contexts reach backward).
                 TextPosition implied = leftMappings[j].getLocation();
-                implied.addOffset((int64_t) i - (int64_t) j);
+                // As i increases and j stays the same, we want offset to
+                // become more negative. For some reason.
+                implied.addOffset((int64_t) j - (int64_t) i);
+                
+                Log::trace() << "Base " << j << " places base " << i << 
+                    " at " << implied << " by left context" << std::endl;
                 
                 if(!leftFound) {
                     // This is the first one. Make sure all the others match.
@@ -166,6 +193,7 @@ std::vector<Mapping> CreditFilter::apply(
                     // There are two or more implied locations from left
                     // contexts.
                     leftConsistent = false;
+                    break;
                 }
                 
             }
