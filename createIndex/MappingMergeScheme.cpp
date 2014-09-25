@@ -385,7 +385,7 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
             // Merge coordinates are 1-based.
             generateMerge(queryContig, i + 1, 
                 candidate.getContigNumber(), index.getOffset(candidate),
-                !candidate.getStrand());
+                candidate.getStrand());
             mappedBases++;
         } else {
             // This base didn't map

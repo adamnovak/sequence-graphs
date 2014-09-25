@@ -1,5 +1,6 @@
 #include "CreditFilter.hpp"
 #include <algorithm>
+#include <cmath>
 #include "Log.hpp"
 
 CreditFilter::CreditFilter(const FMDIndex& index): index(index), 
@@ -250,6 +251,31 @@ std::vector<Mapping> CreditFilter::apply(
         // Then for each base at or after the right sentinel, disambiguate
         // normally.
         toReturn.push_back(disambiguated[i]);
+    }
+    
+    for(size_t i = 1; i < toReturn.size() - 1; i++) {
+        // For each base with two neighbors
+        if(toReturn[i].isMapped() && !disambiguated[i].isMapped()) {
+            // This base was mapped on credit.
+            
+            // To where?
+            TextPosition center = toReturn[i].getLocation();
+            TextPosition prev = toReturn[i - 1].getLocation();
+            TextPosition next = toReturn[i + 1].getLocation();
+            
+            
+            if(abs(center.getOffset() - prev.getOffset()) != 1 && 
+                abs(center.getOffset() - next.getOffset()) != 1) {
+                
+                // This credit-mapped base has nothing mapped with it on either
+                // side. This should not be possible.
+                throw std::runtime_error(
+                    std::string("Credit-mapped base is alone at text ") + 
+                    std::to_string(center.getText()) + " offset " + 
+                    std::to_string(center.getOffset()));
+            }
+            
+        }
     }
     
     // Return the credit-mapped stuff
