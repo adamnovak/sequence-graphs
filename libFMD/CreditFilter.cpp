@@ -117,6 +117,8 @@ std::vector<Mapping> CreditFilter::apply(
                 if(rightMappings[j].getContext() - 1 < i - j) {
                     // This base's context didn't reach all the way out, after
                     // accounting for the fact that it includes the base itself.
+                    // This prevents us from mapping off the end of a contig,
+                    // since these are limited by contig ends.
                     continue;
                 }
                 
@@ -171,6 +173,8 @@ std::vector<Mapping> CreditFilter::apply(
                 if(leftMappings[j].getContext() - 1 < j - i) {
                     // This base's context didn't reach all the way out, after
                     // accounting for the fact that it includes the base itself.
+                    // This prevents us from mapping off the end of a contig,
+                    // since these are limited by contig ends.
                     continue;
                 }
                 

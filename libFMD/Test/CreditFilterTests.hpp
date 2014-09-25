@@ -11,6 +11,7 @@ class CreditFilterTests : public CppUnit::TestFixture {
     CPPUNIT_TEST_SUITE(CreditFilterTests);
     CPPUNIT_TEST(testApply);
     CPPUNIT_TEST(testDisagreement);
+    CPPUNIT_TEST(testDistance);
     CPPUNIT_TEST_SUITE_END();
     
     // Keep a string saying where to get the haplotypes to test with.
@@ -32,6 +33,7 @@ public:
 
     void testApply();
     void testDisagreement();
+    void testDistance();
     
 };
 
