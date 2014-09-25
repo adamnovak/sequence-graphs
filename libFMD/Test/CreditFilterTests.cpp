@@ -152,6 +152,105 @@ void CreditFilterTests::testDisagreement() {
 }
 
 /**
+ * Make sure conflicting placement on a side interferes with mapping from that
+ * side.
+ */
+void CreditFilterTests::testConflictingCredit() {
+    
+    // Make some left mappings
+    std::vector<Mapping> leftMappings {
+        Mapping(TextPosition(0, 0)),
+        Mapping(),
+        Mapping(),
+        Mapping(TextPosition(2, 3), 4),
+        Mapping(TextPosition(0, 4), 5)
+    };
+    
+    // Make some right mappings
+    std::vector<Mapping> rightMappings {
+        Mapping(TextPosition(1, 34), 5),
+        Mapping(TextPosition(3, 33), 4),
+        Mapping(),
+        Mapping(),
+        Mapping(TextPosition(1, 30))
+    };
+    
+    // Make the filter to test.
+    CreditFilter filter(*index);
+    
+    // Apply the filter
+    std::vector<Mapping> result = filter.apply(leftMappings, rightMappings);
+    
+    // Make sure the result is the right length.
+    CPPUNIT_ASSERT_EQUAL((size_t)5, result.size());
+        
+    CPPUNIT_ASSERT(result[0].isMapped());
+    CPPUNIT_ASSERT(result[1].isMapped());
+    // Only this middle base should not map.
+    CPPUNIT_ASSERT(!result[2].isMapped());
+    CPPUNIT_ASSERT(result[3].isMapped());
+    CPPUNIT_ASSERT(result[4].isMapped());
+    
+    CPPUNIT_ASSERT_EQUAL(TextPosition(0, 0), result[0].getLocation());
+    CPPUNIT_ASSERT_EQUAL(TextPosition(2, 1), result[1].getLocation());
+    // Middle base didn't map
+    CPPUNIT_ASSERT_EQUAL(TextPosition(2, 3), result[3].getLocation());
+    CPPUNIT_ASSERT_EQUAL(TextPosition(0, 4), result[4].getLocation());
+    
+}
+
+/**
+ * Make sure conflicting placement on one side still allows credit mapping from
+ * the other.
+ */
+void CreditFilterTests::testConflictingCreditOneSideOnly() {
+    
+    // Make some left mappings
+    std::vector<Mapping> leftMappings {
+        Mapping(TextPosition(0, 0)),
+        Mapping(),
+        Mapping(),
+        Mapping(),
+        Mapping(TextPosition(0, 4), 5)
+    };
+    
+    // Make some right mappings
+    std::vector<Mapping> rightMappings {
+        Mapping(TextPosition(1, 34), 5),
+        Mapping(TextPosition(3, 33), 4),
+        Mapping(),
+        Mapping(),
+        Mapping(TextPosition(1, 30))
+    };
+    
+    // Make the filter to test.
+    CreditFilter filter(*index);
+    
+    // Apply the filter
+    std::vector<Mapping> result = filter.apply(leftMappings, rightMappings);
+    
+    // Make sure the result is the right length.
+    CPPUNIT_ASSERT_EQUAL((size_t)5, result.size());
+        
+    // Everyone should map.
+    CPPUNIT_ASSERT(result[0].isMapped());
+    CPPUNIT_ASSERT(result[1].isMapped());
+    CPPUNIT_ASSERT(result[2].isMapped());
+    CPPUNIT_ASSERT(result[3].isMapped());
+    CPPUNIT_ASSERT(result[4].isMapped());
+    
+    CPPUNIT_ASSERT_EQUAL(TextPosition(0, 0), result[0].getLocation());
+    CPPUNIT_ASSERT_EQUAL(TextPosition(2, 1), result[1].getLocation());
+    // These two bases with no mappings should map on credit fom left contexts,
+    // even though right contexts disagree about them.
+    CPPUNIT_ASSERT_EQUAL(TextPosition(0, 2), result[2].getLocation());
+    CPPUNIT_ASSERT_EQUAL(TextPosition(0, 3), result[3].getLocation());
+    
+    CPPUNIT_ASSERT_EQUAL(TextPosition(0, 4), result[4].getLocation());
+    
+}
+
+/**
  * Make sure context lengths are honored. Context lengths are inclusive of the
  * base, so 2 is the minimum to map anything on credit.
  */
