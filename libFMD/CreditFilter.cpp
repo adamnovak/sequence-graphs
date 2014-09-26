@@ -115,7 +115,8 @@ std::vector<Mapping> CreditFilter::apply(
                         std::endl;
                 }
                 
-                if(!rightMappings[j].isMapped()) {
+                if(!rightMappings[j].isMapped() || 
+                    !disambiguated[j].isMapped()) {
                     // This base never mapped, so it can't give credit.
                     continue;
                 }
@@ -175,7 +176,8 @@ std::vector<Mapping> CreditFilter::apply(
                         std::endl;
                 }
                 
-                if(!leftMappings[j].isMapped()) {
+                if(!leftMappings[j].isMapped() || 
+                    !disambiguated[j].isMapped()) {
                     // This base never mapped, so it can't give credit.
                     continue;
                 }
