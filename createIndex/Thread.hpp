@@ -5,11 +5,10 @@
 #include <sys/time.h>
 #include <errno.h>
 
-#define SINGLE_THREAD
-
 /**
  * Defines a class that wraps std::thread and preserves the itimer of the
  * original thread. Necessary for gprof to profile a multithreaded application.
+ * Also provides a convenient hook to make the program single-threaded.
  */
 class Thread : public std::thread {
 

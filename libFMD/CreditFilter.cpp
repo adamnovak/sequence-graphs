@@ -92,11 +92,7 @@ std::vector<Mapping> CreditFilter::apply(
             toReturn.push_back(disambiguated[i]);   
         } else {
         
-            bool logLots = (i == 67373);
-        
-            if(logLots) {
-                Log::info() << "Trying to credit map base " << i << std::endl;
-            }
+            Log::trace() << "Trying to credit map base " << i << std::endl;
         
             // Set this to true if you find a base that implies a position for
             // this one by its right context.
@@ -110,10 +106,8 @@ std::vector<Mapping> CreditFilter::apply(
                 (int64_t) j >= (int64_t) i - (int64_t) maxRightContext; j--) {
                 // Look left from here until you find a base that maps and
                 // places us.
-                if(logLots) {
-                    Log::info() << "Checking base " << j << " on right" << 
-                        std::endl;
-                }
+                Log::trace() << "Checking base " << j << " on right" << 
+                    std::endl;
                 
                 if(!rightMappings[j].isMapped() || 
                     !disambiguated[j].isMapped()) {
@@ -137,10 +131,8 @@ std::vector<Mapping> CreditFilter::apply(
                 // become more positive.
                 implied.addOffset((int64_t) i - (int64_t) j);
                 
-                if(logLots) {
-                    Log::info() << "Base " << j << " places base " << i << 
-                        " at " << implied << " by right context" << std::endl;
-                }
+                Log::trace() << "Base " << j << " places base " << i << 
+                    " at " << implied << " by right context" << std::endl;
                 
                 if(!rightFound) {
                     // This is the first one. Make sure all the others match.
@@ -171,10 +163,8 @@ std::vector<Mapping> CreditFilter::apply(
                 // Look right from here until you find a base that maps and
                 // places us.
                 
-                if(logLots) {
-                    Log::info() << "Checking base " << j << " on left" << 
-                        std::endl;
-                }
+                Log::trace() << "Checking base " << j << " on left" << 
+                    std::endl;
                 
                 if(!leftMappings[j].isMapped() || 
                     !disambiguated[j].isMapped()) {
@@ -198,10 +188,8 @@ std::vector<Mapping> CreditFilter::apply(
                 // become less negative.
                 implied.addOffset((int64_t) i - (int64_t) j);
                 
-                if(logLots) {
-                    Log::info() << "Base " << j << " places base " << i << 
-                        " at " << implied << " by left context" << std::endl;
-                }
+                Log::trace() << "Base " << j << " places base " << i << 
+                    " at " << implied << " by left context" << std::endl;
                 
                 if(!leftFound) {
                     // This is the first one. Make sure all the others match.
@@ -255,19 +243,6 @@ std::vector<Mapping> CreditFilter::apply(
                 toReturn.push_back(Mapping());
             }
         }
-        
-        if(i == 67373 && toReturn[i].getLocation().getText() == 0 && 
-            toReturn[i].getLocation().getOffset() == 1494147) {
-            
-            for(size_t j = i - 10; j < i + 10; j++) {
-                Log::info() << ((j == i) ? "*" : " ") << leftMappings[j] << 
-                    "\t" << disambiguated[j] << "\t" << rightMappings[j] << 
-                    std::endl;
-            }
-            
-            throw std::runtime_error("Caught the bad base");
-        }
-        
         
     }
     
