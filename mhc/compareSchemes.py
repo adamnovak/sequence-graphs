@@ -87,7 +87,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             (True, True, 140, 0, 0, 0),
             (True, True, 160, 0, 0, 0),
             (True, True, 180, 0, 0, 0),
-            (True, True, 200, 0, 0, 0)
+            (True, True, 200, 0, 0, 0),
             # Specified add
             (True, True, 0, 25, 0, 0),
             (True, True, 0, 50, 0, 0),
@@ -96,7 +96,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             (True, True, 0, 125, 0, 0),
             (True, True, 0, 150, 0, 0),
             (True, True, 0, 200, 0, 0),
-            (True, True, 0, 250, 0, 0)
+            (True, True, 0, 250, 0, 0),
             # Coding cost context
             (True, True, 0, 0, 0, 20),
             (True, True, 0, 0, 0, 80),
