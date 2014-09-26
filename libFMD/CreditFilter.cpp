@@ -275,31 +275,6 @@ std::vector<Mapping> CreditFilter::apply(
         toReturn.push_back(disambiguated[i]);
     }
     
-    for(size_t i = 1; i < toReturn.size() - 1; i++) {
-        // For each base with two neighbors
-        if(toReturn[i].isMapped() && !disambiguated[i].isMapped()) {
-            // This base was mapped on credit.
-            
-            // To where?
-            TextPosition center = toReturn[i].getLocation();
-            TextPosition prev = toReturn[i - 1].getLocation();
-            TextPosition next = toReturn[i + 1].getLocation();
-            
-            
-            if(abs(center.getOffset() - prev.getOffset()) != 1 && 
-                abs(center.getOffset() - next.getOffset()) != 1) {
-                
-                // This credit-mapped base has nothing mapped with it on either
-                // side. This should not be possible.
-                throw std::runtime_error(
-                    std::string("Credit-mapped base ") + std::to_string(i) +
-                    " is alone at text " + std::to_string(center.getText()) +
-                    " offset " + std::to_string(center.getOffset()));
-            }
-            
-        }
-    }
-    
     // Return the credit-mapped stuff
     return std::move(toReturn);
     
