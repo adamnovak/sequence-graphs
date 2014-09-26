@@ -260,7 +260,7 @@ void FMDIndexTests::testDisambiguate() {
     // Make some positions    
     Mapping mapped(TextPosition(1, 1));
     Mapping otherSide(TextPosition(0, 33)); 
-    Mapping unmapped(TextPosition(0, 0), false);
+    Mapping unmapped;
     Mapping elsewhere(TextPosition(2, 10));
     
     // Make sure disambiguate does the right things
