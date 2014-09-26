@@ -300,6 +300,54 @@ void CreditFilterTests::testDistance() {
     
 }
 
+/**
+ * Make sure inconsistently-mapped bases cannot give credit.
+ */
+void CreditFilterTests::testNoInconsistentCredit() {
+        
+    // Make some left mappings
+    std::vector<Mapping> leftMappings {
+        Mapping(TextPosition(0, 0)),
+        Mapping(),
+        Mapping(),
+        Mapping(TextPosition(0, 3), 2),
+        Mapping()
+    };
+    
+    // Make some right mappings
+    std::vector<Mapping> rightMappings {
+        Mapping(),
+        Mapping(),
+        Mapping(),
+        Mapping(TextPosition(3, 31)),
+        Mapping(TextPosition(1, 30))
+    };
+    
+    // Make the filter to test.
+    CreditFilter filter(*index);
+    
+    // Apply the filter
+    std::vector<Mapping> result = filter.apply(leftMappings, rightMappings);
+    
+    // Make sure the result is the right length.
+    CPPUNIT_ASSERT_EQUAL((size_t)5, result.size());
+        
+    // Check all the results
+    
+    CPPUNIT_ASSERT(result[0].isMapped());
+    // These bases that would need credit and this inconsistent base should not
+    // map.
+    CPPUNIT_ASSERT(!result[1].isMapped());
+    CPPUNIT_ASSERT(!result[2].isMapped());
+    CPPUNIT_ASSERT(!result[3].isMapped());
+    CPPUNIT_ASSERT(result[4].isMapped());
+    
+    CPPUNIT_ASSERT_EQUAL(TextPosition(1, 34), result[0].getLocation());
+    CPPUNIT_ASSERT_EQUAL(TextPosition(1, 30), result[4].getLocation());
+        
+}
+
+
 
 
 

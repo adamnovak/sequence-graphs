@@ -92,7 +92,11 @@ std::vector<Mapping> CreditFilter::apply(
             toReturn.push_back(disambiguated[i]);   
         } else {
         
-            Log::debug() << "Trying to credit map base " << i << std::endl;
+            bool logLots = (i == 67373);
+        
+            if(logLots) {
+                Log::info() << "Trying to credit map base " << i << std::endl;
+            }
         
             // Set this to true if you find a base that implies a position for
             // this one by its right context.
@@ -106,9 +110,10 @@ std::vector<Mapping> CreditFilter::apply(
                 (int64_t) j >= (int64_t) i - (int64_t) maxRightContext; j--) {
                 // Look left from here until you find a base that maps and
                 // places us.
-                
-                Log::trace() << "Checking base " << j << " on right" << 
-                    std::endl;
+                if(logLots) {
+                    Log::info() << "Checking base " << j << " on right" << 
+                        std::endl;
+                }
                 
                 if(!rightMappings[j].isMapped()) {
                     // This base never mapped, so it can't give credit.
@@ -131,8 +136,10 @@ std::vector<Mapping> CreditFilter::apply(
                 // become more positive.
                 implied.addOffset((int64_t) i - (int64_t) j);
                 
-                Log::trace() << "Base " << j << " places base " << i << 
-                    " at " << implied << " by right context" << std::endl;
+                if(logLots) {
+                    Log::info() << "Base " << j << " places base " << i << 
+                        " at " << implied << " by right context" << std::endl;
+                }
                 
                 if(!rightFound) {
                     // This is the first one. Make sure all the others match.
@@ -163,8 +170,10 @@ std::vector<Mapping> CreditFilter::apply(
                 // Look right from here until you find a base that maps and
                 // places us.
                 
-                Log::trace() << "Checking base " << j << " on left" << 
-                    std::endl;
+                if(logLots) {
+                    Log::info() << "Checking base " << j << " on left" << 
+                        std::endl;
+                }
                 
                 if(!leftMappings[j].isMapped()) {
                     // This base never mapped, so it can't give credit.
@@ -187,8 +196,10 @@ std::vector<Mapping> CreditFilter::apply(
                 // become less negative.
                 implied.addOffset((int64_t) i - (int64_t) j);
                 
-                Log::trace() << "Base " << j << " places base " << i << 
-                    " at " << implied << " by left context" << std::endl;
+                if(logLots) {
+                    Log::info() << "Base " << j << " places base " << i << 
+                        " at " << implied << " by left context" << std::endl;
+                }
                 
                 if(!leftFound) {
                     // This is the first one. Make sure all the others match.
@@ -243,6 +254,17 @@ std::vector<Mapping> CreditFilter::apply(
             }
         }
         
+        if(i == 67373 && toReturn[i].getLocation().getText() == 0 && 
+            toReturn[i].getLocation().getOffset() == 1494147) {
+            
+            for(size_t j = i - 10; j < i + 10; j++) {
+                Log::info() << ((j == i) ? "*" : " ") << leftMappings[j] << 
+                    "\t" << disambiguated[j] << "\t" << rightMappings[j] << 
+                    std::endl;
+            }
+            
+            throw std::runtime_error("Caught the bad base");
+        }
         
         
     }
@@ -270,9 +292,9 @@ std::vector<Mapping> CreditFilter::apply(
                 // This credit-mapped base has nothing mapped with it on either
                 // side. This should not be possible.
                 throw std::runtime_error(
-                    std::string("Credit-mapped base is alone at text ") + 
-                    std::to_string(center.getText()) + " offset " + 
-                    std::to_string(center.getOffset()));
+                    std::string("Credit-mapped base ") + std::to_string(i) +
+                    " is alone at text " + std::to_string(center.getText()) +
+                    " offset " + std::to_string(center.getOffset()));
             }
             
         }
