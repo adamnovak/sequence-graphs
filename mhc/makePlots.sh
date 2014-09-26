@@ -148,3 +148,47 @@ do
 done
 
 scatter.py ${OUTFILE} --x_label "Precision" --y_label "Recall" --title "Recall vs. Precision by Scheme" --sparse_ticks --save recallVsPrecision.png
+
+# Go get the size-4 adjacency components from the spectrums, and the tabndem
+# dupe counts, and see what portion of size-4 adjacency components are tandem
+# dupes per scheme.
+for FILE in `ls tandem.*`
+do
+
+    # Grab the scheme
+    SCHEME=${FILE##*.}
+
+    # Make the spectrum filename
+    SPECTRUM_FILE="spectrum.${SCHEME}"
+    
+    # Sum up the tandem duplications
+    TOTAL_TANDEMS=0
+    while read LINE || [[ -n $LINE ]]
+    do
+        TOTAL_TANDEMS=$((${TOTAL_TANDEMS} + ${LINE}))
+    done < ${FILE}
+    
+    
+    # Sum up the 4-part rearrangements
+    TOTAL_4PART=0
+    while read LINE || [[ -n $LINE ]]
+    do
+        
+        # Split on spaces
+        PARTS=(${LINE})
+        
+        if [[ ${PARTS[0]} -eq 4 ]]
+        then
+            TOTAL_4PART=$((${TOTAL_4PART} + ${PARTS[1]}))
+        fi
+    done < ${SPECTRUM_FILE}
+    
+    # Work out the fraction of 4-part rearrangements (i.e. 2-break operations)
+    # that are tandem duplications by our count. Will miss tandems with any
+    # differences, or any other things aligned.
+    FRACTION=$(echo ${TOTAL_TANDEMS} / ${TOTAL_4PART} | bc -l)
+    
+    echo "Scheme ${SCHEME} is ${TOTAL_TANDEMS} / ${TOTAL_4PART} = ${FRACTION} tandems"
+
+done
+
