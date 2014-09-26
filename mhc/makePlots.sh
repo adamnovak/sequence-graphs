@@ -152,6 +152,8 @@ scatter.py ${OUTFILE} --x_label "Precision" --y_label "Recall" --title "Recall v
 # Go get the size-4 adjacency components from the spectrums, and the tabndem
 # dupe counts, and see what portion of size-4 adjacency components are tandem
 # dupes per scheme.
+OUTFILE="tandemPortion.tsv"
+truncate -s 0 ${OUTFILE}
 for FILE in `ls tandem.*`
 do
 
@@ -188,7 +190,11 @@ do
     # differences, or any other things aligned.
     FRACTION=$(echo ${TOTAL_TANDEMS} / ${TOTAL_4PART} | bc -l)
     
+    printf "${SCHEME}\t${FRACTION}\n" >> ${OUTFILE}
+    
     echo "Scheme ${SCHEME} is ${TOTAL_TANDEMS} / ${TOTAL_4PART} = ${FRACTION} tandems"
 
 done
+
+barchart.py ${OUTFILE} --x_label "Merging Scheme" --y_label "2-break tandem portion" --title "Portion Tandem Dupes vs. Merging Scheme" --x_sideways --save tandemPortion.png
 
