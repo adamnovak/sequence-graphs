@@ -84,11 +84,19 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             (True, True, 80, 0, 0, 0),
             (True, True, 100, 0, 0, 0),
             (True, True, 120, 0, 0, 0),
+            (True, True, 140, 0, 0, 0),
+            (True, True, 160, 0, 0, 0),
+            (True, True, 180, 0, 0, 0),
+            (True, True, 200, 0, 0, 0)
             # Specified add
             (True, True, 0, 25, 0, 0),
             (True, True, 0, 50, 0, 0),
             (True, True, 0, 75, 0, 0),
             (True, True, 0, 100, 0, 0),
+            (True, True, 0, 125, 0, 0),
+            (True, True, 0, 150, 0, 0),
+            (True, True, 0, 200, 0, 0),
+            (True, True, 0, 250, 0, 0)
             # Coding cost context
             (True, True, 0, 0, 0, 20),
             (True, True, 0, 0, 0, 80),
@@ -96,14 +104,15 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             (True, True, 0, 0, 0, 200),
             (True, True, 0, 0, 0, 260),
             # MultContext
-            (True, True, 0, 0, 1.25, 0),
-            (True, True, 0, 0, 1.5, 0),
-            (True, True, 0, 0, 1.75, 0),
             (True, True, 0, 0, 2.0, 0),
-            (True, True, 0, 0, 2.25, 0),
-            (True, True, 0, 0, 2.50, 0),
-            (True, True, 0, 0, 2.75, 0),
-            (True, True, 0, 0, 3.0, 0)
+            (True, True, 0, 0, 3.0, 0),
+            (True, True, 0, 0, 4.0, 0),
+            (True, True, 0, 0, 5.0, 0),
+            (True, True, 0, 0, 6.0, 0),
+            (True, True, 0, 0, 7.0, 0),
+            (True, True, 0, 0, 8.0, 0),
+            (True, True, 0, 0, 9.0, 0),
+            (True, True, 0, 0, 10.0, 0)
         ]
 
     def getMonotonicSchemePlan(self):
@@ -138,11 +147,13 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         
         """
         
-        
-        scheme_plan = self.getMonotonicSchemePlan()
+        # Get a big list of tuples succinctly describing all the schemes we want
+        # to run.
+        scheme_plan = self.getSchemePlan()
         
         for mismatch, credit, min_context, add_context, mult_context, \
             min_coding_cost in scheme_plan:
+            # Unpack each planned scheme
             
             # Start out with the context args
             extra_args = ["--context", str(min_context), "--addContext",
