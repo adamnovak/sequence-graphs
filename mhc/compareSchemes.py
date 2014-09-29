@@ -79,15 +79,6 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # add_context, mult_context, min_coding_cost
         return [
             (False, False, 100, 0, 0, 0),
-            # Specified Min
-            (True, True, 60, 0, 0, 0),
-            (True, True, 80, 0, 0, 0),
-            (True, True, 100, 0, 0, 0),
-            (True, True, 120, 0, 0, 0),
-            (True, True, 140, 0, 0, 0),
-            (True, True, 160, 0, 0, 0),
-            (True, True, 180, 0, 0, 0),
-            (True, True, 200, 0, 0, 0),
             # Specified add
             (True, True, 0, 25, 0, 0),
             (True, True, 0, 50, 0, 0),
@@ -97,12 +88,6 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             (True, True, 0, 150, 0, 0),
             (True, True, 0, 200, 0, 0),
             (True, True, 0, 250, 0, 0),
-            # Coding cost context
-            (True, True, 0, 0, 0, 20),
-            (True, True, 0, 0, 0, 80),
-            (True, True, 0, 0, 0, 140),
-            (True, True, 0, 0, 0, 200),
-            (True, True, 0, 0, 0, 260),
             # MultContext
             (True, True, 0, 0, 2.0, 0),
             (True, True, 0, 0, 3.0, 0),
@@ -112,7 +97,15 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             (True, True, 0, 0, 7.0, 0),
             (True, True, 0, 0, 8.0, 0),
             (True, True, 0, 0, 9.0, 0),
-            (True, True, 0, 0, 10.0, 0)
+            (True, True, 0, 0, 10.0, 0),
+            # Add and Mult
+            (True, True, 0, 25, 4.0, 0),
+            (True, True, 0, 50, 4.0, 0),
+            (True, True, 0, 75, 4.0, 0),
+            (True, True, 0, 100, 4.0, 0),
+            (True, True, 0, 150, 4.0, 0),
+            (True, True, 0, 200, 4.0, 0),
+            (True, True, 0, 250, 4.0, 0)
         ]
 
     def getMonotonicSchemePlan(self):

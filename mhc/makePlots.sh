@@ -105,16 +105,8 @@ do
     # Grab the scheme
     SCHEME=${FILE##*.}
     
-    # Break it into scheme proper and parameter setting
-    # Parameter is whatever's after all the alpha stuff (2p0)
-    SCHEME_PARAMETER=${SCHEME##*([A-Za-z])}
-    # Type is whatever's before that (ICMult)
-    SCHEME_TYPE=${SCHEME%${SCHEME_PARAMETER}}
-    
-    # Fix up fractional values
-    SCHEME_PARAMETER=$(printf "${SCHEME_PARAMETER}" | sed s/p/./)
-    
-    echo "Scheme ${SCHEME_TYPE} parameter ${SCHEME_PARAMETER}"
+    # Type is the scheme name without the numbers (with ps in them)
+    SCHEME_TYPE=$(echo ${SCHEME} | sed 's/[0-9]\(p\)\?//g')
     
     # We want totals
     TOTAL_PRECISION=0
