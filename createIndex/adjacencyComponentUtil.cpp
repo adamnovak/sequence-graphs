@@ -343,6 +343,9 @@ countTandemDuplications(
     size_t tandemDuplications = 0;
 
     for(auto component : components) {
+        // Is this component a tandem duplication?
+        bool isTandem = false;
+    
         for(size_t i = 0; i < component.size(); i++) {
             // Go through all the ends
             stPinchEnd end1 = component[i];
@@ -388,7 +391,7 @@ countTandemDuplications(
                             // This end that the first end is connected to looks
                             // exactly like the second end. Call this a tandem
                             // duplication.
-                            tandemDuplications++;
+                            isTandem = true;
                             
                             // TODO: Break out of like 3 loops now, so we don't
                             // check all the other end pairs or somehow call two
@@ -410,6 +413,35 @@ countTandemDuplications(
                     stSet_destruct(connectedEnds);
                 }
             }
+        }
+        
+        // Now we know if the component is a tandem duplication or not. Add to
+        // the sum if applicable.
+        tandemDuplications += isTandem;
+        
+        if(!isTandem) {
+            Log::output() << "Non-tandem-duplication: " << std::endl;
+            
+            for(size_t i = 0; i < component.size(); i++) {
+                // Go through all the ends
+                stPinchEnd end1 = component[i];
+                
+                // Get the block for each
+                stPinchBlock* block = stPinchEnd_getBlock(&end1);
+                
+                // And a segment for the block
+                stPinchSegment* segment = stPinchBlock_getFirst(block);
+                
+                // Report the block (already done 1-based I think?)
+                Log::output() << "\t" << stPinchSegment_getStart(segment) <<
+                    "-" << stPinchSegment_getStart(segment) + 
+                    stPinchSegment_getLength(segment) - 1 << " thread #" << 
+                    stPinchThread_getName(stPinchSegment_getThread(segment)) <<
+                    std::endl;
+                
+                
+            }
+            
         }
         
     }
@@ -444,11 +476,11 @@ writeAdjacencyComponents(
             // Get the segment the end belongs to
             auto segment = stPinchBlock_getFirst(block);
             
-            // Name it
+            // Name it. Remember threads are already 1-based.
             std::string segmentName =
-                std::to_string(stPinchSegment_getStart(segment) + 1) +
+                std::to_string(stPinchSegment_getStart(segment)) +
                  "-" + std::to_string(stPinchSegment_getStart(segment) + 
-                 stPinchSegment_getLength(segment) + 1);
+                 stPinchSegment_getLength(segment) - 1);
             
             // And get which end we're on
             char endName = stPinchEnd_getOrientation(&end) ? 'R' : 'L';
@@ -478,7 +510,7 @@ writeAdjacencyComponents(
             // Make an edge with the info from the first segment, annotated with
             // copy number
             out << "\t\t{rank=same; n" <<
-                (stPinchSegment_getStart(segment) + 1) << "L -- n" <<
+                (stPinchSegment_getStart(segment)) << "L -- n" <<
                 std::to_string(stPinchSegment_getStart(segment) + 
                 stPinchSegment_getLength(segment)) << 
                 "R[color=blue,label=\"" << count << "\"];}" << std::endl;
@@ -492,9 +524,9 @@ writeAdjacencyComponents(
             
             // Pick left end L or right end R to represent this end
             std::string node = stPinchEnd_getOrientation(&end) ? 
-                std::to_string(stPinchSegment_getStart(segment) + 1) + "L" :
+                std::to_string(stPinchSegment_getStart(segment)) + "L" :
                 std::to_string(stPinchSegment_getStart(segment) + 
-                stPinchSegment_getLength(segment)) + "R";
+                stPinchSegment_getLength(segment) - 1) + "R";
             
             // Go through all the other ends and connect them to this one
             stSet* otherEnds = stPinchEnd_getConnectedPinchEnds(&end);
@@ -512,9 +544,9 @@ writeAdjacencyComponents(
                 
                 // Pick left end L or right end R to represent this other end
                 std::string otherNode = stPinchEnd_getOrientation(otherEnd) ? 
-                    std::to_string(stPinchSegment_getStart(otherSegment) + 1) +
+                    std::to_string(stPinchSegment_getStart(otherSegment)) +
                     "L" : std::to_string(stPinchSegment_getStart(otherSegment) +
-                    stPinchSegment_getLength(otherSegment)) + "R";
+                    stPinchSegment_getLength(otherSegment) - 1) + "R";
                 
                 if(node < otherNode) {
                     // Only draw these edges going in one direction, so copy
