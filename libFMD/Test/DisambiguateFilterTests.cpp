@@ -65,22 +65,22 @@ void DisambiguateFilterTests::tearDown() {
  */
 void DisambiguateFilterTests::testApply() {
     
-    // Make some left mappings
+    // Make some left mappings (really right mappings that ended up backwards)
     std::vector<Mapping> leftMappings {
-        Mapping(TextPosition(0, 0)),
+        Mapping(TextPosition(1, 34), 2, 0),
         Mapping(),
         Mapping(),
-        Mapping(TextPosition(0, 3)),
-        Mapping(TextPosition(0, 4))
+        Mapping(TextPosition(1, 31), 2, 0),
+        Mapping(TextPosition(1, 30), 2, 0)
     };
     
     // Make some right mappings
     std::vector<Mapping> rightMappings {
-        Mapping(TextPosition(1, 34)),
-        Mapping(TextPosition(1, 33)),
+        Mapping(TextPosition(1, 34), 0, 3),
+        Mapping(TextPosition(1, 33), 0, 3),
         Mapping(),
-        Mapping(TextPosition(1, 31)),
-        Mapping(TextPosition(1, 29))
+        Mapping(),
+        Mapping(TextPosition(1, 29), 0, 3)
     };
     
     // Make the filter to test.
@@ -91,15 +91,15 @@ void DisambiguateFilterTests::testApply() {
         
     // Check all the results
     // Both agree
-    CPPUNIT_ASSERT_EQUAL(result[0], Mapping(TextPosition(1, 34)));
-    // Left only
-    CPPUNIT_ASSERT_EQUAL(result[1], Mapping(TextPosition(1, 33)));
-    // Neither
-    CPPUNIT_ASSERT_EQUAL(result[2], Mapping());
+    CPPUNIT_ASSERT_EQUAL(Mapping(TextPosition(1, 34), 2, 3), result[0]);
     // Right only
-    CPPUNIT_ASSERT_EQUAL(result[3], Mapping(TextPosition(1, 31)));
+    CPPUNIT_ASSERT_EQUAL(Mapping(TextPosition(1, 33), 0, 3), result[1]);
+    // Neither
+    CPPUNIT_ASSERT_EQUAL(Mapping(), result[2]);
+    // Left only
+    CPPUNIT_ASSERT_EQUAL(Mapping(TextPosition(1, 31), 2, 0), result[3]);
     // Disagree
-    CPPUNIT_ASSERT_EQUAL(result[4], Mapping());
+    CPPUNIT_ASSERT_EQUAL(Mapping(), result[4]);
     
 }
 

@@ -17,7 +17,8 @@ struct Mapping
 {
 public:
     Mapping();
-    Mapping(TextPosition location, size_t context=0);
+    Mapping(TextPosition location);
+    Mapping(TextPosition location, size_t leftContext, size_t rightContext);
     
     /**
      * Provide equality comparison for testing.
@@ -32,30 +33,68 @@ public:
     /**
      * What text and offset is this mapping to?
      */
-    inline TextPosition getLocation() {
+    inline TextPosition getLocation() const {
         return location;
     }
     
     /**
      * Is this Mapping actually mapped?
      */
-    inline bool isMapped() {
+    inline bool isMapped() const {
         return is_mapped;
     }
     
     /**
-     * Return the amount of context used to map. This counts the base itself.
+     * Return the amount of context used to map on the left. This counts the
+     * base itself. Returns 0 if not mapped using this side. 0 for
+     * unmapped Mappings.
      */
-    inline size_t getContext() {
-        return context; 
+    inline size_t getLeftContext() const {
+        return leftContext; 
+    }
+    
+    /**
+     * Return the amount of context used to map on the right. This counts the
+     * base itself. Returns 0 if not mapped using this side. 0 for
+     * unmapped Mappings.
+     */
+    inline size_t getRightContext() const {
+        return rightContext; 
+    }
+    
+    
+    /**
+     * Return the amount of total context used to map this base.
+     */
+    inline size_t getContext() const {
+        // Don't double-count the central base if both contexts are nonzero.
+        return leftContext + (rightContext > 0) ? rightContext - 1 : 0;
+    }
+    
+    /**
+     * Flip this mapping and return a new mapping for the other strand, with
+     * contexts swapped.
+     */
+    inline Mapping flip(size_t contigLength) const {
+        if(is_mapped) {
+            // If we're mapped, flip the location and exchange the contexts.
+            TextPosition newLocation = location;
+            newLocation.flip(contigLength);
+            return Mapping(newLocation, rightContext, leftContext);
+        } else {
+            // If we are unmapped, just continue being exactly the same.
+            return *this;
+        }
     }
     
     // Holds (text, offset)
     TextPosition location;
     // Is the above actually filled in?
     bool is_mapped;
-    // How much context was used for this?    
-    size_t context;
+    // How much left context was used for this?    
+    size_t leftContext;
+    // And how much right context?
+    size_t rightContext;
 };
 
 /**

@@ -21,10 +21,11 @@ public:
     CreditFilter(const FMDIndex& index);
     
     /**
-     * Given a vector of left mappings and an equal-length vector of right
-     * mappings, apply credit. Produce a vector of disambiguated mappings with
-     * credit. TODO: needs to check base identity. TODO: needs to not go off the
-     * ends of contigs.
+     * Given a vector of left mappings (in right semantics with left context
+     * set, in left to right order) and an equal-length vector of right mappings
+     * (also in right semantics, with right context set, in left-to-right
+     * order), apply credit. Produce a vector of disambiguated mappings with
+     * credit. TODO: needs to check base identity.
      */
     std::vector<Mapping> apply(std::vector<Mapping> leftMappings, 
         std::vector<Mapping> rightMappings);

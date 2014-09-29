@@ -940,8 +940,8 @@ std::vector<Mapping> FMDIndex::map(const std::string& query,
             textPosition.setOffset(textPosition.getOffset() + 
                 (location.characters - 1));
 
-            // Add a Mapping for this mapped base.
-            mappings.push_back(Mapping(textPosition));
+            // Add a Mapping for this mapped base, mapped on the right.
+            mappings.push_back(Mapping(textPosition, 0, location.characters));
 
             // We definitely have a non-empty FMDPosition to continue from
 
@@ -1081,8 +1081,9 @@ std::vector<Mapping> FMDIndex::mapRight(const std::string& query,
                 textPosition.getText() << " position " <<
                 textPosition.getOffset() << std::endl;
 
-            // Add a Mapping for this mapped base.
-            mappings.push_back(Mapping(textPosition));
+            // Add a Mapping for this mapped base, with patternLength right
+            // context.
+            mappings.push_back(Mapping(textPosition, 0, patternLength));
         } else {
             // Otherwise record that this position is unmapped on the right.
             
@@ -1126,14 +1127,10 @@ std::vector<Mapping> FMDIndex::mapLeft(const std::string& query,
     for(size_t i = 0; i < mappings.size(); i++) {
         // Go through all the mappings
         
-        if(mappings[i].is_mapped) {
-            // Flip the mapping onto the correct text for left semantics.
-            size_t contigLength = getContigLength(getContigNumber(
-                mappings[i].location));
-                
-            mappings[i].location.setText(mappings[i].location.getText() ^ 1);
-            mappings[i].location.setOffset(contigLength - 
-                mappings[i].location.getOffset() - 1);
+        if(mappings[i].isMapped()) {
+            // Flip the mapping for left semantics.
+            mappings[i] = mappings[i].flip(getContigLength(getContigNumber(
+                mappings[i].getLocation())));
         }
     }
     
@@ -1166,147 +1163,6 @@ std::vector<Mapping> FMDIndex::mapBoth(const std::string& query, int64_t genome,
     // Give back the disambiguated vector.
     return left;
     
-}
-
-std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> FMDIndex::Cmap(const GenericBitVector& ranges,
-    const std::string& query, const GenericBitVector* mask, int minContext, int start,
-    int length) const {
-    
-    // Map to a range.
-    
-    if(length == -1) {
-        // Fix up the length parameter if it is -1: that means the whole rest of
-        // the string.
-        length = query.length() - start;
-    }
-    
-    Log::debug() << "Mapping with (two-sided) minimum " << minContext << " context." <<
-        std::endl;
-
-    // We need a vector to return.
-    std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> mappings;
-
-    // Keep around the result that we get from the single-character mapping
-    // function. We use it as our working state to trackour FMDPosition and how
-    // many characters we've extended by. We use the is_mapped flag to indicate
-    // whether the current iteration is an extension or a restart.
-    creditMapAttemptResult location;
-    // Make sure the scratch position is empty so we re-start on the first base
-    location.position = EMPTY_FMD_POSITION;
-
-    for(int i = start + length - 1; i >= start; i--) {
-        // Go from the end of our selected region to the beginning.
-        
-        Log::trace() << "On position " << i << " from " <<
-            start + length - 1 << " to " << start << std::endl;
-            
-        // Need to prevent an extension from overrunning the query contig, if
-        // this will happen, also trigger a restart
-                        
-        if(location.position.isEmpty() || i < location.characters) {
-            Log::debug() << "Starting over by mapping position " << i << std::endl;
-            // We do not currently have a non-empty FMDPosition to extend. Start
-            // over by mapping this character by itself.
-            location = this->CmapPosition(ranges, query, i, mask);
-        } else {
-            Log::debug() << "Extending with position " << i << " with characters = " << location.characters << std::endl;
-            // The last base either mapped successfully or failed due to multi-
-            // mapping. Try to extend the FMDPosition we have to the left
-            // (backwards) with the next base.
-            location.position = this->extend(location.position, query[i - location.characters + 1], true);
-            location.position = this->extend(location.position, query[i - location.characters], true);
-            location.characters++;
-            if(location.characters > location.maxCharacters) {
-                location.maxCharacters++;
-            }
-        }
-
-        // What range index does our current left-side position (the one we just
-        // moved) correspond to, if any?
-        int64_t range = location.position.range(ranges, mask);
-        
-        if(location.characters < minContext && location.maxCharacters >=minContext) {
-            location.characters = minContext;
-        }
-
-        if(location.is_mapped && location.characters >= minContext && 
-            !location.position.isEmpty(mask) && range != -1) {
-            
-            // It mapped. We didn't do a re-start and fail, we have sufficient
-            // context to be confident, and our interval is nonempty and
-            // subsumed by a range.
-
-            Log::debug() << i << " Mapped " << location.characters << 
-                " context to " << location.position << " in range #" << range <<
-                std::endl;
-
-            // Remember that this base mapped to this range
-            mappings.push_back(std::make_pair(range,std::make_pair(location.characters,location.maxCharacters)));
-            
-            // We definitely have a non-empty FMDPosition to continue from
-
-        } else {
-
-            Log::debug() << "Failed at " << i << " " << location.position << " (" << 
-                location.position.ranges(ranges, mask) <<
-                " options for " << location.characters << " context)." << 
-                std::endl;
-                
-            if(location.is_mapped && location.position.isEmpty(mask)) {
-                // We extended right until we got no results. We need to try
-                // this base again, in case we tried with a too-long left
-                // context.
-
-                Log::debug() << "Restarting from here..." << std::endl;
-
-                // Move the loop index towards the end we started from (right)
-                i++;
-                
-                // Since the FMDPosition is empty, on the next iteration we will
-                // retry this base.
-
-            } else {
-                // It didn't map for some other reason:
-                // - It was an initial mapping with too little right context to 
-                //   be unique to a range.
-                // - It was an initial mapping with a nonexistent right context
-                // - It was an extension that was multimapped and still is
-
-                // In none of these cases will re-starting from this base help
-                // at all. If we just restarted here, we don't want to do it
-                // again. If it was multimapped before, it had as much left
-                // context as it could take without running out of string or
-                // getting no results.
-
-                // It didn't map. Say it corresponds to no range.
-                mappings.push_back(std::make_pair(-1,std::make_pair(0,0)));
-
-                // Mark that the next iteration will be an extension (if we had
-                // any results this iteration; if not it will just restart)
-                location.is_mapped = true;
-
-            }
-        }
-    }
-
-    // We've gone through and attempted the whole string. Put our results in the
-    // same order as the string, instead of the backwards order we got them in.
-    // See <http://www.cplusplus.com/reference/algorithm/reverse/>
-    std::reverse(mappings.begin(), mappings.end());
-
-    // Give back our answers.
-    return mappings;
-    
-    
-}
-
-std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> FMDIndex::Cmap(const GenericBitVector& ranges, 
-    const std::string& query, int64_t genome, int minContext, int start,
-    int length) const {
-    
-    // Get the appropriate mask, or NULL if given the special all-genomes value.
-    return Cmap(ranges, query, genome == -1 ? NULL : genomeMasks[genome], 
-        minContext, start, length);    
 }
 
 std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
@@ -1954,13 +1810,21 @@ MapAttemptResult FMDIndex::mapPosition(const GenericBitVector& ranges,
 
 Mapping FMDIndex::disambiguate(const Mapping& left, 
     const Mapping& right) const {
+    
+    // Make sure to disambiguate contexts along with mappings. Left/right
+    // semantics agnostic, since both inputs must have the same which-text-is-
+    // forward semantics.
 
-    if(left == right || !left.is_mapped) {
-        // If they match or left has nothing to say, use right.
+    if(!left.isMapped()) {
         return right;
-    } else if(!right.is_mapped) {
+    } else if(!right.isMapped()) {
         // If right has nothing to say, use left
         return left;
+    } else if(left.getLocation() == right.getLocation()) {
+        // If they match, make sure to merge contexts, taking the left of left
+        // and the right of right.
+        return Mapping(right.getLocation(), left.getLeftContext(),
+            right.getRightContext());
     } else {
         // Else they disagree, so return an unmapped mapping.
         return Mapping();

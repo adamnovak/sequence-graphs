@@ -11,7 +11,8 @@ CreditFilter::CreditFilter(const FMDIndex& index): index(index),
 std::vector<Mapping> CreditFilter::apply(
     std::vector<Mapping> leftMappings, std::vector<Mapping> rightMappings) {
 
-    // First disambiguate everything
+    // First disambiguate everything. This also makes combined left and right
+    // contexts.
     std::vector<Mapping> disambiguated = disambiguate.apply(leftMappings,
         rightMappings);
 
@@ -27,6 +28,7 @@ std::vector<Mapping> CreditFilter::apply(
         if(leftMappings[i].isMapped() && 
             disambiguated[i].isMapped()) {
             // This is the first mapped thing we have found mapped on the left.
+            // TODO: check getLeftContext() for left-mapping status instead?
             leftSentinel = i;
             Log::info() << "Left sentinel found at " << leftSentinel << 
                 std::endl;
@@ -62,14 +64,15 @@ std::vector<Mapping> CreditFilter::apply(
     size_t maxLeftContext = 0;
     size_t maxRightContext = 0;
     
-    for(size_t i = 0; i < leftMappings.size(); i++) {
+    for(size_t i = 0; i < disambiguated.size(); i++) {
         // Take the max left and right context when we find them.
         
-        Log::debug() << leftMappings[i].getContext() << ", " << rightMappings[i].getContext() << std::endl;
+        Log::debug() << disambiguated[i].getLeftContext() << ", " << disambiguated[i].getRightContext() << std::endl;
         
-        maxLeftContext = std::max(maxLeftContext, leftMappings[i].getContext());
+        maxLeftContext = std::max(maxLeftContext, 
+            disambiguated[i].getLeftContext());
         maxRightContext = std::max(maxRightContext, 
-            rightMappings[i].getContext());
+            disambiguated[i].getRightContext());
     }
     
     Log::debug() << "Max context sizes: " << maxLeftContext << "|" << 
@@ -115,7 +118,7 @@ std::vector<Mapping> CreditFilter::apply(
                     continue;
                 }
                 
-                if(rightMappings[j].getContext() - 1 < i - j) {
+                if(disambiguated[j].getRightContext() - 1 < i - j) {
                     // This base's context didn't reach all the way out, after
                     // accounting for the fact that it includes the base itself.
                     // This prevents us from mapping off the end of a contig,
@@ -126,7 +129,7 @@ std::vector<Mapping> CreditFilter::apply(
                 // OK, we imply some mapping. What is it?
                 // Grab the mapped base and go forwards on the forward strand
                 // (since right contexts reach forward).
-                TextPosition implied = rightMappings[j].getLocation();
+                TextPosition implied = disambiguated[j].getLocation();
                 // As i increases and j stays the same, we want offset to
                 // become more positive.
                 implied.addOffset((int64_t) i - (int64_t) j);
@@ -172,7 +175,7 @@ std::vector<Mapping> CreditFilter::apply(
                     continue;
                 }
                 
-                if(leftMappings[j].getContext() - 1 < j - i) {
+                if(disambiguated[j].getLeftContext() - 1 < j - i) {
                     // This base's context didn't reach all the way out, after
                     // accounting for the fact that it includes the base itself.
                     // This prevents us from mapping off the end of a contig,
@@ -183,7 +186,7 @@ std::vector<Mapping> CreditFilter::apply(
                 // OK, we imply some mapping. What is it?
                 // Grab the mapped base and go backward on the forward strand
                 // (since left contexts reach backward).
-                TextPosition implied = leftMappings[j].getLocation();
+                TextPosition implied = disambiguated[j].getLocation();
                 // As i increases and j stays the same, we want offset to
                 // become less negative.
                 implied.addOffset((int64_t) i - (int64_t) j);
@@ -211,28 +214,17 @@ std::vector<Mapping> CreditFilter::apply(
                     // We have credit from both the left and the right. Do they
                     // agree?
                     
-                    // Flip the text position we got from the left using the
-                    // index.
-                    TextPosition leftFlipped = leftCreditPosition;
-                    leftFlipped.flip(index.getContigLength(
-                        index.getContigNumber(leftFlipped)));
-                        
-                    if(leftFlipped == rightCreditPosition) {
-                        // They agree! Record a successful mapping.
-                        toReturn.push_back(Mapping(leftFlipped));
+                    if(leftCreditPosition == rightCreditPosition) {
+                        // They agree! Record a successful mapping. TODO: do we
+                        // want to send credit info along here as well?
+                        toReturn.push_back(Mapping(leftCreditPosition));
                     } else {
                         // They disagree. Fail the mapping
                         toReturn.push_back(Mapping());
                     }
                 } else {
                     // We have credit only from the left.
-                    
-                    // We need to flip it into right semantics.
-                    TextPosition leftFlipped = leftCreditPosition;
-                    leftFlipped.flip(index.getContigLength(
-                        index.getContigNumber(leftFlipped)));
-                    
-                    toReturn.push_back(Mapping(leftFlipped));
+                    toReturn.push_back(Mapping(leftCreditPosition));
                 }
             } else if(rightFound && rightConsistent) {
                 // We have credit only from the right

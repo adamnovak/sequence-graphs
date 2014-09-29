@@ -406,17 +406,13 @@ public:
         int start = 0, int length = -1) const;
 
     /**
-     * CENTERED VERSIONS of the functions described above
+     * Given a left mapping and a right mapping for a base, disambiguate them to
+     * produce one mapping. Things that consistently left and right-mapped to a
+     * forward strand will be on an even text.
+     *
+     * TODO: Should this be Mapping::disambiguate()?
      */
-    
-    std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> Cmap(const GenericBitVector& ranges,
-        const std::string& query, const GenericBitVector* mask, int minContext = 0, 
-        int start = 0, int length = -1) const;
-    
-    
-    std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> Cmap(const GenericBitVector& ranges,
-        const std::string& query, int64_t genome = -1, int minContext = 0, 
-        int start = 0, int length = -1) const;
+    Mapping disambiguate(const Mapping& left, const Mapping& right) const;
         
     /***************************************************************************
      * Mismatch
@@ -666,13 +662,6 @@ protected:
         const std::string& pattern, size_t index, 
         const GenericBitVector* mask = NULL) const;
         
-    /**
-     * Given a left mapping and a right mapping for a base, disambiguate them to
-     * produce one mapping. Things that consistently left and right-mapped to a
-     * forward strand will be on an even text.
-     */
-    Mapping disambiguate(const Mapping& left, const Mapping& right) const;
-      
 private:
     
     // No copy constructor.

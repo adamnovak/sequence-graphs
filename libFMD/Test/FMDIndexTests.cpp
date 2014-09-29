@@ -258,19 +258,36 @@ void FMDIndexTests::testIterate() {
 void FMDIndexTests::testDisambiguate() {
 
     // Make some positions    
-    Mapping mapped(TextPosition(1, 1));
-    Mapping otherSide(TextPosition(0, 33)); 
+    Mapping leftMapped(TextPosition(1, 1), 5, 0);
+    Mapping rightMapped(TextPosition(1, 1), 0, 4);
+    Mapping otherSide(TextPosition(0, 33), 0, 5); 
     Mapping unmapped;
     Mapping elsewhere(TextPosition(2, 10));
     
     // Make sure disambiguate does the right things
-    CPPUNIT_ASSERT(index->disambiguate(mapped, otherSide).is_mapped == false);
-    CPPUNIT_ASSERT(index->disambiguate(otherSide, mapped).is_mapped == false);
-    CPPUNIT_ASSERT(index->disambiguate(mapped, unmapped) == mapped);
-    CPPUNIT_ASSERT(index->disambiguate(unmapped, mapped) == mapped);
-    CPPUNIT_ASSERT(index->disambiguate(mapped, mapped) == mapped);
-    CPPUNIT_ASSERT(index->disambiguate(unmapped, unmapped).is_mapped == false);
-    CPPUNIT_ASSERT(index->disambiguate(elsewhere, mapped).is_mapped == false);
+    
+    // Map things that agree
+    CPPUNIT_ASSERT(!index->disambiguate(leftMapped, otherSide).is_mapped);
+    CPPUNIT_ASSERT(!index->disambiguate(otherSide, leftMapped).is_mapped);
+    
+    // Don't map things that disagree, especially if someone put in things with
+    // differing orientations
+    CPPUNIT_ASSERT_EQUAL(leftMapped, index->disambiguate(leftMapped, unmapped));
+    CPPUNIT_ASSERT_EQUAL(rightMapped, index->disambiguate(unmapped, 
+        rightMapped));
+    
+    // Properly integrate contexts when things map.
+    CPPUNIT_ASSERT(index->disambiguate(leftMapped, rightMapped).isMapped());
+    CPPUNIT_ASSERT_EQUAL(leftMapped.getLocation(), 
+        index->disambiguate(leftMapped, rightMapped).getLocation());
+    CPPUNIT_ASSERT_EQUAL((size_t)5, index->disambiguate(leftMapped,
+        rightMapped).getLeftContext());
+    CPPUNIT_ASSERT_EQUAL((size_t)4, index->disambiguate(leftMapped,
+        rightMapped).getRightContext());
+        
+    // Don't map when the two inputs go to completely different places
+    CPPUNIT_ASSERT(!index->disambiguate(unmapped, unmapped).is_mapped);
+    CPPUNIT_ASSERT(!index->disambiguate(elsewhere, leftMapped).is_mapped);
 }
 
 /**

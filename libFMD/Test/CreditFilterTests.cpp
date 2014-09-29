@@ -67,16 +67,16 @@ void CreditFilterTests::testApply() {
     
     // Make some left mappings. Make sure we have a sentinel first.
     std::vector<Mapping> leftMappings {
-        Mapping(TextPosition(0, 0)),
+        Mapping(TextPosition(1, 34)),
         Mapping(),
         Mapping(),
         Mapping(),
-        Mapping(TextPosition(0, 4), 5)
+        Mapping(TextPosition(1, 30), 5, 0)
     };
     
     // Make some right mappings. Make sure we have a sentinel last.
     std::vector<Mapping> rightMappings {
-        Mapping(TextPosition(1, 34), 5),
+        Mapping(TextPosition(1, 34), 0, 5),
         Mapping(),
         Mapping(),
         Mapping(),
@@ -117,16 +117,16 @@ void CreditFilterTests::testDisagreement() {
     
     // Make some left mappings
     std::vector<Mapping> leftMappings {
-        Mapping(TextPosition(1, 34)),
+        Mapping(TextPosition(0, 0)),
         Mapping(),
         Mapping(),
         Mapping(),
-        Mapping(TextPosition(3, 30), 5)
+        Mapping(TextPosition(2, 4), 5, 0)
     };
     
     // Make some right mappings
     std::vector<Mapping> rightMappings {
-        Mapping(TextPosition(2, 0), 5),
+        Mapping(TextPosition(2, 0), 0, 5),
         Mapping(),
         Mapping(),
         Mapping(),
@@ -159,17 +159,17 @@ void CreditFilterTests::testConflictingCredit() {
     
     // Make some left mappings
     std::vector<Mapping> leftMappings {
-        Mapping(TextPosition(0, 0)),
+        Mapping(TextPosition(1, 34)),
         Mapping(),
         Mapping(),
-        Mapping(TextPosition(2, 3), 4),
-        Mapping(TextPosition(0, 4), 5)
+        Mapping(TextPosition(3, 31), 4, 0),
+        Mapping(TextPosition(1, 30), 5, 0)
     };
     
     // Make some right mappings
     std::vector<Mapping> rightMappings {
-        Mapping(TextPosition(1, 34), 5),
-        Mapping(TextPosition(3, 33), 4),
+        Mapping(TextPosition(1, 34), 0, 5),
+        Mapping(TextPosition(3, 33), 0, 4),
         Mapping(),
         Mapping(),
         Mapping(TextPosition(1, 30))
@@ -207,17 +207,17 @@ void CreditFilterTests::testConflictingCreditOneSideOnly() {
     
     // Make some left mappings
     std::vector<Mapping> leftMappings {
-        Mapping(TextPosition(0, 0)),
+        Mapping(TextPosition(1, 34)),
         Mapping(),
         Mapping(),
         Mapping(),
-        Mapping(TextPosition(0, 4), 5)
+        Mapping(TextPosition(1, 30), 5, 0)
     };
     
     // Make some right mappings
     std::vector<Mapping> rightMappings {
-        Mapping(TextPosition(1, 34), 5),
-        Mapping(TextPosition(3, 33), 4),
+        Mapping(TextPosition(1, 34), 0, 5),
+        Mapping(TextPosition(3, 33), 0, 4),
         Mapping(),
         Mapping(),
         Mapping(TextPosition(1, 30))
@@ -258,16 +258,16 @@ void CreditFilterTests::testDistance() {
     
     // Make some left mappings
     std::vector<Mapping> leftMappings {
-        Mapping(TextPosition(0, 0)),
+        Mapping(TextPosition(1, 34)),
         Mapping(),
         Mapping(),
         Mapping(),
-        Mapping(TextPosition(0, 4), 2)
+        Mapping(TextPosition(1, 30), 2, 0)
     };
     
     // Make some right mappings
     std::vector<Mapping> rightMappings {
-        Mapping(TextPosition(1, 34), 2),
+        Mapping(TextPosition(1, 34), 0, 2),
         Mapping(),
         Mapping(),
         Mapping(),
@@ -307,10 +307,10 @@ void CreditFilterTests::testNoInconsistentCredit() {
         
     // Make some left mappings
     std::vector<Mapping> leftMappings {
-        Mapping(TextPosition(0, 0)),
+        Mapping(TextPosition(1, 34)),
         Mapping(),
         Mapping(),
-        Mapping(TextPosition(0, 3), 2),
+        Mapping(TextPosition(1, 31), 2, 0),
         Mapping()
     };
     
