@@ -235,9 +235,6 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # name.
         alignments_by_scheme = {}
         
-        # And a similar structure for HALs
-        hals_by_scheme = {}
-        
         # This holds pairs of c2h and FASTA files
         c2h_fasta_pairs = []
         
@@ -266,17 +263,11 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             
             # Make a temp file for each of the children with this scheme to
             # write coverage stats to.
-            stats_filenames = [sonLib.bioio.getTempFile(suffix=".coverage",
+            coverage_filenames = [sonLib.bioio.getTempFile(suffix=".coverage",
                 rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
                 
             # And another one to hold each child's MAF alignment
             maf_filenames = [sonLib.bioio.getTempFile(suffix=".maf",
-                rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
-                
-            # And another one to hold each child's hal alignment. We still need
-            # individual hals because we need to have individual mafs for
-            # comparison.
-            hal_filenames = [sonLib.bioio.getTempFile(suffix=".hal",
                 rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
                 
             # And another one to hold each child's c2h alignment
@@ -287,13 +278,8 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             fasta_filenames = [sonLib.bioio.getTempFile(suffix=".fa",
                 rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
                 
-            for hal in hal_filenames:
-                # Make sure the HALs don't exist yet.
-                os.unlink(hal)
-                
             # Save these so we can compare them to other schemes later.
             alignments_by_scheme[scheme] = maf_filenames
-            hals_by_scheme[scheme] = hal_filenames
                 
             # And another one to hold each child's adjacency component size
             # spectrum
@@ -321,9 +307,8 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 # For each other FASTA to compare against
                 
                 # Pull out the files that this child should output.
-                stats_filename = stats_filenames[i]
+                coverage_filename = coverage_filenames[i]
                 maf_filename = maf_filenames[i]
-                hal_filename = hal_filenames[i]
                 spectrum_filename = spectrum_filenames[i]
                 indel_filename = indel_filenames[i]
                 tandem_filename = tandem_filenames[i]
@@ -336,7 +321,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 # make sure to tell it to use the spectrum output file.
                 self.addChildTarget(ReferenceStructureTarget(
                     [reference_fasta, other_fasta], random.getrandbits(256), 
-                    stats_filename, maf_filename, hal_filename=hal_filename,
+                    coverage_filename, maf_filename,
                     spectrum_filename=spectrum_filename, 
                     indel_filename=indel_filename, 
                     tandem_filename=tandem_filename, c2h_filename=c2h_filename, 
@@ -346,8 +331,8 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 
             # Make a follow-on job to merge all the child coverage outputs and
             # produce our coverage output file for this scheme.
-            followOns.append(ConcatenateTarget(stats_filenames, self.stats_dir +
-                "/coverage." + scheme))
+            followOns.append(ConcatenateTarget(coverage_filenames, 
+                self.stats_dir + "/coverage." + scheme))
                 
             # Make a follow-on job to merge all the child spectrum outputs and
             # produce our spectrum output file for this scheme.
@@ -386,24 +371,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             os.path.splitext(other)[0]) 
             for other in self.fasta_list[1:]]
                 
-        # Now we have all the followons for concatenating our stats and
-        # comparing against the truth, we need a followon for comparing
-        # corresponding MAFs from the same FASTA pair with different schemes,
-        # for all combinations of schemes.
-        agreement_target = AlignmentSchemeAgreementTarget(alignments_by_scheme,
-            genome_pairs, random.getrandbits(256), 
-            self.stats_dir + "/agreement", bed_root)
-            
-        # After that though, we need to take the BED files and the HAL files and
-        # make assembly hubs in hub_root.
-        hubs_target = AssemblyHubsTarget(hals_by_scheme, genome_pairs, bed_root,
-            self.hub_root)
-            
-        # Do those two things in order.
-        # TODO: These no longer work with unary-tree HALs.
-        #followOns.append(SequenceTarget([agreement_target, hubs_target]))
-        
-        # We also want to combine all our c2h files into one massive hub.
+        # We want to combine all our c2h files into one massive hub.
         
         # What HAL will we use?
         merged_hal = sonLib.bioio.getTempFile(suffix=".hal",
@@ -447,126 +415,6 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 
         self.logToMaster("SchemeAssessmentTarget Finished")
 
-class AlignmentSchemeAgreementTarget(jobTree.scriptTree.target.Target):
-    """
-    A target that, given lists of corresponding alignments in a dict by scheme,
-    compares corresponding alignments across all pairs of schemes and collates
-    the results.
-    
-    """
-    
-    def __init__(self, alignments_by_scheme, genome_names, seed, 
-        agreement_basename, bed_root):
-        """
-        Takes a dict of lists of alignments by scheme (arranged so alignments at
-        the same indices are of the same FASTAs), a list of pairs of genomes
-        which are compared by each alignment. Sends output to a file basename to
-        name all results after, and a directory in which to build a fairly
-        oragnized tree of BED files.
-        
-        Compares each scheme to each other scheme on corresponding genome pairs.
-        
-        Uses the seed to generate mafComparator seeds and temporary file names,
-        so don't run two copies with the same seed.
-        
-        Each (scheme1, scheme2, genome pair) combination produces a pair of BED
-        files of positions where the two schemes differ. These are saved in:
-            
-        <bed_root>/<scheme1>-<scheme2>-<genome1>-<genome2>/<genome>/<genome>.bed
-        
-        where scheme 1 is the lexicographically smaller scheme,  genome 1 and
-        genome 2 are the genomes as specified in the pair, and <genome> is the
-        genome on which the BED coordinates are given.
-        
-        """
-        
-        # Make the base Target. Ask for 2gb of memory since this is easy.
-        super(AlignmentSchemeAgreementTarget, self).__init__(memory=2147483648)
-        
-        self.seed = seed
-        
-        # Save the alignment names
-        self.alignments_by_scheme = alignments_by_scheme
-        
-        # And the genome name pairs
-        self.genome_names = genome_names
-        
-        # And the agreement file name
-        self.agreement_basename = agreement_basename
-        
-        # And the BED root
-        self.bed_root = bed_root
-        
-        self.logToMaster(
-            "Creating AlignmentSchemeAgreementTarget with seed {}".format(seed))
-        
-        
-    def run(self):
-        """
-        Send off all the child targets to do comparisons.
-        """
-        
-        self.logToMaster("Starting AlignmentSchemeAgreementTarget")
-        
-        # Seed the RNG
-        random.seed(self.seed)
-        
-        # We need a few different follow-on jobs.
-        followOns = []    
-        
-        for scheme1, scheme2 in itertools.combinations(
-            self.alignments_by_scheme.iterkeys(), 2):
-            
-            # For each pair of schemes to compare
-            
-            # What files will we concatenate? Get one for each pair of
-            # corresponding alignments. Just use our seeded random state for
-            # this; we only seeded once. So don't run this target twice with the
-            # same seed.
-            comparison_filenames = [sonLib.bioio.getTempFile(
-                rootDir=self.getGlobalTempDir()) 
-                for i in xrange(len(self.alignments_by_scheme[scheme1]))]
-            
-            for comparison_filename, alignment1, alignment2, compared_genomes \
-                in itertools.izip(comparison_filenames, 
-                self.alignments_by_scheme[scheme1], 
-                self.alignments_by_scheme[scheme2], self.genome_names):
-                
-                # For corresponding alignments
-                
-                # Find a place for a temporary BED file
-                temp_bed = sonLib.bioio.getTempFile(
-                    rootDir=self.getGlobalTempDir()) 
-                
-                # Work out where the split up BED files should land
-                bed_dir = self.bed_root + "/{}-{}-{}-{}".format(scheme1, 
-                    scheme2, compared_genomes[0], compared_genomes[1])
-                
-                # Make sure that directory exists.
-                os.makedirs(bed_dir)
-                
-                # Compare the alignments
-                self.addChildTarget(AlignmentComparisonTarget(alignment1, 
-                    alignment2, random.getrandbits(256), comparison_filename,
-                    bed=temp_bed))
-                    
-                # Split the BED file from this comparison out by genome.
-                # Override the feature names to be meaningful and list the
-                # scheme we're comparing against.
-                followOns.append(BedSplitTarget(temp_bed, compared_genomes, 
-                    bed_dir, feature_name="{}-{}".format(scheme1, scheme2)))
-                    
-            # Concatenate all the comparisons into a file named after both
-            # schemes.
-            followOns.append(ConcatenateTarget(comparison_filenames,
-                self.agreement_basename + "." + scheme1 + "." + scheme2))
-        
-        
-        # We need to run all of the follow-ons in parallel after this job
-        self.setFollowOnTarget(RunTarget(followOns))
-                
-        self.logToMaster("AlignmentSchemeAgreementTarget Finished")
-        
 class C2hMergeTarget(jobTree.scriptTree.target.Target):
     """
     A target that merges a list of c2h/FASTA pairs on a shared reference, where
@@ -882,213 +730,6 @@ class BedSplitTarget(jobTree.scriptTree.target.Target):
         
         self.logToMaster("BedSplitTarget Finished")
         
-class AssemblyHubsTarget(jobTree.scriptTree.target.Target):
-    """
-    A target that makes assembly hubs showing a bunch of HALs and how they
-    compare to each other.
-    
-    """
-    
-    def __init__(self, hals_by_scheme, genome_names, bed_root, hub_root):
-        """
-        Takes a dict of lists of HAL alignments by scheme (arranged so
-        alignments at the same indices are of the same FASTAs), and a list of
-        the pairs of genomes used to make each hal (in the same order).
-        
-        Also takes the root of a directory tree full of BED files:
-            
-        <bed_root>/<scheme1>-<scheme2>-<genome1>-<genome2>/<genome>/<genome>.bed
-        
-        where scheme 1 is the lexicographically smaller scheme,  genome 1 and
-        genome 2 are the genomes as specified in the pair, and <genome> is the
-        genome on which the BED coordinates are given.
-        
-        Produces a set of assembly hubs in:
-        
-        <hub_root>/<scheme>/<genome1>-<genome2>
-        
-        with one for each genome pair under each scheme. hub_root will be
-        created if it does not exist.
-        
-        """
-        
-        # Make the base Target. Ask for 2gb of memory since this is easy.
-        super(AssemblyHubsTarget, self).__init__(memory=2147483648)
-        
-        # Save the alignment names
-        self.hals_by_scheme = hals_by_scheme
-        
-        # And the genome name pairs
-        self.genome_names = genome_names
-        
-        # And the BED root
-        self.bed_root = bed_root
-        
-        # And the hub root
-        self.hub_root = hub_root
-        
-        self.logToMaster("Creating AssemblyHubsTarget")
-        
-        
-    def run(self):
-        """
-        Make the assembly hubs.
-        """
-        
-        self.logToMaster("Starting AssemblyHubsTarget")
-        
-        for scheme in self.hals_by_scheme.iterkeys():
-            
-            # Figure out where hubs of this scheme go
-            scheme_root = self.hub_root + "/" + scheme
-            if not os.path.exists(scheme_root):
-                os.makedirs(scheme_root)
-            
-            for i, (genome1, genome2) in enumerate(self.genome_names):
-                # Grab pairs of genomes, and their indices.
-                
-                # Work out its directory name
-                genome_string = "{}-{}".format(genome1, genome2)
-                
-                # Determine the directory for the assembly hub.
-                hub_dir = scheme_root + "/" + genome_string
-                
-                if not os.path.exists(hub_dir):
-                    # Don't let something else try making these in parallel.
-                    os.makedirs(hub_dir)
-                
-                # Make a child target to make this actual hub
-                self.addChildTarget(AssemblyHubTarget(
-                    self.hals_by_scheme[scheme][i], scheme, 
-                    self.hals_by_scheme.keys(), (genome1, genome2), 
-                    self.bed_root, hub_dir))
-                
-        self.logToMaster("AssemblyHubsTarget Finished")
-        
-class AssemblyHubTarget(jobTree.scriptTree.target.Target):
-    """
-    A target that makes a single assembly hub showing a HAL and some BEDs.
-    
-    """
-    
-    def __init__(self, hal, scheme, scheme_names, genome_pair, bed_root, hub):
-        """
-        Takes a hal alignment and a scheme name, along with the names of all the
-        other schemes to compare against (possibly including itself, which will
-        be skipped).
-        
-        Also takes the pair (as a tuple) of genomes we are making the hub for.
-        
-        Also takes the root of a directory tree full of BED files:
-            
-        <bed_root>/<scheme1>-<scheme2>-<genome1>-<genome2>/<genome>/<genome>.bed
-        
-        where scheme 1 is the lexicographically smaller scheme,  genome 1 and
-        genome 2 are the genomes as specified in the pair, and <genome> is the
-        genome on which the BED coordinates are given.
-        
-        Produces an assembly hub in the hub directory.
-        
-        """
-        
-        # Make the base Target. Ask for 8gb of memory since this is hard.
-        super(AssemblyHubTarget, self).__init__(memory=8589934592, cpu=1)
-        
-        # Save the alignment file
-        self.hal = hal
-        
-        # And the scheme
-        self.scheme = scheme
-        
-        # And all the other schemes to compare against
-        self.scheme_names = scheme_names
-        
-        # And the genome name pair
-        self.genome_pair = genome_pair
-        
-        # And the BED root
-        self.bed_root = bed_root
-        
-        # And the hub directory
-        self.hub = hub
-        
-        self.logToMaster("Creating AssemblyHubTarget")
-        
-        
-    def run(self):
-        """
-        Make the assembly hubs.
-        """
-        
-        self.logToMaster("Starting AssemblyHubTarget")
-        
-                
-        # Make a temporary directory for the jobTree tree. Make sure it's
-        # absolute.
-        tree_dir = os.path.abspath(sonLib.bioio.getTempDirectory(
-            rootDir=self.getLocalTempDir()))
-            
-        # Make sure it doesn't exist yet
-        os.rmdir(tree_dir)
-        
-        # Get all the pairs of schemes involving this one
-        possible_bed_pairs = ([(self.scheme, other) 
-            for other in self.scheme_names
-            if other != self.scheme] + 
-            [(other, self.scheme) 
-            for other in self.scheme_names
-            if other != self.scheme])
-            
-        # Get the directory each pair of schemes would produce for this pair of
-        # genomes
-        bed_dirs = [self.bed_root + "/{}-{}-{}-{}".format(scheme1, scheme2,
-            self.genome_pair[0], self.genome_pair[1]) 
-            for (scheme1, scheme2) in possible_bed_pairs]
-            
-        # Keep the ones that exist and make a string of them. Make sure they are
-        # absolute paths.
-        bed_dirs_string = ",".join([os.path.abspath(directory) 
-            for directory in bed_dirs if os.path.exists(directory)])
-            
-        if bed_dirs_string == "":
-            bed_args = []
-        else:
-            # Only include the bedDirs option if there are beds.
-            bed_args = ["--bedDirs", bed_dirs_string]
-        
-        # We want to make an assembly hub like so: 
-                       
-        # hal2assemblyHub.py data/alignment1.hal data/alignment1.hub
-        # --jobTree data/tree --bedDirs data/beddir --hub=nocredit
-        # --shortLabel="No Credit" --lod --cpHalFileToOut --noUcscNames
-        
-        # We need to do it in its own directory since it makes temp files in the
-        # current directory.
-        working_directory = sonLib.bioio.getTempDirectory(
-            rootDir=self.getLocalTempDir())
-            
-        # Where should we come back to when done?
-        original_directory = os.getcwd()
-            
-        # Turn our arguments into absolute paths (beddirs is already done).
-        # May or may not be necessary.
-        hal_abspath = os.path.abspath(self.hal)
-        hub_abspath = os.path.abspath(self.hub)
-        
-        # Go in the temp directory and run the script
-        os.chdir(working_directory)
-        check_call(self, ["hal2assemblyHub.py", 
-            hal_abspath, hub_abspath, "--jobTree", 
-            tree_dir] + bed_args + ["--shortLabel", 
-            self.scheme, # No LOD
-            "--cpHalFileToOut", "--noUcscNames"])
-        
-        # Go back to the original directory
-        os.chdir(original_directory)
-            
-        
-        self.logToMaster("AssemblyHubTarget Finished")
-        
 class AssemblyHubOnlyTarget(jobTree.scriptTree.target.Target):
     """
     A target that makes a single assembly hub showing just a HAL.
@@ -1209,9 +850,7 @@ def main(args):
     # Make sure we've given everything an absolute module name.
     # Don't try to import * because that's illegal.
     if __name__ == "__main__":
-        from compareSchemes import SchemeAssessmentTarget, \
-            AlignmentSchemeAgreementTarget, BedSplitTarget, \
-            AssemblyHubsTarget, AssemblyHubTarget
+        from compareSchemes import SchemeAssessmentTarget, BedSplitTarget
         
     # Make a stack of jobs to run
     stack = jobTree.scriptTree.stack.Stack(SchemeAssessmentTarget(
