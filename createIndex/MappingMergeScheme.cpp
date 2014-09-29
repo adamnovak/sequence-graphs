@@ -312,8 +312,8 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
                 rangeBases[pair.first];
             
             // Make a mapping with that text, offset and the amount of
-            // context used.
-            return Mapping(index.getTextPosition(base), pair.second);
+            // context used (right semantics).
+            return Mapping(index.getTextPosition(base), 0, pair.second);
             
         }
     };
@@ -322,13 +322,15 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
     std::vector<Mapping> leftMappings = transform<std::pair<int64_t, size_t>, Mapping>(leftRanges, toMapping);
     std::vector<Mapping> rightMappings = transform<std::pair<int64_t, size_t>, Mapping>(rightRanges, toMapping);
     
-    // Convert all the left mapping positions to right semantics
+    
     for(size_t i = 0; i < leftMappings.size(); i++) {
+        // Convert all the left mapping positions to right semantics
+        
         if(leftMappings[i].isMapped()) {
             // Flip anything that's mapped, using the length of the contig it
             // mapped to.
             leftMappings[i] = leftMappings[i].flip(index.getContigLength(
-                leftMappings[i].getLocation().getContig()));
+                leftMappings[i].getLocation().getContigNumber()));
         }
     }
     
