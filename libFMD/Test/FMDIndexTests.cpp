@@ -385,13 +385,13 @@ void FMDIndexTests::testMap() {
 }
 
 /**
- * Make sure we can properly map over a mismatch.
+ * Make sure we can properly map over a mismatch that isn't the first one
  */
 void FMDIndexTests::testMapOverMismatch() {
 
     // Grab all of the first contig, with a mismatch in the middle.
-    //                                     v here
-    std::string query = "CATGCTTCGGCGATTCGAAGCTCATCTGCGACTCT";
+    //                                     v here          v and here
+    std::string query = "CATGCTTCGGCGATTCGAAGCTCATCTGCGACTCC";
     
     // Declare everything to be a range
     GenericBitVector bv;
@@ -400,15 +400,21 @@ void FMDIndexTests::testMapOverMismatch() {
     }
     bv.finish(index->getBWTLength());
     
-    // Map it with right contexts, allowing for 1 mismatch, using addContext=5.
+    // Map it with right contexts, allowing for 1 mismatch.
     // TODO: can we specify things by name=value in c++11 to avoid breaking this
     // sneakily when we add new arguments?
     std::vector<std::pair<int64_t,size_t>> mappings = index->misMatchMap(bv,
-        query, (GenericBitVector*)NULL, 0, 5, 0.0, 0.0, 1);
+        query, (GenericBitVector*)NULL, 0, 0, 0.0, 0.0, 1);
+        
+    for(size_t i = 0; i < mappings.size(); i++) {
+        // Dump all the mappings
+        Log::output() << mappings[i].first << ", " << mappings[i].second <<
+            std::endl;
+    }
         
     // Make sure it maps right before the mismatch, having read through it
     CPPUNIT_ASSERT(mappings[17].first != -1);
-    CPPUNIT_ASSERT_EQUAL((size_t)17, mappings[17].second);
+    CPPUNIT_ASSERT_EQUAL((size_t)16, mappings[17].second);
     // Not on the mismatch
     CPPUNIT_ASSERT(mappings[18].first == -1);
     CPPUNIT_ASSERT_EQUAL((size_t)0, mappings[18].second);
