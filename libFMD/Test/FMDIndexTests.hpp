@@ -19,6 +19,7 @@ class FMDIndexTests : public CppUnit::TestFixture {
     CPPUNIT_TEST(testDisambiguate);
     CPPUNIT_TEST(testMap);
     CPPUNIT_TEST(testContextLimit);
+    CPPUNIT_TEST(testMapOverMismatch);
     CPPUNIT_TEST(testAddContext);
     CPPUNIT_TEST(testMultContext);
     CPPUNIT_TEST(testLCP);
@@ -51,6 +52,7 @@ public:
     void testIterate();
     void testDisambiguate();
     void testMap();
+    void testMapOverMismatch();
     void testContextLimit();
     void testAddContext();
     void testMultContext();

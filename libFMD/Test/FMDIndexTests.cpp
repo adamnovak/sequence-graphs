@@ -385,6 +385,40 @@ void FMDIndexTests::testMap() {
 }
 
 /**
+ * Make sure we can properly map over a mismatch.
+ */
+void FMDIndexTests::testMapOverMismatch() {
+
+    // Grab all of the first contig, with a mismatch in the middle.
+    //                                     v here
+    std::string query = "CATGCTTCGGCGATTCGAAGCTCATCTGCGACTCT";
+    
+    // Declare everything to be a range
+    GenericBitVector bv;
+    for(size_t i = 0; i < index->getBWTLength(); i++) {
+        bv.addBit(i);
+    }
+    bv.finish(index->getBWTLength());
+    
+    // Map it with right contexts, allowing for 1 mismatch. TODO: can we specify
+    // things by name=value in c++11 to avoid breaking this sneakily when we add
+    // new arguments?
+    std::vector<std::pair<int64_t,size_t>> mappings = index->misMatchMap(bv,
+        query, (GenericBitVector*)NULL, 0, 0, 0.0, 0.0, 1);
+        
+    // Make sure it maps right before the mismatch, having read through it
+    CPPUNIT_ASSERT(mappings[17].first != -1);
+    CPPUNIT_ASSERT_EQUAL((size_t)17, mappings[17].second);
+    // Not on the mismatch
+    CPPUNIT_ASSERT(mappings[18].first == -1);
+    CPPUNIT_ASSERT_EQUAL((size_t)0, mappings[18].second);
+    // But again right after the mismatch
+    CPPUNIT_ASSERT(mappings[19].first != -1);
+    CPPUNIT_ASSERT_EQUAL((size_t)15, mappings[19].second);
+
+}
+
+/**
  * Make sure minimum context length is respected.
  */
 void FMDIndexTests::testContextLimit() {
@@ -454,7 +488,7 @@ void FMDIndexTests::testAddContext() {
     // Grab (range number, context length) pairs for mapping with 0 additional
     // context and 0 mismatches.
     std::vector<std::pair<int64_t,size_t>> mappings = index->misMatchMap(bv,
-        query, (GenericBitVector*)NULL, 0, 0, 0);
+        query, (GenericBitVector*)NULL, 0, 0, 0.0, 0.0, 0);
         
     std::vector<std::pair<int64_t,size_t>> mappingsExact = index->map(bv, query,
         (GenericBitVector*)NULL, 0, 0);
@@ -471,7 +505,7 @@ void FMDIndexTests::testAddContext() {
     CPPUNIT_ASSERT(mappings[31].first == -1);
     
     // Try again with 3 context required after uniqueness
-    mappings = index->misMatchMap(bv, query, (GenericBitVector*)NULL, 0, 3, 0);
+    mappings = index->misMatchMap(bv, query, (GenericBitVector*)NULL, 0, 3, 0.0, 0.0, 0);
     
     mappingsExact = index->map(bv, query, (GenericBitVector*)NULL, 0, 3);
     
@@ -487,7 +521,7 @@ void FMDIndexTests::testAddContext() {
     CPPUNIT_ASSERT(mappings[28].first == -1);
     
     // And a nonzero min context
-    mappings = index->misMatchMap(bv, query, (GenericBitVector*)NULL, 10, 0, 0);
+    mappings = index->misMatchMap(bv, query, (GenericBitVector*)NULL, 10, 0, 0.0, 0.0, 0);
     
     mappingsExact = index->map(bv, query, (GenericBitVector*)NULL, 10, 0);
     
@@ -504,7 +538,7 @@ void FMDIndexTests::testAddContext() {
     CPPUNIT_ASSERT(mappings[26].first == -1);
 
     // And a nonzero min context with an addContext
-    mappings = index->misMatchMap(bv, query, (GenericBitVector*)NULL, 10, 8, 0);
+    mappings = index->misMatchMap(bv, query, (GenericBitVector*)NULL, 10, 8, 0.0, 0.0, 0);
     
     mappingsExact = index->map(bv, query, (GenericBitVector*)NULL, 10, 8);
     
@@ -543,7 +577,7 @@ void FMDIndexTests::testMultContext() {
     // Grab (range number, context length) pairs for mapping with 0 additional
     // context and 0 mismatches.
     std::vector<std::pair<int64_t,size_t>> mappings = index->misMatchMap(bv,
-        query, (GenericBitVector*)NULL, 0, 0, 0.0, 0);
+        query, (GenericBitVector*)NULL, 0, 0, 0.0, 0.0, 0);
         
     std::vector<std::pair<int64_t,size_t>> mappingsExact = index->map(bv, query,
         (GenericBitVector*)NULL, 0, 0, 0.0);
@@ -561,7 +595,7 @@ void FMDIndexTests::testMultContext() {
     
     // Try again with 2x multiplier.
     mappings = index->misMatchMap(bv, query, (GenericBitVector*)NULL, 0, 0, 2.0,
-        0);
+        0.0, 0);
     
     mappingsExact = index->map(bv, query, (GenericBitVector*)NULL, 0, 0, 2.0);
     
@@ -577,7 +611,7 @@ void FMDIndexTests::testMultContext() {
     CPPUNIT_ASSERT(mappings[26].first == -1);
     
     // And a nonzero min context
-    mappings = index->misMatchMap(bv, query, (GenericBitVector*)NULL, 10, 0, 0);
+    mappings = index->misMatchMap(bv, query, (GenericBitVector*)NULL, 10, 0, 0.0, 0.0, 0);
     
     mappingsExact = index->map(bv, query, (GenericBitVector*)NULL, 10, 0);
     
@@ -595,7 +629,7 @@ void FMDIndexTests::testMultContext() {
 
     // And a nonzero min context with a multContext
     mappings = index->misMatchMap(bv, query, (GenericBitVector*)NULL, 10, 0, 
-        2.0, 0);
+        2.0, 0.0, 0);
     
     mappingsExact = index->map(bv, query, (GenericBitVector*)NULL, 10, 0,
         2.0);
@@ -728,6 +762,7 @@ void FMDIndexTests::testRetract() {
     CPPUNIT_ASSERT(search.getEndOffset() == countInterval.getEndOffset());
     
 }
+
 
 
 
