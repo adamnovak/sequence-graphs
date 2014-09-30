@@ -406,12 +406,6 @@ void FMDIndexTests::testMapOverMismatch() {
     std::vector<std::pair<int64_t,size_t>> mappings = index->misMatchMap(bv,
         query, (GenericBitVector*)NULL, 0, 0, 0.0, 0.0, 1);
         
-    for(size_t i = 0; i < mappings.size(); i++) {
-        // Dump all the mappings
-        Log::output() << mappings[i].first << ", " << mappings[i].second <<
-            std::endl;
-    }
-        
     // Make sure it maps right before the mismatch, having read through it
     CPPUNIT_ASSERT(mappings[17].first != -1);
     CPPUNIT_ASSERT_EQUAL((size_t)16, mappings[17].second);
