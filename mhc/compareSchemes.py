@@ -78,34 +78,15 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # Plan out all the schemes as mismatch, credit, min_context,
         # add_context, mult_context, min_coding_cost
         return [
+            # Exact no credit min 100
             (False, False, 100, 0, 0, 0),
-            # Specified add
-            (True, True, 0, 25, 0, 0),
-            (True, True, 0, 50, 0, 0),
-            (True, True, 0, 75, 0, 0),
-            (True, True, 0, 100, 0, 0),
-            (True, True, 0, 125, 0, 0),
-            (True, True, 0, 150, 0, 0),
-            (True, True, 0, 200, 0, 0),
-            (True, True, 0, 250, 0, 0),
             # MultContext
             (True, True, 0, 0, 2.0, 0),
-            (True, True, 0, 0, 3.0, 0),
             (True, True, 0, 0, 4.0, 0),
-            (True, True, 0, 0, 5.0, 0),
-            (True, True, 0, 0, 6.0, 0),
-            (True, True, 0, 0, 7.0, 0),
             (True, True, 0, 0, 8.0, 0),
-            (True, True, 0, 0, 9.0, 0),
             (True, True, 0, 0, 10.0, 0),
-            # Add and Mult
-            (True, True, 0, 25, 4.0, 0),
-            (True, True, 0, 50, 4.0, 0),
-            (True, True, 0, 75, 4.0, 0),
-            (True, True, 0, 100, 4.0, 0),
-            (True, True, 0, 150, 4.0, 0),
-            (True, True, 0, 200, 4.0, 0),
-            (True, True, 0, 250, 4.0, 0)
+            # MultContext sans credit
+            (True, False, 0, 0, 8.0, 0)
         ]
 
     def getMonotonicSchemePlan(self):
@@ -847,8 +828,9 @@ class AssemblyHubOnlyTarget(jobTree.scriptTree.target.Target):
         
         """
         
-        # Make the base Target. Ask for 8gb of memory since this is hard.
-        super(AssemblyHubOnlyTarget, self).__init__(memory=8589934592)
+        # Make the base Target. Ask for 8gb of memory and several CPUs since
+        # this is hard.
+        super(AssemblyHubOnlyTarget, self).__init__(memory=8589934592, cpu=32)
         
         # Save the alignment file
         self.hal = hal
@@ -899,7 +881,7 @@ class AssemblyHubOnlyTarget(jobTree.scriptTree.target.Target):
         # Assemble the command
         command = ["hal2assemblyHub.py", 
             hal_abspath, hub_abspath, "--jobTree", 
-            tree_dir, # No LOD
+            tree_dir, "--maxThreads", "32", # No LOD
             "--cpHalFileToOut", "--noUcscNames"]
             
         if self.wiggle_dirs is not None:
