@@ -238,6 +238,9 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # This holds pairs of c2h and FASTA files
         c2h_fasta_pairs = []
         
+        # This holds left and right context wiggle pairs
+        context_pairs = []
+        
         # This holds the genomes to which those pairs correspond
         pair_genomes = []
         
@@ -294,6 +297,14 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             # TODO: these are probably just wrong at the moment.
             tandem_filenames = [sonLib.bioio.getTempFile(suffix=".tandem",
                 rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
+                
+            # And another one for left context length
+            left_context_filenames = [sonLib.bioio.getTempFile(suffix=".wig",
+                rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
+                
+            # And another one for right context length
+            right_context_filenames = [sonLib.bioio.getTempFile(suffix=".wig",
+                rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
             
             # Save the RNG state before clobbering it with the seed.
             random_state = random.getstate()
@@ -314,18 +325,23 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 tandem_filename = tandem_filenames[i]
                 c2h_filename = c2h_filenames[i]
                 fasta_filename = fasta_filenames[i]
+                left_context_filename = left_context_filenames[i]
+                right_context_filename = right_context_filenames[i]
                 
                 # Make a child to produce those, giving it a seed. Make sure to
                 # give it only two FASTAs, reference first, so that when it
                 # shuffles the non-reference ones it doesn't do anything. Also
                 # make sure to tell it to use the spectrum output file.
                 self.addChildTarget(ReferenceStructureTarget(
-                    [reference_fasta, other_fasta], random.getrandbits(256), 
+                    [reference_fasta, other_fasta], random.getrandbits(256),
                     coverage_filename, maf_filename,
-                    spectrum_filename=spectrum_filename, 
-                    indel_filename=indel_filename, 
-                    tandem_filename=tandem_filename, c2h_filename=c2h_filename, 
-                    fasta_filename=fasta_filename, extra_args=extra_args))
+                    spectrum_filename=spectrum_filename,
+                    indel_filename=indel_filename,
+                    tandem_filename=tandem_filename, c2h_filename=c2h_filename,
+                    fasta_filename=fasta_filename,
+                    left_context_filename=left_context_filename,
+                    right_context_filename=right_context_filename,
+                    extra_args=extra_args))
         
         
                 
@@ -365,6 +381,10 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             # lenght as pair_genomes.
             pair_schemes += [scheme for _ in self.fasta_list[1:]]
             
+            # Also save the context wiggle pairs.
+            context_pairs += zip(left_context_filenames,
+                right_context_filenames)
+            
         
         # What genome pairs did we run, in order? Make sure to strip extensions.
         genome_pairs = [(os.path.splitext(self.fasta_list[0])[0], 
@@ -383,6 +403,12 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 rootDir=self.getGlobalTempDir())
         merged_fasta = sonLib.bioio.getTempFile(suffix=".fa",
                 rootDir=self.getGlobalTempDir())
+                
+        # Where should we keep our left and right context wiggles?
+        left_context_dir = sonLib.bioio.getTempDirectory(
+                rootDir=self.getGlobalTempDir()) + "/leftContext"
+        right_context_dir = sonLib.bioio.getTempDirectory(
+                rootDir=self.getGlobalTempDir()) + "/rightContext"
         
         # What suffixes should we put on genomes?
         suffixes = [scheme for scheme in pair_schemes]
@@ -402,12 +428,23 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         merged_hal_target = HalTarget(merged_c2h, merged_fasta, reference, 
             genomes_with_suffixes, merged_hal)
             
+        # And a target to sort out all of the left wiggles
+        left_wiggle_target = WiggleCollateTarget(
+            [pair[0] for pair in context_pairs], pair_genomes, suffixes,
+            left_context_dir)
+        # And the right ones
+        right_wiggle_target = WiggleCollateTarget(
+            [pair[1] for pair in context_pairs], pair_genomes, suffixes,
+            right_context_dir)
+            
         # And a target to make a hub from that
         merged_hub_target = AssemblyHubOnlyTarget(merged_hal, self.hub_root + 
-            "/all")
+            "/all", wiggle_dirs=[left_context_dir, right_context_dir])
             
-        # Do those last two in order.
-        followOns.append(SequenceTarget([merged_c2h_target, merged_hal_target,
+        # Do those last ones in order. TODO: express actual order restrictions
+        # with a few more intermediate targets.
+        followOns.append(SequenceTarget([left_wiggle_target, 
+            right_wiggle_target, merged_c2h_target, merged_hal_target,
             merged_hub_target]))
             
         # So we need to run all of the follow-ons in parallel after this job
@@ -730,13 +767,81 @@ class BedSplitTarget(jobTree.scriptTree.target.Target):
         
         self.logToMaster("BedSplitTarget Finished")
         
+class WiggleCollateTarget(jobTree.scriptTree.target.Target):
+    """
+    A target which collates wiggle files by suffixed genome and applies
+    suffixes.
+    
+    Produces an output directory of wiggles of the form 
+    <out_dir>/<genome><suffix>/<genome><suffix>.wig
+    
+    """
+
+    def __init__(self, wiggle_files, genomes, suffixes, out_dir):
+        """
+        Given a list of wiggle files, a list of the genome name for each wiggle
+        file, and a list of suffixes to be applied to the genome names, apply
+        the suffixes and organize the wiggle files in out_dir for use by
+        hal2assemblyHub.py.
+        
+        """
+        
+        # Make the base Target. Ask for 2gb of memory since this is easy.
+        super(WiggleCollateTarget, self).__init__(memory=2147483648)
+        
+        # Save the arguments
+        self.wiggle_files = wiggle_files
+        self.genomes = genomes
+        self.suffixes = suffixes
+        self.out_dir = out_dir
+        
+            
+    def run(self):
+        """
+        Run this target and do the splitting.
+        
+        """
+    
+        self.logToMaster("Starting WiggleCollateTarget")
+        
+        # Work out the suffixed genome nemae
+        suffixed_names = [genome + suffix 
+            for (genome, suffix) in itertools.izip(self.genomes, self.suffixes)]
+            
+        for suffixed in suffixed_names:
+            # Make a directory for each genome with its suffix
+            os.makedirs(self.out_dir + "/" + suffixed)
+        
+        # Work out what each genome's wiggle should be called.
+        out_filenames = [self.out_dir + "/{}/{}.wig".format(suffixed, suffixed) 
+            for suffixed in suffixed_names]
+            
+        for in_filename, original_genome, new_genome, out_filename in \
+            itertools.izip(self.wiggle_files, self.genomes, suffixed_names, 
+            out_filenames):
+            
+            # For every wiggle we have to copy (and update)
+            
+            # Open the file to write
+            out_file = open(out_filename, "w")
+            
+            for line in open(in_filename):
+                # For each line we want to copy, change the genome name
+                line = line.replace(original_genome, new_genome)
+                # Then write it
+                out_file.write(line)
+            
+        
+        self.logToMaster("WiggleCollateTarget Finished")
+        
+        
 class AssemblyHubOnlyTarget(jobTree.scriptTree.target.Target):
     """
     A target that makes a single assembly hub showing just a HAL.
     
     """
     
-    def __init__(self, hal, hub):
+    def __init__(self, hal, hub, wiggle_dirs=None):
         """
         Takes a hal alignment and makes a hub.
         
@@ -750,6 +855,9 @@ class AssemblyHubOnlyTarget(jobTree.scriptTree.target.Target):
         
         # And the hub directory
         self.hub = hub
+        
+        # And the wiggle directory list
+        self.wiggle_dirs = wiggle_dirs
         
         self.logToMaster("Creating AssemblyHubOnlyTarget")
         
@@ -778,17 +886,31 @@ class AssemblyHubOnlyTarget(jobTree.scriptTree.target.Target):
         # Where should we come back to when done?
         original_directory = os.getcwd()
             
-        # Turn our arguments into absolute paths (beddirs is already done).
+        # Turn our arguments into absolute paths.
         # May or may not be necessary.
         hal_abspath = os.path.abspath(self.hal)
         hub_abspath = os.path.abspath(self.hub)
         
-        # Go in the temp directory and run the script
-        os.chdir(working_directory)
-        check_call(self, ["hal2assemblyHub.py", 
+        if self.wiggle_dirs is not None:
+            # Make wiggle directories absolute paths if needed.
+            self.wiggle_dirs = [os.path.abspath(path) 
+                for path in self.wiggle_dirs]
+        
+        # Assemble the command
+        command = ["hal2assemblyHub.py", 
             hal_abspath, hub_abspath, "--jobTree", 
             tree_dir, # No LOD
-            "--cpHalFileToOut", "--noUcscNames"])
+            "--cpHalFileToOut", "--noUcscNames"]
+            
+        if self.wiggle_dirs is not None:
+            # Add the option to use these wiggle dirs. TODO: these directories
+            # can't have commas in their names
+            command.append("--wigDirs")
+            command.append(",".join(self.wiggle_dirs))
+        
+        # Go in the temp directory and run the script
+        os.chdir(working_directory)
+        check_call(self, command)
         
         # Go back to the original directory
         os.chdir(original_directory)

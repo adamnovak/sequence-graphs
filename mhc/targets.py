@@ -115,8 +115,8 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
     
     def __init__(self, fasta_list, seed, coverage_filename, alignment_filename,
         hal_filename=None, spectrum_filename=None, indel_filename=None,
-        tandem_filename=None, c2h_filename=None, fasta_filename=None,
-        extra_args=[]):
+        tandem_filename=None, c2h_filename=None, fasta_filename=None, 
+        left_context_filename=None, right_context_filename=None, extra_args=[]):
         """
         Make a new Target for building a reference structure from the given
         FASTAs, using the specified RNG seed, and writing coverage statistics to
@@ -147,6 +147,12 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         
         If fasta_filename is specified, the FASTA that goes with the c2h file is
         saved there.
+        
+        If left_context_filename is specified, will save the left context
+        lengths used to map bases to the given wiggle file.
+        
+        If right_context_filename is specified, will save the right context
+        lengths used to map bases to the given wiggle file.
         
         If extra_args is specified, it should be a list of additional command-
         line arguments to createIndex, for specifying things like inexact
@@ -183,9 +189,17 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         # And the tandem duplication count filename, if any
         self.tandem_filename = tandem_filename
         
+        # And the cactus2hal file for the alignment to be written to
         self.c2h_filename = c2h_filename
         
+        # And the FASTA to go with it
         self.fasta_filename = fasta_filename
+        
+        # And the wiggle file for dumping left context lengths
+        self.left_context_filename = left_context_filename
+        
+        # And the wiggle file for dumping right context lengths
+        self.right_context_filename = right_context_filename
         
         # And the extra args
         self.extra_args = extra_args
@@ -243,6 +257,16 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
             # We want to keep the tandem duplication count.
             args.append("--tandemDuplications")
             args.append(self.tandem_filename)
+            
+        if self.left_context_filename is not None:
+            # We want to save left context lengths
+            args.append("--leftWiggle")
+            args.append(self.left_context_filename)
+            
+        if self.right_context_filename is not None:
+            # We want to save right context lengths
+            args.append("--rightWiggle")
+            args.append(self.right_context_filename)
             
         # Announce our command we're going to run
         self.logToMaster("Invoking {}".format(" ".join(args)))
