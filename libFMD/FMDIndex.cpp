@@ -283,6 +283,14 @@ std::pair<size_t, size_t> FMDIndex::getGenomeContigs(size_t genome) const {
     return genomeRanges[genome];
 }
 
+size_t FMDIndex::getGenomeLength(size_t genome) {
+    // What's the last contig in the range for the genome?
+    size_t lastContig = getGenomeContigs(genome).second - 1;
+    
+    // Where does it end?
+    return getContigStart(lastContig) + getContigLength(lastContig);
+}
+
 bool FMDIndex::isInGenome(int64_t bwtIndex, size_t genome) const {
     return genomeMasks[genome]->isSet(bwtIndex);
 }

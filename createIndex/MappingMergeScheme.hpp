@@ -26,6 +26,9 @@ public:
      * Also takes a minimum coding cost for contexts to map on.
      *
      * TODO: Make this function take a less absurd number of things.
+     *
+     * If mappingsOut is set, the Mapping for each position along the first
+     * scaffold of the genome will be placed in the proper slot in the vector.
      */
     MappingMergeScheme(const FMDIndex& index, const GenericBitVector& rangeVector, 
         const std::vector<std::pair<std::pair<size_t, size_t>, bool> >&
@@ -33,7 +36,7 @@ public:
         size_t minContext = 0, size_t addContext = 0, double multContext = 0, 
         double minCodingCost = 0, bool credit = false, 
         std::string mapType = "LRexact", bool mismatch = false, 
-        size_t z_max = 0);
+        size_t z_max = 0, std::vector<Mapping>* mappingsOut = NULL);
     
     /**
      * Get rid of a MappingMergeScheme (and delete its queue, if it has one).
@@ -118,6 +121,9 @@ protected:
     bool mismatch;
     
     size_t z_max;
+    
+    // Place to cram Mappings from the first scaffold, for debugging.
+    std::vector<Mapping>* mappingsOut;
     
     /**
      * Create a Merge between two positions and enqueue it. Positions are

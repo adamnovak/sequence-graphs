@@ -153,6 +153,12 @@ public:
     std::pair<size_t, size_t> getGenomeContigs(size_t genome) const;
     
     /**
+     * Get the minimum length that the genome can be while holding all its
+     * contigs. TODO: Assumes 1-scaffold genomes
+     */
+    size_t getGenomeLength(size_t genome);
+    
+    /**
      * Return whether the given BWT position is in the given genome.
      */
     bool isInGenome(int64_t bwtIndex, size_t genome) const;

@@ -456,6 +456,10 @@ mergeOverlap(
  *
  * If minCodingCost is specified, don't map on any contexts that have a coding
  * cost under the index's Markov model less than that (in bits).
+ *
+ * If mappingsOut is specified, we must have exactly two genomes of exactly one
+ * scaffold each. It must be sufficiently large, and will be populated with
+ * mappings for each mapped position on the second genome's scaffold.
  */
 stPinchThreadSet*
 mergeGreedy(
@@ -467,7 +471,8 @@ mergeGreedy(
     bool credit = false,
     std::string mapType = "LRexact",
     bool mismatch = false,
-    int z_max = 0
+    int z_max = 0,
+    std::vector<Mapping>* mappingsOut = NULL
 ) {
 
     Log::info() << "Creating initial pinch thread set" << std::endl;
@@ -498,7 +503,7 @@ mergeGreedy(
         // need to tell it what genome to map the contigs of.
         MappingMergeScheme scheme(index, *mergedRuns.first, mergedRuns.second,
             *includedPositions, genome, context, addContext, multContext, 
-            minCodingCost, credit, mapType, mismatch, z_max);
+            minCodingCost, credit, mapType, mismatch, z_max, mappingsOut);
 
         // Set it running and grab the queue where its results come out.
         ConcurrentQueue<Merge>& queue = scheme.run();
@@ -661,6 +666,12 @@ main(
         ("nontrivialRearrangements", 
             boost::program_options::value<std::string>(), 
             "File in which to dump nontrivial rearrangements")
+        ("leftWiggle", 
+            boost::program_options::value<std::string>(), 
+            "File in which to save left context lengths")
+        ("rightWiggle", 
+            boost::program_options::value<std::string>(), 
+            "File in which to save right context lengths")
         ("markovModel", boost::program_options::value<std::string>(), 
             "File to load a Markov model of query sequences from")
         ("context", boost::program_options::value<size_t>()
@@ -821,6 +832,22 @@ main(
         mismatchb = true;
     }
     
+    // We'll set this if we want to pull out all the mappings for making context
+    // wiggle tracks.
+    std::vector<Mapping>* mappingsOut = NULL;
+    
+    if(options.count("leftWiggle") || options.count("rightWiggle")) {
+        // We want context wiggles!
+        // TODO: Only works for exactly 2 genomes with exactly 1 scaffold each.
+        
+        // Make a vector to hold all the mappings for the second genome.
+        mappingsOut = new std::vector<Mapping>(index.getGenomeLength(1));
+        for(size_t i = 0; i < mappingsOut->size(); i++) {
+            // And fill it in with unmapped Mappings.
+            (*mappingsOut)[i] = Mapping();
+        }
+    }
+    
     if(mergeScheme == "overlap") {
         // Make a thread set that's all merged, with the given minimum merge
         // context.
@@ -831,7 +858,8 @@ main(
             options["addContext"].as<size_t>(), 
             options["multContext"].as<double>(), 
             options["minCodingCost"].as<double>(), 
-            creditBool, mapType, mismatchb, options["mismatches"].as<size_t>());
+            creditBool, mapType, mismatchb, options["mismatches"].as<size_t>(),
+            mappingsOut);
     } else {
         // Complain that's not a real merge scheme. TODO: Can we make the
         // options parser parse an enum or something instead of this?
@@ -941,7 +969,50 @@ main(
     // Clean up the thread set after we analyze everything about it.
     stPinchThreadSet_destruct(threadSet);
     
+    if(options.count("leftWiggle")) {
+        // We need to dump the left contexts as a wiggle.
+        
+        // Open a file
+        std::ofstream out(options["leftWiggle"].as<std::string>().c_str());
+        
+        // Write the wiggle header. TODO: get genome name better and not with a
+        // huge hack.
+        out << "fixedStep chrom=" << 
+            index.getContigName(index.getGenomeContigs(1).first) << 
+            " start=1 step=1" << std::endl;
+        
+        for(size_t i = 0; i < mappingsOut->size(); i++) {
+            // Write the left context for each position
+            out << (*mappingsOut)[i].getLeftContext() << std::endl;
+        }
+        
+        out.close();
+    }
     
+    if(options.count("rightWiggle")) {
+        // We need to dump the left contexts as a wiggle.
+        
+        // Open a file
+        std::ofstream out(options["rightWiggle"].as<std::string>().c_str());
+        
+        // Write the wiggle header. TODO: get genome name better and not with a
+        // huge hack.
+        out << "fixedStep chrom=" << 
+            index.getContigName(index.getGenomeContigs(1).first) << 
+            " start=1 step=1" << std::endl;
+        
+        for(size_t i = 0; i < mappingsOut->size(); i++) {
+            // Write the right context for each position
+            out << (*mappingsOut)[i].getRightContext() << std::endl;
+        }
+        
+        out.close();
+    }
+    
+    if(mappingsOut != NULL) {
+        // Delete the mappings vector
+        delete mappingsOut;
+    }
     
     // Get rid of the range vector
     delete levelIndex.first;

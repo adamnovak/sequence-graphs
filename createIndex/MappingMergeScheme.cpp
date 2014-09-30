@@ -15,12 +15,13 @@ MappingMergeScheme::MappingMergeScheme(const FMDIndex& index,
     const std::vector<std::pair<std::pair<size_t, size_t>, bool> >& rangeBases, 
     const GenericBitVector& includedPositions, size_t genome, size_t minContext, 
     size_t addContext, double multContext, double minCodingCost, bool credit, 
-    std::string mapType, bool mismatch, size_t z_max) : MergeScheme(index), 
-    threads(), queue(NULL), rangeVector(rangeVector), rangeBases(rangeBases), 
+    std::string mapType, bool mismatch, size_t z_max, 
+    std::vector<Mapping>* mappingsOut) : MergeScheme(index), threads(), 
+    queue(NULL), rangeVector(rangeVector), rangeBases(rangeBases), 
     includedPositions(includedPositions), genome(genome), 
     minContext(minContext), addContext(addContext), multContext(multContext),
     minCodingCost(minCodingCost), credit(credit), mapType(mapType), 
-    mismatch(mismatch), z_max(z_max) {
+    mismatch(mismatch), z_max(z_max), mappingsOut(mappingsOut) {
     
     // Nothing to do
     
@@ -202,7 +203,7 @@ void MappingMergeScheme::generateMerge(size_t queryContig, size_t queryBase,
         auto lock = queue->lock();
         // Spend our lock to add something to it.
         queue->enqueue(merge, lock);
-    
+        
     }
     
 }
@@ -319,8 +320,10 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
     };
 
     // Apply it to make left and right mappings
-    std::vector<Mapping> leftMappings = transform<std::pair<int64_t, size_t>, Mapping>(leftRanges, toMapping);
-    std::vector<Mapping> rightMappings = transform<std::pair<int64_t, size_t>, Mapping>(rightRanges, toMapping);
+    std::vector<Mapping> leftMappings = 
+        transform<std::pair<int64_t, size_t>, Mapping>(leftRanges, toMapping);
+    std::vector<Mapping> rightMappings = 
+        transform<std::pair<int64_t, size_t>, Mapping>(rightRanges, toMapping);
     
     
     for(size_t i = 0; i < leftMappings.size(); i++) {
@@ -351,8 +354,8 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
         // Now go through all the bases and make sure they have matching
         // characters before merging them. TODO: make this another filter.
         
-        Log::debug() << leftMappings[i] << "\t" << filteredMappings[i] << "\t" <<
-            rightMappings[i] << std::endl;
+        Log::debug() << leftMappings[i] << "\t" << filteredMappings[i] << 
+            "\t" << rightMappings[i] << std::endl;
             
         TextPosition candidate = filteredMappings[i].getLocation();
         
@@ -399,6 +402,17 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
                 candidate.getContigNumber(), index.getOffset(candidate),
                 candidate.getStrand());
             mappedBases++;
+            
+            if(mappingsOut != NULL) {
+                // TODO: Assumes we have exactly one scaffold in this genome.
+                
+                // Offset from the start of this contig in its scaffold, and
+                // save the mapping.
+                (*mappingsOut)[index.getContigStart(queryContig) + i] = 
+                    filteredMappings[i];
+                
+            }
+            
         } else {
             // This base didn't map
             unmappedBases++;
