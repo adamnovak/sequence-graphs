@@ -219,8 +219,13 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # This holds pairs of c2h and FASTA files
         c2h_fasta_pairs = []
         
-        # This holds left and right context wiggle pairs
+        # This holds left and right context wiggle pairs. TODO: rename this to
+        # max_context_pairs, and all the plain context stuff to max context
+        # stuff.
         context_pairs = []
+        
+        # This holds left and right min context wiggle pairs
+        min_context_pairs = []
         
         # This holds the genomes to which those pairs correspond
         pair_genomes = []
@@ -286,6 +291,14 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             # And another one for right context length
             right_context_filenames = [sonLib.bioio.getTempFile(suffix=".wig",
                 rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
+                
+            # And then for min contexts
+            left_min_context_filenames = [sonLib.bioio.getTempFile(
+                suffix=".wig", rootDir=self.getGlobalTempDir())
+                for i in xrange(num_children)]
+            right_min_context_filenames = [sonLib.bioio.getTempFile(
+                suffix=".wig", rootDir=self.getGlobalTempDir())
+                for i in xrange(num_children)]
             
             # Save the RNG state before clobbering it with the seed.
             random_state = random.getstate()
@@ -308,6 +321,8 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 fasta_filename = fasta_filenames[i]
                 left_context_filename = left_context_filenames[i]
                 right_context_filename = right_context_filenames[i]
+                left_min_context_filename = left_min_context_filenames[i]
+                right_min_context_filename = right_min_context_filenames[i]
                 
                 # Make a child to produce those, giving it a seed. Make sure to
                 # give it only two FASTAs, reference first, so that when it
@@ -322,6 +337,8 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                     fasta_filename=fasta_filename,
                     left_context_filename=left_context_filename,
                     right_context_filename=right_context_filename,
+                    left_min_context_filename=left_min_context_filename,
+                    right_min_context_filename=right_min_context_filename,
                     extra_args=extra_args))
         
         
@@ -365,6 +382,10 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             # Also save the context wiggle pairs.
             context_pairs += zip(left_context_filenames,
                 right_context_filenames)
+                
+            # And the min context wiggle pairs.
+            min_context_pairs += zip(left_min_context_filenames,
+                right_min_context_filenames)
             
         
         # What genome pairs did we run, in order? Make sure to strip extensions.
@@ -385,11 +406,17 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         merged_fasta = sonLib.bioio.getTempFile(suffix=".fa",
                 rootDir=self.getGlobalTempDir())
                 
-        # Where should we keep our left and right context wiggles?
+        # Where should we keep our left and right max context wiggles?
         left_context_dir = sonLib.bioio.getTempDirectory(
-                rootDir=self.getGlobalTempDir()) + "/leftContext"
+                rootDir=self.getGlobalTempDir()) + "/leftMaxContext"
         right_context_dir = sonLib.bioio.getTempDirectory(
-                rootDir=self.getGlobalTempDir()) + "/rightContext"
+                rootDir=self.getGlobalTempDir()) + "/rightMaxContext"
+                
+        # Where should we keep our left and right max context wiggles?
+        left_min_context_dir = sonLib.bioio.getTempDirectory(
+                rootDir=self.getGlobalTempDir()) + "/leftMinContext"
+        right_min_context_dir = sonLib.bioio.getTempDirectory(
+                rootDir=self.getGlobalTempDir()) + "/rightMinContext"
         
         # What suffixes should we put on genomes?
         suffixes = [scheme for scheme in pair_schemes]
@@ -418,14 +445,24 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             [pair[1] for pair in context_pairs], pair_genomes, suffixes,
             right_context_dir)
             
+        # And for the minimum contexts for uniqueness
+        left_min_wiggle_target = WiggleCollateTarget(
+            [pair[0] for pair in min_context_pairs], pair_genomes, suffixes,
+            left_min_context_dir)
+        right_min_wiggle_target = WiggleCollateTarget(
+            [pair[1] for pair in min_context_pairs], pair_genomes, suffixes,
+            right_min_context_dir)
+            
         # And a target to make a hub from that
         merged_hub_target = AssemblyHubOnlyTarget(merged_hal, self.hub_root + 
-            "/all", wiggle_dirs=[left_context_dir, right_context_dir])
+            "/all", wiggle_dirs=[left_context_dir, right_context_dir, 
+            left_min_context_dir, right_min_context_dir])
             
         # Do those last ones in order. TODO: express actual order restrictions
         # with a few more intermediate targets.
         followOns.append(SequenceTarget([left_wiggle_target, 
-            right_wiggle_target, merged_c2h_target, merged_hal_target,
+            right_wiggle_target, left_min_wiggle_target, 
+            right_min_wiggle_target, merged_c2h_target, merged_hal_target,
             merged_hub_target]))
             
         # So we need to run all of the follow-ons in parallel after this job
