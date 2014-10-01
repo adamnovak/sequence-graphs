@@ -675,7 +675,7 @@ main(
         ("leftMinWiggle", 
             boost::program_options::value<std::string>(), 
             "File in which to save left min unique context lengths")
-        ("rightMJinWiggle", 
+        ("rightMinWiggle", 
             boost::program_options::value<std::string>(), 
             "File in which to save right min unique context lengths")
         ("markovModel", boost::program_options::value<std::string>(), 
