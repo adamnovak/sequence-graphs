@@ -842,7 +842,9 @@ main(
     // wiggle tracks.
     std::vector<Mapping>* mappingsOut = NULL;
     
-    if(options.count("leftWiggle") || options.count("rightWiggle")) {
+    if(options.count("leftMaxWiggle") || options.count("rightMaxWiggle") || 
+        options.count("leftMinWiggle") || options.count("rightMinWiggle")) {
+        
         // We want context wiggles!
         // TODO: Only works for exactly 2 genomes with exactly 1 scaffold each.
         
