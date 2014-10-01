@@ -472,13 +472,13 @@ public:
      * minimum additional context after uniqueness required to map.
      */
                  
-    std::vector<std::pair<int64_t,size_t>> misMatchMap(const GenericBitVector& ranges,
+    std::vector<Mapping> misMatchMap(const GenericBitVector& ranges,
         const std::string& query, const GenericBitVector* mask, 
         int minContext = 0, int addContext = 0, double multContext = 0, 
         double minCodingCost = 0, size_t z_max = 0, int start = 0, 
         int length = -1) const;
         
-    std::vector<std::pair<int64_t,size_t>> misMatchMap(const GenericBitVector& ranges, 
+    std::vector<Mapping> misMatchMap(const GenericBitVector& ranges, 
         const std::string& query, int64_t genome = -1, int minContext = 0, 
         int addContext = 0, double multContext = 0, double minCodingCost = 0,
         size_t z_max = 0, int start = 0, int length = -1) const;

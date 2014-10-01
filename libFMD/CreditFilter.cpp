@@ -67,12 +67,13 @@ std::vector<Mapping> CreditFilter::apply(
     for(size_t i = 0; i < disambiguated.size(); i++) {
         // Take the max left and right context when we find them.
         
-        Log::debug() << disambiguated[i].getLeftContext() << ", " << disambiguated[i].getRightContext() << std::endl;
+        Log::debug() << disambiguated[i].getLeftMaxContext() << ", " << 
+            disambiguated[i].getRightMaxContext() << std::endl;
         
         maxLeftContext = std::max(maxLeftContext, 
-            disambiguated[i].getLeftContext());
+            disambiguated[i].getLeftMaxContext());
         maxRightContext = std::max(maxRightContext, 
-            disambiguated[i].getRightContext());
+            disambiguated[i].getRightMaxContext());
     }
     
     Log::debug() << "Max context sizes: " << maxLeftContext << "|" << 
@@ -118,7 +119,7 @@ std::vector<Mapping> CreditFilter::apply(
                     continue;
                 }
                 
-                if(disambiguated[j].getRightContext() - 1 < i - j) {
+                if(disambiguated[j].getRightMaxContext() - 1 < i - j) {
                     // This base's context didn't reach all the way out, after
                     // accounting for the fact that it includes the base itself.
                     // This prevents us from mapping off the end of a contig,
@@ -175,7 +176,7 @@ std::vector<Mapping> CreditFilter::apply(
                     continue;
                 }
                 
-                if(disambiguated[j].getLeftContext() - 1 < j - i) {
+                if(disambiguated[j].getLeftMaxContext() - 1 < j - i) {
                     // This base's context didn't reach all the way out, after
                     // accounting for the fact that it includes the base itself.
                     // This prevents us from mapping off the end of a contig,

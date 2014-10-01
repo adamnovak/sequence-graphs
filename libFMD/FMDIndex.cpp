@@ -1831,8 +1831,12 @@ Mapping FMDIndex::disambiguate(const Mapping& left,
     } else if(left.getLocation() == right.getLocation()) {
         // If they match, make sure to merge contexts, taking the left of left
         // and the right of right.
-        return Mapping(right.getLocation(), left.getLeftContext(),
-            right.getRightContext());
+        Mapping combined(right.getLocation());
+        combined.setMinContext(left.getLeftMinContext(),
+            right.getRightMinContext());
+        combined.setMaxContext(left.getLeftMaxContext(),
+            right.getRightMaxContext());
+        return combined;
     } else {
         // Else they disagree, so return an unmapped mapping.
         return Mapping();
@@ -1964,7 +1968,7 @@ MisMatchAttemptResults FMDIndex::misMatchExtend(MisMatchAttemptResults& prevMisM
     
 }
 
-std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
+std::vector<Mapping> FMDIndex::misMatchMap(
     const GenericBitVector& ranges, const std::string& query, 
     const GenericBitVector* mask, int minContext, int addContext,
     double multContext, double minCodingCost, size_t z_max, int start,
@@ -1982,7 +1986,7 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
         minCodingCost << " bits." << std::endl;
         
     // We need a vector to return.
-    std::vector<std::pair<int64_t,size_t>> mappings;
+    std::vector<Mapping> mappings;
     
     // Keep around the result that we get from the single-character mapping
     // function. We use it as our working state to trackour FMDPosition and how
@@ -2063,7 +2067,11 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
             
                 // Remember that this base mapped to this range (or didn't, if
                 // the range is -1).
-                mappings.push_back(std::make_pair(range,search.maxCharacters - 1));
+                Mapping mapping(range);
+                // Set its right max context.
+                mapping.setMaxContext(0, search.maxCharacters);
+                // Save it
+                mappings.push_back(mapping);
             
                 // We definitely have a non-empty FMDPosition to continue from
             } else {
@@ -2077,7 +2085,10 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
                 
             
                 // It didn't map. Say it corresponds to no range.
-                mappings.push_back(std::make_pair(-1,0));
+                Mapping mapping;
+                // Save the max context we could get.
+                mapping.setMaxContext(0, search.maxCharacters);
+                mappings.push_back(mapping);
 
                 if(addContext == 0 && multContext <= 1) {
                     // We can map as soon as we become unique, without needing
@@ -2172,7 +2183,11 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
                 
                 
                     // Remember that this base mapped to this range
-                    mappings.push_back(std::make_pair(range,search.maxCharacters - 1));
+                    Mapping mapping(range);
+                    // Set its right max context.
+                    mapping.setMaxContext(0, search.maxCharacters);
+                    // Save it
+                    mappings.push_back(mapping);
                 
                     // We definitely have a non-empty FMDPosition to continue from
                     
@@ -2225,7 +2240,11 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
                         // getting no results.
                         
                         // It didn't map. Say it corresponds to no range.
-                        mappings.push_back(std::make_pair(-1,0));
+                        Mapping mapping;
+                        // Save the max context we could get.
+                        mapping.setMaxContext(0, search.maxCharacters);
+                        mappings.push_back(mapping);
+
                         
                         // Mark that the next iteration will be an extension (if we had
                         // any results this iteration; if not it will just restart)
@@ -2245,7 +2264,7 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
     return mappings;
 }
 
-std::vector<std::pair<int64_t,size_t>> FMDIndex::misMatchMap(
+std::vector<Mapping> FMDIndex::misMatchMap(
     const GenericBitVector& ranges, const std::string& query, int64_t genome, 
     int minContext, int addContext, double multContext, double minCodingCost,
     size_t z_max, int start, int length) const {
