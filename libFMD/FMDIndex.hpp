@@ -470,18 +470,23 @@ public:
     /**
      * Implementing mismatch search for Left-Right exact contexts. addContext is
      * minimum additional context after uniqueness required to map.
+     *
+     * keepIntermediates can be set to false to force a restart at every base,
+     * so minContext will be accurate; there's no way to calculate it if we're
+     * allowed to extend from a previous result.
      */
                  
     std::vector<Mapping> misMatchMap(const GenericBitVector& ranges,
         const std::string& query, const GenericBitVector* mask, 
         int minContext = 0, int addContext = 0, double multContext = 0, 
-        double minCodingCost = 0, size_t z_max = 0, int start = 0, 
-        int length = -1) const;
+        double minCodingCost = 0, size_t z_max = 0, 
+        bool keepIntermediates = true, int start = 0, int length = -1) const;
         
     std::vector<Mapping> misMatchMap(const GenericBitVector& ranges, 
         const std::string& query, int64_t genome = -1, int minContext = 0, 
         int addContext = 0, double multContext = 0, double minCodingCost = 0,
-        size_t z_max = 0, int start = 0, int length = -1) const;
+        size_t z_max = 0, bool keepIntermediates = true,
+        int start = 0, int length = -1) const;
         
     // We have to pass back the extra context after uniqueness through a
     // pointer, because this design is not really suitable for all the extra

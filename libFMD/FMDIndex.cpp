@@ -1973,7 +1973,7 @@ MisMatchAttemptResults FMDIndex::misMatchExtend(MisMatchAttemptResults& prevMisM
 std::vector<Mapping> FMDIndex::misMatchMap(
     const GenericBitVector& ranges, const std::string& query, 
     const GenericBitVector* mask, int minContext, int addContext,
-    double multContext, double minCodingCost, size_t z_max, int start,
+    double multContext, double minCodingCost, size_t z_max, bool keepIntermediates, int start,
     int length) const {
     
     if(length == -1) {
@@ -2028,7 +2028,11 @@ std::vector<Mapping> FMDIndex::misMatchMap(
         Log::debug() << "On position " << i << " from " <<
             start + length - 1 << " to " << start << std::endl;
 
-        if(search.positions.size() == 1 && search.positions.front().first.isEmpty()) {
+        if(!keepIntermediates || (search.positions.size() == 1 && 
+            search.positions.front().first.isEmpty())) {
+            // If we're not allowed to re-use intermediates, or the one we have
+            // can't be re-used, we need to restart.
+            
             Log::debug() << "Starting over by mapping position " << i << std::endl;
             // We do not currently have a non-empty FMDPosition to extend. Start
             // over by mapping this character by itself. TODO: We're responsible
@@ -2301,12 +2305,12 @@ std::vector<Mapping> FMDIndex::misMatchMap(
 std::vector<Mapping> FMDIndex::misMatchMap(
     const GenericBitVector& ranges, const std::string& query, int64_t genome, 
     int minContext, int addContext, double multContext, double minCodingCost,
-    size_t z_max, int start, int length) const {
+    size_t z_max, bool keepIntermediates, int start, int length) const {
     
     // Get the appropriate mask, or NULL if given the special all-genomes value.
     return misMatchMap(ranges, query, genome == -1 ? NULL : genomeMasks[genome], 
-        minContext, addContext, multContext, minCodingCost, z_max, start,
-        length);    
+        minContext, addContext, multContext, minCodingCost, z_max,
+        keepIntermediates, start, length);    
 }
 
 MisMatchAttemptResults FMDIndex::misMatchMapPosition(const GenericBitVector& ranges, 

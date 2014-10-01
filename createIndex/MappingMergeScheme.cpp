@@ -275,15 +275,16 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
         Log::info() << "Using mismatch mapping with z_max " << z_max << 
             std::endl;
         
-        // Map it on the right
+        // Map it on the right. Make sure to restart at every base so we can get
+        // accurate min contexts out.
         rightMappings = index.misMatchMap(rangeVector, contig,
             &includedPositions, minContext, addContext, multContext, 
-            minCodingCost, z_max);
+            minCodingCost, z_max, false);
         
         // Map it on the left
         leftMappings = index.misMatchMap(rangeVector, 
             reverseComplement(contig), &includedPositions, minContext, 
-            addContext, multContext, minCodingCost, z_max); 
+            addContext, multContext, minCodingCost, z_max, false); 
                 
     } else {
         
@@ -292,12 +293,12 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
         // Map it on the right
         rightMappings = index.misMatchMap(rangeVector, contig,
             &includedPositions, minContext, addContext, multContext, 
-            minCodingCost, 0);
+            minCodingCost, 0, false);
         
         // Map it on the left
         leftMappings = index.misMatchMap(rangeVector, 
             reverseComplement(contig), &includedPositions, minContext, 
-            addContext, multContext, minCodingCost, 0); 
+            addContext, multContext, minCodingCost, 0, false); 
     
     }
     
