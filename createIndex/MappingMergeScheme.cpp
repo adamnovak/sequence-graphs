@@ -381,10 +381,12 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
         // Grab the base from the contig.
         char referenceBase;
         if(candidate.getStrand()) {
-            // Flip around and pull from the reverse strand
-            candidate.flip(index.getContigLength(candidate.getContigNumber()));
-            referenceBase = complement(contigCache[candidate.getContigNumber()][
-            candidate.getOffset()]);
+            // Flip around a copy and pull the complement of what's on the
+            // forward strand.
+            TextPosition flipped = candidate;
+            flipped.flip(index.getContigLength(candidate.getContigNumber()));
+            referenceBase = complement(contigCache[flipped.getContigNumber()][
+                flipped.getOffset()]);
         } else {
             // Pull from the forward strand
             referenceBase = contigCache[candidate.getContigNumber()][
