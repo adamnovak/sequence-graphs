@@ -266,6 +266,8 @@ void FMDIndexTests::testDisambiguate() {
     
     // Make sure disambiguate does the right things
     
+    CPPUNIT_ASSERT(index != NULL);
+    
     // Map things that agree
     CPPUNIT_ASSERT(!index->disambiguate(leftMapped, otherSide).is_mapped);
     CPPUNIT_ASSERT(!index->disambiguate(otherSide, leftMapped).is_mapped);
@@ -281,9 +283,9 @@ void FMDIndexTests::testDisambiguate() {
     CPPUNIT_ASSERT_EQUAL(leftMapped.getLocation(), 
         index->disambiguate(leftMapped, rightMapped).getLocation());
     CPPUNIT_ASSERT_EQUAL((size_t)5, index->disambiguate(leftMapped,
-        rightMapped).getLeftContext());
+        rightMapped).getLeftMaxContext());
     CPPUNIT_ASSERT_EQUAL((size_t)4, index->disambiguate(leftMapped,
-        rightMapped).getRightContext());
+        rightMapped).getRightMaxContext());
         
     // Don't map when the two inputs go to completely different places
     CPPUNIT_ASSERT(!index->disambiguate(unmapped, unmapped).is_mapped);
@@ -403,18 +405,19 @@ void FMDIndexTests::testMapOverMismatch() {
     // Map it with right contexts, allowing for 1 mismatch.
     // TODO: can we specify things by name=value in c++11 to avoid breaking this
     // sneakily when we add new arguments?
-    std::vector<std::pair<int64_t,size_t>> mappings = index->misMatchMap(bv,
+    std::vector<Mapping> mappings = index->misMatchMap(bv,
         query, (GenericBitVector*)NULL, 0, 0, 0.0, 0.0, 1);
         
     // Make sure it maps right before the mismatch, having read through it
-    CPPUNIT_ASSERT(mappings[17].first != -1);
-    CPPUNIT_ASSERT_EQUAL((size_t)16, mappings[17].second);
+    CPPUNIT_ASSERT(mappings[17].getRange() != -1);
+    CPPUNIT_ASSERT_EQUAL((size_t)17, mappings[17].getRightMaxContext());
     // Not on the mismatch
-    CPPUNIT_ASSERT(mappings[18].first == -1);
-    CPPUNIT_ASSERT_EQUAL((size_t)0, mappings[18].second);
+    CPPUNIT_ASSERT(mappings[18].getRange() == -1);
+    // It can't get further than 1 base max.
+    CPPUNIT_ASSERT_EQUAL((size_t)1, mappings[18].getRightMaxContext());
     // But again right after the mismatch
-    CPPUNIT_ASSERT(mappings[19].first != -1);
-    CPPUNIT_ASSERT_EQUAL((size_t)15, mappings[19].second);
+    CPPUNIT_ASSERT(mappings[19].getRange() != -1);
+    CPPUNIT_ASSERT_EQUAL((size_t)16, mappings[19].getRightMaxContext());
 
 }
 
@@ -487,22 +490,27 @@ void FMDIndexTests::testAddContext() {
     
     // Grab (range number, context length) pairs for mapping with 0 additional
     // context and 0 mismatches.
-    std::vector<std::pair<int64_t,size_t>> mappings = index->misMatchMap(bv,
+    std::vector<Mapping> mappings = index->misMatchMap(bv,
         query, (GenericBitVector*)NULL, 0, 0, 0.0, 0.0, 0);
         
     std::vector<std::pair<int64_t,size_t>> mappingsExact = index->map(bv, query,
         (GenericBitVector*)NULL, 0, 0);
         
     for(size_t i = 0; i < mappings.size(); i++) {
-        Log::debug() << "Mapping " << i << ": " << mappings[i].first << "," <<
-            mappings[i].second << " vs " << mappingsExact[i].first  << "," << 
-            mappingsExact[i].second << std::endl;
-        CPPUNIT_ASSERT(mappings[i] == mappingsExact[i]);
+        Log::debug() << "Mapping " << i << ": " << mappings[i].getRange() <<
+            "," << mappings[i].getRightMaxContext() << " vs " <<
+            mappingsExact[i].first  << "," << mappingsExact[i].second <<
+            std::endl;
+        CPPUNIT_ASSERT(mappings[i].getRange() == mappingsExact[i].first);
+        if(mappings[i].isMapped()) {
+            CPPUNIT_ASSERT_EQUAL(mappings[i].getRightMaxContext(),
+                mappingsExact[i].second);
+        }
     }
         
     // The A in ACTCT should be the last mapped thing
-    CPPUNIT_ASSERT(mappings[30].first != -1);
-    CPPUNIT_ASSERT(mappings[31].first == -1);
+    CPPUNIT_ASSERT(mappings[30].getRange() != -1);
+    CPPUNIT_ASSERT(mappings[31].getRange() == -1);
     
     // Try again with 3 context required after uniqueness
     mappings = index->misMatchMap(bv, query, (GenericBitVector*)NULL, 0, 3, 0.0, 0.0, 0);
@@ -510,15 +518,20 @@ void FMDIndexTests::testAddContext() {
     mappingsExact = index->map(bv, query, (GenericBitVector*)NULL, 0, 3);
     
     for(size_t i = 0; i < mappings.size(); i++) {
-        Log::debug() << "Mapping " << i << ": " << mappings[i].first << "," <<
-            mappings[i].second << " vs " << mappingsExact[i].first  << "," << 
-            mappingsExact[i].second << std::endl;
-        CPPUNIT_ASSERT(mappings[i] == mappingsExact[i]);
+        Log::debug() << "Mapping " << i << ": " << mappings[i].getRange() <<
+            "," << mappings[i].getRightMaxContext() << " vs " <<
+            mappingsExact[i].first  << "," << mappingsExact[i].second <<
+            std::endl;
+        CPPUNIT_ASSERT(mappings[i].getRange() == mappingsExact[i].first);
+        if(mappings[i].isMapped()) {
+            CPPUNIT_ASSERT_EQUAL(mappings[i].getRightMaxContext(),
+                mappingsExact[i].second);
+        }
     }
     
     // The G in GCGACTCT should be the last mapped thing
-    CPPUNIT_ASSERT(mappings[27].first != -1);
-    CPPUNIT_ASSERT(mappings[28].first == -1);
+    CPPUNIT_ASSERT(mappings[27].getRange() != -1);
+    CPPUNIT_ASSERT(mappings[28].getRange() == -1);
     
     // And a nonzero min context
     mappings = index->misMatchMap(bv, query, (GenericBitVector*)NULL, 10, 0, 0.0, 0.0, 0);
@@ -526,16 +539,21 @@ void FMDIndexTests::testAddContext() {
     mappingsExact = index->map(bv, query, (GenericBitVector*)NULL, 10, 0);
     
     for(size_t i = 0; i < mappings.size(); i++) {
-        Log::debug() << "Mapping " << i << ": " << mappings[i].first << "," <<
-            mappings[i].second << " vs " << mappingsExact[i].first  << "," << 
-            mappingsExact[i].second << std::endl;
-        CPPUNIT_ASSERT(mappings[i] == mappingsExact[i]);
+        Log::debug() << "Mapping " << i << ": " << mappings[i].getRange() <<
+            "," << mappings[i].getRightMaxContext() << " vs " <<
+            mappingsExact[i].first  << "," << mappingsExact[i].second <<
+            std::endl;
+        CPPUNIT_ASSERT(mappings[i].getRange() == mappingsExact[i].first);
+        if(mappings[i].isMapped()) {
+            CPPUNIT_ASSERT_EQUAL(mappings[i].getRightMaxContext(),
+                mappingsExact[i].second);
+        }
     }
     
     // The first C in CTGCGACTCT should be the last mapped thing, because it's
     // at the start of a length-10 string.
-    CPPUNIT_ASSERT(mappings[25].first != -1);
-    CPPUNIT_ASSERT(mappings[26].first == -1);
+    CPPUNIT_ASSERT(mappings[25].getRange() != -1);
+    CPPUNIT_ASSERT(mappings[26].getRange() == -1);
 
     // And a nonzero min context with an addContext
     mappings = index->misMatchMap(bv, query, (GenericBitVector*)NULL, 10, 8, 0.0, 0.0, 0);
@@ -543,16 +561,21 @@ void FMDIndexTests::testAddContext() {
     mappingsExact = index->map(bv, query, (GenericBitVector*)NULL, 10, 8);
     
     for(size_t i = 0; i < mappings.size(); i++) {
-        Log::debug() << "Mapping " << i << ": " << mappings[i].first << "," <<
-            mappings[i].second << " vs " << mappingsExact[i].first  << "," << 
-            mappingsExact[i].second << std::endl;
-        CPPUNIT_ASSERT(mappings[i] == mappingsExact[i]);
+        Log::debug() << "Mapping " << i << ": " << mappings[i].getRange() <<
+            "," << mappings[i].getRightMaxContext() << " vs " <<
+            mappingsExact[i].first  << "," << mappingsExact[i].second <<
+            std::endl;
+        CPPUNIT_ASSERT(mappings[i].getRange() == mappingsExact[i].first);
+        if(mappings[i].isMapped()) {
+            CPPUNIT_ASSERT_EQUAL(mappings[i].getRightMaxContext(),
+                mappingsExact[i].second);
+        }
     }
     
     // ATCT is unique, and then GCGACTCT after it is 8 extra characters, so
     // that first A should be the last thing to map.
-    CPPUNIT_ASSERT(mappings[23].first != -1);
-    CPPUNIT_ASSERT(mappings[24].first == -1);
+    CPPUNIT_ASSERT(mappings[23].getRange() != -1);
+    CPPUNIT_ASSERT(mappings[24].getRange() == -1);
 
 }
 
@@ -576,22 +599,27 @@ void FMDIndexTests::testMultContext() {
     
     // Grab (range number, context length) pairs for mapping with 0 additional
     // context and 0 mismatches.
-    std::vector<std::pair<int64_t,size_t>> mappings = index->misMatchMap(bv,
+    std::vector<Mapping> mappings = index->misMatchMap(bv,
         query, (GenericBitVector*)NULL, 0, 0, 0.0, 0.0, 0);
         
     std::vector<std::pair<int64_t,size_t>> mappingsExact = index->map(bv, query,
         (GenericBitVector*)NULL, 0, 0, 0.0);
         
     for(size_t i = 0; i < mappings.size(); i++) {
-        Log::debug() << "Mapping " << i << ": " << mappings[i].first << "," <<
-            mappings[i].second << " vs " << mappingsExact[i].first  << "," << 
-            mappingsExact[i].second << std::endl;
-        CPPUNIT_ASSERT(mappings[i] == mappingsExact[i]);
+        Log::debug() << "Mapping " << i << ": " << mappings[i].getRange() <<
+            "," << mappings[i].getRightMaxContext() << " vs " <<
+            mappingsExact[i].first  << "," << mappingsExact[i].second <<
+            std::endl;
+        CPPUNIT_ASSERT(mappings[i].getRange() == mappingsExact[i].first);
+        if(mappings[i].isMapped()) {
+            CPPUNIT_ASSERT_EQUAL(mappings[i].getRightMaxContext(),
+                mappingsExact[i].second);
+        }
     }
         
     // The A in ACTCT should be the last mapped thing
-    CPPUNIT_ASSERT(mappings[30].first != -1);
-    CPPUNIT_ASSERT(mappings[31].first == -1);
+    CPPUNIT_ASSERT(mappings[30].getRange() != -1);
+    CPPUNIT_ASSERT(mappings[31].getRange() == -1);
     
     // Try again with 2x multiplier.
     mappings = index->misMatchMap(bv, query, (GenericBitVector*)NULL, 0, 0, 2.0,
@@ -600,15 +628,20 @@ void FMDIndexTests::testMultContext() {
     mappingsExact = index->map(bv, query, (GenericBitVector*)NULL, 0, 0, 2.0);
     
     for(size_t i = 0; i < mappings.size(); i++) {
-        Log::debug() << "Mapping " << i << ": " << mappings[i].first << "," <<
-            mappings[i].second << " vs " << mappingsExact[i].first  << "," << 
-            mappingsExact[i].second << std::endl;
-        CPPUNIT_ASSERT(mappings[i] == mappingsExact[i]);
+        Log::debug() << "Mapping " << i << ": " << mappings[i].getRange() <<
+            "," << mappings[i].getRightMaxContext() << " vs " <<
+            mappingsExact[i].first  << "," << mappingsExact[i].second <<
+            std::endl;
+        CPPUNIT_ASSERT(mappings[i].getRange() == mappingsExact[i].first);
+        if(mappings[i].isMapped()) {
+            CPPUNIT_ASSERT_EQUAL(mappings[i].getRightMaxContext(),
+                mappingsExact[i].second);
+        }
     }
     
     // The C in CTGCGACTCT should be the last mapped thing
-    CPPUNIT_ASSERT(mappings[25].first != -1);
-    CPPUNIT_ASSERT(mappings[26].first == -1);
+    CPPUNIT_ASSERT(mappings[25].getRange() != -1);
+    CPPUNIT_ASSERT(mappings[26].getRange() == -1);
     
     // And a nonzero min context
     mappings = index->misMatchMap(bv, query, (GenericBitVector*)NULL, 10, 0, 0.0, 0.0, 0);
@@ -616,16 +649,21 @@ void FMDIndexTests::testMultContext() {
     mappingsExact = index->map(bv, query, (GenericBitVector*)NULL, 10, 0);
     
     for(size_t i = 0; i < mappings.size(); i++) {
-        Log::debug() << "Mapping " << i << ": " << mappings[i].first << "," <<
-            mappings[i].second << " vs " << mappingsExact[i].first  << "," << 
-            mappingsExact[i].second << std::endl;
-        CPPUNIT_ASSERT(mappings[i] == mappingsExact[i]);
+        Log::debug() << "Mapping " << i << ": " << mappings[i].getRange() <<
+            "," << mappings[i].getRightMaxContext() << " vs " <<
+            mappingsExact[i].first  << "," << mappingsExact[i].second <<
+            std::endl;
+        CPPUNIT_ASSERT(mappings[i].getRange() == mappingsExact[i].first);
+        if(mappings[i].isMapped()) {
+            CPPUNIT_ASSERT_EQUAL(mappings[i].getRightMaxContext(),
+                mappingsExact[i].second);
+        }
     }
     
     // The first C in CTGCGACTCT should be the last mapped thing, because it's
     // at the start of a length-10 string.
-    CPPUNIT_ASSERT(mappings[25].first != -1);
-    CPPUNIT_ASSERT(mappings[26].first == -1);
+    CPPUNIT_ASSERT(mappings[25].getRange() != -1);
+    CPPUNIT_ASSERT(mappings[26].getRange() == -1);
 
     // And a nonzero min context with a multContext
     mappings = index->misMatchMap(bv, query, (GenericBitVector*)NULL, 10, 0, 
@@ -635,17 +673,22 @@ void FMDIndexTests::testMultContext() {
         2.0);
     
     for(size_t i = 0; i < mappings.size(); i++) {
-        Log::debug() << "Mapping " << i << ": " << mappings[i].first << "," <<
-            mappings[i].second << " vs " << mappingsExact[i].first  << "," << 
-            mappingsExact[i].second << std::endl;
-        CPPUNIT_ASSERT(mappings[i] == mappingsExact[i]);
+        Log::debug() << "Mapping " << i << ": " << mappings[i].getRange() <<
+            "," << mappings[i].getRightMaxContext() << " vs " <<
+            mappingsExact[i].first  << "," << mappingsExact[i].second <<
+            std::endl;
+        CPPUNIT_ASSERT(mappings[i].getRange() == mappingsExact[i].first);
+        if(mappings[i].isMapped()) {
+            CPPUNIT_ASSERT_EQUAL(mappings[i].getRightMaxContext(),
+                mappingsExact[i].second);
+        }
     }
     
     // CTG is unique, and then CGACTCT after it is 7 extra characters (which
     // more than exceeds 2 * 3 total), and we have 10 total characters, so that
     // first C should be the last thing to map.
-    CPPUNIT_ASSERT(mappings[25].first != -1);
-    CPPUNIT_ASSERT(mappings[26].first == -1);
+    CPPUNIT_ASSERT(mappings[25].getRange() != -1);
+    CPPUNIT_ASSERT(mappings[26].getRange() == -1);
 
 }
 

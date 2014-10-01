@@ -949,7 +949,9 @@ std::vector<Mapping> FMDIndex::map(const std::string& query,
                 (location.characters - 1));
 
             // Add a Mapping for this mapped base, mapped on the right.
-            mappings.push_back(Mapping(textPosition, 0, location.characters));
+            Mapping mapped(textPosition);
+            mapped.setMaxContext(0, location.characters);
+            mappings.push_back(mapped);
 
             // We definitely have a non-empty FMDPosition to continue from
 
@@ -1346,7 +1348,7 @@ std::vector<std::pair<int64_t,size_t>> FMDIndex::map(
 
             // Remember that this base mapped to this range
             mappings.push_back(std::make_pair(range, 
-                location.characters - 1));
+                location.characters));
             // We definitely have a non-empty FMDPosition to continue from
         } else {
 
@@ -2010,6 +2012,8 @@ std::vector<Mapping> FMDIndex::misMatchMap(
     // Start it out at -1 so the first character we find making us unique brings
     // us to 0.
     int64_t extraContext = -1;
+    // How many characters were in our context when we became unique?
+    size_t uniqueContext = 0;
     
     // Track the highest coding cost since restart.
     double codingCost = 0;
@@ -2032,6 +2036,16 @@ std::vector<Mapping> FMDIndex::misMatchMap(
             search = this->misMatchMapPosition(ranges, query, i, minContext, 
                 addContext, multContext, &extraContext, z_max, mask);
                 
+            if(extraContext != -1) {
+                // We are unique. Whatever context isn't extra was required to
+                // become unique.
+                uniqueContext = search.maxCharacters - extraContext; 
+            } else {
+                // We aren't unique yet. Set this to 0, since that's a
+                // completely unreasonable value.
+                uniqueContext = 0;
+            }
+                
             if(markovModel != NULL) {
                 // Calculate the coding cost and current state if we have a
                 // model.
@@ -2048,18 +2062,20 @@ std::vector<Mapping> FMDIndex::misMatchMap(
                 && search.positions.size() == 1 && 
                 (markovModel == NULL || codingCost >= minCodingCost)) {
 
-                // It mapped. We didn't do a re-start and fail, we have sufficient
-                // context to be confident, and our interval is nonempty.
+                // It mapped. We didn't do a re-start and fail, we have
+                // sufficient context to be confident, and our interval is
+                // nonempty.
                 
-                // See if we're subsumed by a range.
+                // See if we're subsumed by a range. We really ought to be if
+                // extraContext is set at all.
                 range = search.positions.front().first.range(ranges, mask);
                 
                 if(range != -1) { 
                     Log::debug() << "Mapped " << search.maxCharacters << 
                         " context (" << extraContext << "/" << addContext << 
                         " extra) with multiplier " << multContext << 
-                        " to " << search.positions.front().first << " in range #" <<
-                        range << std::endl;
+                        " to " << search.positions.front().first << 
+                        " in range #" << range << std::endl;
                 } else {
                     Log::debug() << "Still ambiguous at " << 
                         search.maxCharacters << " context" << std::endl;
@@ -2070,11 +2086,15 @@ std::vector<Mapping> FMDIndex::misMatchMap(
                 Mapping mapping(range);
                 // Set its right max context.
                 mapping.setMaxContext(0, search.maxCharacters);
+                // And the right context at which it became unique (if it did)
+                mapping.setMinContext(0, uniqueContext);
                 // Save it
                 mappings.push_back(mapping);
             
                 // We definitely have a non-empty FMDPosition to continue from
             } else {
+            
+                // We didn't map after a restart.
             
                 Log::debug() << search.positions.size() << 
                     " positions, " << search.maxCharacters << " context, " << 
@@ -2088,6 +2108,8 @@ std::vector<Mapping> FMDIndex::misMatchMap(
                 Mapping mapping;
                 // Save the max context we could get.
                 mapping.setMaxContext(0, search.maxCharacters);
+                // Save the point at which we became unique, if any.
+                mapping.setMinContext(0, uniqueContext);
                 mappings.push_back(mapping);
 
                 if(addContext == 0 && multContext <= 1) {
@@ -2132,12 +2154,16 @@ std::vector<Mapping> FMDIndex::misMatchMap(
                 
             } else {
                 
-                // If no mismatch extension results exist, we can safely extend by the correct base
-                // and be assured we are passing forward a complete set of search results
+                // If no mismatch extension results exist, we can safely extend
+                // by the correct base and be assured we are passing forward a
+                // complete set of search results
                 
-                Log::debug() << "No mismatch extensions; Extending with position " << i << std::endl;
+                Log::debug() <<
+                    "No mismatch extensions; Extending with position " << i <<
+                    std::endl;
                 
-                search = this->misMatchExtend(search, query[i], true, z_max, mask, true, false);
+                search = this->misMatchExtend(search, query[i], true, z_max, 
+                    mask, true, false);
                 search.characters++;
                 search.maxCharacters++;
                 
@@ -2186,10 +2212,13 @@ std::vector<Mapping> FMDIndex::misMatchMap(
                     Mapping mapping(range);
                     // Set its right max context.
                     mapping.setMaxContext(0, search.maxCharacters);
+                    // And the point at which we became unique
+                    mapping.setMinContext(0, uniqueContext);
                     // Save it
                     mappings.push_back(mapping);
                 
-                    // We definitely have a non-empty FMDPosition to continue from
+                    // We definitely have a non-empty FMDPosition to continue
+                    // from
                     
                 } else {
                 
@@ -2204,9 +2233,11 @@ std::vector<Mapping> FMDIndex::misMatchMap(
                         // we tried with a too-long right context, or we need to
                         // re-count extra context.
                     
-                        Log::debug() << "Failed at " << search.positions.front().first << " (" << 
-                        search.positions.size() << " mismatch search results for " <<
-                        search.maxCharacters << " context)." << std::endl;
+                        Log::debug() << "Failed at " << 
+                            search.positions.front().first << " (" << 
+                            search.positions.size() <<
+                            " mismatch search results for " << 
+                            search.maxCharacters << " context)." << std::endl;
                 
                         Log::debug() << "Restarting from here..." << std::endl;
                 
@@ -2217,15 +2248,16 @@ std::vector<Mapping> FMDIndex::misMatchMap(
                         search.characters = 0;
                         search.maxCharacters = 0;
                 
-                        // Since the FMDPosition is empty, on the next iteration we will
-                        // retry this base.
+                        // Since the FMDPosition is empty, on the next iteration
+                        // we will retry this base.
 
                     } else {
                             
-                        Log::debug() << "Failed at " << search.positions.front().first << " (" << 
+                        Log::debug() << "Failed at " << 
+                        search.positions.front().first << " (" << 
                         search.positions.size() <<
-                        " mismatch search results for " << search.maxCharacters << " context)." << 
-                        std::endl;
+                        " mismatch search results for " << 
+                        search.maxCharacters << " context)." << std::endl;
                         
                         // It didn't map for some other reason:
                         // - It was an initial mapping with too little right context to 
@@ -2243,6 +2275,8 @@ std::vector<Mapping> FMDIndex::misMatchMap(
                         Mapping mapping;
                         // Save the max context we could get.
                         mapping.setMaxContext(0, search.maxCharacters);
+                        // And the point at which we became unique, if any.
+                        mapping.setMinContext(0, uniqueContext);
                         mappings.push_back(mapping);
 
                         

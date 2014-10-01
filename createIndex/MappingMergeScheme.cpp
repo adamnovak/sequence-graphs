@@ -265,8 +265,10 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
         " bases via " << includedPositions.rank(index.getBWTLength()) <<
         " bottom-level positions" << std::endl;
     
-    std::vector<std::pair<int64_t,size_t>> rightRanges;
-    std::vector<std::pair<int64_t,size_t>> leftRanges;    
+    // We will fill these in with mappings that are to ranges, and then convert
+    // the ranges to TextPositions.
+    std::vector<Mapping> rightMappings;
+    std::vector<Mapping> leftMappings;    
         
     if (mismatch) {
       
@@ -274,58 +276,51 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
             std::endl;
         
         // Map it on the right
-        rightRanges = index.misMatchMap(rangeVector, contig,
+        rightMappings = index.misMatchMap(rangeVector, contig,
             &includedPositions, minContext, addContext, multContext, 
             minCodingCost, z_max);
         
         // Map it on the left
-        leftRanges = index.misMatchMap(rangeVector, 
+        leftMappings = index.misMatchMap(rangeVector, 
             reverseComplement(contig), &includedPositions, minContext, 
             addContext, multContext, minCodingCost, z_max); 
                 
     } else {
+        
+        // We use the same function, with mismatches hardcoded to 0.
                 
         // Map it on the right
-        rightRanges = index.map(rangeVector, contig, &includedPositions, 
-            minContext, addContext, multContext, minCodingCost);
-    
+        rightMappings = index.misMatchMap(rangeVector, contig,
+            &includedPositions, minContext, addContext, multContext, 
+            minCodingCost, 0);
+        
         // Map it on the left
-        leftRanges = index.map(rangeVector, reverseComplement(contig), 
-            &includedPositions, minContext, addContext, multContext,
-            minCodingCost);
+        leftMappings = index.misMatchMap(rangeVector, 
+            reverseComplement(contig), &includedPositions, minContext, 
+            addContext, multContext, minCodingCost, 0); 
     
     }
     
     // Flip the left mappings back into the original order. They should stay
     // as other-side ranges.
-    std::reverse(leftRanges.begin(), leftRanges.end());
+    std::reverse(leftMappings.begin(), leftMappings.end());
     
-    // Convert left and right mappings from ranges to base positions.
-    
-    // make a function that turns range, context pairs into Mappings
-    auto toMapping = [&](std::pair<int64_t, size_t> pair) {
-        if(pair.first == -1) {
-            // This position is unmapped
-            return Mapping();
-        } else {
-            // Get the (contig, base, face) that the range belongs to.
-            std::pair<std::pair<size_t, size_t>, bool> base = 
-                rangeBases[pair.first];
-            
-            // Make a mapping with that text, offset and the amount of
-            // context used (right semantics).
-            return Mapping(index.getTextPosition(base), 0, pair.second);
-            
+    for(size_t i = 0; i < leftMappings.size(); i++) {
+        // Convert left and right mappings from ranges to base positions.
+        
+        if(leftMappings[i].isMapped()) {
+            // Left is mapped, so go look up its TextPosition
+            leftMappings[i].setLocation(index.getTextPosition(
+                rangeBases[leftMappings[i].getRange()]));
         }
-    };
+        
+        if(rightMappings[i].isMapped()) {
+            // Right is mapped, so go look up its TextPosition
+            rightMappings[i].setLocation(index.getTextPosition(
+                rangeBases[rightMappings[i].getRange()]));
+        }
+    }
 
-    // Apply it to make left and right mappings
-    std::vector<Mapping> leftMappings = 
-        transform<std::pair<int64_t, size_t>, Mapping>(leftRanges, toMapping);
-    std::vector<Mapping> rightMappings = 
-        transform<std::pair<int64_t, size_t>, Mapping>(rightRanges, toMapping);
-    
-    
     for(size_t i = 0; i < leftMappings.size(); i++) {
         // Convert all the left mapping positions to right semantics
         

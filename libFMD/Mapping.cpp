@@ -22,9 +22,9 @@ Mapping::Mapping(TextPosition location, size_t leftContext,
     // Nothing to do
 }
 
-Mapping::Mapping(int64_t range): location(0, 0), range(range), is_mapped(true),
-    leftMinContext(0), rightMinContext(0), leftMaxContext(0), 
-    rightMaxContext(0) {
+Mapping::Mapping(int64_t range): location(0, 0), range(range),
+    is_mapped(range != -1), leftMinContext(0), rightMinContext(0), 
+    leftMaxContext(0), rightMaxContext(0) {
     
     // Nothing to do
 }
