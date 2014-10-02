@@ -290,6 +290,11 @@ void FMDIndexTests::testDisambiguate() {
     // Don't map when the two inputs go to completely different places
     CPPUNIT_ASSERT(!index->disambiguate(unmapped, unmapped).is_mapped);
     CPPUNIT_ASSERT(!index->disambiguate(elsewhere, leftMapped).is_mapped);
+    
+    // Preserve min contexts of unmapped things
+    unmapped.setMinContext(2, 0);
+    CPPUNIT_ASSERT_EQUAL((size_t)2,
+        index->disambiguate(unmapped, Mapping()).getLeftMinContext());
 }
 
 /**

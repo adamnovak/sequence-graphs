@@ -1824,27 +1824,33 @@ Mapping FMDIndex::disambiguate(const Mapping& left,
     // Make sure to disambiguate contexts along with mappings. Left/right
     // semantics agnostic, since both inputs must have the same which-text-is-
     // forward semantics.
+    
+    // Also make sure to combine contexts even if the result is not mapped.
+
+    // Build a mapping that we will return.
+    Mapping toReturn;
 
     if(!left.isMapped()) {
-        return right;
+        // Copy the right mapping with its mapping location
+        toReturn = right;
     } else if(!right.isMapped()) {
         // If right has nothing to say, use left
-        return left;
+        toReturn = left;
     } else if(left.getLocation() == right.getLocation()) {
         // If they match, make sure to merge contexts, taking the left of left
         // and the right of right.
-        Mapping combined(right.getLocation());
-        combined.setMinContext(left.getLeftMinContext(),
-            right.getRightMinContext());
-        combined.setMaxContext(left.getLeftMaxContext(),
-            right.getRightMaxContext());
-        return combined;
-    } else {
-        // Else they disagree, so return an unmapped mapping.
-        return Mapping();
+        toReturn = Mapping(right.getLocation());
     }
-
     
+    // Else they disagree, so keep that default-constructed unmapped mapping.
+    
+    // Now fill in the contexts
+    toReturn.setMinContext(left.getLeftMinContext(),
+        right.getRightMinContext());
+    toReturn.setMaxContext(left.getLeftMaxContext(),
+        right.getRightMaxContext());
+        
+    return toReturn;
 }
 
 MisMatchAttemptResults FMDIndex::misMatchExtend(MisMatchAttemptResults& prevMisMatches,

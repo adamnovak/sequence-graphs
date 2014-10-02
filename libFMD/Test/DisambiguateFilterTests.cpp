@@ -95,11 +95,11 @@ void DisambiguateFilterTests::testApply() {
     // Right only
     CPPUNIT_ASSERT_EQUAL(Mapping(TextPosition(1, 33), 0, 3), result[1]);
     // Neither
-    CPPUNIT_ASSERT_EQUAL(Mapping(), result[2]);
+    CPPUNIT_ASSERT(!result[2].isMapped());
     // Left only
     CPPUNIT_ASSERT_EQUAL(Mapping(TextPosition(1, 31), 2, 0), result[3]);
     // Disagree
-    CPPUNIT_ASSERT_EQUAL(Mapping(), result[4]);
+    CPPUNIT_ASSERT(!result[4].isMapped());
     
 }
 
