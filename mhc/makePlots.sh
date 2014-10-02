@@ -188,5 +188,5 @@ do
 
 done
 
-barchart.py ${OUTFILE} --x_label "Merging Scheme" --y_label "2-break tandem portion" --title "Portion Tandem Dupes vs. Merging Scheme" --x_sideways --save tandemPortion.png
+barchart.py ${OUTFILE} --x_label "Merging Scheme" --y_label "2-break tandem portion" --max 1 --title "Portion Tandem Dupes vs. Merging Scheme" --x_sideways --save tandemPortion.png
 
