@@ -2037,8 +2037,9 @@ std::vector<Mapping> FMDIndex::misMatchMap(
             // We do not currently have a non-empty FMDPosition to extend. Start
             // over by mapping this character by itself. TODO: We're responsible
             // for checking coding cost, but it does everything else.
+            // Get maximal contexts
             search = this->misMatchMapPosition(ranges, query, i, minContext, 
-                addContext, multContext, &extraContext, z_max, mask);
+                addContext, multContext, &extraContext, z_max, mask, true);
                 
             if(extraContext != -1) {
                 // We are unique. Whatever context isn't extra was required to
@@ -2171,6 +2172,22 @@ std::vector<Mapping> FMDIndex::misMatchMap(
                 search.characters++;
                 search.maxCharacters++;
                 
+                // Go and get the min unique context with no restrictions
+                int64_t shortExtraContext = -1;
+                MisMatchAttemptResults shortResult = this->misMatchMapPosition(
+                    ranges, query, i, 0, 0, 0, &shortExtraContext, z_max, mask,
+                    false);
+                    
+                if(shortExtraContext == 0) {
+                    // We are unique.
+                    uniqueContext = shortResult.maxCharacters; 
+                } else {
+                    // We aren't unique yet. Set this to 0, since that's a
+                    // completely unreasonable value.
+                    uniqueContext = 0;
+                }
+                
+                
                 if(markovModel != NULL) {
                     if(state == NULL) {
                         // Get the coding cost for everything we have searched
@@ -2210,7 +2227,6 @@ std::vector<Mapping> FMDIndex::misMatchMap(
                         " extra) " << " with multiplier " << multContext << 
                         " to " << search.positions.front().first << 
                         " in range #" << range << std::endl;
-                
                 
                     // Remember that this base mapped to this range
                     Mapping mapping(range);
