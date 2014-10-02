@@ -422,6 +422,40 @@ void FMDIndexTests::testMapOverMismatch() {
 }
 
 /**
+ * Make sure we can get min unique context for bases that don't map due to
+ * context limits.
+ */
+void FMDIndexTests::testContextWithoutMapping() {
+
+    // Grab all of the first contig
+    std::string query = "CATGCTTCGGCGATTCGACGCTCATCTGCGACTCT";
+    
+    // Declare everything to be a range
+    GenericBitVector bv;
+    for(size_t i = 0; i < index->getBWTLength(); i++) {
+        bv.addBit(i);
+    }
+    bv.finish(index->getBWTLength());
+    
+    // Map it with right contexts, allowing for 1 mismatch, and requiring
+    // mult 8 on the context.
+    std::vector<Mapping> mappings = index->misMatchMap(bv,
+        query, (GenericBitVector*)NULL, 0, 0, 8.0, 0.0, 1);
+    
+    // And map it without the restriction
+    std::vector<Mapping> unrestricted = index->misMatchMap(bv,
+        query, (GenericBitVector*)NULL, 0, 0, 0.0, 0.0, 1);
+   
+    for(size_t i = 0; i < 35; i++) {
+        if(unrestricted[i].isMapped() && !mappings[i].isMapped()) {
+            // This base mapped without the context restriction, so it should
+            // have a unique right context of defined length.
+            CPPUNIT_ASSERT(mappings[i].getRightMinContext() > 0);
+        }
+    }
+}
+
+/**
  * Make sure minimum context length is respected.
  */
 void FMDIndexTests::testContextLimit() {
