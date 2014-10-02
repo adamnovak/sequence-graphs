@@ -495,7 +495,7 @@ public:
         const std::string& pattern, size_t index, size_t minContext, 
         size_t addContext, double multContext, 
         int64_t* extraContext, size_t z_max, 
-        const GenericBitVector* mask = NULL) const;
+        const GenericBitVector* mask = NULL, bool maxContext=true) const;
     
     /**
      * Centered search versions of all the mismatch mapping functions
