@@ -30,3 +30,7 @@ then
     sed -i "s/>.*/>refmhc/" refmhc.fa
     
 fi
+
+# Add in self.fa, which is refmhc.fa with a different name
+cp refmhc.fa self.fa
+sed -i "s/>.*/>self/" self.fa
