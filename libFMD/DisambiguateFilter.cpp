@@ -1,4 +1,6 @@
  #include "DisambiguateFilter.hpp"
+ #include <stdexcept>
+ #include "Mapping.hpp"
  
  DisambiguateFilter::DisambiguateFilter(const FMDIndex& index): index(index) {
     // Nothing to do!
@@ -15,7 +17,6 @@
         // semantics.
         toReturn.push_back(index.disambiguate(leftMappings[i],
             rightMappings[i]));
-        
     }
     
     // Return the vector of disambiguated mappings.

@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <utility>
+#include <stdexcept>
 
 #include "TextPosition.hpp"
 
@@ -111,6 +112,10 @@ public:
     inline void setMinContext(size_t left, size_t right) {
         leftMinContext = left;
         rightMinContext = right;
+        
+        if(rightMinContext > 1000) {
+            throw std::runtime_error("Can't set contex so high");
+        }
     }
     
     /**

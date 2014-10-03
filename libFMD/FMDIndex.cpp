@@ -2047,6 +2047,10 @@ std::vector<Mapping> FMDIndex::misMatchMap(
             search = this->misMatchMapPosition(ranges, query, i, minContext, 
                 addContext, multContext, &extraContext, z_max, mask, true);
                 
+            if(search.maxCharacters > extraContext) {
+                throw std::runtime_error("Extra characters is nonsense");
+            }
+                
             if(extraContext != -1) {
                 // We are unique. Whatever context isn't extra was required to
                 // become unique.

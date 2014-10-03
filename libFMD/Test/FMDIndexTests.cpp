@@ -295,6 +295,12 @@ void FMDIndexTests::testDisambiguate() {
     unmapped.setMinContext(2, 0);
     CPPUNIT_ASSERT_EQUAL((size_t)2,
         index->disambiguate(unmapped, Mapping()).getLeftMinContext());
+    
+    // Make sure it gets picked up even if we are mapped.
+    CPPUNIT_ASSERT_EQUAL((size_t)2,
+        index->disambiguate(unmapped, rightMapped).getLeftMinContext());
+    CPPUNIT_ASSERT_EQUAL((size_t)4,
+        index->disambiguate(unmapped, rightMapped).getRightMinContext());
 }
 
 /**

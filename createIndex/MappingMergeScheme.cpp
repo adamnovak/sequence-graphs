@@ -313,7 +313,7 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
             leftMappings[i].setLocation(index.getTextPosition(
                 rangeBases[leftMappings[i].getRange()]));
         }
-        
+
         if(rightMappings[i].isMapped()) {
             // Right is mapped, so go look up its TextPosition
             rightMappings[i].setLocation(index.getTextPosition(
@@ -349,7 +349,7 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
         // Now go through all the bases and make sure they have matching
         // characters before merging them. TODO: make this another filter.
         
-        Log::debug() << leftMappings[i] << "\t" << filteredMappings[i] << 
+        Log::output() << leftMappings[i] << "\t" << filteredMappings[i] << 
             "\t" << rightMappings[i] << std::endl;
             
         TextPosition candidate = filteredMappings[i].getLocation();
