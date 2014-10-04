@@ -496,6 +496,15 @@ public:
         size_t addContext, double multContext, 
         int64_t* extraContext, size_t z_max, 
         const GenericBitVector* mask = NULL, bool maxContext=true) const;
+        
+    // Here is a slightly better designed overload of the above which leaves min
+    // context enforcement up to its caller, and can be run in two modes to get
+    // min and max context so that that is actually practical. TODO: It doesn't
+    // consider mismatches on the base being mapped, so there could potentially
+    // be issues extending from there.
+    MisMatchAttemptResults misMatchMapPosition(const GenericBitVector& ranges, 
+        const std::string& pattern, size_t index, size_t z_max, bool maxContext,
+        const GenericBitVector* mask = NULL) const;
     
     /**
      * Centered search versions of all the mismatch mapping functions

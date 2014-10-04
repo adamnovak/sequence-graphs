@@ -1,6 +1,8 @@
 #ifndef MAPATTEMPTRESULT_HPP
 #define MAPATTEMPTRESULT_HPP
 
+#include "GenericBitVector.hpp"
+
 /**
  * A triple to hold the return values from FMD::mapPosition() or
  * FMD::partialMap(). Holds a flag for whether the mapping succeeded or not, an
@@ -25,16 +27,61 @@ struct creditMapAttemptResult
 
 struct MisMatchAttemptResults
 {
+
+    MisMatchAttemptResults(): is_mapped(0), positions(), characters(0) {
+        // Nothing to do. No positions at all is fine.
+    }
+
     bool is_mapped;
     std::vector<std::pair<FMDPosition,size_t>> positions;
     
-    // Want to carry character counter because we need to check if we've hit
-    // minimum context length from inside the misMatch mapping function, else
-    // we'll funnel down our priority queue too early in the case of a unique
-    // hit below minimum context length
-    // TODO: What's the difference here?
+    // How many characters have been searched?
     size_t characters;
-    size_t maxCharacters;
+    
+    /**
+     * Returns true if there are no for the search (when restricting ourselves
+     * to the BWT positions covered by the mask), false otherwise.
+     */
+    inline bool isEmpty(const GenericBitVector* mask = NULL) const {
+        for(auto position : positions) {
+            // Go through all the ranges
+            if(!position.first.isEmpty(mask)) {
+                // We found a range that includes something
+                return false;
+            }
+        }
+        // No range included anything
+        return true;
+    }
+    
+    /**
+     * Return the range number that all search results belong to, or -1 if there
+     * is no such range number.
+     *
+     * May only be called if the result set is nonempty.
+     */
+    inline int64_t range(const GenericBitVector& ranges) const {
+        // Check the first search result (which must exist because we said so.)
+        int64_t candidate = positions[0].first.range(ranges);
+        
+        if(candidate == -1) {
+            // Already failed.
+            return candidate;
+        }
+        
+        for(size_t i = 1; i < positions.size(); i++) {
+            // Check to make sure everything else has the same range as the
+            // first result.
+            if(positions[i].first.range(ranges) != candidate) {
+                // They don't all match
+                return -1;
+            }
+        }
+        
+        // Everybody has the same range.
+        return candidate;
+    }
+    
     
 };
 
