@@ -188,14 +188,14 @@ def main(args):
     options = parse_args(args) # This holds the nicely-parsed options object
     
     # Load all the BEDs, and concatenate them
-    genes = list(itertools.chain.from_iterable([parse_bed(open(bed)) 
-        for bed in options.beds]))
+    genes = itertools.chain.from_iterable([parse_bed(open(bed)) 
+        for bed in options.beds])
     
     # Get all the mappings
-    mappings = list(get_mappings(options.maf))
+    mappings = get_mappings(options.maf)
     
     # Classify each mapping in light of the genes
-    classifications = list(classify_mappings(mappings, genes))
+    classifications = classify_mappings(mappings, genes)
     
     for classification, count in \
         collections.Counter(classifications).iteritems():
