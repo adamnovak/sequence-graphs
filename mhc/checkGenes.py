@@ -90,8 +90,6 @@ def get_mappings(maf_stream):
         if query is None:
             raise Exception("Could not find query")
             
-        print("Reference: {} Query: {}".format(reference, query))
-        
         # This will hold alignment records arranged by the contig they belong
         # to.
         records_by_contig = collections.defaultdict(list)
@@ -143,9 +141,6 @@ def classify_mappings(mappings, genes):
     # what genes overlap each end of each mapping.
     geneTrees = collections.defaultdict(IntervalTree)
     
-    for thing in genes:
-        print(thing)
-    
     for contig, start, end, gene, strand in genes:
         # Put the gene in under the given interval
         geneTrees[contig].insert(start, end, (gene, strand))
@@ -182,10 +177,7 @@ def classify_mappings(mappings, genes):
         else:
             # We mapped a non-gene to somewhere where there are no genes.
             yield "non2non"
-            
-                
-        
-    
+
 def main(args):
     """
     Parses command line arguments and do the work of the program.
@@ -205,9 +197,11 @@ def main(args):
     # Classify each mapping in light of the genes
     classifications = list(classify_mappings(mappings, genes))
     
-    for mapping, classification in itertools.izip(mappings, classifications):
-        # Dump them
-        print("{}: {}".format(mapping, classification))
+    for classification, count in \
+        collections.Counter(classifications).iteritems():
+        
+        # Dump a TSV of bases by classification
+        print("{}\t{}".format(classification, count))
             
 
 if __name__ == "__main__" :
