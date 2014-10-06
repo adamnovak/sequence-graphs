@@ -2043,7 +2043,7 @@ std::vector<Mapping> FMDIndex::misMatchMap(
             
             for(auto result : matchExtended.positions) {
                 // Dump all the options.
-                Log::debug() << "\t" << result.first << "\t" << result.second <<
+                Log::trace() << "\t" << result.first << "\t" << result.second <<
                     std::endl;
             }
                 
@@ -2090,11 +2090,11 @@ std::vector<Mapping> FMDIndex::misMatchMap(
             false);
         search.characters++;
         
-        Log::debug() << "Extending with all characters:" << std::endl;
+        Log::debug() << "Extending with all characters." << std::endl;
         
         for(auto result : search.positions) {
             // Dump all the options.
-            Log::debug() << "\t" << result.first << "\t" << result.second <<
+            Log::trace() << "\t" << result.first << "\t" << result.second <<
                 std::endl;
         }
         

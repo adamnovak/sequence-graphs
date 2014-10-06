@@ -15,7 +15,6 @@ TEST_OBJS=Test/TestRunner.o Test/GenericBitVectorTests.o \
 	Test/FMDIndexTests.o Test/SmallSideTests.o Test/MarkovModelTests.o \
 	Test/DisambiguateFilterTests.o Test/CreditFilterTests.o \
 	Test/FMDIndexMismatchTest.o
-TEST_OBJS=Test/TestRunner.o Test/FMDIndexMismatchTest.o
 
 # What projects do we depend on? We have rules for each of these.
 DEPS=libsuffixtools
