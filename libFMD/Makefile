@@ -13,7 +13,8 @@ SWIG_OBJS=swigbindings_wrap.o
 TEST_OBJS=Test/TestRunner.o Test/GenericBitVectorTests.o \
 	Test/BWTTests.o Test/FMDIndexBuilderTests.o \
 	Test/FMDIndexTests.o Test/SmallSideTests.o Test/MarkovModelTests.o \
-	Test/DisambiguateFilterTests.o Test/CreditFilterTests.o
+	Test/DisambiguateFilterTests.o Test/CreditFilterTests.o \
+	Test/FMDIndexMismatchTest.o
 
 # What projects do we depend on? We have rules for each of these.
 DEPS=libsuffixtools
@@ -87,7 +88,7 @@ test: check
 check: testRunner
 	./testRunner
 	
-testRunner: $(TEST_OBJS) $(OBJS) $(DEPS)
+testRunner: $(TEST_OBJS) $(OBJS) $(DEPS) Makefile
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(TEST_OBJS) $(OBJS) $(LDLIBS) \
 	$(TEST_LIBS)
 	
