@@ -424,8 +424,9 @@ void FMDIndexTests::testMapOverMismatch() {
     CPPUNIT_ASSERT_EQUAL((size_t)17, mappings[17].getRightMaxContext());
     // Not on the mismatch
     CPPUNIT_ASSERT(mappings[18].getRange() == -1);
-    // It can't get further than 1 base max.
-    CPPUNIT_ASSERT_EQUAL((size_t)1, mappings[18].getRightMaxContext());
+    // It can't get further than 1 base max, but since it's unmapped it will
+    // probably report a 0 max context.
+    CPPUNIT_ASSERT(mappings[18].getRightMaxContext() < 1);
     // But again right after the mismatch
     CPPUNIT_ASSERT(mappings[19].getRange() != -1);
     CPPUNIT_ASSERT_EQUAL((size_t)16, mappings[19].getRightMaxContext());
@@ -546,7 +547,7 @@ void FMDIndexTests::testAddContext() {
             "," << mappings[i].getRightMaxContext() << " vs " <<
             mappingsExact[i].first  << "," << mappingsExact[i].second <<
             std::endl;
-        CPPUNIT_ASSERT(mappings[i].getRange() == mappingsExact[i].first);
+        CPPUNIT_ASSERT_EQUAL(mappingsExact[i].first, mappings[i].getRange());
         if(mappings[i].isMapped()) {
             CPPUNIT_ASSERT_EQUAL(mappings[i].getRightMaxContext(),
                 mappingsExact[i].second);
@@ -655,7 +656,7 @@ void FMDIndexTests::testMultContext() {
             "," << mappings[i].getRightMaxContext() << " vs " <<
             mappingsExact[i].first  << "," << mappingsExact[i].second <<
             std::endl;
-        CPPUNIT_ASSERT(mappings[i].getRange() == mappingsExact[i].first);
+        CPPUNIT_ASSERT_EQUAL(mappingsExact[i].first, mappings[i].getRange());
         if(mappings[i].isMapped()) {
             CPPUNIT_ASSERT_EQUAL(mappings[i].getRightMaxContext(),
                 mappingsExact[i].second);

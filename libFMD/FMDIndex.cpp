@@ -2005,6 +2005,13 @@ std::vector<Mapping> FMDIndex::misMatchMap(
         // when we extend left?
         MisMatchAttemptResults mapUntilUnique = misMatchMapPosition(ranges, 
             query, i, z_max, false, mask);
+        
+        if(mapUntilUnique.is_mapped) {    
+            Log::debug() << "Minimum right context: " << 
+                mapUntilUnique.characters << std::endl;
+        } else {
+            Log::debug() << "No unique match." << std::endl;
+        }
             
         // Set this if we have to throw away our current search and restart.
         bool restart = false;
@@ -2012,10 +2019,17 @@ std::vector<Mapping> FMDIndex::misMatchMap(
         if(search.isEmpty(mask)) {
             // If the search interval is empty, we need to restart here.
             restart = true;
+            
+            Log::debug() << "Search interval empty. Need to restart." <<
+                std::endl;
+            
         } else {
             // If the search interval is not empty, but there are results for
             // extending left with bases other than the one we have, we need to
             // restart here.
+            
+            Log::debug() << "Looking for mismatches vs. " << query[i] <<
+                std::endl;
             
             // Extend by *only* mismatched bases. Do not extend by the correct
             // base yet.
@@ -2025,6 +2039,8 @@ std::vector<Mapping> FMDIndex::misMatchMap(
             if(!mismatchExtended.isEmpty(mask)) {
                 // We might need to consider mismatches at this next position,
                 // so we can't just extend over it and need to restart.
+                
+                Log::debug() << "Mismatches found" << std::endl;
                 
                 // TODO: restarting doesn't consider mismatches on the base it
                 // is on, making ti difficult to continue from.
@@ -2037,11 +2053,26 @@ std::vector<Mapping> FMDIndex::misMatchMap(
             // If we need to restart, do a full mapping out to max context
             search = misMatchMapPosition(ranges, query, i, z_max, true,
                 mask);
+                
+            Log::debug() << "Restarted" << std::endl;
+            
+            if(search.range(ranges) != -1) {
+                search.is_mapped = true;
+                Log::debug() << "Mapped on restart" << std::endl;
+            }
+                
         } else {
             // If we don't need to restart, do an extension left
             search = this->misMatchExtend(search, query[i], true, z_max, 
                 mask, true, false);
             search.characters++;
+            
+            Log::debug() << "Extended with " << query[i] << std::endl;
+            
+            if(!search.is_mapped && search.range(ranges) != -1) {
+                search.is_mapped = true;
+                Log::debug() << "Mapped on extension" << std::endl;
+            }
         }
         
         // Either way we now have maximal right context length.
@@ -2052,11 +2083,31 @@ std::vector<Mapping> FMDIndex::misMatchMap(
         Mapping mapping;
         if(mapUntilUnique.is_mapped) {
             // It is at all possible to map.
+            
+            Log::debug() << "Min unique context was actually found." <<
+                std::endl;
          
-            if(search.is_mapped &&
-                search.characters >= minContext &&
-                search.characters >= addContext + mapUntilUnique.characters &&
-                search.characters >= multContext * mapUntilUnique.characters) {
+            if(!search.is_mapped) {
+                Log::debug() << "Search is not uniquely mapped" << std::endl;
+            } else if(search.characters < minContext) {
+                Log::debug() << "Search failed min context (" << 
+                    search.characters << "/" << minContext << ")" << std::endl;
+            } else if(search.characters < 
+                addContext + mapUntilUnique.characters) {
+                
+                Log::debug() << "Search failed add context (" << 
+                    search.characters << "/" << 
+                    addContext + mapUntilUnique.characters << ")" << std::endl;
+            } else if(search.characters < multContext * 
+                mapUntilUnique.characters) {
+                
+                Log::debug() << "Search failed mult context (" << 
+                    search.characters << "/" << 
+                    multContext * mapUntilUnique.characters << ")" << std::endl;
+            } else {
+            
+                Log::debug() << "Search mapped and passed criteria" <<
+                    std::endl;
             
                 // And the search itself did map, and passes all the context
                 // limit criteria. TODO: HMMs. TODO: Make these filters?
