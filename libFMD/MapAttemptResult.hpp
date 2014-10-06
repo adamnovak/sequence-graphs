@@ -60,9 +60,11 @@ struct MisMatchAttemptResults
      *
      * May only be called if the result set is nonempty.
      */
-    inline int64_t range(const GenericBitVector& ranges) const {
+    inline int64_t range(const GenericBitVector& ranges, 
+        const GenericBitVector* mask = NULL) const {
+        
         // Check the first search result (which must exist because we said so.)
-        int64_t candidate = positions[0].first.range(ranges);
+        int64_t candidate = positions[0].first.range(ranges, mask);
         
         if(candidate == -1) {
             // Already failed.
@@ -72,7 +74,7 @@ struct MisMatchAttemptResults
         for(size_t i = 1; i < positions.size(); i++) {
             // Check to make sure everything else has the same range as the
             // first result.
-            if(positions[i].first.range(ranges) != candidate) {
+            if(positions[i].first.range(ranges, mask) != candidate) {
                 // They don't all match
                 return -1;
             }

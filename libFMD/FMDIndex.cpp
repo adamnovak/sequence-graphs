@@ -1990,21 +1990,25 @@ std::vector<Mapping> FMDIndex::misMatchMap(
     // We need a vector to return.
     std::vector<Mapping> mappings;
     
-    // Start a set of mismatch search results with nothing
+    // Start a set of mismatch search results with everything selected, no
+    // characters searched and no mismatches.
     MisMatchAttemptResults search;
+    search.positions.push_back(std::make_pair(getCoveringPosition(), 0));
     
     
     for(int i = start + length - 1; i >= start; i--) {
-         // OK, I need to start at the right
+         // OK, I need to start at the right.
+         
+         // Loop invariant: search holds the result for searching up through the
+         // previous position with all possible mismatches.
         
         Log::debug() << "On position " << i << " from " <<
             start + length - 1 << " to " << start << std::endl;
     
-        // For each base, search out right until it becomes unique. TODO: What
-        // if there's a mismatch right on that base, and we need to consider it
-        // when we extend left?
+        // For each base, search out right until it becomes unique, and no
+        // further. Don't consider any mismatches on the base itself.
         MisMatchAttemptResults mapUntilUnique = misMatchMapPosition(ranges, 
-            query, i, z_max, false, mask);
+            query, i, z_max, false, false, mask);
         
         if(mapUntilUnique.is_mapped) {    
             Log::debug() << "Minimum right context: " << 
@@ -2016,117 +2020,104 @@ std::vector<Mapping> FMDIndex::misMatchMap(
         // Set this if we have to throw away our current search and restart.
         bool restart = false;
             
-        if(search.isEmpty(mask)) {
-            // If the search interval is empty, we need to restart here.
-            restart = true;
-            
-            Log::debug() << "Search interval empty. Need to restart." <<
-                std::endl;
-            
-        } else {
-            // If the search interval is not empty, but there are results for
-            // extending left with bases other than the one we have, we need to
-            // restart here.
-            
-            Log::debug() << "Looking for mismatches vs. " << query[i] <<
-                std::endl;
-            
-            // Extend by *only* mismatched bases. Do not extend by the correct
-            // base yet.
-            MisMatchAttemptResults mismatchExtended = misMatchExtend(search, 
-                query[i], true, z_max, mask, false, true);
-            
-            if(!mismatchExtended.isEmpty(mask)) {
-                // We might need to consider mismatches at this next position,
-                // so we can't just extend over it and need to restart.
-                
-                Log::debug() << "Mismatches found" << std::endl;
-                
-                // TODO: restarting doesn't consider mismatches on the base it
-                // is on, making ti difficult to continue from.
-                restart = true;
-            }
-        }
-            
-            
-        if(restart) {
-            // If we need to restart, do a full mapping out to max context
-            search = misMatchMapPosition(ranges, query, i, z_max, true,
-                mask);
-                
-            Log::debug() << "Restarted" << std::endl;
-            
-            if(search.range(ranges) != -1) {
-                search.is_mapped = true;
-                Log::debug() << "Mapped on restart" << std::endl;
-            }
-                
-        } else {
-            // If we don't need to restart, do an extension left
-            search = this->misMatchExtend(search, query[i], true, z_max, 
-                mask, true, false);
-            search.characters++;
-            
-            Log::debug() << "Extended with " << query[i] << std::endl;
-            
-            if(!search.is_mapped && search.range(ranges) != -1) {
-                search.is_mapped = true;
-                Log::debug() << "Mapped on extension" << std::endl;
-            }
-        }
         
-        // Either way we now have maximal right context length.
+        // Search interval can never be empty at the start of an iteration, by
+        // the loop invariant.
         
-        // We can check all of the mapping filter criteria (minContext,
-        // multContext, addContext, etc.) and make a mapping that is mapped or
-        // unmapped.
+        // Try extending left with the base we have. 
+        MisMatchAttemptResults matchExtended = misMatchExtend(search, query[i],
+            true, z_max, mask, true, false);
+        matchExtended.characters++;
+        
+        if(matchExtended.range(ranges, mask) != -1) {
+            // Flag it if it maps uniquely now.
+            matchExtended.is_mapped = true;
+        }
+          
+        // Make a Mapping to represent the result of this extension  
         Mapping mapping;
-        if(mapUntilUnique.is_mapped) {
-            // It is at all possible to map.
-            
-            Log::debug() << "Min unique context was actually found." <<
-                std::endl;
          
-            if(!search.is_mapped) {
-                Log::debug() << "Search is not uniquely mapped" << std::endl;
-            } else if(search.characters < minContext) {
-                Log::debug() << "Search failed min context (" << 
-                    search.characters << "/" << minContext << ")" << std::endl;
-            } else if(search.characters < 
-                addContext + mapUntilUnique.characters) {
-                
-                Log::debug() << "Search failed add context (" << 
-                    search.characters << "/" << 
-                    addContext + mapUntilUnique.characters << ")" << std::endl;
-            } else if(search.characters < multContext * 
-                mapUntilUnique.characters) {
-                
-                Log::debug() << "Search failed mult context (" << 
-                    search.characters << "/" << 
-                    multContext * mapUntilUnique.characters << ")" << std::endl;
-            } else {
+        if(!matchExtended.is_mapped) {
+            Log::debug() << "Correct-base extension with " << query[i] << 
+                " is not uniquely mapped" << std::endl;
             
-                Log::debug() << "Search mapped and passed criteria" <<
+            for(auto result : matchExtended.positions) {
+                // Dump all the options.
+                Log::debug() << "\t" << result.first << "\t" << result.second <<
                     std::endl;
-            
-                // And the search itself did map, and passes all the context
-                // limit criteria. TODO: HMMs. TODO: Make these filters?
-                
-                // Make a mapping from the right range. TODO: can this ever be
-                // -1?
-                mapping = Mapping(search.range(ranges));
-                
-                // Keep the context that was the max we could go out to.
-                mapping.setMaxContext(0, search.characters);
             }
+                
+        } else if(matchExtended.characters < minContext) {
+            Log::debug() << "Correct-base extension with " << query[i] << 
+                " failed min context (" << matchExtended.characters << "/" << 
+                minContext << ")" << std::endl;
+                
+        } else if(matchExtended.characters < 
+            addContext + mapUntilUnique.characters) {
             
-            // Say there is some context that makes us unique
-            mapping.setMinContext(0, mapUntilUnique.characters);
-               
+            Log::debug() << "Correct-base extension with " << query[i] << 
+                " failed add context (" << matchExtended.characters << "/" << 
+                addContext + mapUntilUnique.characters << ")" << std::endl;
+        
+        } else if(matchExtended.characters < multContext * 
+            mapUntilUnique.characters) {
+            
+            Log::debug() << "Correct-base extension failed mult context (" <<
+                matchExtended.characters << "/" << 
+                multContext * mapUntilUnique.characters << ")" << std::endl;
+        } else {
+        
+            Log::debug() << "Correct-base extension with " << query[i] <<
+                " mapped and passed criteria" << std::endl;
+        
+            // Make a mapping from the right range. TODO: can this ever be
+            // -1?
+            mapping = Mapping(matchExtended.range(ranges, mask));
+            
+            // Keep the context that was the max we could go out to.
+            mapping.setMaxContext(0, matchExtended.characters);
         }
         
+        // Say there is some context that makes us unique, if there is one.
+        mapping.setMinContext(0, mapUntilUnique.characters);
+               
         // Then add the Mapping
         mappings.push_back(mapping);
+        
+        // Now compose the extension we will want to actually build on, by
+        // extending with all characters.
+        search = misMatchExtend(search, query[i], true, z_max, mask, false,
+            false);
+        search.characters++;
+        
+        Log::debug() << "Extending with all characters:" << std::endl;
+        
+        for(auto result : search.positions) {
+            // Dump all the options.
+            Log::debug() << "\t" << result.first << "\t" << result.second <<
+                std::endl;
+        }
+        
+        
+        if(search.isEmpty(mask)) {
+            // Adding in this base kills off all the results we had. We need to
+            // restart so we can try to find a non-empty interval. Go out as far
+            // as you can without running out of results, and consider
+            // mismatches on the original base.
+            
+            Log::debug() << "Search result set is empty. Restarting." <<
+                std::endl;
+            
+            search = misMatchMapPosition(ranges, query, i, z_max, true, true,
+                mask);
+                
+            if(search.isEmpty(mask)) {
+                // We should always have at least some multimapping after a
+                // restart.
+                throw std::runtime_error("Restart got no results");
+            }
+            
+        }
         
         // Repeat until the query string runs out.
         
@@ -2154,7 +2145,8 @@ std::vector<Mapping> FMDIndex::misMatchMap(
 
 MisMatchAttemptResults FMDIndex::misMatchMapPosition(
     const GenericBitVector& ranges, const std::string& pattern, size_t index,
-    size_t z_max, bool maxContext, const GenericBitVector* mask) const {
+    size_t z_max, bool maxContext, bool allowFirstMismatch,
+    const GenericBitVector* mask) const {
     
     // Reading right, note when(if ever) we become unique within one mismatch.
     // If maxContext is set, go all the way until we can't go anymore instead.
@@ -2172,15 +2164,32 @@ MisMatchAttemptResults FMDIndex::misMatchMapPosition(
     // We aren't unique yet.
     result.is_mapped = false;
     // Start at the given index, and get the starting range for that character.
-    result.positions.push_back(std::pair<FMDPosition,size_t>(
-        this->getCharPosition(pattern[index]), 0));
+    // Add it in with 0 mismatches.
+    result.positions.push_back(std::make_pair(getCharPosition(pattern[index]),
+        0));
+        
+    if(allowFirstMismatch) {
+        // We have to consider all the possible mismatches we could have at this
+        // forst position as well.
+        for(char other : BASES) {
+            if(other == pattern[index]) {
+                // Don't consider matches
+                continue;
+            }
+            
+            // Add in each other character's BWT range with 1 mismatch on it.
+            result.positions.push_back(std::make_pair(getCharPosition(other),
+                1));
+        }
+    }
+        
     result.characters = 1;
     
     if(result.isEmpty(mask)) {
         // This character isn't even in it. Just return it as unmapped and let
         // the caller deal with it.
         return result;
-    } else if (result.positions.front().first.range(ranges, mask) != -1) {
+    } else if (result.range(ranges, mask) != -1) {
         // We've already become unique.
         result.is_mapped = true;
         
@@ -2224,7 +2233,7 @@ MisMatchAttemptResults FMDIndex::misMatchMapPosition(
             
             // Have we uniquely mapped yet?
             // TODO: account for levels at which one range is not one node.
-            if(result.range(ranges) != -1) {
+            if(result.range(ranges, mask) != -1) {
                 // Flag it as having mapped
                 result.is_mapped = true;
                 
