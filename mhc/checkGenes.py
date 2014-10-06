@@ -3,6 +3,10 @@
 checkGenes.py: check to see if a MAF aligns things properly according to a set
 of gene annotations.
 
+Writes a file of <category>\t<count> TSV lines categorizing all the mappings.
+
+TODO: document categories.
+
 """
 
 import argparse, sys, os, os.path, random, subprocess, shutil, itertools
@@ -43,6 +47,9 @@ def parse_args(args):
         help="MAF file of two genomes to read")
     parser.add_argument("--beds", nargs="+", required=True,
         help=".bed file(s) of genes on the genomes in the MAF")
+    parser.add_argument("--out", type=argparse.FileType("w"),
+        default=sys.stdout,
+        help="output file to write")
     
     # The command line arguments start with the program name, which we don't
     # want to treat as an argument for argparse. So we remove it.
@@ -201,7 +208,7 @@ def main(args):
         collections.Counter(classifications).iteritems():
         
         # Dump a TSV of bases by classification
-        print("{}\t{}".format(classification, count))
+        options.out.write("{}\t{}\n".format(classification, count))
             
 
 if __name__ == "__main__" :

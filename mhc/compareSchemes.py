@@ -6,7 +6,7 @@ alignments to the official GRC alt loci alignments.
 
 """
 
-import argparse, sys, os, os.path, random, subprocess, shutil, itertools
+import argparse, sys, os, os.path, random, subprocess, shutil, itertools, glob
 from xml.etree import ElementTree
 import tsv
 
@@ -24,14 +24,17 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
     
     """
     
-    def __init__(self, fasta_list, true_maf, markov_model, seed, stats_dir,
-        hub_root):
+    def __init__(self, fasta_list, true_maf, markov_model, gene_bed_dir, seed,
+        stats_dir, hub_root):
         """
         Make a new Target for building a several reference structures from the
         given FASTAs, and comparing against the given truth MAF, using the given
         Markov model to measure coding costs, using the specified RNG seed, and
         writing statistics to one directory, and assembly hubs for different
         pairs of genomes and schemes to another.
+        
+        The BED files in gene_bed_dir will be used to evaluate alignment quality
+        in light of gene annotations.
         
         The coverage statistics are just alignment coverage for each pair of
         genomes, in <genome number>\t<coverage fraction> TSVs per scheme.
@@ -55,6 +58,8 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         
         # Save the Markov model file
         self.markov_model = markov_model
+        
+        self.gene_bed_dir = gene_bed_dir
         
         # Save the random seed
         self.seed = seed
@@ -201,6 +206,15 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             # And our hubs directory
             os.makedirs(self.hub_root)
         
+        # Look in the gene bed dir and grab all the bed files for alignment vs.
+        # gene annotations comparison.
+        if self.gene_bed_dir is not None:
+            # This will hold all the gene BED files found
+            gene_beds = list(glob.glob(self.gene_bed_dir + "/*.bed"))
+        else:
+            # No gene BED files will be used.
+            gene_beds = []
+        
         # We need a few different follow-on jobs.
         followOns = []    
         
@@ -258,7 +272,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             # And another one to hold each child's MAF alignment
             maf_filenames = [sonLib.bioio.getTempFile(suffix=".maf",
                 rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
-                
+            
             # And another one to hold each child's c2h alignment
             c2h_filenames = [sonLib.bioio.getTempFile(suffix=".c2h",
                 rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
@@ -340,8 +354,25 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                     left_min_context_filename=left_min_context_filename,
                     right_min_context_filename=right_min_context_filename,
                     extra_args=extra_args))
-        
-        
+                    
+            
+            # We need to check every MAF against the gene annotations.
+            
+            # What file will we use for each?
+            checkgenes_filenames = [sonLib.bioio.getTempFile(suffix=".tsv",
+                rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
+                
+            # What target will we use for each? We can just give the whole list
+            # of BEDs to each.
+            checkgenes_targets = [MafGeneCheckerTarget(maf, gene_beds, out) 
+                for maf, out in itertools.izip(maf_filenames, 
+                checkgenes_filenames)]
+            
+            # Check each MAF against all the genes, and then concatenate the
+            # answers for this scheme.
+            followOns.append(SequenceTarget([RunTarget(checkgenes_targets), 
+                ConcatenateTarget(checkgenes_filenames, 
+                self.stats_dir + "/checkgenes." + scheme)]))
                 
             # Make a follow-on job to merge all the child coverage outputs and
             # produce our coverage output file for this scheme.
@@ -361,6 +392,12 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             # count outputs.
             followOns.append(ConcatenateTarget(tandem_filenames, 
                 self.stats_dir + "/tandem." + scheme))
+                
+            # Make a follow-on job to merge all the files with counts of how
+            # many times a mappings are good/bad with respect to gene
+            # annotations.
+            followOns.append(ConcatenateTarget(checkgenes_filenames, 
+                self.stats_dir + "/checkgenes." + scheme))
             
             if self.true_maf is not None:
                 # We also need another target for comparing all these MAFs
@@ -469,6 +506,48 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         self.setFollowOnTarget(RunTarget(followOns))
                 
         self.logToMaster("SchemeAssessmentTarget Finished")
+
+class MafGeneCheckerTarget(jobTree.scriptTree.target.Target):
+    """
+    A target that checks a MAF alignment against a set of BED files, and reports
+    the number of mappings in various categories of correctness.
+    
+    """
+    
+    def __init__(self, maf_file, bed_files, output_file):
+        """
+        Given a MAF filename and a list of BED filenames, check the MAF against
+        the genes in the BEDs and write the output statistics to the given
+        output file.
+        
+        """
+        
+        # Make the base Target. Ask for 2gb of memory since this is easy.
+        super(MafGeneCheckerTarget, self).__init__(memory=2147483648)
+        
+        # Save the arguments
+        self.maf_file = maf_file
+        self.bed_files = bed_files
+        self.output_file = output_file
+        
+        self.logToMaster("Creating MafGeneCheckerTarget")
+        
+        
+    def run(self):
+        """
+        Run the checks.
+        """
+        
+        self.logToMaster("Starting MafGeneCheckerTarget")
+        
+        # Prepare arguments
+        args = (["./checkGenes.py", "--maf", self.maf_file, "--beds"] + 
+            self.bed_files + ["--out", self.output_file])
+        
+        # Make the call
+        check_call(self, args)
+        
+        self.logToMaster("MafGeneCheckerTarget Finished")
 
 class C2hMergeTarget(jobTree.scriptTree.target.Target):
     """
@@ -966,6 +1045,8 @@ def parse_args(args):
         help="filename of a MAF to compare all generated MAFs against")
     parser.add_argument("--markovModel", default=None,
         help="filename of a Markov model to model query sequences with")
+    parser.add_argument("--geneBedDir", default=None,
+        help="directory in which to find gene annotations to judge alignments")
         
     
     
@@ -991,12 +1072,14 @@ def main(args):
     # Make sure we've given everything an absolute module name.
     # Don't try to import * because that's illegal.
     if __name__ == "__main__":
-        from compareSchemes import SchemeAssessmentTarget, BedSplitTarget
+        from compareSchemes import SchemeAssessmentTarget, BedSplitTarget, \
+            MafGeneCheckerTarget
         
     # Make a stack of jobs to run
     stack = jobTree.scriptTree.stack.Stack(SchemeAssessmentTarget(
-        options.fastas, options.trueMaf, options.markovModel, options.seed,
-        options.outDir, options.outDir + "/hubs"))
+        options.fastas, options.trueMaf, options.markovModel, 
+        options.geneBedDir, options.seed, options.outDir, 
+        options.outDir + "/hubs"))
     
     print "Starting stack"
     
