@@ -14,6 +14,12 @@ from Bio import AlignIO, SeqIO, Align
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
+# We need yet another comprehensive bio library in Python since BioPython hasn't
+# got interval trees.
+from bx.intervals import IntervalTree
+
+
+
 def parse_args(args):
     """
     Takes in the command-line arguments list (args), and returns a nice argparse
@@ -47,7 +53,8 @@ def parse_args(args):
 def parse_bed(stream):
     """
     Parse a (tab-separated) BED from the given stream. Yield (contig, start,
-    end, name) tuples.
+    end, name, strand) tuples, where strand is 1 or -1. Start is inclusive and
+    end is exclusive.
     
     """
     
@@ -57,20 +64,33 @@ def parse_bed(stream):
     
     for line in reader:
         # Break it out into a consistent tuple, and turn the numbers into ints.
-        yield (line[0], int(line[1]), int(line[2]), line[3])
+        yield (line[0], int(line[1]), int(line[2]), line[3], 
+            1 if line[5] == "+" else -1)
 
-def get_matchings(maf_stream):
+def get_mappings(maf_stream):
     """
-    Given a stream of MAF data, yield individual base matchings from the
-    alignment.
+    Given a stream of MAF data between a single reference contig and a single
+    query contig, yield individual base mappings from the alignment.
     
-    Each matching is a tuple of (contig, base, other contig, other base, 
-    orientation).
+    Each mappings is a tuple of (reference contig, reference base, query contig,
+    query base, orientation).
     
     """
     
     for alignment in AlignIO.parse(maf_stream, "maf"):
         records = list(alignment)
+        
+        # Guess the reference and query
+        reference = records[0].id
+        query = None
+        for record in records:
+            if record.id != reference:
+                query = record.id
+                break
+        if query is None:
+            raise Exception("Could not find query")
+            
+        print("Reference: {} Query: {}".format(reference, query))
         
         # This will hold alignment records arranged by the contig they belong
         # to.
@@ -80,35 +100,91 @@ def get_matchings(maf_stream):
             # Save it to the right list
             records_by_contig[record.id].append(record)
             
-        for (contig1, records1), (contig2, records2) in itertools.combinations(
-            records_by_contig.iteritems(), 2):
-            # For each pair of contigs, make all the matchings between them...
+            if record.id not in (reference, query):
+                # Complain if we get something not from the reference or query.
+                raise Exception("Extra record: {}".format(record.id))
             
-            for record1, record2 in itertools.product(records1, records2):
-                # For each pair of records which may induce matchings...
+        for record1, record2 in itertools.product(records_by_contig[reference],
+            records_by_contig[query]):
+            # For each pair of records which may induce mappings...
+            
+            # Where are we on the first sequence?
+            index1 = record1.annotations["start"]
+            # What direction do we go in?
+            delta1 = record1.annotations["strand"]
+            
+            # Where are we on the second sequence?
+            index2 = record2.annotations["start"]
+            # What direction do we go in?
+            delta2 = record2.annotations["strand"]
+            
+            for char1, char2 in itertools.izip(record1, record2):
+                if char1 != "-" and char2 != "-":
+                    # This is an aligned character. Yield a base mapping.
+                    yield (reference, index1, query, index2, 
+                        (delta1 == delta2))
+                        
+                if char1 != "-":
+                    # Advance in record 1
+                    index1 += delta1
+                if char2 != "-":
+                    # Advance in record 2
+                    index2 += delta2
+
+def classify_mappings(mappings, genes):
+    """
+    Given a source of (contig, base, other contig, other base, orientation)
+    mappings (in reference, query order), and a soucre of (contig, start, end,
+    gene name, strand number) genes, yield a mapping class for each mapping.
+    
+    """
+    
+    # First we need to build an interval tree for each contig so we can look up
+    # what genes overlap each end of each mapping.
+    geneTrees = collections.defaultdict(IntervalTree)
+    
+    for thing in genes:
+        print(thing)
+    
+    for contig, start, end, gene, strand in genes:
+        # Put the gene in under the given interval
+        geneTrees[contig].insert(start, end, (gene, strand))
+        
+    for contig1, base1, contig2, base2, orientation in mappings:
+        # Pull the name, strand tuples for both ends
+        genes1 = set(geneTrees[contig1].find(base1, base1))
+        genes2 = set(geneTrees[contig2].find(base2, base2))
+        
+        if orientation == False:
+            # This is a backwads mapping, so flip orientations on one of the
+            # sets
+            genes2 = {(name, -strand) for name, strand in genes2}
+        
+        # Reference was first, so we want to see if the genes we were supposed
+        # to have in the query were recapitulated in the right orientation in
+        # the reference.
+        
+        if(len(genes1 & genes2)) > 0:
+            # At least one shared gene exists in the right orientation to
+            # explain this mapping.
+            yield "gene2gene"
+        elif len(genes1) == 0 and len(genes2) > 0:
+            # We mapped a gene to somewhere where there is no gene
+            yield "gene2non"
+        
+        elif len(genes1) > 0 and len(genes2) > 0:
+            # We mapped a gene to a place where there are genes, but not the
+            # right gene in the right orientation
+            yield "gene2wrong"
+        elif len(genes1) > 0 and len(genes2) == 0:
+            # We mapped a non-gene to somewhere where there are genes
+            yield "non2gene"
+        else:
+            # We mapped a non-gene to somewhere where there are no genes.
+            yield "non2non"
+            
                 
-                # Where are we on the first sequence?
-                index1 = record1.annotations["start"]
-                # What direction do we go in?
-                delta1 = record1.annotations["strand"]
-                
-                # Where are we on the second sequence?
-                index2 = record2.annotations["start"]
-                # What direction do we go in?
-                delta2 = record2.annotations["strand"]
-                
-                for char1, char2 in itertools.izip(record1, record2):
-                    if char1 != "-" and char2 != "-":
-                        # This is an aligned character. Yield a base matching.
-                        yield (contig1, index1, contig2, index2, 
-                            (delta1 == delta2))
-                            
-                    if char1 != "-":
-                        # Advance in record 1
-                        index1 += delta1
-                    if char2 != "-":
-                        # Advance in record 2
-                        index2 += delta2
+        
     
 def main(args):
     """
@@ -119,31 +195,19 @@ def main(args):
     
     options = parse_args(args) # This holds the nicely-parsed options object
     
-    # Load all the BEDs
-    bedRegions = [list(parse_bed(open(bed))) for bed in options.beds]
+    # Load all the BEDs, and concatenate them
+    genes = list(itertools.chain.from_iterable([parse_bed(open(bed)) 
+        for bed in options.beds]))
     
+    # Get all the mappings
+    mappings = list(get_mappings(options.maf))
     
-    for matching in get_matchings(options.maf):
-        print matching
+    # Classify each mapping in light of the genes
+    classifications = list(classify_mappings(mappings, genes))
     
-    return
-    
-    for alignment in AlignIO.parse(options.maf, "maf"):
-        records = list(alignment)
-        for record in records:
-            # Grab the original source sequence name and coordinates
-            source_name = record.id
-            source_start = record.annotations["start"]
-            source_length = record.annotations["size"]
-            source_strand = record.annotations["strand"]
-            source_end = (source_start + source_length if source_strand == "+1"
-                else source_start - source_length)
-            
-            print record
-            print record.annotations
-            print("{}:{}-{}".format(source_name, source_start, source_end))
-    
-    
+    for mapping, classification in itertools.izip(mappings, classifications):
+        # Dump them
+        print("{}: {}".format(mapping, classification))
             
 
 if __name__ == "__main__" :
