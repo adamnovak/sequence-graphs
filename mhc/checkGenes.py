@@ -87,6 +87,10 @@ def get_mappings(maf_stream):
     for alignment in AlignIO.parse(maf_stream, "maf"):
         records = list(alignment)
         
+        if len(records) < 2:
+            # We don't have two sequences aligned here.
+            continue
+        
         # Guess the reference and query
         reference = records[0].id
         query = None
@@ -95,7 +99,10 @@ def get_mappings(maf_stream):
                 query = record.id
                 break
         if query is None:
-            raise Exception("Could not find query")
+            # We have multiple records but no query. This might happen if we
+            # turned things around on purpose, but for now we should fail.
+            raise Exception("Could not find query in {} records".format(
+                len(records)))
             
         # This will hold alignment records arranged by the contig they belong
         # to.

@@ -314,6 +314,10 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 suffix=".wig", rootDir=self.getGlobalTempDir())
                 for i in xrange(num_children)]
             
+            # We also need files for the checkgenes outputs.
+            checkgenes_filenames = [sonLib.bioio.getTempFile(suffix=".tsv",
+                rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
+            
             # Save the RNG state before clobbering it with the seed.
             random_state = random.getstate()
             
@@ -357,10 +361,6 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                     
             
             # We need to check every MAF against the gene annotations.
-            
-            # What file will we use for each?
-            checkgenes_filenames = [sonLib.bioio.getTempFile(suffix=".tsv",
-                rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
                 
             # What target will we use for each? We can just give the whole list
             # of BEDs to each.

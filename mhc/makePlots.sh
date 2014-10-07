@@ -141,7 +141,7 @@ done
 
 scatter.py ${OUTFILE} --x_label "Precision" --y_label "Recall" --title "Recall vs. Precision by Scheme" --sparse_ticks --save recallVsPrecision.png
 
-# Go get the size-4 adjacency components from the spectrums, and the tabndem
+# Go get the size-4 adjacency components from the spectrums, and the tandem
 # dupe counts, and see what portion of size-4 adjacency components are tandem
 # dupes per scheme.
 OUTFILE="tandemPortion.tsv"
@@ -189,4 +189,48 @@ do
 done
 
 barchart.py ${OUTFILE} --x_label "Merging Scheme" --y_label "2-break tandem portion" --max 1 --title "Portion Tandem Dupes vs. Merging Scheme" --x_sideways --save tandemPortion.png
+
+# Make a boxplot of alignment mappings by scheme for each category, to display
+# the result of classifying mappings according to what they say about genes.
+# Still not sure exactly what the right way to display this is.
+rm -Rf checkgenes/
+mkdir checkgenes/
+for FILE in `ls checkgenes.*`
+do
+    # Sort things out by category
+
+    # Grab the scheme
+    SCHEME=${FILE##*.}
+    
+    while read LINE || [[ -n $LINE ]]
+    do
+        
+        # Split on spaces
+        PARTS=(${LINE})
+        
+        # Parse out the category and count for each line
+        CATEGORY="${PARTS[0]}"
+        COUNT="${PARTS[1]}"
+        
+        # Save the count and scheme name to the file for the category
+        printf "${SCHEME}\t${COUNT}\n" >> checkgenes/${CATEGORY}.tsv
+        
+    done < ${FILE}
+    
+done
+
+for FILE in `ls checkgenes/*.tsv`
+do
+
+    # Now make the actual charts
+
+    # Pull out the filename without directory
+    FILENAME="${FILE##*/}"
+    # And the category name from that
+    CATEGORY="${FILENAME%.*}"
+
+    boxplot.py ${FILE} --x_label "Scheme" --x_sideways --y_label "Count" --title "Occurrences of ${CATEGORY} mappings" --save checkgenes/${CATEGORY}.checkgenes.png
+    
+done
+
 
