@@ -86,12 +86,12 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             # Exact no credit min 100
             (False, False, 100, 0, 0, 0),
             # MultContext with and without min
-            (True, True, 0, 0, 4.0, 0),
-            (True, True, 60, 0, 4.0, 0),
+            #(True, True, 0, 0, 4.0, 0),
+            #(True, True, 60, 0, 4.0, 0),
             (True, True, 0, 0, 8.0, 0),
-            (True, True, 120, 0, 8.0, 0),
+            #(True, True, 120, 0, 8.0, 0),
             # MultContext sans credit
-            (True, False, 0, 0, 8.0, 0),
+            #(True, False, 0, 0, 8.0, 0),
         ]
 
     def getMonotonicSchemePlan(self):

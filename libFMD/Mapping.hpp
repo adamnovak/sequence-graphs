@@ -113,9 +113,6 @@ public:
         leftMinContext = left;
         rightMinContext = right;
         
-        if(rightMinContext > 1000) {
-            throw std::runtime_error("Can't set contex so high");
-        }
     }
     
     /**
