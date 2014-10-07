@@ -734,7 +734,8 @@ class HalTarget(jobTree.scriptTree.target.Target):
         
 class BedSplitTarget(jobTree.scriptTree.target.Target):
     """
-    A target which splits a BED up by genome. Also fixes them up a bit.
+    A target which splits a BED up by genome. Also fixes them up a bit by
+    collapsing adjacent identical features.
     
     """
 
