@@ -85,13 +85,15 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         return [
             # Exact no credit min 100
             (False, False, 100, 0, 0, 0),
+            # Exact no credit min 50
+            (False, False, 50, 0, 0, 0),
             # MultContext with and without min
-            (True, True, 0, 0, 4.0, 0),
-            (True, True, 60, 0, 4.0, 0),
-            (True, True, 0, 0, 8.0, 0),
-            (True, True, 120, 0, 8.0, 0),
+            #(True, True, 0, 0, 4.0, 0),
+            #(True, True, 60, 0, 4.0, 0),
+            #(True, True, 0, 0, 8.0, 0),
+            #(True, True, 120, 0, 8.0, 0),
             # MultContext sans credit
-            (True, False, 0, 0, 8.0, 0),
+            #(True, False, 0, 0, 8.0, 0),
         ]
 
     def getMonotonicSchemePlan(self):
@@ -640,7 +642,7 @@ class MafGeneCheckerTarget(jobTree.scriptTree.target.Target):
             self.gene_bed_files + ["--classCounts", self.class_count_file,
             "--geneSets", self.gene_set_file])
             
-        for classification, bed_file in self.class_beds:
+        for classification, bed_file in self.class_beds.iteritems():
             # We need to pass each mapping in this dict along. Since the options
             # are predictably named, we generate them.
             args.append("--" + classification + "Bed")
@@ -847,7 +849,7 @@ class BedSplitTarget(jobTree.scriptTree.target.Target):
         Split the given bed file per genome into <genome>/<genome>.bed in the
         given output directory, using the given list of genomes.
         
-        out_dir must exist.
+        If out_dir does not exist, it will be created.
         
         If a feature_name is specified, it is used to rename all the BED
         feratures.
@@ -897,6 +899,14 @@ class BedSplitTarget(jobTree.scriptTree.target.Target):
     
         self.logToMaster("Starting BedSplitTarget")
         
+        if not os.path.exists(self.out_dir):
+            try:
+                # Make sure out_dir exists
+                os.makedirs(self.out_dir)
+            except OSError:
+                self.logToMaster("OSError trying to make {}. Did it get " +
+                    "created after we looked for it?".format(self.out_dir))
+        
         # Work out output file names
         out_filenames = [self.out_dir + "/{0}/{0}.bed".format(
             self.get_name(genome)) for genome in self.genomes]
@@ -919,13 +929,13 @@ class BedSplitTarget(jobTree.scriptTree.target.Target):
         # newlines. We put a genome in this set when we have written to its
         # file.
         content_written = set()
+        
+        # Count lines processed
+        lines_processed = 0
             
         for line in open(self.bed_file):
             # For each BED record, grab all the parts.
             parts = line.strip().split()
-            
-            # Rename the genome if needed
-            parts[0] = self.get_name(parts[0])
             
             if self.feature_name is not None:
                 if len(parts) > 3:
@@ -938,12 +948,18 @@ class BedSplitTarget(jobTree.scriptTree.target.Target):
             if len(parts) == 1 and parts[0] == "":
                 # Skip any blank lines
                 continue
+                
+            # Say we're doing this line
+            lines_processed += 1
             
             for genome, temp_file in itertools.izip(self.genomes, temp_files):
                 if parts[0] == genome:
                     # Send the line to the file corresponding to the matching
                     # genome. TODO: use a dict or something instead of scanning
                     # for matching names.
+                    
+                    # Rename the genome if needed
+                    parts[0] = self.get_name(genome)
                     
                     if genome in content_written:
                         # Terminate the previous line
@@ -993,7 +1009,8 @@ class BedSplitTarget(jobTree.scriptTree.target.Target):
             # Otherwise, don't bother making the actual output file.
         
         
-        self.logToMaster("BedSplitTarget Finished")
+        self.logToMaster("BedSplitTarget Finished ({} lines)".format(
+            lines_processed))
         
 class WiggleCollateTarget(jobTree.scriptTree.target.Target):
     """

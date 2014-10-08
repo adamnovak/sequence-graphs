@@ -349,9 +349,6 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
         // Now go through all the bases and make sure they have matching
         // characters before merging them. TODO: make this another filter.
         
-        Log::output() << leftMappings[i] << "\t" << filteredMappings[i] << 
-            "\t" << rightMappings[i] << std::endl;
-            
         TextPosition candidate = filteredMappings[i].getLocation();
         
         if(!filteredMappings[i].isMapped()) {
