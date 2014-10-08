@@ -47,9 +47,18 @@ def parse_args(args):
         help="MAF file of two genomes to read")
     parser.add_argument("--beds", nargs="+", required=True,
         help=".bed file(s) of genes on the genomes in the MAF")
-    parser.add_argument("--out", type=argparse.FileType("w"),
+    parser.add_argument("--gene2wrongBed", type=argparse.FileType("w"),
+        default=None,
+        help=".bed file in which to save location of gene2wrong mappings")
+    parser.add_argument("--gene2geneBed", type=argparse.FileType("w"),
+        default=None,
+        help=".bed file in which to save location of gene2gene mappings")
+    parser.add_argument("--classCounts", type=argparse.FileType("w"),
         default=sys.stdout,
-        help="output file to write")
+        help="output file to save mapping class counts to")
+    parser.add_argument("--geneSets", type=argparse.FileType("w"),
+        default=sys.stdout,
+        help="output file to save sets of genes with mappings in each class to")
     
     # The command line arguments start with the program name, which we don't
     # want to treat as an argument for argparse. So we remove it.
@@ -147,7 +156,8 @@ def classify_mappings(mappings, genes):
     """
     Given a source of (contig, base, other contig, other base, orientation)
     mappings (in reference, query order), and a soucre of (contig, start, end,
-    gene name, strand number) genes, yield a mapping class for each mapping.
+    gene name, strand number) genes, yield a (class, gene, mapping) tuple for
+    each mapping.
     
     """
     
@@ -159,7 +169,12 @@ def classify_mappings(mappings, genes):
         # Put the gene in under the given interval
         geneTrees[contig].insert(start, end, (gene, strand))
         
-    for contig1, base1, contig2, base2, orientation in mappings:
+    for mapping in mappings:
+        # Look at each mapping
+        
+        # Unpack the mapping
+        contig1, base1, contig2, base2, orientation = mapping
+        
         # Pull the name, strand tuples for both ends
         genes1 = set(geneTrees[contig1].find(base1, base1))
         genes2 = set(geneTrees[contig2].find(base2, base2))
@@ -173,24 +188,47 @@ def classify_mappings(mappings, genes):
         # to have in the query were recapitulated in the right orientation in
         # the reference.
         
+        # What gene names from the query should we use to describe this mapping,
+        # if any?
+        
+        # TODO: How many times do genes with different names actually overlap? I
+        # bet never.
+        
+        # Make a set of all the reference gene names.
+        gene_names1 = {name for name, base in genes1}
+        # Make a set of all the query gene names.
+        gene_names2 = {name for name, base in genes2}
+        
         if(len(genes1 & genes2)) > 0:
             # At least one shared gene exists in the right orientation to
             # explain this mapping.
-            yield "gene2gene"
+            
+            # Grab a plausible gene name.
+            gene_name = next(iter(genes1 & genes2))[0]
+            
+            yield "gene2gene", gene_name, mapping
         elif len(genes1) == 0 and len(genes2) > 0:
             # We mapped a gene to somewhere where there is no gene
-            yield "gene2non"
+            
+            # Grab a plausible gene name.
+            gene_name = next(iter(gene_names2))
+            
+            yield "gene2non", gene_name, mapping
         
         elif len(genes1) > 0 and len(genes2) > 0:
             # We mapped a gene to a place where there are genes, but not the
             # right gene in the right orientation
-            yield "gene2wrong"
+            
+            # Grab a plausible gene name.
+            gene_name = next(iter(gene_names2))
+            
+            yield "gene2wrong", gene_name, mapping
         elif len(genes1) > 0 and len(genes2) == 0:
             # We mapped a non-gene to somewhere where there are genes
-            yield "non2gene"
+            yield "non2gene", None, mapping
         else:
             # We mapped a non-gene to somewhere where there are no genes.
-            yield "non2non"
+            yield "non2non", None, mapping
 
 def main(args):
     """
@@ -201,6 +239,14 @@ def main(args):
     
     options = parse_args(args) # This holds the nicely-parsed options object
     
+    # Make a dict from class to BED output stream, or None
+    classBeds = collections.defaultdict(lambda: None)
+    
+    # Populate it with the streams from the options
+    classBeds["gene2wrong"] = options.gene2wrongBed
+    classBeds["gene2gene"] = options.gene2geneBed
+    
+    
     # Load all the BEDs, and concatenate them
     genes = itertools.chain.from_iterable([parse_bed(open(bed)) 
         for bed in options.beds])
@@ -209,13 +255,48 @@ def main(args):
     mappings = get_mappings(options.maf)
     
     # Classify each mapping in light of the genes
-    classifications = classify_mappings(mappings, genes)
+    classified = classify_mappings(mappings, genes)
     
-    for classification, count in \
-        collections.Counter(classifications).iteritems():
+    # This will count up the instances of each class
+    classCounts = collections.Counter()
+    
+    # This will hold sets of genes that have any bases in each category.
+    geneSets = collections.defaultdict(set)
+    
+    for classification, gene, mapping in classified:
+        # For each classified mapping
+        
+        # Record it in its class
+        classCounts[classification] += 1
+        
+        if classBeds[classification] is not None:
+            # We want to write a BED of this class.
+            
+            # Unpack the mapping
+            contig1, base1, contig2, base2, orientation = mapping
+            
+            # Dump a BED record in query coordinates
+            classBeds[classification].write("{}\t{}\t{}\t{}".format(contig2, 
+                base2, base2 + 1, classification))
+                
+        if gene is not None:
+            # Note that this gene has some bases in this mapping class
+            geneSets[classification].add(gene)
+        
+        
+    
+    for classification, count in classCounts.iteritems():
+        # For each class
         
         # Dump a TSV of bases by classification
-        options.out.write("{}\t{}\n".format(classification, count))
+        options.classCounts.write("{}\t{}\n".format(classification, count))
+        
+    for classification, genes in geneSets.iteritems():
+        # For each set of query genes with mappings in a class
+        
+        # Save the whole gene list for each class
+        options.geneSets.write("\t".join([classification] + list(genes)))
+        options.geneSets.write("\n")
             
 
 if __name__ == "__main__" :
