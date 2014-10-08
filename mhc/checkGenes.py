@@ -276,7 +276,7 @@ def main(args):
             contig1, base1, contig2, base2, orientation = mapping
             
             # Dump a BED record in query coordinates
-            classBeds[classification].write("{}\t{}\t{}\t{}".format(contig2, 
+            classBeds[classification].write("{}\t{}\t{}\t{}\n".format(contig2, 
                 base2, base2 + 1, classification))
                 
         if gene is not None:
