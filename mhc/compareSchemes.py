@@ -198,6 +198,15 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         
         self.logToMaster("Starting SchemeAssessmentTarget")
         
+        # Unpack the genome names from the FASTA names. The first one is the
+        # reference and the rest are queries.
+        genome_names = [os.path.splitext(fasta)[0] for fasta in self.fasta_list]
+        
+        # Grab the reference and the queries
+        reference_genome = genome_names[0]
+        query_genomes = genome_names[1:]
+        
+        
         if not os.path.exists(self.stats_dir):
             # Make our out directory exist
             os.makedirs(self.stats_dir)
@@ -216,11 +225,23 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             gene_beds = []
         
         # We need a few different follow-on jobs.
-        followOns = []    
+        followOns = []
+        
+        # We need a list of track targets that make tracks we want on the final
+        # hub.
+        track_targets = []
         
         # We need a directory to save out tree of BED files under for making the
         # assembly hubs.
         bed_root = sonLib.bioio.getTempDirectory(rootDir=self.getGlobalTempDir())
+        
+        # We need to keep track of all the bed dirs added under that. This is a
+        # set so we can register a directory each time we add a genome's track.
+        bed_dirs = set()
+        
+        # And all the wiggle dirs. This is a set so we can register a directory
+        # each time we add a genome's track, if we want to.
+        wiggle_dirs = set()
         
         # We'll keep track of our random state so we can seed without messing up
         # temp filenames.
@@ -255,10 +276,6 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             # Grab the reference FASTA (first in the list)
             reference_fasta = self.fasta_list[0]
             
-            # How many children will we have for this scheme? One per FASTA to
-            # compare against the reference FASTA
-            num_children = len(self.fasta_list) - 1
-            
             if random_state is not None:
                 # Pull out our unseeded random state so filenames on successive
                 # iterations don't conflict.
@@ -267,19 +284,19 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             # Make a temp file for each of the children with this scheme to
             # write coverage stats to.
             coverage_filenames = [sonLib.bioio.getTempFile(suffix=".coverage",
-                rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
+                rootDir=self.getGlobalTempDir()) for _ in query_genomes]
                 
             # And another one to hold each child's MAF alignment
             maf_filenames = [sonLib.bioio.getTempFile(suffix=".maf",
-                rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
+                rootDir=self.getGlobalTempDir()) for _ in query_genomes]
             
             # And another one to hold each child's c2h alignment
             c2h_filenames = [sonLib.bioio.getTempFile(suffix=".c2h",
-                rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
+                rootDir=self.getGlobalTempDir()) for _ in query_genomes]
                 
             # And another one to hold each child's fasta output for the c2h
             fasta_filenames = [sonLib.bioio.getTempFile(suffix=".fa",
-                rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
+                rootDir=self.getGlobalTempDir()) for _ in query_genomes]
                 
             # Save these so we can compare them to other schemes later.
             alignments_by_scheme[scheme] = maf_filenames
@@ -287,36 +304,54 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             # And another one to hold each child's adjacency component size
             # spectrum
             spectrum_filenames = [sonLib.bioio.getTempFile(suffix=".spectrum",
-                rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
+                rootDir=self.getGlobalTempDir()) for _ in query_genomes]
                 
             # And another one to hold each child's indel lengths
             indel_filenames = [sonLib.bioio.getTempFile(suffix=".indels",
-                rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
+                rootDir=self.getGlobalTempDir()) for _ in query_genomes]
                 
             # And another one to hold the tandem duplication counts.
             # TODO: these are probably just wrong at the moment.
             tandem_filenames = [sonLib.bioio.getTempFile(suffix=".tandem",
-                rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
+                rootDir=self.getGlobalTempDir()) for _ in query_genomes]
                 
             # And another one for left context length
             left_context_filenames = [sonLib.bioio.getTempFile(suffix=".wig",
-                rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
+                rootDir=self.getGlobalTempDir()) for _ in query_genomes]
                 
             # And another one for right context length
             right_context_filenames = [sonLib.bioio.getTempFile(suffix=".wig",
-                rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
+                rootDir=self.getGlobalTempDir()) for _ in query_genomes]
                 
             # And then for min contexts
             left_min_context_filenames = [sonLib.bioio.getTempFile(
                 suffix=".wig", rootDir=self.getGlobalTempDir())
-                for i in xrange(num_children)]
+                for _ in query_genomes]
             right_min_context_filenames = [sonLib.bioio.getTempFile(
                 suffix=".wig", rootDir=self.getGlobalTempDir())
-                for i in xrange(num_children)]
+                for _ in query_genomes]
             
-            # We also need files for the checkgenes outputs.
-            checkgenes_filenames = [sonLib.bioio.getTempFile(suffix=".tsv",
-                rootDir=self.getGlobalTempDir()) for i in xrange(num_children)]
+            # We also need files for the checkGenes category count outputs.
+            checkgenes_count_filenames = [sonLib.bioio.getTempFile(
+                suffix=".tsv", rootDir=self.getGlobalTempDir()) 
+                for _ in query_genomes]
+            
+            # And for the checkGenes gene set output
+            checkgenes_gene_filenames = [sonLib.bioio.getTempFile(
+                suffix=".tsv", rootDir=self.getGlobalTempDir()) 
+                for _ in query_genomes]
+                
+            # And we want a list of dicts of these things by mapping class.
+            checkgenes_bed_filename_dicts = [
+                {
+                    classification: sonLib.bioio.getTempFile(
+                        suffix=".bed", rootDir=self.getGlobalTempDir()) 
+                    for classification in
+                        # Skip the non2non mapping class because it's boring.
+                        ["gene2gene", "gene2wrong", "gene2non", "non2gene"]
+                }
+                for _ in query_genomes
+            ]
             
             # Save the RNG state before clobbering it with the seed.
             random_state = random.getstate()
@@ -360,19 +395,68 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                     extra_args=extra_args))
                     
             
-            # We need to check every MAF against the gene annotations.
+            # We need to check every MAF against the gene annotations. Out of
+            # this we need to get mapping classification counts, the set of
+            # query genes with any mappings in each category, and BED files for
+            # each classification.
+            
+            # This list will hold the checkGenes targets that we need to run to
+            # make all that.
+            checkgenes_targets = []
+            
+            for maf, counts, genes, bed_dict in itertools.izip(maf_filenames, 
+                checkgenes_count_filenames, checkgenes_gene_filenames,
+                checkgenes_bed_filename_dicts):
+                # For each set of parameters we need to run checkGenes on...
                 
-            # What target will we use for each? We can just give the whole list
-            # of BEDs to each.
-            checkgenes_targets = [MafGeneCheckerTarget(maf, gene_beds, out) 
-                for maf, out in itertools.izip(maf_filenames, 
-                checkgenes_filenames)]
+                # Make the target, and pass our global set of input gene BEDs.
+                checkgenes_targets.append(MafGeneCheckerTarget(maf, gene_beds, 
+                    counts, genes, bed_dict)) 
+                    
+            # Then for each BED that comes out of one of these checkGenes
+            # targets, we need to BedSplitTarget it to rename the genome to
+            # include the scheme, and to organize it in a proper bedDir for
+            # passing to hal2assemblyHub.
+            
+            # This holds all the targets to do that
+            bed_split_targets = []
+            
+            for query_genome, bed_dict in itertools.izip(query_genomes, 
+                checkgenes_bed_filename_dicts):
+                # For each genome and its corresponding set of BED files
+                
+                for classification, bed_file in bed_dict.iteritems():
+                    # For each classification, we need a BedSplitTarget to split
+                    # its BED and put it under the right bedDir for that
+                    # classifications (so all the classifications become their
+                    # own tracks). Make sure to re-name the query genome
+                    # according to the scheme. TODO: Unify with the main suffix
+                    # logic below.
+                    bed_split_targets.append(BedSplitTarget(bed_file, 
+                        [query_genome], bed_root + "/" + classification, 
+                        genome_names=[query_genome + scheme]))
+                        
+                    # Make sure that the directory we are putting this bed in gets used
+                    bed_dirs.add(bed_root + "/" + classification)
+                
             
             # Check each MAF against all the genes, and then concatenate the
             # answers for this scheme.
-            followOns.append(SequenceTarget([RunTarget(checkgenes_targets), 
-                ConcatenateTarget(checkgenes_filenames, 
-                self.stats_dir + "/checkgenes." + scheme)]))
+            track_targets.append(SequenceTarget([
+                # Run all the checkGenes runs
+                RunTarget(checkgenes_targets),
+                RunTarget([
+                    # Concatenate the mapping classification counts 
+                    ConcatenateTarget(checkgenes_count_filenames, 
+                        self.stats_dir + "/checkgenes." + scheme),
+                    # Concatenate the gene-with-mappings-in-category sets
+                    ConcatenateTarget(checkgenes_gene_filenames, 
+                        self.stats_dir + "/checkgenes-genesets." + scheme),
+                    # Do all the BED splitting so we can have BED tracks on our
+                    # hub
+                    RunTarget(bed_split_targets)
+                ])
+            ]))
                 
             # Make a follow-on job to merge all the child coverage outputs and
             # produce our coverage output file for this scheme.
@@ -392,12 +476,6 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             # count outputs.
             followOns.append(ConcatenateTarget(tandem_filenames, 
                 self.stats_dir + "/tandem." + scheme))
-                
-            # Make a follow-on job to merge all the files with counts of how
-            # many times a mappings are good/bad with respect to gene
-            # annotations.
-            followOns.append(ConcatenateTarget(checkgenes_filenames, 
-                self.stats_dir + "/checkgenes." + scheme))
             
             if self.true_maf is not None:
                 # We also need another target for comparing all these MAFs
@@ -410,11 +488,10 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             # genomes we used.
             c2h_fasta_pairs += zip(c2h_filenames, fasta_filenames)
             # And the genomes they were for.
-            pair_genomes += [os.path.splitext(fasta)[0] 
-                for fasta in self.fasta_list[1:]]
+            pair_genomes += query_genomes
             # And record that each came from this scheme. Needs to keep the same
             # lenght as pair_genomes.
-            pair_schemes += [scheme for _ in self.fasta_list[1:]]
+            pair_schemes += [scheme for _ in query_genomes]
             
             # Also save the context wiggle pairs.
             context_pairs += zip(left_context_filenames,
@@ -425,11 +502,6 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 right_min_context_filenames)
             
         
-        # What genome pairs did we run, in order? Make sure to strip extensions.
-        genome_pairs = [(os.path.splitext(self.fasta_list[0])[0], 
-            os.path.splitext(other)[0]) 
-            for other in self.fasta_list[1:]]
-                
         # We want to combine all our c2h files into one massive hub.
         
         # What HAL will we use?
@@ -446,14 +518,20 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # Where should we keep our left and right max context wiggles?
         left_context_dir = sonLib.bioio.getTempDirectory(
                 rootDir=self.getGlobalTempDir()) + "/leftMaxContext"
+        wiggle_dirs.add(left_context_dir)
+        
         right_context_dir = sonLib.bioio.getTempDirectory(
                 rootDir=self.getGlobalTempDir()) + "/rightMaxContext"
+        wiggle_dirs.add(right_context_dir)
                 
         # Where should we keep our left and right max context wiggles?
         left_min_context_dir = sonLib.bioio.getTempDirectory(
                 rootDir=self.getGlobalTempDir()) + "/leftMinContext"
+        wiggle_dirs.add(left_min_context_dir)
+        
         right_min_context_dir = sonLib.bioio.getTempDirectory(
                 rootDir=self.getGlobalTempDir()) + "/rightMinContext"
+        wiggle_dirs.add(right_min_context_dir)
         
         # What suffixes should we put on genomes?
         suffixes = [scheme for scheme in pair_schemes]
@@ -474,33 +552,42 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             genomes_with_suffixes, merged_hal)
             
         # And a target to sort out all of the left wiggles
-        left_wiggle_target = WiggleCollateTarget(
+        track_targets.append(WiggleCollateTarget(
             [pair[0] for pair in context_pairs], pair_genomes, suffixes,
-            left_context_dir)
+            left_context_dir))
         # And the right ones
-        right_wiggle_target = WiggleCollateTarget(
+        track_targets.append(WiggleCollateTarget(
             [pair[1] for pair in context_pairs], pair_genomes, suffixes,
-            right_context_dir)
+            right_context_dir))
             
         # And for the minimum contexts for uniqueness
-        left_min_wiggle_target = WiggleCollateTarget(
+        track_targets.append(WiggleCollateTarget(
             [pair[0] for pair in min_context_pairs], pair_genomes, suffixes,
-            left_min_context_dir)
-        right_min_wiggle_target = WiggleCollateTarget(
+            left_min_context_dir))
+        track_targets.append(WiggleCollateTarget(
             [pair[1] for pair in min_context_pairs], pair_genomes, suffixes,
-            right_min_context_dir)
+            right_min_context_dir))
             
-        # And a target to make a hub from that
+        # And a target to make a hub from that. Make sure to pass all the track
+        # directories.
         merged_hub_target = AssemblyHubOnlyTarget(merged_hal, self.hub_root + 
-            "/all", wiggle_dirs=[left_context_dir, right_context_dir, 
-            left_min_context_dir, right_min_context_dir])
+            "/all", bed_dirs=list(bed_dirs), wiggle_dirs=list(wiggle_dirs))
             
         # Do those last ones in order. TODO: express actual order restrictions
         # with a few more intermediate targets.
-        followOns.append(SequenceTarget([left_wiggle_target, 
-            right_wiggle_target, left_min_wiggle_target, 
-            right_min_wiggle_target, merged_c2h_target, merged_hal_target,
-            merged_hub_target]))
+        followOns.append(SequenceTarget([
+            RunTarget([
+                # We can do all these tracks in parallel with the HAL.
+                RunTarget(track_targets),
+                SequenceTarget([
+                    # We need to merge the c2h files before the HAL.
+                    merged_c2h_target, 
+                    merged_hal_target
+                ])
+            ]), 
+            # When the tracks are done, we can make the hub
+            merged_hub_target
+        ]))
             
         # So we need to run all of the follow-ons in parallel after this job
         self.setFollowOnTarget(RunTarget(followOns))
@@ -514,11 +601,17 @@ class MafGeneCheckerTarget(jobTree.scriptTree.target.Target):
     
     """
     
-    def __init__(self, maf_file, bed_files, output_file):
+    def __init__(self, maf_file, gene_bed_files, class_count_file, 
+        gene_set_file, class_beds):
         """
-        Given a MAF filename and a list of BED filenames, check the MAF against
-        the genes in the BEDs and write the output statistics to the given
-        output file.
+        Reads the maf_file and the genes from the gene_bed_files list.
+        Classifies every mapping in the alignment. Saves class counts to
+        class_count_file ans a <class>\t<count> TSV. Saves genes with any
+        mappings of each class in them to gene_set_file as a <class>\t<gene
+        name> TSV.
+        
+        For each classification to BED filename mapping in class_beds, saves a
+        BED file of mapped locations that are placed in that class.
         
         """
         
@@ -527,8 +620,10 @@ class MafGeneCheckerTarget(jobTree.scriptTree.target.Target):
         
         # Save the arguments
         self.maf_file = maf_file
-        self.bed_files = bed_files
-        self.output_file = output_file
+        self.gene_bed_files = gene_bed_files
+        self.class_count_file = class_count_file
+        self.gene_set_file = gene_set_file
+        self.class_beds = class_beds
         
         self.logToMaster("Creating MafGeneCheckerTarget")
         
@@ -542,7 +637,14 @@ class MafGeneCheckerTarget(jobTree.scriptTree.target.Target):
         
         # Prepare arguments
         args = (["./checkGenes.py", "--maf", self.maf_file, "--beds"] + 
-            self.bed_files + ["--out", self.output_file])
+            self.gene_bed_files + ["--classCounts", self.class_count_file,
+            "--geneSets", self.gene_set_file])
+            
+        for classification, bed_file in self.class_beds:
+            # We need to pass each mapping in this dict along. Since the options
+            # are predictably named, we generate them.
+            args.append("--" + classification + "Bed")
+            args.append(bed_file)
         
         # Make the call
         check_call(self, args)
@@ -739,7 +841,8 @@ class BedSplitTarget(jobTree.scriptTree.target.Target):
     
     """
 
-    def __init__(self, bed_file, genomes, out_dir, feature_name=None):
+    def __init__(self, bed_file, genomes, out_dir, feature_name=None,
+        genome_names=None):
         """
         Split the given bed file per genome into <genome>/<genome>.bed in the
         given output directory, using the given list of genomes.
@@ -748,6 +851,9 @@ class BedSplitTarget(jobTree.scriptTree.target.Target):
         
         If a feature_name is specified, it is used to rename all the BED
         feratures.
+        
+        If genome_names is specified, each genome in genomes is renamed to the
+        corresponding entry in new_names.
         
         Does not leave a trailing newline.
         
@@ -762,6 +868,26 @@ class BedSplitTarget(jobTree.scriptTree.target.Target):
         self.out_dir = out_dir
         self.feature_name = feature_name
         
+        if genome_names is not None:
+            # Build a dict with which we can efficiently rename genomes.
+            self.genome_map = {old_name: new_name 
+                for old_name, new_name in itertools.izip(genomes, genome_names)}
+        else:
+            self.genome_map = None
+    
+    def get_name(self, genome_name):
+        """
+        Given the name of a genome, return the name we should use for it,
+        subject to any renaming we are supposed to do.
+        
+        """
+        
+        if self.genome_map is not None:
+            # Apply the renaming map
+            return self.genome_map[genome_name]
+        else:
+            # Don't rename since there is no renaming map.
+            return genome_name
             
     def run(self):
         """
@@ -772,8 +898,8 @@ class BedSplitTarget(jobTree.scriptTree.target.Target):
         self.logToMaster("Starting BedSplitTarget")
         
         # Work out output file names
-        out_filenames = [self.out_dir + "/{}/{}.bed".format(genome, genome) 
-            for genome in self.genomes]
+        out_filenames = [self.out_dir + "/{0}/{0}.bed".format(
+            self.get_name(genome)) for genome in self.genomes]
             
         # Work out temp files to write to first
         temp_filenames = [sonLib.bioio.getTempFile(
@@ -797,6 +923,9 @@ class BedSplitTarget(jobTree.scriptTree.target.Target):
         for line in open(self.bed_file):
             # For each BED record, grab all the parts.
             parts = line.strip().split()
+            
+            # Rename the genome if needed
+            parts[0] = self.get_name(parts[0])
             
             if self.feature_name is not None:
                 if len(parts) > 3:
@@ -836,9 +965,10 @@ class BedSplitTarget(jobTree.scriptTree.target.Target):
             if genome in content_written:
                 # We have content
                 
-                if not os.path.exists(self.out_dir + "/" + genome):
+                if not os.path.exists(self.out_dir + "/" + 
+                    self.get_name(genome)):
                     # Make the directory for the final BED file.
-                    os.mkdir(self.out_dir + "/" + genome)
+                    os.mkdir(self.out_dir + "/" + self.get_name(genome))
             
                 # We need an intermediate file for sorting.
                 intermediate = sonLib.bioio.getTempFile(
@@ -939,9 +1069,13 @@ class AssemblyHubOnlyTarget(jobTree.scriptTree.target.Target):
     
     """
     
-    def __init__(self, hal, hub, wiggle_dirs=None):
+    def __init__(self, hal, hub, bed_dirs=None, wiggle_dirs=None):
         """
         Takes a hal alignment and makes a hub.
+        
+        Can also optionally take a directory of BEDs and a directory of wiggles.
+        Each is named after the name of the track, and arranged like:
+        <track name>/<genome>/<genome>.<extension>
         
         """
         
@@ -954,6 +1088,9 @@ class AssemblyHubOnlyTarget(jobTree.scriptTree.target.Target):
         
         # And the hub directory
         self.hub = hub
+        
+        # And the BED directory list
+        self.bed_dirs = bed_dirs        
         
         # And the wiggle directory list
         self.wiggle_dirs = wiggle_dirs
@@ -990,6 +1127,11 @@ class AssemblyHubOnlyTarget(jobTree.scriptTree.target.Target):
         hal_abspath = os.path.abspath(self.hal)
         hub_abspath = os.path.abspath(self.hub)
         
+        if self.bed_dirs is not None:
+            # Make bed directories absolute paths if needed.
+            self.bed_dirs = [os.path.abspath(path) 
+                for path in self.bed_dirs]
+        
         if self.wiggle_dirs is not None:
             # Make wiggle directories absolute paths if needed.
             self.wiggle_dirs = [os.path.abspath(path) 
@@ -1000,6 +1142,12 @@ class AssemblyHubOnlyTarget(jobTree.scriptTree.target.Target):
             hal_abspath, hub_abspath, "--jobTree", 
             tree_dir, "--maxThreads", "32", # No LOD
             "--cpHalFileToOut", "--noUcscNames"]
+            
+        if self.bed_dirs is not None:
+            # Add the option to use these bed dirs. TODO: these directories
+            # can't have commas in their names
+            command.append("--bedDirs")
+            command.append(",".join(self.bed_dirs))
             
         if self.wiggle_dirs is not None:
             # Add the option to use these wiggle dirs. TODO: these directories

@@ -49,10 +49,19 @@ def parse_args(args):
         help=".bed file(s) of genes on the genomes in the MAF")
     parser.add_argument("--gene2wrongBed", type=argparse.FileType("w"),
         default=None,
-        help=".bed file in which to save location of gene2wrong mappings")
+        help=".bed for mappings to the wrong gene")
     parser.add_argument("--gene2geneBed", type=argparse.FileType("w"),
         default=None,
-        help=".bed file in which to save location of gene2gene mappings")
+        help=".bed file for mappings to the right gene")
+    parser.add_argument("--non2geneBed", type=argparse.FileType("w"),
+        default=None,
+        help=".bed file for mappings of non-genes to genes")
+    parser.add_argument("--gene2nonBed", type=argparse.FileType("w"),
+        default=None,
+        help=".bed file for mappings of genes to non-genes")
+    parser.add_argument("--non2nonBed", type=argparse.FileType("w"),
+        default=None,
+        help=".bed file for mappings of non-genes to non-genes")
     parser.add_argument("--classCounts", type=argparse.FileType("w"),
         default=sys.stdout,
         help="output file to save mapping class counts to")
@@ -240,11 +249,14 @@ def main(args):
     options = parse_args(args) # This holds the nicely-parsed options object
     
     # Make a dict from class to BED output stream, or None
-    classBeds = collections.defaultdict(lambda: None)
+    class_beds = collections.defaultdict(lambda: None)
     
     # Populate it with the streams from the options
-    classBeds["gene2wrong"] = options.gene2wrongBed
-    classBeds["gene2gene"] = options.gene2geneBed
+    class_beds["gene2wrong"] = options.gene2wrongBed
+    class_beds["gene2gene"] = options.gene2geneBed
+    class_beds["gene2non"] = options.gene2nonBed
+    class_beds["non2gene"] = options.non2geneBed
+    class_beds["non2non"] = options.non2nonBed
     
     
     # Load all the BEDs, and concatenate them
@@ -258,40 +270,40 @@ def main(args):
     classified = classify_mappings(mappings, genes)
     
     # This will count up the instances of each class
-    classCounts = collections.Counter()
+    class_counts = collections.Counter()
     
     # This will hold sets of genes that have any bases in each category.
-    geneSets = collections.defaultdict(set)
+    gene_sets = collections.defaultdict(set)
     
     for classification, gene, mapping in classified:
         # For each classified mapping
         
         # Record it in its class
-        classCounts[classification] += 1
+        class_counts[classification] += 1
         
-        if classBeds[classification] is not None:
+        if class_beds[classification] is not None:
             # We want to write a BED of this class.
             
             # Unpack the mapping
             contig1, base1, contig2, base2, orientation = mapping
             
             # Dump a BED record in query coordinates
-            classBeds[classification].write("{}\t{}\t{}\t{}\n".format(contig2, 
+            class_beds[classification].write("{}\t{}\t{}\t{}\n".format(contig2, 
                 base2, base2 + 1, classification))
                 
         if gene is not None:
             # Note that this gene has some bases in this mapping class
-            geneSets[classification].add(gene)
+            gene_sets[classification].add(gene)
         
         
     
-    for classification, count in classCounts.iteritems():
+    for classification, count in class_counts.iteritems():
         # For each class
         
         # Dump a TSV of bases by classification
         options.classCounts.write("{}\t{}\n".format(classification, count))
         
-    for classification, genes in geneSets.iteritems():
+    for classification, genes in gene_sets.iteritems():
         # For each set of query genes with mappings in a class
         
         for gene in genes:
