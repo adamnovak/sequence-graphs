@@ -294,9 +294,9 @@ def main(args):
     for classification, genes in geneSets.iteritems():
         # For each set of query genes with mappings in a class
         
-        # Save the whole gene list for each class
-        options.geneSets.write("\t".join([classification] + list(genes)))
-        options.geneSets.write("\n")
+        for gene in genes:
+            # Save each observed gene, one per line
+            options.geneSets.write("{}\t{}\n".format(classification, gene))
             
 
 if __name__ == "__main__" :
