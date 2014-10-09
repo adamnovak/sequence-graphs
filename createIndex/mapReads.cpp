@@ -277,6 +277,7 @@ main(
             }
             
             totalReads++;
+            Log::info() << "Mapping read " << totalReads << std::endl;
             
             // Map the sequence with credit
             

@@ -51,7 +51,8 @@ def parse_args(args):
 def shred(records_in, size, spacing):
     """
     Given an iterator of SeqRecords, a read size, and a start position spacing,
-    yield SeqRecords for the reads.
+    yield SeqRecords for the reads. Skips any reads containing Ns, or which are
+    too short.
     """
     
     for input_record in records_in:
@@ -69,8 +70,9 @@ def shred(records_in, size, spacing):
             read.id += ":{}-{}".format(start_pos, start_pos + size)
             read.description = ""
             
-            # Give out the read we've made
-            yield read
+            if("N" not in str(read.seq)):
+                # Give out the read we've made
+                yield read
     
 def main(args):
     """
