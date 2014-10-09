@@ -100,7 +100,7 @@ def get_mappings_from_maf(maf_stream):
     query contig, yield individual base mappings from the alignment.
     
     Each mappings is a tuple of (reference contig, reference base, query contig,
-    query base, orientation).
+    query base, is backwards).
     
     """
     
@@ -154,7 +154,7 @@ def get_mappings_from_maf(maf_stream):
                 if char1 != "-" and char2 != "-":
                     # This is an aligned character. Yield a base mapping.
                     yield (reference, index1, query, index2, 
-                        (delta1 == delta2))
+                        (delta1 != delta2))
                         
                 if char1 != "-":
                     # Advance in record 1
@@ -194,8 +194,9 @@ def get_mappings_from_tsv(tsv_stream):
         query_offset = int(query_parts[0])
         
         # Assemble a mapping of the original query sequence and yield it.
-        yield (reference_name, reference_position, query_name, 
+        toYield = (reference_name, reference_position, query_name, 
             query_position + query_offset, is_backwards)
+        yield toYield
 
 def classify_mappings(mappings, genes):
     """
@@ -224,7 +225,7 @@ def classify_mappings(mappings, genes):
         genes1 = set(geneTrees[contig1].find(base1, base1))
         genes2 = set(geneTrees[contig2].find(base2, base2))
         
-        if orientation == False:
+        if orientation:
             # This is a backwads mapping, so flip orientations on one of the
             # sets
             genes2 = {(name, -strand) for name, strand in genes2}
@@ -329,7 +330,7 @@ def main(args):
             # We want to write a BED of this class.
             
             # Unpack the mapping
-            contig1, base1, contig2, base2, orientation = mapping
+            contig1, base1, contig2, base2, _ = mapping
             
             # Dump a BED record in query coordinates
             class_beds[classification].write("{}\t{}\t{}\t{}\n".format(contig2, 
