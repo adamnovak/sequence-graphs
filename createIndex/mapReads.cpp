@@ -92,6 +92,239 @@ buildIndex(
 }
 
 /**
+ * Load reads from the given FASTAs and queue them up in the given queue.
+ * Returns total reads processed. Skips any reads with Ns.
+ */
+size_t
+loadReads(
+    const std::vector<std::string>& fastas,
+    ConcurrentQueue<std::pair<std::string, std::string>>* recordsOut
+) {
+
+    size_t totalReads = 0;
+
+    for(std::string readFasta : fastas) {
+        // Now go through all the read FASTAs
+        Fasta reader(readFasta);
+        while(reader.hasNext()) {
+            // Go through each FASTA record
+            std::pair<std::string, std::string> headerAndSequence = 
+                reader.getNextRecord();
+            
+            if(headerAndSequence.second.find('N') != std::string::npos) {
+                // Skip this read
+                Log::error() << "Skipping read with N: " << 
+                    headerAndSequence.second << std::endl;
+                continue;
+            }
+            
+            totalReads++;
+            Log::info() << "Mapping read " << totalReads << std::endl;
+            
+            // Put the read in the queue
+            auto lock = recordsOut->lock();
+            recordsOut->enqueue(headerAndSequence, lock);
+        }
+    }
+    
+    // Close the queue since we read everything.
+    auto lock = recordsOut->lock();
+    recordsOut->close(lock);
+    
+    return totalReads;
+}
+
+/**
+ * Save each string in the queue to the given output stream. The strings already
+ * have newlines.
+ */
+void
+saveLines(
+    ConcurrentQueue<std::string>* linesIn, std::ofstream& out
+) {
+    // Lock the record queue so we can maybe get a record    
+    auto lineLock = linesIn->waitForNonemptyOrEnd();
+    while(!linesIn->isEmpty(lineLock)) {
+        
+        // Dequeue and write every line
+        out << linesIn->dequeue(lineLock);
+    
+        lineLock = linesIn->waitForNonemptyOrEnd();
+    }
+}
+
+/**
+ * Read FASTA sequence names and sequences from the input queue, map them to the
+ * reference in the given index, with the given range vector, following the
+ * given scheme parameters, and send lines of mapping TSV output to the output
+ * queue.
+ *
+ * Returns the total mappings made.
+ */
+size_t
+mapSomeReads(
+    ConcurrentQueue<std::pair<std::string, std::string>>* recordsIn, 
+    const std::pair<std::string, std::string>& referenceRecord,
+    const FMDIndex& index,
+    const GenericBitVector& ranges,
+    size_t minContext,
+    size_t addContext,
+    double multContext,
+    size_t mismatches,
+    bool credit,
+    ConcurrentQueue<std::string>* linesOut
+) {
+
+    // We'll count all the mappings we make.
+    size_t totalMappings = 0;
+
+    // Lock the record queue so we can maybe get a record    
+    auto recordLock = recordsIn->waitForNonemptyOrEnd();
+    while(!recordsIn->isEmpty(recordLock)) {
+        // We got a record to do. Dequeue it and unlock.
+        std::pair<std::string, std::string> record = 
+            recordsIn->dequeue(recordLock);
+        
+        // Parse out the record.
+        std::string recordName = record.first;
+        std::string sequence = record.second;
+        
+        // Map the sequence with credit
+
+        // Map it on the right.
+        std::vector<Mapping> rightMappings = index.misMatchMap(ranges,
+            sequence, -1, minContext, addContext, multContext, 0,
+            mismatches);
+
+        // Map it on the left
+        std::vector<Mapping> leftMappings = index.misMatchMap(ranges, 
+            reverseComplement(sequence), -1, minContext, 
+            addContext, multContext, 0, mismatches);
+
+        // Flip the left mappings back into the original order. They should
+        // stay as other-side ranges.
+        std::reverse(leftMappings.begin(), leftMappings.end());
+
+        for(size_t i = 0; i < leftMappings.size(); i++) {
+            // Convert left and right mappings from ranges to base
+            // positions.
+            
+            if(leftMappings[i].isMapped()) {
+                // Locate by the BWT index we infer from the range number.
+                // We can do this since we made each BWT position its own
+                // range.
+                leftMappings[i].setLocation(index.locate(
+                    leftMappings[i].getRange() - 1));
+            }
+
+            if(rightMappings[i].isMapped()) {
+                // Locate by the BWT index we infer from the range number.
+                rightMappings[i].setLocation(index.locate(
+                    rightMappings[i].getRange() - 1));
+            }
+        }
+
+        for(size_t i = 0; i < leftMappings.size(); i++) {
+            // Convert all the left mapping positions to right semantics
+            
+            if(leftMappings[i].isMapped()) {
+                // Flip anything that's mapped, using the length of the
+                // contig it mapped to.
+                leftMappings[i] = leftMappings[i].flip(index.getContigLength(
+                    leftMappings[i].getLocation().getContigNumber()));
+            }
+        }
+         
+        // Run the mappings through a filter to disambiguate and possibly
+        // apply credit.
+        std::vector<Mapping> filteredMappings;    
+        if(credit) {
+            // Apply a credit filter to the mappings
+            filteredMappings = CreditFilter(index).apply(leftMappings,
+                rightMappings);
+        } else {
+            // Apply only a disambiguate filter to the mappings
+            filteredMappings = DisambiguateFilter(index).apply(leftMappings,
+                rightMappings);
+        }
+
+        // Do one final pass to remove mappings of the wrong base, and
+        // output. TODO: Make a real filter.
+        for(size_t i = 0; i < sequence.size(); i++) {
+            Mapping mapping = filteredMappings[i];
+            
+            if(mapping.isMapped()) {
+            
+                // Did we map backwards or not?
+                bool backwards = false;
+            
+                if(mapping.getLocation().getText() != 0) {
+                    // Flip everything around to be on strand 0. Easy since
+                    // there's exactly one contig indexed.
+                    mapping = mapping.flip(index.getContigLength(0));
+                    backwards = true;
+                }
+                
+                // Get the character being mapped
+                char mapped = sequence[i];
+                // Get the character it is mapped to
+                char mappedTo = referenceRecord.second[
+                    mapping.getLocation().getOffset()]; 
+                    
+                if(mapped != mappedTo) {
+                    // Throw out this mapping, since it's placing a
+                    // character on a character it doesn't match.
+                    mapping = Mapping();
+                    
+                    Log::info() << "Tried mapping " << recordName << ":" <<
+                        i << " (" << mapped << ") to " << 
+                        referenceRecord.first << ":" << 
+                        mapping.getLocation().getOffset() << " (" << 
+                        mappedTo << ")" << std::endl;
+                    
+                } else {
+                
+                    // Now do the output for this line, because this
+                    // position mapped. Do it as reference, then query.
+                    // And do it to this stringstream.
+                    std::stringstream mappingStream;
+                    mappingStream << referenceRecord.first << "\t" << 
+                        mapping.getLocation().getOffset() << "\t" << 
+                        recordName << "\t" << 
+                        i << "\t" << 
+                        backwards << std::endl;
+                    
+                    // Make a string of the output
+                    std::string line(mappingStream.str());
+                    
+                    // Send it
+                    auto lineLock = linesOut->lock();
+                    linesOut->enqueue(line, lineLock);
+                        
+                    // Count that we had a mapping
+                    totalMappings++;
+                        
+                }
+                
+            }
+            
+        }
+        
+        // Now wait for a new task, or for there to be no more records.
+        recordLock = recordsIn->waitForNonemptyOrEnd();
+        
+    }
+    
+    // Close the output queue since we have run out of data.
+    auto lineLock = linesOut->lock();
+    linesOut->close(lineLock);
+    
+    // Give back the total mapping count.
+    return totalMappings;
+
+}
+
+/**
  * mapReads: command-line tool to map strings to a string, using a reference
  * structure.
  */
@@ -149,7 +382,10 @@ main(
         ("credit", "Mapping on credit for greedy scheme")
         ("mismatches", boost::program_options::value<size_t>()
             ->default_value(0), 
-            "Maximum allowed number of mismatches");
+            "Maximum allowed number of mismatches")
+        ("threads", boost::program_options::value<size_t>()
+            ->default_value(16),
+            "Number of mapping threads to run");
         
     // And set up our positional arguments
     boost::program_options::positional_options_description positionals;
@@ -248,154 +484,41 @@ main(
     size_t mismatches = options["mismatches"].as<size_t>();
     double multContext = options["multContext"].as<double>();
     
-    // Open the alignment fie for writing
+    // And the number of threads to use
+    size_t numThreads = options["threads"].as<size_t>();
+    
+    // Open the alignment file for writing
     std::ofstream alignment(options["alignment"].as<std::string>());
     
-    // How many reads are mapped total?
-    size_t totalReads = 0;
+    // Now set up the parallel system we are going to use to map.
     
-    // And how many mappings?
-    size_t totalMappings = 0;
+    // This holds records waiting to be mapped. Only one thread writes to it.
+    ConcurrentQueue<std::pair<std::string, std::string>> recordQueue(1);
     
-    for(std::string readFasta : fastas) {
-        // Now go through all the read FASTAs
-        Fasta reader(readFasta);
-        while(reader.hasNext()) {
-            // Go through each FASTA record
-            std::pair<std::string, std::string> headerAndSequence = 
-                reader.getNextRecord();
-                
-            // Split it out
-            std::string recordName = headerAndSequence.first;
-            std::string sequence = headerAndSequence.second;
-            
-            if(sequence.find('N') != std::string::npos) {
-                // Skip this read
-                Log::error() << "Skipping read with N: " << sequence << 
-                    std::endl;
-                continue;
-            }
-            
-            totalReads++;
-            Log::info() << "Mapping read " << totalReads << std::endl;
-            
-            // Map the sequence with credit
-            
-            // Map it on the right.
-            std::vector<Mapping> rightMappings = index.misMatchMap(ranges,
-                sequence, -1, minContext, addContext, multContext, 0,
-                mismatches);
-            
-            // Map it on the left
-            std::vector<Mapping> leftMappings = index.misMatchMap(ranges, 
-                reverseComplement(sequence), -1, minContext, 
-                addContext, multContext, 0, mismatches);
-            
-            // Flip the left mappings back into the original order. They should
-            // stay as other-side ranges.
-            std::reverse(leftMappings.begin(), leftMappings.end());
-            
-            for(size_t i = 0; i < leftMappings.size(); i++) {
-                // Convert left and right mappings from ranges to base
-                // positions.
-                
-                if(leftMappings[i].isMapped()) {
-                    // Locate by the BWT index we infer from the range number.
-                    // We can do this since we made each BWT position its own
-                    // range.
-                    leftMappings[i].setLocation(index.locate(
-                        leftMappings[i].getRange() - 1));
-                }
-
-                if(rightMappings[i].isMapped()) {
-                    // Locate by the BWT index we infer from the range number.
-                    rightMappings[i].setLocation(index.locate(
-                        rightMappings[i].getRange() - 1));
-                }
-            }
-
-            for(size_t i = 0; i < leftMappings.size(); i++) {
-                // Convert all the left mapping positions to right semantics
-                
-                if(leftMappings[i].isMapped()) {
-                    // Flip anything that's mapped, using the length of the
-                    // contig it mapped to.
-                    leftMappings[i] = leftMappings[i].flip(index.getContigLength(
-                        leftMappings[i].getLocation().getContigNumber()));
-                }
-            }
-             
-            // Run the mappings through a filter to disambiguate and possibly
-            // apply credit.
-            std::vector<Mapping> filteredMappings;    
-            if(credit) {
-                // Apply a credit filter to the mappings
-                filteredMappings = CreditFilter(index).apply(leftMappings,
-                    rightMappings);
-            } else {
-                // Apply only a disambiguate filter to the mappings
-                filteredMappings = DisambiguateFilter(index).apply(leftMappings,
-                    rightMappings);
-            }
-            
-            // Do one final pass to remove mappings of the wrong base, and
-            // output. TODO: Make a real filter.
-            for(size_t i = 0; i < sequence.size(); i++) {
-                Mapping mapping = filteredMappings[i];
-                
-                if(mapping.isMapped()) {
-                
-                    // Did we map backwards or not?
-                    bool backwards = false;
-                
-                    if(mapping.getLocation().getText() != 0) {
-                        // Flip everything around to be on strand 0. Easy since
-                        // there's exactly one contig indexed.
-                        mapping = mapping.flip(index.getContigLength(0));
-                        backwards = true;
-                    }
-                    
-                    // Get the character being mapped
-                    char mapped = sequence[i];
-                    // Get the character it is mapped to
-                    char mappedTo = referenceRecord.second[
-                        mapping.getLocation().getOffset()]; 
-                        
-                    if(mapped != mappedTo) {
-                        // Throw out this mapping, since it's placing a
-                        // character on a character it doesn't match.
-                        mapping = Mapping();
-                        
-                        Log::info() << "Tried mapping " << recordName << ":" <<
-                            i << " (" << mapped << ") to " << 
-                            referenceRecord.first << ":" << 
-                            mapping.getLocation().getOffset() << " (" << 
-                            mappedTo << ")" << std::endl;
-                        
-                    } else {
-                    
-                        // Now do the output for this line, because this
-                        // position mapped. Do it as reference, then query.
-                        alignment << referenceRecord.first << "\t" << 
-                            mapping.getLocation().getOffset() << "\t" << 
-                            recordName << "\t" << 
-                            i << "\t" << 
-                            backwards << std::endl;
-                            
-                        // Count that we had a mapping
-                        totalMappings++;
-                            
-                    }
-                    
-                }
-                
-            }
-            
-        }
+    // This holds output lines waiting to be written. All the mapping threads
+    // write to it.
+    ConcurrentQueue<std::string> lineQueue(numThreads);
+    
+    // This holds all our threads
+    std::vector<Thread> threads;
+    
+    // Make a thread to load all the reads
+    threads.push_back(Thread(&loadReads, std::ref(fastas), &recordQueue));
+    
+    for(size_t i = 0; i < numThreads; i++) {
+        // Then some threads to process the reads
+        threads.push_back(Thread(&mapSomeReads, &recordQueue, referenceRecord,
+            std::ref(index), std::ref(ranges), minContext, addContext, 
+            multContext, mismatches, credit, &lineQueue));
     }
     
-    Log::output() << "Mapped " << totalReads << " total reads with " << 
-        totalMappings << " mapped positions" << std::endl;
+    // Then a thread to do the writing
+    threads.push_back(Thread(&saveLines, &lineQueue, std::ref(alignment)));
+    
+    for(Thread& thread : threads) {
+        // Wait for all the threads to be done
+        thread.join();
+    }
     
     // Get rid of the index itself. Invalidates the index reference.
     delete indexPointer;

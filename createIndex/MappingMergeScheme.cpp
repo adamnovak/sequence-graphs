@@ -69,7 +69,7 @@ ConcurrentQueue<Merge>& MappingMergeScheme::run() {
     // And one for the contigs to merge
     contigsToMerge = new ConcurrentQueue<size_t>(1);
     
-    // Start up a thread for every contig in this genome.
+    // Say we need to do every contig in this genome.
     
     for(size_t contig = genomeContigs.first; contig < genomeContigs.second; 
         contig++) {
