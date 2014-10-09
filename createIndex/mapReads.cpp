@@ -289,6 +289,40 @@ main(
             std::vector<Mapping> leftMappings = index.misMatchMap(ranges, 
                 reverseComplement(sequence), -1, minContext, 
                 addContext, multContext, 0, mismatches);
+            
+            // Flip the left mappings back into the original order. They should stay
+            // as other-side ranges.
+            std::reverse(leftMappings.begin(), leftMappings.end());
+            
+            for(size_t i = 0; i < leftMappings.size(); i++) {
+                // Convert left and right mappings from ranges to base positions.
+                
+                if(leftMappings[i].isMapped()) {
+                    // Locate by the BWT index we infer from the range number.
+                    // We can do this since we made each BWT position its own
+                    // range.
+                    leftMappings[i].setLocation(index.locate(
+                        leftMappings[i].getRange() - 1));
+                    Log::info() << "Range " << leftMappings[i].getRange() - 1 << " is " << leftMappings[i].getLocation() << std::endl;
+                }
+
+                if(rightMappings[i].isMapped()) {
+                    // Locate by the BWT index we infer from the range number.
+                    rightMappings[i].setLocation(index.locate(
+                        rightMappings[i].getRange() - 1));
+                }
+            }
+
+            for(size_t i = 0; i < leftMappings.size(); i++) {
+                // Convert all the left mapping positions to right semantics
+                
+                if(leftMappings[i].isMapped()) {
+                    // Flip anything that's mapped, using the length of the contig it
+                    // mapped to.
+                    leftMappings[i] = leftMappings[i].flip(index.getContigLength(
+                        leftMappings[i].getLocation().getContigNumber()));
+                }
+            }
              
             // Run the mappings through a filter to disambiguate and possibly
             // apply credit.
