@@ -22,10 +22,14 @@ class TargetQueuer(object):
     
     """
     
-    def __init__(self):
+    def __init__(self, target):
         """
         Make a new TargetQueuer to queue up targets. No subtasks exist by
         default.
+        
+        Takes the parent target so it can use the temp directory.
+        
+        TODO: Just make this into a target?
         
         """
         
@@ -34,6 +38,9 @@ class TargetQueuer(object):
         
         # What target will we run to run everything?
         self.root = None
+        
+        # What target can we steal temp files from
+        self.target = target
         
     def subtask_serial(self, name=None):
         """
@@ -104,12 +111,12 @@ class TargetQueuer(object):
         
         return self.root
         
-    def tempfile():
+    def tempfile(self):
         """
         Quickly and easily grab a temp file name.
         """
         
-        return sonLib.bioio.getTempFile(rootDir=self.getGlobalTempDir())
+        return sonLib.bioio.getTempFile(rootDir=self.target.getGlobalTempDir())
             
             
         
@@ -225,6 +232,10 @@ class AlignerAssessmentTarget(jobTree.scriptTree.target.Target):
         
         self.logToMaster("Starting AlignerAssessmentTarget")
         
+        if not os.path.exists(self.out_dir):
+            # Make sure our output directory is real.
+            os.makedirs(self.out_dir)
+        
         # Make a TargetQueuer so we can phrase this top-down control logic in
         # terms of subtasks.
         queuer = TargetQueuer()
@@ -323,7 +334,7 @@ class AlignerAssessmentTarget(jobTree.scriptTree.target.Target):
                     
                 # Make a target to do the mapping
                 queuer.append(MapReadsTarget(self.fasta_list[0], reads,
-                    mappings))
+                    mappings, extra_args=extra_args))
                 
                 # Make a file to put the class counts in
                 class_count_file = queuer.tempfile()
@@ -363,7 +374,7 @@ class AlignerAssessmentTarget(jobTree.scriptTree.target.Target):
         queuer.end_subtask()
         
         # Run all the tasks we put in the queuer.
-        self.setChildTarget(queuer.get_root())
+        self.addChildTarget(queuer.get_root())
             
         
         self.logToMaster("AlignerAssessmentTarget Finished")
@@ -514,7 +525,7 @@ class BWATarget(jobTree.scriptTree.target.Target):
                 
         # Now we need to make the TSV output our parent expects.
         check_call(["./sam2tsv.py", "--samIn", sam_file, "--tsvOut", 
-            self.mappings_out, "--reference", self.reference])
+            self.mappings_out, "--reference", self.reference], self)
             
         self.logToMaster("BWATarget Finished")
         
@@ -541,7 +552,7 @@ class TsvGeneCheckerTarget(jobTree.scriptTree.target.Target):
         """
         
         # Make the base Target. Ask for 2gb of memory since this is easy.
-        super(MafGeneCheckerTarget, self).__init__(memory=2147483648)
+        super(TsvGeneCheckerTarget, self).__init__(memory=2147483648)
         
         # Save the arguments
         self.mapping_file = mapping_file
@@ -630,10 +641,8 @@ def main(args):
         from compareReads import AlignerAssessmentTarget
         
     # Make a stack of jobs to run
-    stack = jobTree.scriptTree.stack.Stack(SchemeAssessmentTarget(
-        options.fastas, options.trueMaf, options.markovModel, 
-        options.geneBedDir, options.seed, options.outDir, 
-        options.outDir + "/hubs"))
+    stack = jobTree.scriptTree.stack.Stack(AlignerAssessmentTarget(
+        options.fastas, options.geneBeds, options.outDir))
     
     print "Starting stack"
     
