@@ -238,7 +238,7 @@ class AlignerAssessmentTarget(jobTree.scriptTree.target.Target):
         
         # Make a TargetQueuer so we can phrase this top-down control logic in
         # terms of subtasks.
-        queuer = TargetQueuer()
+        queuer = TargetQueuer(self)
         
         # Start out saying things to do in serial.
         queuer.subtask_serial("shredThenMap")
@@ -416,9 +416,9 @@ class ShredTarget(jobTree.scriptTree.target.Target):
         # Put together the arguments
         args = ["./shred.py", "--fastaIn", self.contig_fasta, "--fastaOut",
             self.read_fasta]
-            
+        
         # Run the shred script         
-        check_call(args, self)
+        check_call(self, args)
             
         self.logToMaster("ShredTarget Finished")
 
@@ -464,7 +464,7 @@ class MapReadsTarget(jobTree.scriptTree.target.Target):
             self.query, "--alignment", self.mappings_out] + self.extra_args
             
         # Invoke the mapper
-        check_call(args, self)
+        check_call(self, args)
             
         self.logToMaster("MapReadsTarget Finished")
         
@@ -524,8 +524,8 @@ class BWATarget(jobTree.scriptTree.target.Target):
                 process.returncode))
                 
         # Now we need to make the TSV output our parent expects.
-        check_call(["./sam2tsv.py", "--samIn", sam_file, "--tsvOut", 
-            self.mappings_out, "--reference", self.reference], self)
+        check_call(self, ["./sam2tsv.py", "--samIn", sam_file, "--tsvOut", 
+            self.mappings_out, "--reference", self.reference])
             
         self.logToMaster("BWATarget Finished")
         

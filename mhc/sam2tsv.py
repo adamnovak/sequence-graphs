@@ -79,9 +79,20 @@ def main(args):
                 # Supposedly unaligned things can sneak in here? The pysam docs
                 # say so, so we skip them.
                 continue
-                
+            
             # Look up the reference sequence name
             ref_name = sam.getrname(read.tid)
+                
+            if query_pos >= len(read.seq):
+                print(read.seq)
+                print read
+                raise Exception("Query {} out of bounds!".format(query_pos))
+                
+            if ref_pos >= len(reference[ref_name]):
+                print(reference[ref_name])
+                print read
+                raise Exception("Reference {} out of bounds!".format(ref_pos))
+                
             
             if read.seq[query_pos] == reference[ref_name][ref_pos]:
                 # This is a match, and not a mismatch.
