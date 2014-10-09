@@ -65,6 +65,17 @@ cd boost_1_55_0
 Make sure to add `$HOME/.local/include` to your `CPLUS_INCLUDE_PATH`, and
 `$HOME/.local/lib` to your `LD_LIBRARY_PATH`.
 
+####Install SDSL
+
+Succinct bit vectors from the Succinct Data Structures Library (SDSL) are used. You thus need to install SDSL in order to build the code. Make sure that SDSL gets picked up by your compiler.
+
+```
+git clone https://github.com/simongog/sdsl-lite.git
+cd sdsl-lite
+./install $HOME/.local/
+```
+
+
 ####Install CPPUnit
 
 The C++ code includes test cases, which you can run if you have a version of

@@ -43,8 +43,10 @@ def parse_args(args):
         formatter_class=argparse.RawDescriptionHelpFormatter)
     
     # General options
-    parser.add_argument("--maf", type=argparse.FileType("r"), required=True, 
+    parser.add_argument("--maf", type=argparse.FileType("r"), 
         help="MAF file of two genomes to read")
+    parser.add_argument("--tsv", type=argparse.FileType("r"),
+        help="TSV file of mappings of reads to load")
     parser.add_argument("--beds", nargs="+", required=True,
         help=".bed file(s) of genes on the genomes in the MAF")
     parser.add_argument("--gene2wrongBed", type=argparse.FileType("w"),
@@ -92,7 +94,7 @@ def parse_bed(stream):
         yield (line[0], int(line[1]), int(line[2]), line[3], 
             1 if line[5] == "+" else -1)
 
-def get_mappings(maf_stream):
+def get_mappings_from_maf(maf_stream):
     """
     Given a stream of MAF data between a single reference contig and a single
     query contig, yield individual base mappings from the alignment.
@@ -160,6 +162,40 @@ def get_mappings(maf_stream):
                 if char2 != "-":
                     # Advance in record 2
                     index2 += delta2
+                    
+def get_mappings_from_tsv(tsv_stream):
+    """
+    Given a TSV stream of mappings like
+    <reference>\t<position>\t<query>\t<position>\t<isBackwards>, where the query
+    name is of the form <actual query contig>:<start>-<end>, parse out and yield
+    mappings between the actual full query sequence and the reference.
+    
+    """
+    
+    for parts in tsv.TsvReader(tsv_stream):
+        # Parse out everything
+        # What is the reference we're aligned to?
+        reference_name = parts[0]
+        # Where on it are we?
+        reference_position = int(parts[1])
+        # What is the query we're aligning?
+        query = parts[2]
+        # Where on it are we?
+        query_position = int(parts[3])
+        # Are we aligned to the reverse strand?
+        is_backwards = bool(int(parts[4]))
+        
+        # Parse the query name more
+        query_parts = query.split(":")
+        # What is the name of the orifginal un-split query sequence?
+        query_name = query_parts[0]
+        query_parts = query_parts[1].split("-")
+        # Where on it did this sequence start?
+        query_offset = int(query_parts[0])
+        
+        # Assemble a mapping of the original query sequence and yield it.
+        yield (reference_name, reference_position, query_name, 
+            query_position + query_offset, is_backwards)
 
 def classify_mappings(mappings, genes):
     """
@@ -263,8 +299,16 @@ def main(args):
     genes = itertools.chain.from_iterable([parse_bed(open(bed)) 
         for bed in options.beds])
     
-    # Get all the mappings
-    mappings = get_mappings(options.maf)
+    if options.maf is not None:
+        # Get all the mappings
+        mappings = get_mappings_from_maf(options.maf)
+    elif options.tsv is not None:
+        # Get all the mappings by re-assembling reads mapped in a TSV
+        mappings = get_mappings_from_tsv(options.tsv)
+    else:
+        # TODO make argparse check this
+        raise Exception("No mappings provided")
+        
     
     # Classify each mapping in light of the genes
     classified = classify_mappings(mappings, genes)
