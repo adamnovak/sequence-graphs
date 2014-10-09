@@ -133,9 +133,9 @@ main(
         ("sampleRate", boost::program_options::value<unsigned int>()
             ->default_value(64), 
             "Set the suffix array sample rate to use")
-        // These next three options should be ->required(), but that's not in the
-        // Boost version I can convince our cluster admins to install. From now
-        // on I shall work exclusively in Docker containers or something.
+        // These next three options should be ->required(), but that's not in
+        // the Boost version I can convince our cluster admins to install. From
+        // now on I shall work exclusively in Docker containers or something.
         ("indexDirectory", boost::program_options::value<std::string>(), 
             "Directory to make the index in; will be deleted and replaced!")
         ("reference", boost::program_options::value<std::string>(),
@@ -290,12 +290,13 @@ main(
                 reverseComplement(sequence), -1, minContext, 
                 addContext, multContext, 0, mismatches);
             
-            // Flip the left mappings back into the original order. They should stay
-            // as other-side ranges.
+            // Flip the left mappings back into the original order. They should
+            // stay as other-side ranges.
             std::reverse(leftMappings.begin(), leftMappings.end());
             
             for(size_t i = 0; i < leftMappings.size(); i++) {
-                // Convert left and right mappings from ranges to base positions.
+                // Convert left and right mappings from ranges to base
+                // positions.
                 
                 if(leftMappings[i].isMapped()) {
                     // Locate by the BWT index we infer from the range number.
@@ -316,8 +317,8 @@ main(
                 // Convert all the left mapping positions to right semantics
                 
                 if(leftMappings[i].isMapped()) {
-                    // Flip anything that's mapped, using the length of the contig it
-                    // mapped to.
+                    // Flip anything that's mapped, using the length of the
+                    // contig it mapped to.
                     leftMappings[i] = leftMappings[i].flip(index.getContigLength(
                         leftMappings[i].getLocation().getContigNumber()));
                 }
@@ -372,8 +373,8 @@ main(
                         
                     } else {
                     
-                        // Now do the output for this line, because this position
-                        // mapped. Do it as reference, then query.
+                        // Now do the output for this line, because this
+                        // position mapped. Do it as reference, then query.
                         alignment << referenceRecord.first << "\t" << 
                             mapping.getLocation().getOffset() << "\t" << 
                             recordName << "\t" << 
