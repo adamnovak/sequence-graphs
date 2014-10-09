@@ -345,7 +345,7 @@ class AlignerAssessmentTarget(jobTree.scriptTree.target.Target):
                 gene_set_files.append(gene_set_file)
                 
                 # And one to do the gene checking
-                queuer.append(TsvGeneCheckerTarget(bwa_mappings, self.gene_beds, 
+                queuer.append(TsvGeneCheckerTarget(mappings, self.gene_beds, 
                     class_count_file, gene_set_file))
                     
                 queuer.end_subtask()
