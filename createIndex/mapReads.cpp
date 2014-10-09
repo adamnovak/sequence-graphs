@@ -113,7 +113,8 @@ main(
 
     std::string appDescription = 
         std::string("Map strings to a string.\n") + 
-        "Usage: mapReads <index directory> <reference> [<fasta> [<fasta> ...]]";
+        "Usage: mapReads <index directory> <reference> [<fasta> [<fasta> ...]] "
+        "--alignment <alignment>";
 
     // Make an options description for our program's options.
     boost::program_options::options_description description("Options");
@@ -250,6 +251,12 @@ main(
     // Open the alignment fie for writing
     std::ofstream alignment(options["alignment"].as<std::string>());
     
+    // How many reads are mapped total?
+    size_t totalReads = 0;
+    
+    // And how many mappings?
+    size_t totalMappings = 0;
+    
     for(std::string readFasta : fastas) {
         // Now go through all the read FASTAs
         Fasta reader(readFasta);
@@ -262,16 +269,25 @@ main(
             std::string recordName = headerAndSequence.first;
             std::string sequence = headerAndSequence.second;
             
+            if(sequence.find('N') != std::string::npos) {
+                // Skip this read
+                Log::error() << "Skipping read with N: " << sequence << 
+                    std::endl;
+                continue;
+            }
+            
+            totalReads++;
+            
             // Map the sequence with credit
             
             // Map it on the right.
             std::vector<Mapping> rightMappings = index.misMatchMap(ranges,
-                sequence, NULL, minContext, addContext, multContext, 0,
+                sequence, -1, minContext, addContext, multContext, 0,
                 mismatches);
             
             // Map it on the left
             std::vector<Mapping> leftMappings = index.misMatchMap(ranges, 
-                reverseComplement(sequence), NULL, minContext, 
+                reverseComplement(sequence), -1, minContext, 
                 addContext, multContext, 0, mismatches);
              
             // Run the mappings through a filter to disambiguate and possibly
@@ -291,6 +307,8 @@ main(
             // output. TODO: Make a real filter.
             for(size_t i = 0; i < sequence.size(); i++) {
                 Mapping mapping = filteredMappings[i];
+                
+                Log::info() << mapping << std::endl;
                 
                 if(mapping.isMapped()) {
                 
@@ -314,15 +332,27 @@ main(
                         // Throw out this mapping, since it's placing a
                         // character on a character it doesn't match.
                         mapping = Mapping();
-                    }
+                        
+                        Log::info() << "Tried mapping " << recordName << ":" <<
+                            i << " (" << mapped << ") to " << 
+                            referenceRecord.first << ":" << 
+                            mapping.getLocation().getOffset() << " (" << 
+                            mappedTo << ")" << std::endl;
+                        
+                    } else {
                     
-                    // Now do the output for this line, because this position
-                    // mapped. Do it as reference, then query.
-                    alignment << referenceRecord.first << "\t" << 
-                        mapping.getLocation().getOffset() << "\t" << 
-                        recordName << "\t" << 
-                        i << "\t" << 
-                        backwards << std::endl;
+                        // Now do the output for this line, because this position
+                        // mapped. Do it as reference, then query.
+                        alignment << referenceRecord.first << "\t" << 
+                            mapping.getLocation().getOffset() << "\t" << 
+                            recordName << "\t" << 
+                            i << "\t" << 
+                            backwards << std::endl;
+                            
+                        // Count that we had a mapping
+                        totalMappings++;
+                            
+                    }
                     
                 }
                 
@@ -330,6 +360,9 @@ main(
             
         }
     }
+    
+    Log::output() << "Mapped " << totalReads << " total reads with " << 
+        totalMappings << " mapped positions" << std::endl;
     
     // Get rid of the index itself. Invalidates the index reference.
     delete indexPointer;
