@@ -303,7 +303,6 @@ main(
                     // range.
                     leftMappings[i].setLocation(index.locate(
                         leftMappings[i].getRange() - 1));
-                    Log::info() << "Range " << leftMappings[i].getRange() - 1 << " is " << leftMappings[i].getLocation() << std::endl;
                 }
 
                 if(rightMappings[i].isMapped()) {
@@ -341,8 +340,6 @@ main(
             // output. TODO: Make a real filter.
             for(size_t i = 0; i < sequence.size(); i++) {
                 Mapping mapping = filteredMappings[i];
-                
-                Log::info() << mapping << std::endl;
                 
                 if(mapping.isMapped()) {
                 
