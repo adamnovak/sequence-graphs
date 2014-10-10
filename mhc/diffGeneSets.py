@@ -48,6 +48,9 @@ def parse_args(args):
         help="TSV file for first gene set")
     parser.add_argument("set2", type=argparse.FileType("r"),
         help="TSV file for second gene set")
+    parser.add_argument("--mode", choices=["set", "multiset"],
+        default="multiset",
+        help="Mode in which to count gene differences")
     parser.add_argument("--outFile", type=argparse.FileType("w"),
         default=sys.stdout,
         help="TSV file for first gene set")
@@ -77,10 +80,17 @@ def parse_gene_set(stream):
         
     return to_return
     
-def diff_gene_sets(set1, set2):
+def diff_gene_sets(set1, set2, mode="multiset"):
     """
     Make a dict by category and then gene of the count differences between these
     two gene sets.
+    
+    Mode can be "set" or "multiset".
+    
+    If it is "set", gives +1 for completely new genes in a category, -1 for
+    completely removed genes in a category, and 0 for anything else.
+    
+    If it is "multiset", gives actual count differences in each category.
     
     """
     
@@ -92,35 +102,66 @@ def diff_gene_sets(set1, set2):
         for gene in (set(set1[category].iterkeys()) | 
             set(set2[category].iterkeys())):
             
-            # For each gene we have anything for, count up the number of copies
-            # gained/lost in this category.
-            difference = set2[category][gene] - set1[category][gene]
+            if mode == "multiset":
+            
+                # For each gene we have anything for, count up the number of
+                # copies gained/lost in this category.
+                difference = set2[category][gene] - set1[category][gene]
+                
+            elif mode == "set":
+                # Just flag added/removed genes.
+                
+                # This is our flag. 0 for no change, 1 for added, -1 for
+                # removed.
+                difference = 0
+                
+                if set1[category][gene] == 0 and set2[category][gene] > 0:
+                    # Gene was added
+                    difference = 1
+                elif set1[category][gene] > 0 and set2[category][gene] == 0:
+                    # Gene was removed
+                    difference = -1
+            else:
+                raise Exception("Mode {} not valid".format(mode))
             
             # Save it
             differences[category][gene] = difference
     
     return differences
                 
-def describe_difference(differences, stream):
+def describe_difference(differences, stream, numbers=True):
     """
     Given a dict of gene set count differences by category and then gene,
     describe said differences to the given output stream.
     
     """
-       
+    
     for category, gene_dict in differences.iteritems():
         # What's the net change for this category
         net = sum(gene_dict.itervalues())
     
         # Each category gets a header.
-        stream.write("{} ({:+}):\n".format(category, net))
+        stream.write("{}".format(category))
+        if numbers:
+            # And maybe a net copies added/removed count.
+            stream.write(" ({:+})".format(net))
+        stream.write(":\n")
+        
         for gene, difference in gene_dict.iteritems():
             if difference > 0:
                 # Say this category gained copies.
-                stream.write("\t+++ {: <16}\t{:+}\n".format(gene, difference))
+                stream.write("\t+++ {: <16}".format(gene))
+                if numbers:
+                    # Say how many
+                    stream.write("\t{:+}".format(difference))
+                stream.write("\n")
             if difference < 0:
-                # Sau this category lost copies.
-                stream.write("\t--- {: <16}\t{:+}\n".format(gene, difference))
+                # Say this category lost copies.
+                stream.write("\t--- {: <16}".format(gene))
+                if numbers:
+                    # Say how many
+                    stream.write("\t{:+}".format(difference))
+                stream.write("\n")
     
 def main(args):
     """
@@ -133,7 +174,8 @@ def main(args):
     
     # Parse the two gene sets, diff them, and describe the results.
     describe_difference(diff_gene_sets(parse_gene_set(options.set1),
-        parse_gene_set(options.set2)), options.outFile)
+        parse_gene_set(options.set2), options.mode), options.outFile,
+        options.mode == "multiset")
     
             
 
