@@ -463,7 +463,7 @@ class MapReadsTarget(jobTree.scriptTree.target.Target):
         # Put together the arguments to invoke. Make sure to specify we want
         # lots of threads.
         args = (["../createIndex/mapReads", index_dir, self.reference, 
-            self.query, "--alignment", self.mappings_out, "--threads", 32] +
+            self.query, "--alignment", self.mappings_out, "--threads", "32"] +
             self.extra_args)
             
         # Invoke the mapper
