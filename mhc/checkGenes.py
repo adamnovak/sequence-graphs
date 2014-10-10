@@ -202,8 +202,8 @@ def classify_mappings(mappings, genes):
     """
     Given a source of (contig, base, other contig, other base, orientation)
     mappings (in reference, query order), and a soucre of (contig, start, end,
-    gene name, strand number) genes, yield a (class, gene, mapping) tuple for
-    each mapping.
+    gene name, strand number) genes, yield a (class, fromGene, toGene, mapping)
+    tuple for each mapping.
     
     """
     
@@ -252,29 +252,36 @@ def classify_mappings(mappings, genes):
             # Grab a plausible gene name.
             gene_name = next(iter(genes1 & genes2))[0]
             
-            yield "gene2gene", gene_name, mapping
+            yield "gene2gene", gene_name, gene_name, mapping
         elif len(genes1) == 0 and len(genes2) > 0:
             # We mapped a gene to somewhere where there is no gene
             
             # Grab a plausible gene name.
             gene_name = next(iter(gene_names2))
             
-            yield "gene2non", gene_name, mapping
+            yield "gene2non", gene_name, None, mapping
         
         elif len(genes1) > 0 and len(genes2) > 0:
             # We mapped a gene to a place where there are genes, but not the
             # right gene in the right orientation
             
-            # Grab a plausible gene name.
-            gene_name = next(iter(gene_names2))
+            # Grab a plausible gene name from.
+            gene_from = next(iter(gene_names2))
             
-            yield "gene2wrong", gene_name, mapping
+            # And where it could be mapped to
+            gene_to = next(iter(gene_names1))
+            
+            yield "gene2wrong", gene_from, gene_to, mapping
         elif len(genes1) > 0 and len(genes2) == 0:
             # We mapped a non-gene to somewhere where there are genes
-            yield "non2gene", None, mapping
+            
+            # What's a plausible gene name we could be going to?
+            gene_to = next(iter(gene_names1))
+            
+            yield "non2gene", None, gene_to, mapping
         else:
             # We mapped a non-gene to somewhere where there are no genes.
-            yield "non2non", None, mapping
+            yield "non2non", None, None, mapping
 
 def main(args):
     """
@@ -288,13 +295,22 @@ def main(args):
     # Make a dict from class to BED output stream, or None
     class_beds = collections.defaultdict(lambda: None)
     
-    # Populate it with the streams from the options
-    class_beds["gene2wrong"] = options.gene2wrongBed
-    class_beds["gene2gene"] = options.gene2geneBed
-    class_beds["gene2non"] = options.gene2nonBed
-    class_beds["non2gene"] = options.non2geneBed
-    class_beds["non2non"] = options.non2nonBed
+    # Populate it with TSV writers for the streams from the options
+    # TODO: this is awkward and needs a map-over-option like Scala.
+    class_beds["gene2wrong"] = tsv.TsvWriter(options.gene2wrongBed) \
+        if options.gene2wrongBed is not None else None
+    class_beds["gene2gene"] = tsv.TsvWriter(options.gene2geneBed) \
+        if options.gene2geneBed is not None else None
+    class_beds["gene2non"] = tsv.TsvWriter(options.gene2nonBed) \
+        if options.gene2nonBed is not None else None
+    class_beds["non2gene"] = tsv.TsvWriter(options.non2geneBed) \
+        if options.non2geneBed is not None else None
+    class_beds["non2non"] = tsv.TsvWriter(options.non2nonBed) \
+        if options.non2nonBed is not None else None
     
+    
+    # Make a writer for gene set output
+    gene_set_writer = tsv.TsvWriter(options.geneSets)
     
     # Load all the BEDs, and concatenate them
     genes = itertools.chain.from_iterable([parse_bed(open(bed)) 
@@ -317,10 +333,11 @@ def main(args):
     # This will count up the instances of each class
     class_counts = collections.Counter()
     
-    # This will hold sets of genes that have any bases in each category.
-    gene_sets = collections.defaultdict(set)
+    # This will hold a dict for each category. That dict will be from gene name
+    # to set of genes it has mapped to in that category.
+    gene_sets = collections.defaultdict(lambda: collections.defaultdict(set))
     
-    for classification, gene, mapping in classified:
+    for classification, gene_from, gene_to, mapping in classified:
         # For each classified mapping
         
         # Record it in its class
@@ -332,13 +349,18 @@ def main(args):
             # Unpack the mapping
             contig1, base1, contig2, base2, _ = mapping
             
-            # Dump a BED record in query coordinates
-            class_beds[classification].write("{}\t{}\t{}\t{}\n".format(contig2, 
-                base2, base2 + 1, classification))
+            # Dump a BED record in query coordinates, named after the gene we
+            # mapped to.
+            class_beds[classification].line(contig2, base2, base2 + 1,
+                gene_to)
                 
-        if gene is not None:
-            # Note that this gene has some bases in this mapping class
-            gene_sets[classification].add(gene)
+        # Note that this gene (which may itself be None) has some bases in this
+        # mapping class, pointing to this other gene (which may balso be None).
+        # For gene2gene it will always be the same gene, and for gene2non it
+        # will always be pointing to None. For non2gene we'll get a set of all
+        # the genes we go to under the key None, and for non2non it will be None
+        # to a set of None.
+        gene_sets[classification][gene_from].add(gene_to)
         
         
     
@@ -348,12 +370,19 @@ def main(args):
         # Dump a TSV of bases by classification
         options.classCounts.write("{}\t{}\n".format(classification, count))
         
-    for classification, genes in gene_sets.iteritems():
+    for classification, gene_mappings in gene_sets.iteritems():
         # For each set of query genes with mappings in a class
         
-        for gene in genes:
-            # Save each observed gene, one per line
-            options.geneSets.write("{}\t{}\n".format(classification, gene))
+        for gene, other_genes in gene_mappings.iteritems():
+            # For each gene, what other genes was it observed mapping to?
+            
+            for other_gene in other_genes:
+                # Record it mapped to each of those TODO: This redefines each
+                # "instance" of a gene2wrong mapping later in the pipeline as an
+                # instance of a gene in an alt mapping to another different
+                # gene, where multiple destination mappings in a single genome
+                # are counted.
+                gene_set_writer.line(classification, gene, other_gene)
             
 
 if __name__ == "__main__" :
