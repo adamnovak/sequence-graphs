@@ -436,8 +436,9 @@ class MapReadsTarget(jobTree.scriptTree.target.Target):
         
         """
         
-        # Make the base Target. Ask for 8gb of memory since this is kinda hard.
-        super(MapReadsTarget, self).__init__(memory=8589934592)
+        # Make the base Target. Ask for 8gb of memory since this is kinda hard,
+        # and a bunch of CPUs so we can run in parallel.
+        super(MapReadsTarget, self).__init__(memory=8589934592, cpu=32)
         
         # Save everything
         self.reference = reference
@@ -459,9 +460,11 @@ class MapReadsTarget(jobTree.scriptTree.target.Target):
         index_dir = sonLib.bioio.getTempDirectory(
             rootDir=self.getLocalTempDir())
         
-        # Put together the arguments to invoke
-        args = ["../createIndex/mapReads", index_dir, self.reference, 
-            self.query, "--alignment", self.mappings_out] + self.extra_args
+        # Put together the arguments to invoke. Make sure to specify we want
+        # lots of threads.
+        args = (["../createIndex/mapReads", index_dir, self.reference, 
+            self.query, "--alignment", self.mappings_out, "--threads", 32] +
+            self.extra_args)
             
         # Invoke the mapper
         check_call(self, args)
