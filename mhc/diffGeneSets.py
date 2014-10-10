@@ -120,7 +120,7 @@ def describe_difference(differences, stream):
                 stream.write("\t+++ {: <16}\t{:+}\n".format(gene, difference))
             if difference < 0:
                 # Sau this category lost copies.
-                stream.write("\t--- {: <16}\t{:+}\n".format(gene, -difference))
+                stream.write("\t--- {: <16}\t{:+}\n".format(gene, difference))
     
 def main(args):
     """
