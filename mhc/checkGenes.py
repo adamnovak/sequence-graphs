@@ -333,12 +333,15 @@ def main(args):
     # This will count up the instances of each class
     class_counts = collections.Counter()
     
-    # This will hold a dict for each category. That dict will be from gene name
-    # to set of genes it has mapped to in that category.
-    gene_sets = collections.defaultdict(lambda: collections.defaultdict(set))
+    # This maps from classification, source gene, and gene mapped to to genome set that has that mapping.
+    gene_sets = collections.defaultdict(lambda: collections.defaultdict(
+        lambda: collections.defaultdict(set)))
     
     for classification, gene_from, gene_to, mapping in classified:
         # For each classified mapping
+        
+        # Unpack the mapping
+        contig1, base1, contig2, base2, _ = mapping
         
         # Record it in its class
         class_counts[classification] += 1
@@ -346,21 +349,14 @@ def main(args):
         if class_beds[classification] is not None:
             # We want to write a BED of this class.
             
-            # Unpack the mapping
-            contig1, base1, contig2, base2, _ = mapping
-            
             # Dump a BED record in query coordinates, named after the gene we
             # mapped to.
             class_beds[classification].line(contig2, base2, base2 + 1,
                 gene_to)
                 
-        # Note that this gene (which may itself be None) has some bases in this
-        # mapping class, pointing to this other gene (which may balso be None).
-        # For gene2gene it will always be the same gene, and for gene2non it
-        # will always be pointing to None. For non2gene we'll get a set of all
-        # the genes we go to under the key None, and for non2non it will be None
-        # to a set of None.
-        gene_sets[classification][gene_from].add(gene_to)
+        # Note that this mapped genome has some bases mapping from this one gene
+        # to this other gene (either of which may be None).
+        gene_sets[classification][gene_from][gene_to].add(contig2)
         
         
     
@@ -376,14 +372,11 @@ def main(args):
         for gene, other_genes in gene_mappings.iteritems():
             # For each gene, what other genes was it observed mapping to?
             
-            for other_gene in other_genes:
-                # Record it mapped to each of those TODO: This redefines each
-                # "instance" of a gene2wrong mapping later in the pipeline as an
-                # instance of a gene in an alt mapping to another different
-                # gene, where multiple destination mappings in a single genome
-                # are counted.
-                gene_set_writer.line(classification, gene, other_gene)
-            
+            for other_gene, genome_set in other_genes.iteritems():
+                # For each mapping of this gene, what genomes did it appear in?
+                gene_set_writer.list_line([classification, gene, other_gene] +
+                    ",".join(sorted(genome_set)))
+                
 
 if __name__ == "__main__" :
     sys.exit(main(sys.argv))

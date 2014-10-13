@@ -2,7 +2,7 @@
 """
 sam2tsv.py: Take a SAM file and output a TSV of
 <reference>\t<position>\t<query>\t<position>\t<isBackwards> lines for each
-mapped base.
+mapped base in a primary alignment.
 
 """
 
@@ -71,6 +71,14 @@ def main(args):
     
     for read in sam.fetch():
         # For each read
+        
+        if read.flag & 0x900 > 0:
+            # This isn't a primary alignment according to the SAM spec at
+            # <http://samtools.github.io/hts-specs/SAMv1.pdf?, so skip it. It
+            # must be either secondary or supplemental. TODO: pysam exposes
+            # is_secondary, but it doesn't expose the supplemental flag in the
+            # same way.
+            continue
         
         for query_pos, ref_pos in read.aligned_pairs:
             # We can just iterate through this super simply.
