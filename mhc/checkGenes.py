@@ -374,7 +374,7 @@ def main(args):
             
             for other_gene, genome_set in other_genes.iteritems():
                 # For each mapping of this gene, what genomes did it appear in?
-                gene_set_writer.list_line([classification, gene, other_gene] +
+                gene_set_writer.line(classification, gene, other_gene,
                     ",".join(sorted(genome_set)))
                 
 
