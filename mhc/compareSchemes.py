@@ -33,8 +33,9 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         writing statistics to one directory, and assembly hubs for different
         pairs of genomes and schemes to another.
         
-        The BED files in gene_bed_dir will be used to evaluate alignment quality
-        in light of gene annotations.
+        The BED files in gene_bed_dir, organized like
+        gene_bed_dir/<genome>/<genome>.bed, will be used to evaluate alignment
+        quality in light of gene annotations.
         
         The coverage statistics are just alignment coverage for each pair of
         genomes, in <genome number>\t<coverage fraction> TSVs per scheme.
@@ -220,7 +221,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # gene annotations comparison.
         if self.gene_bed_dir is not None:
             # This will hold all the gene BED files found
-            gene_beds = list(glob.glob(self.gene_bed_dir + "/*.bed"))
+            gene_beds = list(glob.glob(self.gene_bed_dir + "/*/*.bed"))
         else:
             # No gene BED files will be used.
             gene_beds = []
@@ -540,17 +541,66 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # And what are the genomes with suffixes?
         genomes_with_suffixes = [genome + suffix for genome, suffix in 
             itertools.izip(pair_genomes, suffixes)]
+            
         
-        # What genome is the reference?
-        reference = os.path.splitext(self.fasta_list[0])[0]
+        if self.gene_bed_dir is not None:
+            # We want to go through this directory and duplicate all the genes
+            # for each suffixed genome.
+            
+            # Make a bedDir for the genes
+            genes_dir = bed_root + "/genes"
+            os.mkdir(genes_dir)
+            
+            # If there are reference genes, where are they?
+            reference_source = "{0}/{1}/{1}.bed".format(self.gene_bed_dir,
+                reference_genome)
+            
+            if os.path.exists(reference_source):
+                # Copy them over
+                reference_destination = "{0}/{1}/{1}.bed".format(genes_dir,
+                    reference_genome)
+                    
+                os.makedirs("{}/{}".format(genes_dir, reference_genome))
+                    
+                shutil.copyfile(reference_source, reference_destination)
+            
+            # Make sure we use these genes
+            bed_dirs.add(genes)
+            
+            for genome, suffix in itertools.izip(pair_genomes, suffixes):
+                # For each genome and its suffix
+                
+                # Work out what it needs to be called.
+                suffixed = genome + suffix
+                
+                # Where would the genes come from?
+                genome_source = "{0}/{1}/{1}.bed".format(self.gene_bed_dir,
+                    genome)
+                    
+                if os.path.exists(genome_source):
+                    # They exist.
+                    
+                    # Make the directory now
+                    os.makedirs("{}/{}".format(genes_dir, suffixed)) 
+                    
+                    # We need to change the contig name on every gene, which we
+                    # can do with a BedSplitTarget. It will automatically decide
+                    # to use a BED named after the new genome name.
+                    track_targets.append(BedSplitTarget(
+                        genome_source, [genome], genes_dir, 
+                        genome_names=[suffixed]))
+                        
+                    # Report what we're up to.
+                    self.logToMaster("Taking genes from {} for {}".format(
+                        genome, suffixed))
         
         # Make a target to make the merged c2h/fasta files
         merged_c2h_target = C2hMergeTarget(c2h_fasta_pairs, suffixes, 
             merged_c2h, merged_fasta)
             
         # And a target to make the hal from them
-        merged_hal_target = HalTarget(merged_c2h, merged_fasta, reference, 
-            genomes_with_suffixes, merged_hal)
+        merged_hal_target = HalTarget(merged_c2h, merged_fasta, 
+            reference_genome, genomes_with_suffixes, merged_hal)
             
         # And a target to sort out all of the left wiggles
         track_targets.append(WiggleCollateTarget(
@@ -1211,7 +1261,7 @@ def parse_args(args):
     parser.add_argument("--markovModel", default=None,
         help="filename of a Markov model to model query sequences with")
     parser.add_argument("--geneBedDir", default=None,
-        help="directory in which to find gene annotations to judge alignments")
+        help="hal2assemblyHub.py --bedDirs entry for evaluating alignments")
         
     
     
