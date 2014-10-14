@@ -74,7 +74,7 @@ def main(args):
         
         if read.flag & 0x900 > 0:
             # This isn't a primary alignment according to the SAM spec at
-            # <http://samtools.github.io/hts-specs/SAMv1.pdf?, so skip it. It
+            # <http://samtools.github.io/hts-specs/SAMv1.pdf>, so skip it. It
             # must be either secondary or supplemental. TODO: pysam exposes
             # is_secondary, but it doesn't expose the supplemental flag in the
             # same way.

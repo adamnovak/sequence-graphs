@@ -2,7 +2,7 @@
 set -e
 shopt -s extglob
 
-# makeGenePlots.sh: make plots of gene mapping info from compareGenes.py. Run in
+# makeGenePlots.sh: make plots of gene mapping info from compareReads.py. Run in
 # the output directory of the run.
 
 rm -Rf counts/
