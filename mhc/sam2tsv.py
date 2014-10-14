@@ -83,9 +83,13 @@ def main(args):
         for query_pos, ref_pos in read.aligned_pairs:
             # We can just iterate through this super simply.
             
-            if ref_pos is None or query_pos is None:
-                # Supposedly unaligned things can sneak in here? The pysam docs
-                # say so, so we skip them.
+            if query_pos is None:
+                # It's an insert in the reference
+                continue
+                
+            if ref_pos is None:
+                # It's an unaligned query base. Report it as unaligned.
+                writer.line(read.qname, query_pos)
                 continue
             
             # Look up the reference sequence name

@@ -64,6 +64,12 @@ def parse_args(args):
     parser.add_argument("--non2nonBed", type=argparse.FileType("w"),
         default=None,
         help=".bed file for mappings of non-genes to non-genes")
+    parser.add_argument("--gene2unmappedBed", type=argparse.FileType("w"),
+        default=None,
+        help=".bed file for unmapped positions in genes")
+    parser.add_argument("--non2unmappedBed", type=argparse.FileType("w"),
+        default=None,
+        help=".bed file for unmapped positions in non-genes")
     parser.add_argument("--classCounts", type=argparse.FileType("w"),
         default=sys.stdout,
         help="output file to save mapping class counts to")
@@ -166,44 +172,65 @@ def get_mappings_from_maf(maf_stream):
 def get_mappings_from_tsv(tsv_stream):
     """
     Given a TSV stream of mappings like
-    <reference>\t<position>\t<query>\t<position>\t<isBackwards>, where the query
-    name is of the form <actual query contig>:<start>-<end>, parse out and yield
-    mappings between the actual full query sequence and the reference.
+    <reference>\t<position>\t<query>\t<position>\t<isBackwards> (or
+    <query>\t<position> for unmapped bases), where the query name is of the form
+    <actual query contig>:<start>-<end>, parse out and yield mappings between
+    the actual full query sequence and the reference.
     
     """
     
     for parts in tsv.TsvReader(tsv_stream):
-        # Parse out everything
-        # What is the reference we're aligned to?
-        reference_name = parts[0]
-        # Where on it are we?
-        reference_position = int(parts[1])
-        # What is the query we're aligning?
-        query = parts[2]
-        # Where on it are we?
-        query_position = int(parts[3])
-        # Are we aligned to the reverse strand?
-        is_backwards = bool(int(parts[4]))
-        
-        # Parse the query name more
-        query_parts = query.split(":")
-        # What is the name of the orifginal un-split query sequence?
-        query_name = query_parts[0]
-        query_parts = query_parts[1].split("-")
-        # Where on it did this sequence start?
-        query_offset = int(query_parts[0])
-        
-        # Assemble a mapping of the original query sequence and yield it.
-        toYield = (reference_name, reference_position, query_name, 
-            query_position + query_offset, is_backwards)
-        yield toYield
+        if len(parts) == 5:
+            # This base is mapped
+    
+            # Parse out everything
+            # What is the reference we're aligned to?
+            reference_name = parts[0]
+            # Where on it are we?
+            reference_position = int(parts[1])
+            # What is the query we're aligning?
+            query = parts[2]
+            # Where on it are we?
+            query_position = int(parts[3])
+            # Are we aligned to the reverse strand?
+            is_backwards = bool(int(parts[4]))
+            
+            # Parse the query name more
+            query_parts = query.split(":")
+            # What is the name of the orifginal un-split query sequence?
+            query_name = query_parts[0]
+            query_parts = query_parts[1].split("-")
+            # Where on it did this sequence start?
+            query_offset = int(query_parts[0])
+            
+            # Assemble a mapping of the original query sequence and yield it.
+            yield (reference_name, reference_position, query_name, 
+                query_position + query_offset, is_backwards)
+        elif len(parts) == 2:
+            # This base is unmapped
+            # Parse out everything
+            # What query holds the base?
+            query = parts[0]
+            # Where on it are we?
+            query_position = int(parts[1])
+            
+            # Parse the query name more
+            query_parts = query.split(":")
+            # What is the name of the orifginal un-split query sequence?
+            query_name = query_parts[0]
+            query_parts = query_parts[1].split("-")
+            # Where on it did this sequence start?
+            query_offset = int(query_parts[0])
+            
+            yield (query_name, query_position + query_offset)
+            
 
 def classify_mappings(mappings, genes):
     """
-    Given a source of (contig, base, other contig, other base, orientation)
-    mappings (in reference, query order), and a soucre of (contig, start, end,
-    gene name, strand number) genes, yield a (class, fromGene, toGene, mapping)
-    tuple for each mapping.
+    Given a source of (contig, base, other contig, other base, orientation) or
+    (other contig, other base) mappings (in reference, query order), and a
+    soucre of (contig, start, end, gene name, strand number) genes, yield a
+    (class, fromGene, toGene, mapping) tuple for each mapping.
     
     """
     
@@ -218,70 +245,95 @@ def classify_mappings(mappings, genes):
     for mapping in mappings:
         # Look at each mapping
         
-        # Unpack the mapping
-        contig1, base1, contig2, base2, orientation = mapping
+        if len(mapping) == 5:
         
-        # Pull the name, strand tuples for both ends
-        genes1 = set(geneTrees[contig1].find(base1, base1))
-        genes2 = set(geneTrees[contig2].find(base2, base2))
-        
-        if orientation:
-            # This is a backwads mapping, so flip orientations on one of the
-            # sets
-            genes2 = {(name, -strand) for name, strand in genes2}
-        
-        # Reference was first, so we want to see if the genes we were supposed
-        # to have in the query were recapitulated in the right orientation in
-        # the reference.
-        
-        # What gene names from the query should we use to describe this mapping,
-        # if any?
-        
-        # TODO: How many times do genes with different names actually overlap? I
-        # bet never.
-        
-        # Make a set of all the reference gene names.
-        gene_names1 = {name for name, base in genes1}
-        # Make a set of all the query gene names.
-        gene_names2 = {name for name, base in genes2}
-        
-        if(len(genes1 & genes2)) > 0:
-            # At least one shared gene exists in the right orientation to
-            # explain this mapping.
+            # Unpack the mapping
+            contig1, base1, contig2, base2, orientation = mapping
             
-            # Grab a plausible gene name.
-            gene_name = next(iter(genes1 & genes2))[0]
+            # Pull the name, strand tuples for both ends
+            genes1 = set(geneTrees[contig1].find(base1, base1))
+            genes2 = set(geneTrees[contig2].find(base2, base2))
             
-            yield "gene2gene", gene_name, gene_name, mapping
-        elif len(genes1) == 0 and len(genes2) > 0:
-            # We mapped a gene to somewhere where there is no gene
+            if orientation:
+                # This is a backwads mapping, so flip orientations on one of the
+                # sets
+                genes2 = {(name, -strand) for name, strand in genes2}
             
-            # Grab a plausible gene name.
-            gene_name = next(iter(gene_names2))
+            # Reference was first, so we want to see if the genes we were
+            # supposed to have in the query were recapitulated in the right
+            # orientation in the reference.
             
-            yield "gene2non", gene_name, None, mapping
-        
-        elif len(genes1) > 0 and len(genes2) > 0:
-            # We mapped a gene to a place where there are genes, but not the
-            # right gene in the right orientation
+            # What gene names from the query should we use to describe this
+            # mapping, if any?
+            
+            # TODO: How many times do genes with different names actually
+            # overlap? I bet never.
+            
+            # Make a set of all the reference gene names.
+            gene_names1 = {name for name, _ in genes1}
+            # Make a set of all the query gene names.
+            gene_names2 = {name for name, _ in genes2}
+            
+            if(len(genes1 & genes2)) > 0:
+                # At least one shared gene exists in the right orientation to
+                # explain this mapping.
+                
+                # Grab a plausible gene name.
+                gene_name = next(iter(genes1 & genes2))[0]
+                
+                yield "gene2gene", gene_name, gene_name, mapping
+            elif len(genes1) == 0 and len(genes2) > 0:
+                # We mapped a gene to somewhere where there is no gene
+                
+                # Grab a plausible gene name.
+                gene_name = next(iter(gene_names2))
+                
+                yield "gene2non", gene_name, None, mapping
+            
+            elif len(genes1) > 0 and len(genes2) > 0:
+                # We mapped a gene to a place where there are genes, but not the
+                # right gene in the right orientation
+                
+                # Grab a plausible gene name from.
+                gene_from = next(iter(gene_names2))
+                
+                # And where it could be mapped to
+                gene_to = next(iter(gene_names1))
+                
+                yield "gene2wrong", gene_from, gene_to, mapping
+            elif len(genes1) > 0 and len(genes2) == 0:
+                # We mapped a non-gene to somewhere where there are genes
+                
+                # What's a plausible gene name we could be going to?
+                gene_to = next(iter(gene_names1))
+                
+                yield "non2gene", None, gene_to, mapping
+            else:
+                # We mapped a non-gene to somewhere where there are no genes.
+                yield "non2non", None, None, mapping
+                
+            # OK that's all the cases for mapped bases.
+            
+        elif len(mapping) == 2:
+            # Unpack the mapping (numbered 2 for consistency with above)
+            contig2, base2 = mapping
+            
+            # Pull a set of name, strand pairs for this position
+            genes2 = set(geneTrees[contig2].find(base2, base2))
+            
+            # Pull out just the names
+            gene_names = [name for name, _ in genes2]
             
             # Grab a plausible gene name from.
-            gene_from = next(iter(gene_names2))
+            gene_from = gene_names[0] if len(gene_names) > 0 else None
             
-            # And where it could be mapped to
-            gene_to = next(iter(gene_names1))
+            if gene_from is None:
+                # No gene was here.
+                yield "non2unmapped", None, None, mapping
+            else:
+                # There was a gene here. Report it.
+                yield "gene2unmapped", gene_name, None, mapping
             
-            yield "gene2wrong", gene_from, gene_to, mapping
-        elif len(genes1) > 0 and len(genes2) == 0:
-            # We mapped a non-gene to somewhere where there are genes
-            
-            # What's a plausible gene name we could be going to?
-            gene_to = next(iter(gene_names1))
-            
-            yield "non2gene", None, gene_to, mapping
-        else:
-            # We mapped a non-gene to somewhere where there are no genes.
-            yield "non2non", None, None, mapping
 
 def main(args):
     """
@@ -303,11 +355,14 @@ def main(args):
         if options.gene2geneBed is not None else None
     class_beds["gene2non"] = tsv.TsvWriter(options.gene2nonBed) \
         if options.gene2nonBed is not None else None
+    class_beds["gene2unmapped"] = tsv.TsvWriter(options.gene2unmappedBed) \
+        if options.gene2unmappedBed is not None else None
     class_beds["non2gene"] = tsv.TsvWriter(options.non2geneBed) \
         if options.non2geneBed is not None else None
     class_beds["non2non"] = tsv.TsvWriter(options.non2nonBed) \
         if options.non2nonBed is not None else None
-    
+    class_beds["non2unmapped"] = tsv.TsvWriter(options.non2unmappedBed) \
+        if options.non2unmappedBed is not None else None
     
     # Make a writer for gene set output
     gene_set_writer = tsv.TsvWriter(options.geneSets)
@@ -341,7 +396,12 @@ def main(args):
         # For each classified mapping
         
         # Unpack the mapping
-        contig1, base1, contig2, base2, _ = mapping
+        if len(mapping) == 5:
+            # We have query and reference positions
+            _, _, contig2, base2, _ = mapping
+        elif len(mapping) == 2:
+            # We only have the wuery position
+            contig2, base2 = mapping
         
         # Record it in its class
         class_counts[classification] += 1

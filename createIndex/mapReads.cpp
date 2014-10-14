@@ -306,6 +306,20 @@ mapSomeReads(
                         
                 }
                 
+            } else {
+                // Report this query base as unaligned (just its contig and
+                // base).
+                
+                std::stringstream mappingStream;
+                mappingStream << recordName << "\t" << i << std::endl;
+                
+                // Make a string of the output
+                std::string line(mappingStream.str());
+                
+                // Send it
+                auto lineLock = linesOut->lock();
+                linesOut->enqueue(line, lineLock);
+                
             }
             
         }
