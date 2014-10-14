@@ -565,7 +565,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 shutil.copyfile(reference_source, reference_destination)
             
             # Make sure we use these genes
-            bed_dirs.add(genes)
+            bed_dirs.add(genes_dir)
             
             for genome, suffix in itertools.izip(pair_genomes, suffixes):
                 # For each genome and its suffix
