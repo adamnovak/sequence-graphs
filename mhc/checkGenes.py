@@ -324,10 +324,10 @@ def classify_mappings(mappings, genes):
             # Pull out just the names
             gene_names = [name for name, _ in genes2]
             
-            # Grab a plausible gene name from.
-            gene_from = gene_names[0] if len(gene_names) > 0 else None
+            # Grab a plausible gene name if we have one.
+            gene_name = gene_names[0] if len(gene_names) > 0 else None
             
-            if gene_from is None:
+            if gene_name is None:
                 # No gene was here.
                 yield "non2unmapped", None, None, mapping
             else:
@@ -385,10 +385,13 @@ def main(args):
     # Classify each mapping in light of the genes
     classified = classify_mappings(mappings, genes)
     
-    # This will count up the instances of each class
-    class_counts = collections.Counter()
+    # This will count up the instances of each class, by source and destination
+    # gene.
+    class_counts = collections.defaultdict(lambda: collections.defaultdict(
+        collections.Counter))
     
-    # This maps from classification, source gene, and gene mapped to to genome set that has that mapping.
+    # This maps from classification, source gene, and gene mapped to to genome
+    # set that has that mapping.
     gene_sets = collections.defaultdict(lambda: collections.defaultdict(
         lambda: collections.defaultdict(set)))
     
@@ -403,8 +406,8 @@ def main(args):
             # We only have the wuery position
             contig2, base2 = mapping
         
-        # Record it in its class
-        class_counts[classification] += 1
+        # Record it in its class for its gene pair (which may be Nones)
+        class_counts[classification][gene_from][gene_to] += 1
         
         if class_beds[classification] is not None:
             # We want to write a BED of this class.
@@ -420,22 +423,40 @@ def main(args):
         
         
     
-    for classification, count in class_counts.iteritems():
+    for classification, count_by_source in class_counts.iteritems():
         # For each class
         
-        # Dump a TSV of bases by classification
-        options.classCounts.write("{}\t{}\n".format(classification, count))
+        # Sum over all the gene pairs
+        total = 0
+        for count_by_destination in count_by_source.itervalues():
+            # Over all from genes
+            for count in count_by_destination.itervalues():
+                # And over all to genes
+                total += count
+        
+        # Dump a TSV of base counts (over all gene pairs) by classification
+        options.classCounts.write("{}\t{}\n".format(classification, total))
         
     for classification, gene_mappings in gene_sets.iteritems():
         # For each set of query genes with mappings in a class
         
         for gene, other_genes in gene_mappings.iteritems():
-            # For each gene, what other genes was it observed mapping to?
+            # For each gene, and the other genes it was observed mapping to...
             
             for other_gene, genome_set in other_genes.iteritems():
-                # For each mapping of this gene, what genomes did it appear in?
+                # For each other gene it was mapped to, and the genomes in which
+                # that mapping appeared...
+                
+                # How many mappings in this category between these genes were
+                # there?
+                mapping_count = class_counts[classification][gene][other_gene]
+                
+                # Save the mapping, and the count and genome list. You can just
+                # sum up all the mapping counts for a source gene, and break
+                # them down reasonably by classification, since each read base
+                # gets counted exactly once.
                 gene_set_writer.line(classification, gene, other_gene,
-                    ",".join(sorted(genome_set)))
+                    mapping_count, ",".join(sorted(genome_set)))
                 
 
 if __name__ == "__main__" :
