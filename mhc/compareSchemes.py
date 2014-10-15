@@ -212,6 +212,10 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # set so we can register a directory each time we add a genome's track.
         bed_dirs = set()
         
+        # We have a wiggle root, but we make sure to keep that in our output so
+        # the wiggles can be interrogated for context lengths.
+        wiggle_root = self.stats_dir + "/wiggles"
+        
         # And all the wiggle dirs. This is a set so we can register a directory
         # each time we add a genome's track, if we want to.
         wiggle_dirs = set()
@@ -488,22 +492,20 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         merged_fasta = sonLib.bioio.getTempFile(suffix=".fa",
                 rootDir=self.getGlobalTempDir())
                 
-        # Where should we keep our left and right max context wiggles?
-        left_context_dir = sonLib.bioio.getTempDirectory(
-                rootDir=self.getGlobalTempDir()) + "/leftMaxContext"
+        # Where should we keep our left and right max context wiggles? They have
+        # to be under the output directory so we can read them later for context
+        # length plots.
+        left_context_dir = wiggle_root + "/leftMaxContext"
         wiggle_dirs.add(left_context_dir)
         
-        right_context_dir = sonLib.bioio.getTempDirectory(
-                rootDir=self.getGlobalTempDir()) + "/rightMaxContext"
+        right_context_dir = wiggle_root + "/rightMaxContext"
         wiggle_dirs.add(right_context_dir)
                 
-        # Where should we keep our left and right max context wiggles?
-        left_min_context_dir = sonLib.bioio.getTempDirectory(
-                rootDir=self.getGlobalTempDir()) + "/leftMinContext"
+        # Where should we keep our left and right min context wiggles?
+        left_min_context_dir = wiggle_root + "/leftMinContext"
         wiggle_dirs.add(left_min_context_dir)
         
-        right_min_context_dir = sonLib.bioio.getTempDirectory(
-                rootDir=self.getGlobalTempDir()) + "/rightMinContext"
+        right_min_context_dir = wiggle_root + "/rightMinContext"
         wiggle_dirs.add(right_min_context_dir)
         
         # What suffixes should we put on genomes?

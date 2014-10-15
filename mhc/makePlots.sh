@@ -19,7 +19,7 @@ do
     
 done
 
-boxplot.py ${OUTFILE} --x_label "Merging Scheme" --y_label "Precision" --title "Precision vs. Merging Scheme" --x_sideways --save precisionVsScheme.png
+boxplot.py precision.tsv --x_label "Merging Scheme" --y_label "Precision" --title "Precision vs. Merging Scheme" --x_sideways --save precisionVsScheme.png
 
 OUTFILE="recall.tsv"
 truncate -s 0 ${OUTFILE}
@@ -36,7 +36,7 @@ do
     
 done
 
-boxplot.py ${OUTFILE} --x_label "Merging Scheme" --y_label "Recall" --title "Recall vs. Merging Scheme" --x_sideways --save recallVsScheme.png
+boxplot.py recall.tsv --x_label "Merging Scheme" --y_label "Recall" --title "Recall vs. Merging Scheme" --x_sideways --save recallVsScheme.png
 
 OUTFILE="coverages.tsv"
 truncate -s 0 ${OUTFILE}
@@ -53,7 +53,7 @@ do
     
 done
     
-boxplot.py ${OUTFILE} --x_label "Merging Scheme" --y_label "Portion Aligned to Reference" --title "Coverage vs. Merging Scheme" --x_sideways --save coverageVsScheme.png
+boxplot.py coverages.tsv --x_label "Merging Scheme" --y_label "Portion Aligned to Reference" --title "Coverage vs. Merging Scheme" --x_sideways --save coverageVsScheme.png
 
 mkdir -p spectrums
 
