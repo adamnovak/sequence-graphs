@@ -235,8 +235,6 @@ mapSomeReads(
             }
         }
         
-        Log::output() << leftMappings[50] << "\t" << rightMappings[50] << std::endl;
-        
         // Run the mappings through a filter to disambiguate and possibly
         // apply credit.
         std::vector<Mapping> filteredMappings;    
@@ -250,8 +248,6 @@ mapSomeReads(
                 rightMappings);
         }
         
-        Log::output() << filteredMappings[50] << std::endl;
-
         // Do one final pass to remove mappings of the wrong base, and
         // output. TODO: Make a real filter.
         for(size_t i = 0; i < sequence.size(); i++) {
@@ -281,9 +277,6 @@ mapSomeReads(
                     mappedTo = complement(mappedTo);
                 }
                     
-                Log::output() << mapping.getLocation().getOffset() << std::endl;
-                Log::output() << mapping << "\t" << mapped << "\t" << mappedTo << std::endl;
-                    
                 if(mapped != mappedTo) {
                     // Throw out this mapping, since it's placing a
                     // character on a character it doesn't match.
@@ -292,8 +285,8 @@ mapSomeReads(
                     Log::info() << "Tried mapping " << recordName << ":" <<
                         i << " (" << mapped << ") to " << 
                         referenceRecord.first << ":" << 
-                        mapping.getLocation().getOffset() << " (" << 
-                        mappedTo << ")" << std::endl;
+                        mapping.getLocation().getOffset() << "." << backwards <<
+                        " (" << mappedTo << ")" << std::endl;
                         
                     // Report that this base is unmapped.
                     // TODO: don't duplicate this stringstream code 3 times.
