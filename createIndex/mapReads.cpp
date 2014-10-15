@@ -234,7 +234,9 @@ mapSomeReads(
                     leftMappings[i].getLocation().getContigNumber()));
             }
         }
-         
+        
+        Log::output() << leftMappings[50] << "\t" << rightMappings[50] << std::endl;
+        
         // Run the mappings through a filter to disambiguate and possibly
         // apply credit.
         std::vector<Mapping> filteredMappings;    
@@ -247,6 +249,8 @@ mapSomeReads(
             filteredMappings = DisambiguateFilter(index).apply(leftMappings,
                 rightMappings);
         }
+        
+        Log::output() << filteredMappings[50] << std::endl;
 
         // Do one final pass to remove mappings of the wrong base, and
         // output. TODO: Make a real filter.
@@ -267,9 +271,18 @@ mapSomeReads(
                 
                 // Get the character being mapped
                 char mapped = sequence[i];
-                // Get the character it is mapped to
+                // Get the character it is mapped to, from the forward strand.
                 char mappedTo = referenceRecord.second[
-                    mapping.getLocation().getOffset()]; 
+                    mapping.getLocation().getOffset()];
+                    
+                if(backwards) {
+                    // If we're mapping backwards, we have to match the reverse
+                    // of that character.
+                    mappedTo = complement(mappedTo);
+                }
+                    
+                Log::output() << mapping.getLocation().getOffset() << std::endl;
+                Log::output() << mapping << "\t" << mapped << "\t" << mappedTo << std::endl;
                     
                 if(mapped != mappedTo) {
                     // Throw out this mapping, since it's placing a
@@ -281,6 +294,18 @@ mapSomeReads(
                         referenceRecord.first << ":" << 
                         mapping.getLocation().getOffset() << " (" << 
                         mappedTo << ")" << std::endl;
+                        
+                    // Report that this base is unmapped.
+                    // TODO: don't duplicate this stringstream code 3 times.
+                    std::stringstream mappingStream;
+                    mappingStream << recordName << "\t" << i << std::endl;
+                    
+                    // Make a string of the output
+                    std::string line(mappingStream.str());
+                    
+                    // Send it
+                    auto lineLock = linesOut->lock();
+                    linesOut->enqueue(line, lineLock);
                     
                 } else {
                 
