@@ -86,42 +86,13 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         return [
             # Exact no credit min 100
             (False, False, 100, 0, 0, 0),
-            # MultContext with and without min
+            # Inexact credit min 100
+            (True, True, 100, 0, 0, 0),
+            # MultContext without min
             (True, True, 0, 0, 4.0, 0),
-            (True, True, 60, 0, 4.0, 0),
-            (True, True, 0, 0, 8.0, 0),
-            (True, True, 120, 0, 8.0, 0),
-            (True, True, 0, 0, 10.0, 0),
-            # MultContext sans credit
-            (True, False, 0, 0, 8.0, 0)
+            (True, True, 0, 0, 8.0, 0)
         ]
 
-    def getMonotonicSchemePlan(self):
-        """
-        Return a list of different tuples describing schemes.
-        
-        We want to look at addContext schemes without credit to try and catch
-        nonmonotonicity.
-        
-        """
-        
-        # Plan out all the schemes as mismatch, credit, min_context,
-        # add_context, mult_context, min_coding_cost
-        return [
-            # No credit
-            (True, False, 0, 25, 0, 0),
-            (True, False, 0, 50, 0, 0),
-            (True, False, 0, 75, 0, 0),
-            (True, False, 0, 100, 0, 0),
-            # Credit
-            (True, True, 0, 25, 0, 0),
-            (True, True, 0, 50, 0, 0),
-            (True, True, 0, 75, 0, 0),
-            (True, True, 0, 100, 0, 0)
-        ]
-
-        
-   
     def generateSchemes(self):
         """
         Whatever schemes I want to test at the moment

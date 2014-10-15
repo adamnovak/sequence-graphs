@@ -159,14 +159,11 @@ class AlignerAssessmentTarget(jobTree.scriptTree.target.Target):
         return [
             # Exact no credit min 100
             (False, False, 100, 0, 0, 0),
-            # MultContext with and without min
+            # Inexact credit min 100
+            (True, True, 100, 0, 0, 0),
+            # MultContext without min
             (True, True, 0, 0, 4.0, 0),
-            (True, True, 60, 0, 4.0, 0),
-            (True, True, 0, 0, 8.0, 0),
-            (True, True, 120, 0, 8.0, 0),
-            (True, True, 0, 0, 10.0, 0),
-            # MultContext sans credit
-            (True, False, 0, 0, 8.0, 0)
+            (True, True, 0, 0, 8.0, 0)
         ]
 
         
