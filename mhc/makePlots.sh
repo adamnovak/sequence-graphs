@@ -61,7 +61,12 @@ for SPECTRUM in spectrum.*
 do
     # Grab the extension. See <http://unix.stackexchange.com/a/1574/44348>
     SCHEME=${SPECTRUM##*.}
-    histogram.py --min 0 --max 40 --bins 40 --logCounts ${SPECTRUM} --save spectrums/${SCHEME}.spectrum.png --x_label "Adjacency Component Size" --y_label "Occurrences" --title "${SCHEME} Component Spectrum" --label
+    
+    # Work out the total tandem count
+    TANDEM_COUNT=$(sum.sh < tandem.${SCHEME}) 
+    
+    # Plot the histogram indication the tandem dupes
+    histogram.py --min 0 --max 40 --bins 40 --logCounts ${SPECTRUM} --save spectrums/${SCHEME}.spectrum.png --x_label "Adjacency Component Size" --y_label "Occurrences" --title "${SCHEME} Component Spectrum" --label --redWeight 0 --redWeight 0 --redWeight ${TANDEM_COUNT}
 done
 
 OUTFILE="indelLengths.tsv"
