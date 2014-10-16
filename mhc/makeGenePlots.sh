@@ -41,7 +41,7 @@ do
             TOTAL_MAPPED=$((${TOTAL_MAPPED} + ${COUNT}))
         fi
         
-        if [[ ${CATEGORY} -eq "gene2unmapped" ]]
+        if [[ ${CATEGORY} == "gene2unmapped" ]]
         then
             # This is the last category from each genome. Save stats per genome.
             # TODO: this is a hack.
