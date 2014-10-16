@@ -82,7 +82,7 @@ do
     # And the category name from that
     CATEGORY="${FILENAME%.*}"
 
-    barchart.py ${FILE} --x_label "Scheme" --x_sideways --y_label "Genes" --title "Genes with ${CATEGORY} mappings" --save genes/${CATEGORY}.genes.png
+    barchart.py ${FILE} --x_label "Scheme" --x_sideways --y_label "Gene Instances" --title "Genes with ${CATEGORY} mappings" --save genes/${CATEGORY}.genes.png
     
 done
 
