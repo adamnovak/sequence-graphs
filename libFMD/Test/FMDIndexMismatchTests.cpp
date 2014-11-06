@@ -116,9 +116,11 @@ void FMDIndexMismatchTests::testMapOnMismatch() {
     std::vector<Mapping> mappings = index->misMatchMap(bv,
         query, (GenericBitVector*)NULL, 0, 0, 0.0, 0.0, 1);
         
-    // Make sure it doesn't map, since the C is the last base and not forced to
-    // match exactly.
-    CPPUNIT_ASSERT(mappings[11].getRange() == -1);
+    // Make sure nothing maps, the C is the last base and has no context to map
+    // on.
+    for(auto mapping : mappings) {
+        CPPUNIT_ASSERT(mapping.getRange() == -1);
+    }
     
     
     // Do the same thing in a different orientation, showing that it maps due to
@@ -126,18 +128,28 @@ void FMDIndexMismatchTests::testMapOnMismatch() {
     std::vector<Mapping> rcMappings = index->misMatchMap(bv,
         reverseComplement(query), (GenericBitVector*)NULL, 0, 0, 0.0, 0.0, 1);
         
-    // Make sure it maps, due to the C being forced to match exactly.
+    // Make sure the C maps, due to the C being forced to match exactly and
+    // having some context.
     CPPUNIT_ASSERT(rcMappings[0].getRange() != -1);
     
-    // And try again with bases to the right of the C, which should not matter.
-    query = "AAAAAAAAAAACAAA";
+    // And try again with a few bases to the right of the C, which should
+    // differentiate it from the reverse complement of the G and let it map.
+    query = "AAAAAAAAAAACAA";
     mappings = index->misMatchMap(bv, query, (GenericBitVector*)NULL, 0, 0, 0.0,
         0.0, 1);
     rcMappings = index->misMatchMap(bv, reverseComplement(query),
         (GenericBitVector*)NULL, 0, 0, 0.0, 0.0, 1);
         
-    CPPUNIT_ASSERT(mappings[11].getRange() == -1);
-    CPPUNIT_ASSERT(rcMappings[3].getRange() != -1);
+    // The C should map
+    CPPUNIT_ASSERT(mappings[11].getRange() != -1);
+    // But things on either side of it shouldn't
+    CPPUNIT_ASSERT(mappings[10].getRange() == -1);
+    CPPUNIT_ASSERT(mappings[12].getRange() == -1);
+    
+    // And similarly for left mapping
+    CPPUNIT_ASSERT(rcMappings[2].getRange() != -1);
+    CPPUNIT_ASSERT(rcMappings[1].getRange() == -1);
+    CPPUNIT_ASSERT(rcMappings[3].getRange() == -1);
     
 }
 
