@@ -127,7 +127,18 @@ void FMDIndexMismatchTests::testMapOnMismatch() {
         reverseComplement(query), (GenericBitVector*)NULL, 0, 0, 0.0, 0.0, 1);
         
     // Make sure it maps, due to the C being forced to match exactly.
-    CPPUNIT_ASSERT(mappings[0].getRange() != -1);
+    CPPUNIT_ASSERT(rcMappings[0].getRange() != -1);
+    
+    // And try again with bases to the right of the C, which should not matter.
+    query = "AAAAAAAAAAACAAA";
+    mappings = index->misMatchMap(bv, query, (GenericBitVector*)NULL, 0, 0, 0.0,
+        0.0, 1);
+    rcMappings = index->misMatchMap(bv, reverseComplement(query),
+        (GenericBitVector*)NULL, 0, 0, 0.0, 0.0, 1);
+        
+    CPPUNIT_ASSERT(mappings[11].getRange() == -1);
+    CPPUNIT_ASSERT(rcMappings[3].getRange() != -1);
+    
 }
 
 
