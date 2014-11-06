@@ -425,6 +425,31 @@ public:
      **************************************************************************/
     
     /**
+     * Given a query string, a number of mismatches, and a mask of elligible
+     * positions (which may be null), find all the strings in the index that are
+     * within the specified number of mismatches of the query.
+     *
+     * Returns a MisMatchAttemptResults which contains ranges for each string
+     * within the specified number of mismatches that has any results. If there
+     * is only one range with results for only one position, the is_mapped flag
+     * on the result will be set.
+     *
+     * ranges is a bit vector marking the ranges that belong to each position,
+     * so that we can check for uniqueness and set the is_mapped flag
+     * appropriately.
+     *
+     * pattern gives the query string to be searched for.
+     *
+     * z_max gives the maximum number of mismatches.
+     *
+     * mask indicates which BWT positions should be included by setting their
+     * bits to 1. If it is null, all BWT positions are included.
+     */
+    MisMatchAttemptResults misMatchCount(const GenericBitVector& ranges,
+        const std::string& pattern, size_t z_max, 
+        const GenericBitVector* mask = NULL) const;
+    
+    /**
      * Given a set of mismatch search results, extend each result in the set,
      * throwing out those which do not exist in the reference.
      * 
@@ -442,7 +467,6 @@ public:
      * 
      * For speed, this implementation does not sort search results.
      */ 
-        
     MisMatchAttemptResults misMatchExtend(MisMatchAttemptResults& prevMisMatches,
         char c, bool backward, size_t z_max, const GenericBitVector* mask,
         bool startExtension = false, bool finishExtension = false) const;
@@ -452,7 +476,6 @@ public:
      * in order of number of mismatches. This will allow a speed-up if ever we
      * want to find the match with the fewest number of mismatches.
      */
-        
     MisMatchAttemptResults sortedMisMatchExtend(MisMatchAttemptResults& prevMisMatches,
             char c, bool backward, size_t z_max, const GenericBitVector* mask) const;
         
@@ -460,7 +483,6 @@ public:
      * A submethod of sortedMisMatchExtend to check for existence and then sort
      * extension results
      */
-    
     void processMisMatchPositions(
         MisMatchAttemptResults& nextMisMatches,
         std::vector<std::pair<FMDPosition,size_t>>& waitingMatches,
@@ -474,8 +496,9 @@ public:
      * keepIntermediates can be set to false to force a restart at every base,
      * so minContext will be accurate; there's no way to calculate it if we're
      * allowed to extend from a previous result.
+     *
+     * Does right mapping.
      */
-                 
     std::vector<Mapping> misMatchMap(const GenericBitVector& ranges,
         const std::string& query, const GenericBitVector* mask, 
         int minContext = 0, int addContext = 0, double multContext = 0, 
@@ -506,22 +529,6 @@ public:
         const std::string& pattern, size_t index, size_t z_max, bool maxContext,
         bool allowFirstMismatch, const GenericBitVector* mask = NULL) const;
     
-    /**
-     * Centered search versions of all the mismatch mapping functions
-     */
-    
-    std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> CmisMap(const GenericBitVector& ranges,
-        const std::string& query, const GenericBitVector* mask, int minContext = 0, size_t z_max = 0,
-        int start = 0, int length = -1) const;
-        
-    std::vector<std::pair<int64_t,std::pair<size_t,size_t>>> CmisMap(const GenericBitVector& ranges, 
-        const std::string& query, int64_t genome = -1, int minContext = 0, size_t z_max = 0,
-        int start = 0, int length = -1) const;
-        
-    MisMatchAttemptResults CmisMatchMapPosition(const GenericBitVector& ranges, 
-        const std::string& pattern, size_t index, size_t z_max, size_t minContext,
-        const GenericBitVector* mask = NULL) const;
-
     /***************************************************************************
      * Iteration Functions
      **************************************************************************/

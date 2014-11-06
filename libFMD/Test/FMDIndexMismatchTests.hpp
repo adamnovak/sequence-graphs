@@ -11,6 +11,7 @@ class FMDIndexMismatchTests : public CppUnit::TestFixture {
     CPPUNIT_TEST_SUITE(FMDIndexMismatchTests);
     CPPUNIT_TEST(testMismatch);
     CPPUNIT_TEST(testMapOnMismatch);
+    CPPUNIT_TEST(testMismatchCount);
     CPPUNIT_TEST_SUITE_END();
     
     // Keep a string saying where to get the haplotypes to test with.
@@ -32,6 +33,7 @@ public:
 
     void testMismatch();
     void testMapOnMismatch();
+    void testMismatchCount();
     
 };
 

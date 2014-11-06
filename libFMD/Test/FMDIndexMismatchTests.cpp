@@ -153,6 +153,38 @@ void FMDIndexMismatchTests::testMapOnMismatch() {
     
 }
 
+/**
+ * Test mismatch count.
+ */
+void FMDIndexMismatchTests::testMismatchCount() {
+
+    // Declare everything to be a range
+    GenericBitVector bv;
+    for(size_t i = 0; i < index->getBWTLength(); i++) {
+        bv.addBit(i);
+    }
+    bv.finish(index->getBWTLength());
+
+    // This string appears once within 1 mismatch, 0 times within 0.
+    std::string query = "CAAAAAAAAAAAAAAAAAAAAATAAAAAAAAAAAAAAAAAG";
+    
+    // No results in 0 mismatches
+    MisMatchAttemptResults results = index->misMatchCount(bv, query, 0);
+    CPPUNIT_ASSERT_EQUAL(results.positions.size(), (size_t)0);
+    
+    // 1 result in 1 mismatches
+    results = index->misMatchCount(bv, query, 1);
+    CPPUNIT_ASSERT_EQUAL(results.positions.size(), (size_t)1);
+    CPPUNIT_ASSERT_EQUAL(results.is_mapped, true);
+    
+    // Many results in 1 mismatch for a shorter string.
+    query = "CAAAAAAAAA";
+    results = index->misMatchCount(bv, query, 1);
+    CPPUNIT_ASSERT(results.positions.size() > 1);
+    CPPUNIT_ASSERT_EQUAL(results.is_mapped, false);
+    
+}
+
 
 
 
