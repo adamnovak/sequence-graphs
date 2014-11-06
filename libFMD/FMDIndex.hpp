@@ -432,7 +432,8 @@ public:
      * Returns a MisMatchAttemptResults which contains ranges for each string
      * within the specified number of mismatches that has any results. If there
      * is only one range with results for only one position, the is_mapped flag
-     * on the result will be set.
+     * on the result will be set. The characters field of the result will only
+     * be accurate if there are any result ranges.
      *
      * ranges is a bit vector marking the ranges that belong to each position,
      * so that we can check for uniqueness and set the is_mapped flag
