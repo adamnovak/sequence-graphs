@@ -11,16 +11,16 @@
 #include "../FMDIndexBuilder.hpp"
 #include "../util.hpp"
 
-#include "FMDIndexMismatchTest.hpp"
+#include "FMDIndexMismatchTests.hpp"
 
 
 // Register the fixture to be run.
-CPPUNIT_TEST_SUITE_REGISTRATION( FMDIndexMismatchTest );
+CPPUNIT_TEST_SUITE_REGISTRATION( FMDIndexMismatchTests );
 
 // Define constants
-const std::string FMDIndexMismatchTest::filename = "Test/haplotypes2.fa";
+const std::string FMDIndexMismatchTests::filename = "Test/haplotypes2.fa";
 
-FMDIndexMismatchTest::FMDIndexMismatchTest() {
+FMDIndexMismatchTests::FMDIndexMismatchTests() {
 
     // We need a built index as a fixture, and we don't want to rebuild it for
     // every test.
@@ -46,17 +46,17 @@ FMDIndexMismatchTest::FMDIndexMismatchTest() {
     
 }
 
-FMDIndexMismatchTest::~FMDIndexMismatchTest() {
+FMDIndexMismatchTests::~FMDIndexMismatchTests() {
     // Get rid of the temporary index directory
     boost::filesystem::remove_all(tempDir);
 }
 
-void FMDIndexMismatchTest::setUp() {
+void FMDIndexMismatchTests::setUp() {
     
 }
 
 
-void FMDIndexMismatchTest::tearDown() {
+void FMDIndexMismatchTests::tearDown() {
     
 }
 
@@ -64,7 +64,7 @@ void FMDIndexMismatchTest::tearDown() {
 /**
  * Make sure we properly handle mismatches and let them produce ambiguity.
  */
-void FMDIndexMismatchTest::testMismatch() {
+void FMDIndexMismatchTests::testMismatch() {
 
     // We'll map this contig with only one distinctive base to itself.
     std::string query = "AAAAAAAAAAAAACAAAAAAAAAA";
@@ -93,6 +93,43 @@ void FMDIndexMismatchTest::testMismatch() {
         }
     }
 }
+
+/**
+ * Make sure we key in a mapping on the first base, even when using mismatches.
+ */
+void FMDIndexMismatchTests::testMapOnMismatch() {
+
+    // This string appears once exactly, but differentiated only by its last
+    // base.
+    std::string query = "AAAAAAAAAAAC";
+    
+    // Declare everything to be a range
+    GenericBitVector bv;
+    for(size_t i = 0; i < index->getBWTLength(); i++) {
+        bv.addBit(i);
+    }
+    bv.finish(index->getBWTLength());
+    
+    // Map it with right contexts, allowing for 1 mismatch.
+    // TODO: can we specify things by name=value in c++11 to avoid breaking this
+    // sneakily when we add new arguments?
+    std::vector<Mapping> mappings = index->misMatchMap(bv,
+        query, (GenericBitVector*)NULL, 0, 0, 0.0, 0.0, 1);
+        
+    // Make sure it doesn't map, since the C is the last base and not forced to
+    // match exactly.
+    CPPUNIT_ASSERT(mappings[11].getRange() == -1);
+    
+    
+    // Do the same thing in a different orientation, showing that it maps due to
+    // a mismatch
+    std::vector<Mapping> rcMappings = index->misMatchMap(bv,
+        reverseComplement(query), (GenericBitVector*)NULL, 0, 0, 0.0, 0.0, 1);
+        
+    // Make sure it maps, due to the C being forced to match exactly.
+    CPPUNIT_ASSERT(mappings[0].getRange() != -1);
+}
+
 
 
 

@@ -1,5 +1,5 @@
-#ifndef FMDINDEXMISMATCHTEST_HPP
-#define FMDINDEXMISMATCHTEST_HPP
+#ifndef FMDINDEXMISMATCHTESTS_HPP
+#define FMDINDEXMISMATCHTESTS_HPP
 
 #include <cppunit/extensions/HelperMacros.h>
 #include "../FMDIndex.hpp"
@@ -7,9 +7,10 @@
 /**
  * Mismatch Test for the FMDIndex.
  */
-class FMDIndexMismatchTest : public CppUnit::TestFixture {
-    CPPUNIT_TEST_SUITE(FMDIndexMismatchTest);
+class FMDIndexMismatchTests : public CppUnit::TestFixture {
+    CPPUNIT_TEST_SUITE(FMDIndexMismatchTests);
     CPPUNIT_TEST(testMismatch);
+    CPPUNIT_TEST(testMapOnMismatch);
     CPPUNIT_TEST_SUITE_END();
     
     // Keep a string saying where to get the haplotypes to test with.
@@ -23,13 +24,14 @@ class FMDIndexMismatchTest : public CppUnit::TestFixture {
     FMDIndex const* index;
     
 public:
-    FMDIndexMismatchTest();
-    ~FMDIndexMismatchTest();
+    FMDIndexMismatchTests();
+    ~FMDIndexMismatchTests();
     
     void setUp();
     void tearDown();
 
     void testMismatch();
+    void testMapOnMismatch();
     
 };
 

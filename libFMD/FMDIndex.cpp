@@ -1661,91 +1661,6 @@ MapAttemptResult FMDIndex::mapPosition(const std::string& pattern,
     return result;
 }
 
-creditMapAttemptResult FMDIndex::CmapPosition(const GenericBitVector& ranges, 
-    const std::string& pattern, size_t index, const GenericBitVector* mask) const {
-    
-    // We're going to right-map so ranges match up with the things we can map to
-    // (downstream contexts)
-
-    // Initialize the struct we will use to return our somewhat complex result.
-    // Contains the FMDPosition (which we work in), an is_mapped flag, and a
-    // variable counting the number of extensions made to the FMDPosition.
-    creditMapAttemptResult result;
-
-    // Do a forward search.
-    // Start at the given index, and get the starting range for that character.
-    result.is_mapped = false;
-    result.position = this->getCharPosition(pattern[index]);    
-    result.characters = 1;
-    if(result.position.isEmpty(mask)) {
-        // This character isn't even in it. Just return the result with an empty
-        // FMDPosition; the next character we want to map is going to have to
-        // deal with having some never-before-seen character right upstream of
-        // it.
-        return result;
-    } else if (result.position.range(ranges, mask) != -1) {
-        // We've already mapped.
-        result.is_mapped = true;
-    }
-
-    Log::trace() << "Starting with " << result.position << std::endl;
-
-    FMDPosition found_position;
-    FMDPosition next_position;
-    
-    for(size_t i = 1; index + i < pattern.size() && 1 + index > i; i++) {
-                
-        // Dual extend with subsequent characters.
-        next_position = this->extend(result.position,
-            pattern[index + i], false);
-        next_position = this->extend(next_position,pattern[index - i], true);
-        
-        Log::debug() << "Now at " << next_position << " after " << pattern[i] << std::endl;
-        if(next_position.isEmpty(mask)) {
-            // The next place we would go is empty, so return the result holding
-            // the last position.
-            Log::debug() << "Couldn't find more context" << std::endl;
-            return result;
-        }
-
-        if(!result.is_mapped && next_position.range(ranges, mask) != -1) {
-            // We have successfully mapped to exactly one range. Update our
-            // result to reflect the additional extension and our success, and
-            // return it.
-    
-                result.position = next_position;
-            result.characters++;
-            Log::debug() << "Extended " << i << " times" << std::endl;
-            result.is_mapped = true;
-            found_position = result.position;
-            
-        } else if(result.is_mapped && next_position.range(ranges, mask) != -1) {
-            result.position = next_position;
-            result.characters++;
-            Log::debug() << "Restart continue " << i << std::endl;
-
-        } else {
-            // Otherwise, we still map to a plurality of ranges. Record the
-            // extension and loop again.
-        
-            result.position = next_position;
-            result.characters++;
-            
-        }
-    }
-    
-    if(result.is_mapped) {
-        result.position = found_position;
-    }
-
-    // If we get here, we ran out of downstream context and still map to
-    // multiple ranges. Just give our multi-mapping FMDPosition and unmapped
-    // result.
-    return result;
-
-
-}
-
 MapAttemptResult FMDIndex::mapPosition(const GenericBitVector& ranges, 
     const std::string& pattern, size_t index, const GenericBitVector* mask) const {
     
@@ -2148,10 +2063,10 @@ MisMatchAttemptResults FMDIndex::misMatchMapPosition(
     size_t z_max, bool maxContext, bool allowFirstMismatch,
     const GenericBitVector* mask) const {
     
-    // Reading right, note when(if ever) we become unique within one mismatch.
-    // If maxContext is set, go all the way until we can't go anymore instead.
-    // TODO: can we get both values out in that case? Or continue an
-    // intermediate result right?
+    // Reading right, note when(if ever) we become unique within z_max
+    // mismatches. If maxContext is set, go all the way until we can't go
+    // anymore instead. TODO: can we get both values out in that case? Or
+    // continue an intermediate result right?
     
     // Not responsible for enforcing min context limits.
     

@@ -65,7 +65,7 @@ do
 done
 
 # While we're at it we totaled up per scheme coverage, so plot that.
-boxplot.py coverage.tsv --x_label "Scheme" --x_sideways --y_label "Coverage" --max 1 --title "Read Mapping Coverage" --save coverage.png
+boxplot.py coverage.tsv --x_label "Scheme" --x_sideways --y_label "Coverage" --max 1.01 --min 0 --title "Read Mapping Coverage" --save coverage.png
 
 for FILE in `ls counts/*.tsv`
 do
