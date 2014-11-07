@@ -3,7 +3,7 @@
 #include <Log.hpp>
 #include <util.hpp>
 
-#include <CreditFilter.hpp>
+#include <CreditFilter2.hpp>
 #include <DisambiguateFilter.hpp>
 
 #include "MappingMergeScheme.hpp"
@@ -254,6 +254,7 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
     
     // Keep a cache of contigs by number so we don't constantly locate for
     // credit.
+    // TODO: replace with displayContigCached calls.
     std::map<size_t, std::string> contigCache;
     contigCache[queryContig] = contig;
     
@@ -337,8 +338,9 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
     
     if(credit) {
         // Apply a credit filter to the mappings
-        filteredMappings = CreditFilter(index).apply(leftMappings,
-            rightMappings);
+        filteredMappings = CreditFilter2(index, rangeVector, z_max).apply(
+            leftMappings, rightMappings,
+            index.displayContigCached(queryContig));
     } else {
         // Apply a disambiguate filter to the mappings
         filteredMappings = DisambiguateFilter(index).apply(leftMappings,
