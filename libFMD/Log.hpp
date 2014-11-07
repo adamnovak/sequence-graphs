@@ -20,6 +20,8 @@
 #define CRITICAL_STREAM OutStream
 // Error: Log messages that indicate something is broken
 #define ERROR_STREAM OutStream
+// Warning: Log messages that indicate something is unlikely.
+#define WARNING_STREAM OutStream
 // Output: Messages the user is supposed to see
 #define OUTPUT_STREAM OutStream
 // Info: Messages about the operation of the program
@@ -48,6 +50,7 @@
 // TODO: Make these no-ops early if using NullStream?
 #define LOG_CRITICAL(exp) Log::critical() << LOG_LAZY(exp);
 #define LOG_ERROR(exp) Log::error() << LOG_LAZY(exp);
+#define LOG_WARNING(exp) Log::warning() << LOG_LAZY(exp);
 #define LOG_OUTPUT(exp) Log::output() << LOG_LAZY(exp);
 #define LOG_INFO(exp) Log::info() << LOG_LAZY(exp);
 #define LOG_DEBUG(exp) Log::debug() << LOG_LAZY(exp);
@@ -159,6 +162,14 @@ public:
     }
     
     /**
+     * Function to get a stream to log WARNING-level massages to. Call once per
+     * line.
+     */
+    static inline WARNING_STREAM& warning() {
+        return errorStream << timestamp << "WARNING: ";
+    }
+    
+    /**
      * Function to get a stream to log OUTPUT-level massages to. Call once per
      * line.
      */
@@ -195,6 +206,7 @@ private:
     // Static streams for all the log levels.
     static CRITICAL_STREAM criticalStream;
     static ERROR_STREAM errorStream;
+    static WARNING_STREAM warningStream;
     static OUTPUT_STREAM outputStream;
     static INFO_STREAM infoStream;
     static DEBUG_STREAM debugStream;
