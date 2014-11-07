@@ -2119,7 +2119,7 @@ MisMatchAttemptResults FMDIndex::misMatchMapPosition(
     result.positions.push_back(std::make_pair(getCharPosition(pattern[index]),
         0));
         
-    if(allowFirstMismatch) {
+    if(allowFirstMismatch && z_max > 0) {
         // We have to consider all the possible mismatches we could have at this
         // forst position as well.
         for(char other : BASES) {
