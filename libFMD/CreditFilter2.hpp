@@ -5,6 +5,7 @@
 #include "Mapping.hpp"
 #include "FMDIndex.hpp"
 #include "DisambiguateFilter.hpp"
+#include "GenericBitVector.hpp"
 
 /**
  * Represents a filter for mappings which applies credit. Lives in its own class
@@ -19,7 +20,7 @@ public:
      * lengths, with the given bitvector of ranges for counting words, and using
      * the given max number of mismatches for credit assignment.
      */
-    CreditFilter2(const FMDIndex& index, const GenericBitvector& ranges,
+    CreditFilter2(const FMDIndex& index, const GenericBitVector& ranges,
         size_t z_max);
     
     /**
@@ -39,7 +40,7 @@ protected:
     const FMDIndex& index;
     
     // Where are the range boundaries for counting word occurrences?
-    const GenericBitvector& ranges;
+    const GenericBitVector& ranges;
     
     // How many mismatches are we allowing in sentinel words or maximal left or
     // right contexts?

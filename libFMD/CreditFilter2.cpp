@@ -1,7 +1,45 @@
 #include "CreditFilter2.hpp"
 #include <algorithm>
 #include <cmath>
+#include <cassert>
 #include "Log.hpp"
+
+/**
+ * Given the forward strand of a reference text, a flag for whether we are
+ * talking about the reverse strand, and a 0-based start position on that
+ * strand, along with a query string and a 0-based start position in that, count
+ * the number of mismatches in the next length characters.
+ *
+ * Note that no bounds checking is done.
+ */
+size_t countMismatches(const std::string& reference, bool referenceStrand, 
+    size_t referenceStart, const std::string& query, size_t queryStart, 
+    size_t length) {
+    
+    // We start with no mismatches.
+    size_t mismatches = 0;
+    
+    for(size_t i = 0; i < length; i++) {
+        // For each comparison we need to make
+        
+        // What character do we want from the reference?
+        char refChar;
+        if(referenceStrand) {
+            // Pull from the reverse strand of the reference.
+            refChar = complement(reference[reference.size() - 1 - 
+                referenceStart - i]);
+        } else {
+            // Pull from the forward strand
+            refChar = reference[referenceStart + i];
+        }
+        
+        // Add in any mismatches.
+        mismatches += (refChar != query[queryStart + i]);
+    }
+
+    // Return the total number of mismatches.    
+    return mismatches;
+}
 
 CreditFilter2::CreditFilter2(const FMDIndex& index, 
     const GenericBitVector& ranges, size_t z_max): index(index), ranges(ranges),
@@ -25,6 +63,10 @@ std::vector<Mapping> CreditFilter2::apply(
     int64_t leftSentinel = -1;
     int64_t rightSentinel = -1;
     
+    // We need to track the lengths of the sentinel words for later
+    size_t leftWordLength = 0;
+    size_t rightWordLength = 0;
+    
     for(size_t i = 0; i < disambiguated.size(); i++) {
         // Look in from the left for the left sentinel
         if(leftMappings[i].isMapped() && 
@@ -34,10 +76,11 @@ std::vector<Mapping> CreditFilter2::apply(
             // To be sure, we have to find its word.
             
             // Get the length of its word, which has its right end at i
-            size_t wordLength = disambiguated[i].getLeftMinContext();
+            leftWordLength = disambiguated[i].getLeftMinContext();
             
             // Clip out the word that the base mapped on on the left.
-            std::string word = query.substr(i + 1 - wordLength, wordLength);
+            std::string word = query.substr(i + 1 - leftWordLength,
+                leftWordLength);
             
             if(index.misMatchCount(ranges, word, z_max).is_mapped) {
                 // This word appears exactly once within the specified number of
@@ -59,10 +102,10 @@ std::vector<Mapping> CreditFilter2::apply(
             // To be sure, we have to find its word.
             
             // Get the length of its word, which has its left end at i
-            size_t wordLength = disambiguated[i].getRightMinContext();
+            rightWordLength = disambiguated[i].getRightMinContext();
             
             // Clip out the word that the base mapped on on the right.
-            std::string word = query.substr(i, wordLength);
+            std::string word = query.substr(i, rightWordLength);
             
             if(index.misMatchCount(ranges, word, z_max).is_mapped) {
                 // This word appears exactly once within the specified number of
@@ -83,8 +126,98 @@ std::vector<Mapping> CreditFilter2::apply(
         // applying credit.
         Log::info() << "No sequence between sentinels. No credit applied." <<
             std::endl;
-        return std::move(disambiguated);
+        return disambiguated;
     }
+    
+    // Make a function that tells us whether a base's maximal left context can
+    // extend over the left sentinel's word.
+    auto extendsOverLeft = [&](int i) -> bool {
+        // The max context length counts the base being tested as 1. The base -
+        // the left sentinel gets the number of characters between them (not
+        // including one end), and then the right word length (which includes
+        // the left sentinel) covers the left sentinel. So if the right max
+        // context reaches back to exactly the left end of the left word, these
+        // will be equal.
+        return disambiguated[i].getLeftMaxContext() >= 
+            i - leftSentinel + leftWordLength;
+    };
+    
+    // And another to see if a base;'s maximal right context can extend over the
+    // right sentinel's word.
+    auto extendsOverRight = [&](int i) -> bool {
+        return disambiguated[i].getRightMaxContext() >= 
+            rightSentinel - i + rightWordLength;
+    };
+    
+    // Get the positions for the two sentinels
+    TextPosition leftPosition = disambiguated[leftSentinel].getLocation();
+    TextPosition rightPosition = disambiguated[rightSentinel].getLocation();
+    
+    // The sentinels are a pair if neither can get a context over the other, or
+    // if they are consistent. So they are not a pair if one can get a context
+    // over the other and they are not consistent (i.e. map to places other than
+    // the offset between them suggests).
+    
+    if((extendsOverRight(leftSentinel) || extendsOverLeft(rightSentinel)) && 
+        !leftPosition.isConsistent(rightPosition, 
+        rightSentinel - leftSentinel)) {
+    
+        // One can get over the other, and they aren't the right distance apart
+        // on the same strand. This is not a sentinel pair.
+        
+        // If the outermost sentinels are not a pair, no sentinel pair exists on
+        // this strand, so we can give up on credit.
+        Log::warning() << "Sentinels don't pair! No credit applied." <<
+            std::endl;
+        return disambiguated;
+    }
+    
+    // Now we need to figure out which bases are credit providers. Mapped bases
+    // between sentinels that are either consistent with or unable to reach over
+    // each sentinel are credit providers.
+    
+    // This holds which bases in the string are credit providers
+    std::vector<bool> isCreditProvider(disambiguated.size(), false);
+    
+    for(size_t i = leftSentinel; i <= rightSentinel; i++) {
+        // For each position between the sentinels (including them)...
+        
+        if(!disambiguated[i].isMapped()) {
+            // Not mapped, so doesn't count
+            continue;
+        }
+        
+        // Where did the base map?
+        TextPosition basePosition = disambiguated[i].getLocation();
+        
+        if(extendsOverLeft(i) && 
+            !leftPosition.isConsistent(basePosition, i - leftSentinel)) {
+            
+            // The maximal left context extends over the left sentinel word, but
+            // our mapping is inconsistent with the left sentinel. Can't give
+            // credit; we might unmap.
+            continue;
+        }
+        
+        if(extendsOverRight(i) && 
+            !basePosition.isConsistent(rightPosition, rightSentinel - i)) {
+            
+            // The maximal right context extends over the right sentinel word,
+            // but our mapping is inconsistent with the right sentinel. Can't
+            // give credit; we might unmap.
+            continue;
+        }
+        
+        // If we get here, we can give credit.
+        isCreditProvider[i] = true;
+        
+    }
+    
+    // The sentinels always have to come out as credit providers.
+    assert(isCreditProvider[leftSentinel]);
+    assert(isCreditProvider[rightSentinel]);
+    
+    // Now we can actually try applying credit.
     
     // Find the max left and right contexts we need to worry about checking
     // consistency from.
@@ -118,7 +251,6 @@ std::vector<Mapping> CreditFilter2::apply(
         // For each base between the sentinels
     
         if(disambiguated[i].isMapped()) {
-            // Look at how it has been mapped
             // If it is mapped on one or more sides, disambiguate normally.
             toReturn.push_back(disambiguated[i]);   
         } else {
@@ -140,30 +272,57 @@ std::vector<Mapping> CreditFilter2::apply(
                 Log::trace() << "Checking base " << j << " on right" << 
                     std::endl;
                 
-                if(!rightMappings[j].isMapped() || 
-                    !disambiguated[j].isMapped()) {
-                    // This base never mapped, so it can't give credit.
+                if(!isCreditProvider[j]) {
+                    // This base either didn't map or possibly could unmap, so
+                    // don't take credit from it.
                     continue;
                 }
                 
-                if(disambiguated[j].getRightMaxContext() - 1 < i - j) {
-                    // This base's context didn't reach all the way out, after
-                    // accounting for the fact that it includes the base itself.
-                    // This prevents us from mapping off the end of a contig,
-                    // since these are limited by contig ends.
+                // Go get the text we would map on. This is always strand 0.
+                // TODO: Proper weakref cache thingy.
+                const std::string& referenceText = index.displayContigCached(
+                    disambiguated[j].getLocation().getText());
+                    
+                // Work out what offset we should have on that strand.
+                int64_t offset = (int64_t) i - (int64_t) j + 
+                    (int64_t) disambiguated[j].getLocation().getOffset(); 
+                    
+                if(offset < 0 || offset >= referenceText.size()) {
+                    // This base can't actually give credit to us since it would
+                    // put us off the end of its strand.
                     continue;
                 }
                 
-                // OK, we imply some mapping. What is it?
-                // Grab the mapped base and go forwards on the forward strand
-                // (since right contexts reach forward).
-                TextPosition implied = disambiguated[j].getLocation();
-                // As i increases and j stays the same, we want offset to
-                // become more positive.
-                implied.addOffset((int64_t) i - (int64_t) j);
+                // Make the mapping we imply
+                TextPosition implied(disambiguated[j].getLocation().getText(),
+                    offset);
+                
+                // OK the base can give credit, but can it give credit on its
+                // particular text at this distance, even if it happens to be
+                // unmapped on this side? Remember, we need credit from unmapped
+                // sides to make sure credit is consistent with sentinels.
+                // Otherwise we would have to special-case that credit was
+                // consistent with sentinels.
+                
+                // We need to count the number of mismatches between the query
+                // string and the reference, from the credit provider to here.
+                // So in the reference we start at the credit provider's mapping
+                // location (on the appropriate strand), and in the query we
+                // start at the credit provider, and we go forward until we get
+                // to this base.
+                size_t mismatches = countMismatches(referenceText, 
+                    disambiguated[j].getLocation().getStrand(), 
+                    disambiguated[j].getLocation().getOffset(), query, j, 
+                    i - j + 1);
+                
+                if(mismatches > z_max) {
+                    // No credit because too many mismatches.
+                    continue;
+                }
                 
                 Log::trace() << "Base " << j << " places base " << i << 
-                    " at " << implied << " by right context" << std::endl;
+                    " at " << implied << " by right context with " <<
+                    mismatches << " mismatches" << std::endl;
                 
                 if(!rightFound) {
                     // This is the first one. Make sure all the others match.
@@ -197,30 +356,55 @@ std::vector<Mapping> CreditFilter2::apply(
                 Log::trace() << "Checking base " << j << " on left" << 
                     std::endl;
                 
-                if(!leftMappings[j].isMapped() || 
-                    !disambiguated[j].isMapped()) {
-                    // This base never mapped, so it can't give credit.
+                if(!isCreditProvider[j]) {
+                    // This base either didn't map or possibly could unmap, so
+                    // don't take credit from it.
                     continue;
                 }
                 
-                if(disambiguated[j].getLeftMaxContext() - 1 < j - i) {
-                    // This base's context didn't reach all the way out, after
-                    // accounting for the fact that it includes the base itself.
-                    // This prevents us from mapping off the end of a contig,
-                    // since these are limited by contig ends.
+                // Go get the text we would map on. This is always strand 0.
+                // TODO: Proper weakref cache thingy.
+                const std::string& referenceText = index.displayContigCached(
+                    disambiguated[j].getLocation().getText());
+                    
+                // Work out what offset we should have on that strand.
+                int64_t offset = (int64_t) i - (int64_t) j + 
+                    (int64_t) disambiguated[j].getLocation().getOffset(); 
+                    
+                if(offset < 0 || offset >= referenceText.size()) {
+                    // This base can't actually give credit to us since it would
+                    // put us off the end of its strand.
                     continue;
                 }
                 
-                // OK, we imply some mapping. What is it?
-                // Grab the mapped base and go backward on the forward strand
-                // (since left contexts reach backward).
-                TextPosition implied = disambiguated[j].getLocation();
-                // As i increases and j stays the same, we want offset to
-                // become less negative.
-                implied.addOffset((int64_t) i - (int64_t) j);
+                // Make the mapping we imply
+                TextPosition implied(disambiguated[j].getLocation().getText(),
+                    offset);
+                
+                // OK the base can give credit, but can it give credit on its
+                // particular text at this distance, even if it happens to be
+                // unmapped on this side? Remember, we need credit from unmapped
+                // sides to make sure credit is consistent with sentinels.
+                // Otherwise we would have to special-case that credit was
+                // consistent with sentinels.
+                
+                // We need to count the number of mismatches between the query
+                // string and the reference, from here to the credit provider.
+                // So in the reference we start at the implied mapping location
+                // (on the appropriate strand), and in the query we start at us,
+                // and we go forward until we get to the credit provider.
+                size_t mismatches = countMismatches(referenceText, 
+                    implied.getStrand(), implied.getOffset(), query, i, 
+                    j - i + 1);
+                    
+                if(mismatches > z_max) {
+                    // No credit because too many mismatches.
+                    continue;
+                }
                 
                 Log::trace() << "Base " << j << " places base " << i << 
-                    " at " << implied << " by left context" << std::endl;
+                    " at " << implied << " by left context with " <<
+                    mismatches << " mismatches" << std::endl;
                 
                 if(!leftFound) {
                     // This is the first one. Make sure all the others match.

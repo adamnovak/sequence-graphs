@@ -84,6 +84,16 @@ public:
     }
     
     /**
+     * Returns true if the other position is exactly offset after this position
+     * on the same strand, and false otherwise.
+     */
+    inline bool isConsistent(TextPosition other, int64_t offset) {
+        // They have to be on the same text, with the same offset between them.
+        return getText() == other.getText() && 
+            other.getOffset() - getOffset() == offset;
+    }
+    
+    /**
      * Provide equality comparison for testing.
      */
     inline bool operator==(const TextPosition& other) const {

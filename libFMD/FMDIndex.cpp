@@ -17,7 +17,7 @@ FMDIndex::FMDIndex(std::string basename, SuffixArray* fullSuffixArray,
     cumulativeLengths(), genomeAssignments(), endIndices(), genomeRanges(), 
     genomeMasks(), bwt(basename + ".bwt"), suffixArray(basename + ".ssa"), 
     fullSuffixArray(fullSuffixArray), markovModel(markovModel),
-    lcpArray(basename + ".lcp") {
+    lcpArray(basename + ".lcp"), contigCache(), contigCacheMutex() {
     
     // TODO: Too many initializers
 
@@ -842,6 +842,20 @@ std::string FMDIndex::displayContig(size_t index) const {
     
     // Give it back.
     return bases;
+    
+}
+
+const std::string& FMDIndex::displayContigCached(size_t index) const {
+    // Lock the cache
+    std::unique_lock<std::mutex> lock(contigCacheMutex);
+    
+    if(!contigCache.count(index)) {
+        // Go get it, we don't have that contig
+        contigCache[index] = displayContig(index);
+    }
+    
+    // Return what's in the cache. Lock will unlock when it leaves scope.
+    return contigCache[index];
     
 }
 

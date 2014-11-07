@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 #include <stdint.h>
+#include <map>
+#include <mutex>
 
 #include "BWT.h"
 #include "SampledSuffixArray.h"
@@ -295,6 +297,12 @@ public:
      * Extract and return the forward strand of the given contig.
      */
     std::string displayContig(size_t index) const;
+    
+    /**
+     * Memoized interface to displayContig that pulls out texts when needed,
+     * using a volatile cache. Thread safe.
+     */
+    const std::string& displayContigCached(size_t index) const;
     
     /**
      * Given an index in the BWT, do an LF-mapping to get where the character
@@ -639,6 +647,18 @@ protected:
      * Holds the longest common prefix array.
      */
     LCPArray lcpArray;
+    
+    /**
+     * Holds a cache of contig strings we have had to reconstruct for mapping on
+     * credit. TODO: throw these out eventually somehow.
+     */
+    mutable std::map<size_t, std::string> contigCache;
+    
+    /**
+     * Holds a mutex on contigCache so we don't break it trying to save contigs
+     * on multiple threads.
+     */
+    mutable std::mutex contigCacheMutex;
     
     /**
      * Try left-mapping the given index in the given string, starting from
