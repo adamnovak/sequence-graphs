@@ -77,8 +77,9 @@ std::vector<Mapping> CreditFilter2::apply(
             // This is a left-mapped thing on the left, and may be a sentinel.
             // To be sure, we have to find its word.
             
-            // Get the length of its word, which has its right end at i
-            leftWordLength = disambiguated[i].getLeftMinContext();
+            // Get the length of its longest possible word, which has its right
+            // end at i
+            leftWordLength = disambiguated[i].getLeftMaxContext();
             
             // Clip out the word that the base mapped on on the left.
             std::string word = query.substr(i + 1 - leftWordLength,
@@ -122,8 +123,9 @@ std::vector<Mapping> CreditFilter2::apply(
             // This is a right-mapped thing on the right, and may be a sentinel.
             // To be sure, we have to find its word.
             
-            // Get the length of its word, which has its left end at i
-            rightWordLength = disambiguated[i].getRightMinContext();
+            // Get the length of its longest possible word, which has its left
+            // end at i
+            rightWordLength = disambiguated[i].getRightMaxContext();
             
             // Clip out the word that the base mapped on on the right.
             std::string word = query.substr(i, rightWordLength);
@@ -266,9 +268,6 @@ std::vector<Mapping> CreditFilter2::apply(
     
     for(size_t i = 0; i < disambiguated.size(); i++) {
         // Take the max left and right context when we find them.
-        
-        Log::debug() << disambiguated[i].getLeftMaxContext() << ", " << 
-            disambiguated[i].getRightMaxContext() << std::endl;
         
         maxLeftContext = std::max(maxLeftContext, 
             disambiguated[i].getLeftMaxContext());
