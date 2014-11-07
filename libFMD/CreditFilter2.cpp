@@ -253,6 +253,9 @@ std::vector<Mapping> CreditFilter2::apply(
         // If we get here, we can give credit.
         isCreditProvider[i] = true;
         
+        Log::trace() << "Position " << i << " is a credit provider." <<
+            std::endl;
+        
     }
     
     // The sentinels always have to come out as credit providers.

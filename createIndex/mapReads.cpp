@@ -32,7 +32,7 @@
 #include <Log.hpp>
 #include <MarkovModel.hpp>
 #include <Fasta.hpp>
-#include <CreditFilter.hpp>
+#include <CreditFilter2.hpp>
 #include <DisambiguateFilter.hpp>
 
 // Grab timers from libsuffixtools
@@ -240,8 +240,8 @@ mapSomeReads(
         std::vector<Mapping> filteredMappings;    
         if(credit) {
             // Apply a credit filter to the mappings
-            filteredMappings = CreditFilter(index).apply(leftMappings,
-                rightMappings);
+            filteredMappings = CreditFilter2(index, ranges, mismatches).apply(
+                leftMappings, rightMappings, sequence);
         } else {
             // Apply only a disambiguate filter to the mappings
             filteredMappings = DisambiguateFilter(index).apply(leftMappings,
