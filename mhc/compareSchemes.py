@@ -90,7 +90,10 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             (True, True, 100, 0, 0, 0),
             # MultContext without min
             (True, True, 0, 0, 4.0, 0),
-            (True, True, 0, 0, 8.0, 0)
+            (True, True, 0, 0, 8.0, 0),
+            # MultContext without min or credit
+            (True, False, 0, 0, 4.0, 0),
+            (True, False, 0, 0, 8.0, 0)
         ]
 
     def generateSchemes(self):
