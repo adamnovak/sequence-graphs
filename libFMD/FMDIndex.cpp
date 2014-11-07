@@ -26,7 +26,8 @@ FMDIndex::FMDIndex(std::string basename, SuffixArray* fullSuffixArray,
     // We already loaded the index itself in the initializer. Go load the
     // length/order metadata.
     
-    // Open the contig name/start/length/genome file for reading.
+    // Open the contig name/start/length/genome file for reading. Temporary
+    // string survives until the end of the full expression.
     std::ifstream contigFile((basename + ".contigs").c_str());
     
     // Keep a cumulative length sum
