@@ -170,18 +170,26 @@ void FMDIndexMismatchTests::testMismatchCount() {
     
     // No results in 0 mismatches
     MisMatchAttemptResults results = index->misMatchCount(bv, query, 0);
-    CPPUNIT_ASSERT_EQUAL(results.positions.size(), (size_t)0);
+    CPPUNIT_ASSERT_EQUAL((size_t) 0, results.getLength());
+    CPPUNIT_ASSERT_EQUAL(false, results.is_mapped);
     
     // 1 result in 1 mismatches
     results = index->misMatchCount(bv, query, 1);
-    CPPUNIT_ASSERT_EQUAL(results.positions.size(), (size_t)1);
-    CPPUNIT_ASSERT_EQUAL(results.is_mapped, true);
+    CPPUNIT_ASSERT_EQUAL((size_t) 1, results.positions.size());
+    CPPUNIT_ASSERT_EQUAL((size_t) 1, results.getLength());
+    CPPUNIT_ASSERT_EQUAL(true, results.is_mapped);
     
     // Many results in 1 mismatch for a shorter string.
     query = "CAAAAAAAAA";
     results = index->misMatchCount(bv, query, 1);
     CPPUNIT_ASSERT(results.positions.size() > 1);
-    CPPUNIT_ASSERT_EQUAL(results.is_mapped, false);
+    CPPUNIT_ASSERT_EQUAL(false, results.is_mapped);
+    
+    // Only 1 result when counting with 0 mismatches
+    query = "CAAAAAAAAA";
+    results = index->misMatchCount(bv, query, 0);
+    CPPUNIT_ASSERT_EQUAL((size_t) 1, results.getLength());
+    CPPUNIT_ASSERT_EQUAL(true, results.is_mapped);
     
 }
 

@@ -105,9 +105,9 @@ public:
     }
 
     /**
-    * Return the actual number of matches represented by an FMDPosition. If a
-    * mask is specified, only counts matches with 1s in the mask.
-    */
+     * Return the actual number of matches represented by an FMDPosition. If a
+     * mask is specified, only counts matches with 1s in the mask.
+     */
     inline int64_t getLength(const GenericBitVector* mask = NULL) const
     {
         if(mask == NULL || end_offset == -1) {

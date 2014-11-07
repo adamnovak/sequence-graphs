@@ -18,10 +18,11 @@ public:
     /**
      * Make a new credit filter that uses the given index to get context
      * lengths, with the given bitvector of ranges for counting words, and using
-     * the given max number of mismatches for credit assignment.
+     * the given max number of mismatches for credit assignment. Takes an
+     * optional mask to select the positions in the index to actually use.
      */
     CreditFilter2(const FMDIndex& index, const GenericBitVector& ranges,
-        size_t z_max);
+        size_t z_max, const GenericBitVector* mask = NULL);
     
     /**
      * Given a vector of left mappings (in right semantics with left context
@@ -45,6 +46,9 @@ protected:
     // How many mismatches are we allowing in sentinel words or maximal left or
     // right contexts?
     size_t z_max;
+    
+    // Keep the mask around from construction.
+    const GenericBitVector* mask;
     
     // We need to be able to disambiguate things.
     DisambiguateFilter disambiguate;

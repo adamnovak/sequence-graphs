@@ -27,7 +27,7 @@
 // Info: Messages about the operation of the program
 #define INFO_STREAM OutStream
 // Debug: Messages about the internals of the program.
-#define DEBUG_STREAM NullStream
+#define DEBUG_STREAM OutStream
 // Trace: Messages that pedantically describe what the program is doing.
 #define TRACE_STREAM NullStream
 
@@ -41,7 +41,7 @@
 // TODO: Maybe use <http://stackoverflow.com/a/6928769/402891> to detect
 // callableness instead and save a std::function construction?
 // Use like:
-// Log::debug() << "I know " << LOG_LAZY("Stuff" << std::endl);
+// Log::debug() << "I know " << LOG_LAZY("Some" << "Stuff") << std::endl;
 #define LOG_LAZY(exp) (std::function<void(std::stringstream&)>)\
     ([&](std::stringstream& stream) -> void { stream << exp; })
 

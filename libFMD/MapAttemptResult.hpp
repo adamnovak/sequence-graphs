@@ -33,10 +33,32 @@ struct MisMatchAttemptResults
     }
 
     bool is_mapped;
+    
+    // Holds pairs of result set and mismatch count.
     std::vector<std::pair<FMDPosition,size_t>> positions;
     
     // How many characters have been searched?
     size_t characters;
+    
+    
+    /**
+     * Return the actual number of matches represented by a
+     * MisMatchAttemptResults. If a mask is specified, only counts matches with
+     * 1s in the mask.
+     */
+    inline size_t getLength(const GenericBitVector* mask = NULL) {
+        
+        // How many total results are there?
+        size_t total = 0;
+        
+         for(auto position : positions) {
+            // Add in the length from every position.
+            total += position.first.getLength(mask);
+         }
+         
+         // Return the sum.
+         return total;
+    }
     
     /**
      * Returns true if there are no for the search (when restricting ourselves

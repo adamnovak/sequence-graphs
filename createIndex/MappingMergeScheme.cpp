@@ -338,9 +338,9 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
     
     if(credit) {
         // Apply a credit filter to the mappings
-        filteredMappings = CreditFilter2(index, rangeVector, z_max).apply(
-            leftMappings, rightMappings,
-            index.displayContigCached(queryContig));
+        filteredMappings = CreditFilter2(index, rangeVector, 
+            mismatch? z_max : 0,  &includedPositions).apply(leftMappings, 
+            rightMappings, index.displayContigCached(queryContig));
     } else {
         // Apply a disambiguate filter to the mappings
         filteredMappings = DisambiguateFilter(index).apply(leftMappings,
@@ -387,7 +387,7 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
             candidate.getOffset()];
         }
         
-        Log::debug() << queryBase << " vs. " << referenceBase << std::endl;
+        Log::trace() << queryBase << " vs. " << referenceBase << std::endl;
         
         if(queryBase == referenceBase) {
             // Only merge them if they will be the same base

@@ -42,8 +42,10 @@ size_t countMismatches(const std::string& reference, bool referenceStrand,
 }
 
 CreditFilter2::CreditFilter2(const FMDIndex& index, 
-    const GenericBitVector& ranges, size_t z_max): index(index), ranges(ranges),
-    z_max(z_max), disambiguate(index) {
+    const GenericBitVector& ranges, size_t z_max, const GenericBitVector* mask):
+    index(index), ranges(ranges), z_max(z_max), mask(mask),
+    disambiguate(index) {
+    
     // Nothing to do!
 }
 
@@ -82,13 +84,32 @@ std::vector<Mapping> CreditFilter2::apply(
             std::string word = query.substr(i + 1 - leftWordLength,
                 leftWordLength);
             
-            if(index.misMatchCount(ranges, word, z_max).is_mapped) {
+            Log::debug() << "Considering left sentinel word " << word <<
+                std::endl;
+            
+            // Count how many times the word appears within the right number of
+            // mismatches.
+            MisMatchAttemptResults count = index.misMatchCount(ranges, word,
+                z_max, mask);
+            
+            if(count.is_mapped) {
                 // This word appears exactly once within the specified number of
                 // mismatches. So this is the leftmost left sentinel.
                 leftSentinel = i;
                 Log::info() << "Left sentinel found at " << leftSentinel << 
                     std::endl;
                 break;
+            } else {
+                Log::debug() << "Word candidate had " <<
+                    count.getLength(mask) << " results under mask " << mask <<
+                    " with " << z_max << " mismatches." << std::endl;
+                    
+                for(auto result : count.positions) {
+                    Log::debug() << result.first << "(" <<  
+                        index.locate(result.first.getForwardStart()) << ") ~" << 
+                        result.second << std::endl;
+                }
+                    
             }
         }
     }
@@ -107,13 +128,32 @@ std::vector<Mapping> CreditFilter2::apply(
             // Clip out the word that the base mapped on on the right.
             std::string word = query.substr(i, rightWordLength);
             
-            if(index.misMatchCount(ranges, word, z_max).is_mapped) {
+            Log::debug() << "Considering right sentinel word " << word <<
+                std::endl;
+            
+            // Count how many times the word appears within the right number of
+            // mismatches.
+            MisMatchAttemptResults count = index.misMatchCount(ranges, word,
+                z_max, mask);
+            
+            if(count.is_mapped) {
                 // This word appears exactly once within the specified number of
                 // mismatches. So this is the rightmost right sentinel.
                 rightSentinel = i;
                 Log::info() << "Right sentinel found at " << rightSentinel << 
                     std::endl;
                 break;
+            } else {
+                Log::debug() << "Word candidate had " <<
+                    count.getLength(mask) << " results under mask " << mask <<
+                    " with " << z_max << " mismatches." << std::endl;
+                    
+                for(auto result : count.positions) {
+                    Log::debug() << result.first << "(" <<  
+                        index.locate(result.first.getForwardStart()) << ") ~" << 
+                        result.second << std::endl;
+                }                
+
             }
         }
     }
