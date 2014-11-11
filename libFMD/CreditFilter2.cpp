@@ -177,14 +177,14 @@ std::vector<Mapping> CreditFilter2::apply(
         // The max context length counts the base being tested as 1. The base -
         // the left sentinel gets the number of characters between them (not
         // including one end), and then the right word length (which includes
-        // the left sentinel) covers the left sentinel. So if the right max
+        // the left sentinel) covers the left sentinel. So if the left max
         // context reaches back to exactly the left end of the left word, these
         // will be equal.
         return disambiguated[i].getLeftMaxContext() >= 
             i - leftSentinel + leftWordLength;
     };
     
-    // And another to see if a base;'s maximal right context can extend over the
+    // And another to see if a base's maximal right context can extend over the
     // right sentinel's word.
     auto extendsOverRight = [&](int i) -> bool {
         return disambiguated[i].getRightMaxContext() >= 
