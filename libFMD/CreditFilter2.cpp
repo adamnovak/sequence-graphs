@@ -264,22 +264,208 @@ std::vector<Mapping> CreditFilter2::apply(
     
     // Now we can actually try applying credit.
     
-    // Find the max left and right contexts we need to worry about checking
-    // consistency from.
-    size_t maxLeftContext = 0;
-    size_t maxRightContext = 0;
+    // The obvious way is for each unmapped base to go looking for credit
+    // providers. But that comes out as n^2. So we need a different approach.
     
-    for(size_t i = 0; i < disambiguated.size(); i++) {
-        // Take the max left and right context when we find them.
+    // What we're going to do is read left to right, keeping a list of credit
+    // providers. New credit providers not consistent with anything on the list
+    // are added; if they are consistent with something they replace that thing.
+    // As we read along, we count up mismatches against the positions implied by
+    // each credit provider, and drop those that get too many mismatches. When
+    // we hit an unmapped base, we give it credit from the left if we have
+    // exactly one credit provider for it.
+    
+    // Then we do the same thing from the right, and make sure they agree.
+    
+    // We keep a table of all the credits which are assigned to bases. This
+    // holds the Mapping (which may be unmapped) that credit wants to give each
+    // base, or nothing if credit has nothing to say yet about that base.
+    std::map<size_t, Mapping> credits;
+    
+    for(int direction = 1; direction >= -1; direction -= 2) {
+        // Looking left to right first, then looking right to left.
+    
+        Log::debug() << "Applying credit in direction " << direction <<
+            std::endl;
+    
+        // We keep a table of how many mismatches each active credit provider
+        // has incurred going this direction, by provider position. The keys of
+        // this are our active credit providers.
+        std::map<size_t, size_t> activeMismatches;
         
-        maxLeftContext = std::max(maxLeftContext, 
-            disambiguated[i].getLeftMaxContext());
-        maxRightContext = std::max(maxRightContext, 
-            disambiguated[i].getRightMaxContext());
+        for(size_t i = (direction > 0 ? 0 : disambiguated.size() - 1); 
+            (direction > 0 ? i < disambiguated.size() : i != (size_t) -1);
+            i += direction) {
+            // For each base, reading in the appropriate direction...
+            
+            for(auto iterator = activeMismatches.begin(); 
+                iterator != activeMismatches.end(); 
+                iterator = (iterator->second > z_max ? 
+                    // This credit provider has too many mismatches. Delete it
+                    // and move to the next one.
+                    activeMismatches.erase(iterator) 
+                : 
+                    // Else keep it and move to the next one.
+                    ++iterator)) {
+                
+                // The body runs before the update logic, so we can set the
+                // mismatch count here and have it acted upon there.
+                
+                // Where is the credit provider?
+                size_t provider = iterator->first;
+                
+                // Where did it map?
+                TextPosition providerPos = 
+                    disambiguated[provider].getLocation();
+                
+                // Grab a reference to the reference string that the provider
+                // wants to put us on.
+                const std::string& referenceText = index.displayContigCached(
+                    providerPos.getText());
+                    
+                // Advance the provider mapping position to get our implied
+                // mapping position.
+                providerPos.addOffset(i - provider);
+                
+                // Work out how many mismatches exist at exactly this one
+                // implied position. Should be 0 or 1. TODO: See if we still
+                // need this helper function and if it can be refactored.
+                size_t mismatches = countMismatches(referenceText, 
+                    providerPos.getStrand(), providerPos.getOffset(), query, i,
+                    1);
+            
+                // Add the possible mismatches into the total mismatch strikes
+                // against this credit provider.
+                iterator->second += mismatches;
+                
+                // If it gets too many mismatches, the loop update logic will
+                // remove it when advancing to the next credit provider.
+            }
+            
+            // TODO: Apply credit to this base from the left, if applicable.
+            
+            if(isCreditProvider[i]) {
+                // We found a credit provider
+                
+                // Pull out its TextPosition
+                TextPosition mapped = disambiguated[i].getLocation();
+                
+                // We haven't found any credit providers consistent with this
+                // one.
+                bool found = false;
+                
+                for(auto& keyValue : activeMismatches) {
+                    // Check against all the other current credit providers
+                    
+                    // Pull out the old TextPosition
+                    TextPosition existing =
+                        disambiguated[keyValue.first].getLocation();
+                    
+                    if(existing.isConsistent(mapped, i - keyValue.first)) {
+                        // This new mapping is consistent with the old mapping.
+                        found = true;
+                        
+                        if(keyValue.second > 0) {
+                            // The old mapping has accumulated some mismatches
+                            // that we can skip if we give credit from the new
+                            // one instead.
+                            
+                            Log::debug() << "Credit provider at " << i << 
+                                " supplants that at " << keyValue.first <<
+                                std::endl;
+                            
+                            // Remove the old entry
+                            activeMismatches.erase(keyValue.first);
+                            
+                            // Add the new entry with 0 mismatches.
+                            activeMismatches[i] = 0;
+                            
+                            // Leave the loop since we modified the map.
+                            break;
+                        }
+                        
+                        // Else the old provider is no different than the new one in
+                        // terms of how it gives credit, so we don't need to mess
+                        // with the map.
+                        
+                    }
+                }
+                
+                
+                if(!found) {
+                    // There's nothing in the map currently to take care of this
+                    // credit. Add the new entry with 0 mismatches.
+                    // TODO: Can I refactor to do this once only?
+                    activeMismatches[i] = 0;
+                }
+            } else if(i > leftSentinel && i < rightSentinel &&
+                !leftMappings[i].isMapped() && !rightMappings[i].isMapped()) {
+                // This base is between sentinels, and unmapped due to having no
+                // mapping on either side (i.e. is unmapped and not
+                // conflictingly mapped). We can apply credit to it.
+                
+                if(activeMismatches.size() > 0) {
+                    // What mapping are we going to make?
+                    Mapping mapping;
+                        
+                    if(activeMismatches.size() < 1) {
+                        // There is exactly one outstanding source of credit.
+                        
+                        // Grab its position
+                        size_t provider = activeMismatches.begin()->first;
+                        
+                        // Where did it map?
+                        TextPosition implied =
+                            disambiguated[provider].getLocation();
+                        
+                        // TODO: do the check against giving credit to things
+                        // with the wrong bases here?
+                            
+                        // Advance the provider mapping position to get our
+                        // implied mapping position.
+                        implied.addOffset(i - provider);
+                        
+                        Log::debug() << "Credit in direction " << direction <<
+                            " maps " << i << " to " << implied << std::endl;
+                            
+                        // Make a mapped Mapping
+                        mapping = Mapping(implied);
+                        
+                        
+                    } else {
+                        // There are multiple conflicting credits for this base
+                        // from this side. TODO: Check to see if some of them
+                        // can't apply to us because they imply a merge of two
+                        // different bases.
+                        
+                        // Leave the unmapped Mapping to be added.
+                        
+                        Log::debug() << "Credit in direction " << direction <<
+                            " conflicts at " << i << std::endl;
+                    }
+                    
+                    // Now mapping is filled in with whatever mapping from
+                    // credit we give (mapped somewhere or conflicted).
+                    
+                    if(credits.count(i)) {
+                        // This base was mapped on credit in the other
+                        // direction.
+                        
+                        if(credits[i] != mapping) {
+                            // Change the mapping already there to be unmapped
+                            // if it doesn't match this one.
+                            credits[i] = Mapping();
+                        }
+                    } else {
+                        // This base needs a new mapping, since we had something
+                        // to say about it.
+                        credits[i] = mapping;
+                    }
+                    
+                }
+            }
+        }
     }
-    
-    Log::debug() << "Max context sizes: " << maxLeftContext << "|" << 
-        maxRightContext << std::endl;
     
     // This is going to hold our output
     std::vector<Mapping> toReturn;
@@ -288,6 +474,7 @@ std::vector<Mapping> CreditFilter2::apply(
         // For each base before or at the left sentinel, disambiguate normally.
         toReturn.push_back(disambiguated[i]);
     }
+    
 
     for(size_t i = leftSentinel + 1; i < rightSentinel; i++) {    
         // For each base between the sentinels
@@ -295,199 +482,12 @@ std::vector<Mapping> CreditFilter2::apply(
         if(disambiguated[i].isMapped()) {
             // If it is mapped on one or more sides, disambiguate normally.
             toReturn.push_back(disambiguated[i]);   
+        } else if(credits.count(i) > 0) {
+            // Some credit was offered to it. Take it.
+            toReturn.push_back(credits[i]);
         } else {
-        
-            Log::trace() << "Trying to credit map base " << i << std::endl;
-        
-            // Set this to true if you find a base that implies a position for
-            // this one by its right context.
-            bool rightFound = false;
-            // This is where that base would place this one
-            TextPosition rightCreditPosition(0, 0);
-            // Set this if right contexts all place this base in one spot
-            bool rightConsistent = true;
-        
-            for(size_t j = i - 1; j != (size_t) -1 && 
-                (int64_t) j >= (int64_t) i - (int64_t) maxRightContext; j--) {
-                // Look left from here until you find a base that maps and
-                // places us.
-                Log::trace() << "Checking base " << j << " on right" << 
-                    std::endl;
-                
-                if(!isCreditProvider[j]) {
-                    // This base either didn't map or possibly could unmap, so
-                    // don't take credit from it.
-                    continue;
-                }
-                
-                // Go get the text we would map on. This is always strand 0.
-                // TODO: Proper weakref cache thingy.
-                const std::string& referenceText = index.displayContigCached(
-                    disambiguated[j].getLocation().getText());
-                    
-                // Work out what offset we should have on that strand.
-                int64_t offset = (int64_t) i - (int64_t) j + 
-                    (int64_t) disambiguated[j].getLocation().getOffset(); 
-                    
-                if(offset < 0 || offset >= referenceText.size()) {
-                    // This base can't actually give credit to us since it would
-                    // put us off the end of its strand.
-                    continue;
-                }
-                
-                // Make the mapping we imply
-                TextPosition implied(disambiguated[j].getLocation().getText(),
-                    offset);
-                
-                // OK the base can give credit, but can it give credit on its
-                // particular text at this distance, even if it happens to be
-                // unmapped on this side? Remember, we need credit from unmapped
-                // sides to make sure credit is consistent with sentinels.
-                // Otherwise we would have to special-case that credit was
-                // consistent with sentinels.
-                
-                // We need to count the number of mismatches between the query
-                // string and the reference, from the credit provider to here.
-                // So in the reference we start at the credit provider's mapping
-                // location (on the appropriate strand), and in the query we
-                // start at the credit provider, and we go forward until we get
-                // to this base.
-                size_t mismatches = countMismatches(referenceText, 
-                    disambiguated[j].getLocation().getStrand(), 
-                    disambiguated[j].getLocation().getOffset(), query, j, 
-                    i - j + 1);
-                
-                if(mismatches > z_max) {
-                    // No credit because too many mismatches.
-                    continue;
-                }
-                
-                Log::trace() << "Base " << j << " places base " << i << 
-                    " at " << implied << " by right context with " <<
-                    mismatches << " mismatches" << std::endl;
-                
-                if(!rightFound) {
-                    // This is the first one. Make sure all the others match.
-                    rightFound = true;
-                    rightCreditPosition = implied;
-                } else if (rightCreditPosition != implied) {
-                    // There are two or more implied locations from right
-                    // contexts.
-                    rightConsistent = false;
-                    break;
-                }
-                
-            }
-            
-            // And the same thing for left contexts
-            
-            // Set this to true if you find a base that implies a position for
-            // this one by its left context.
-            bool leftFound = false;
-            // This is where that base would place this one
-            TextPosition leftCreditPosition(0, 0);
-            // Set this if left contexts all place this base in one spot
-            bool leftConsistent = true;
-        
-            for(size_t j = i + 1; j < leftMappings.size() && 
-                j < i + maxLeftContext; j++) {
-                
-                // Look right from here until you find a base that maps and
-                // places us.
-                
-                Log::trace() << "Checking base " << j << " on left" << 
-                    std::endl;
-                
-                if(!isCreditProvider[j]) {
-                    // This base either didn't map or possibly could unmap, so
-                    // don't take credit from it.
-                    continue;
-                }
-                
-                // Go get the text we would map on. This is always strand 0.
-                // TODO: Proper weakref cache thingy.
-                const std::string& referenceText = index.displayContigCached(
-                    disambiguated[j].getLocation().getText());
-                    
-                // Work out what offset we should have on that strand.
-                int64_t offset = (int64_t) i - (int64_t) j + 
-                    (int64_t) disambiguated[j].getLocation().getOffset(); 
-                    
-                if(offset < 0 || offset >= referenceText.size()) {
-                    // This base can't actually give credit to us since it would
-                    // put us off the end of its strand.
-                    continue;
-                }
-                
-                // Make the mapping we imply
-                TextPosition implied(disambiguated[j].getLocation().getText(),
-                    offset);
-                
-                // OK the base can give credit, but can it give credit on its
-                // particular text at this distance, even if it happens to be
-                // unmapped on this side? Remember, we need credit from unmapped
-                // sides to make sure credit is consistent with sentinels.
-                // Otherwise we would have to special-case that credit was
-                // consistent with sentinels.
-                
-                // We need to count the number of mismatches between the query
-                // string and the reference, from here to the credit provider.
-                // So in the reference we start at the implied mapping location
-                // (on the appropriate strand), and in the query we start at us,
-                // and we go forward until we get to the credit provider.
-                size_t mismatches = countMismatches(referenceText, 
-                    implied.getStrand(), implied.getOffset(), query, i, 
-                    j - i + 1);
-                    
-                if(mismatches > z_max) {
-                    // No credit because too many mismatches.
-                    continue;
-                }
-                
-                Log::trace() << "Base " << j << " places base " << i << 
-                    " at " << implied << " by left context with " <<
-                    mismatches << " mismatches" << std::endl;
-                
-                if(!leftFound) {
-                    // This is the first one. Make sure all the others match.
-                    leftFound = true;
-                    leftCreditPosition = implied;
-                } else if (leftCreditPosition != implied) {
-                    // There are two or more implied locations from left
-                    // contexts.
-                    leftConsistent = false;
-                    break;
-                }
-                
-            }
-            
-            // TODO: somehow call into the disambiguation filter here?
-        
-            if(leftFound && leftConsistent) {
-                if(rightFound && rightConsistent) {
-                    // We have credit from both the left and the right. Do they
-                    // agree?
-                    
-                    if(leftCreditPosition == rightCreditPosition) {
-                        // They agree! Record a successful mapping. TODO: do we
-                        // want to send credit info along here as well?
-                        toReturn.push_back(Mapping(leftCreditPosition));
-                    } else {
-                        // They disagree. Fail the mapping
-                        toReturn.push_back(Mapping());
-                    }
-                } else {
-                    // We have credit only from the left.
-                    toReturn.push_back(Mapping(leftCreditPosition));
-                }
-            } else if(rightFound && rightConsistent) {
-                // We have credit only from the right
-                
-                toReturn.push_back(Mapping(rightCreditPosition));
-            } else {
-                // We have credit from nowhere
-                toReturn.push_back(Mapping());
-            }
+            // No way to map it, say it is unmapped.
+            toReturn.push_back(Mapping());
         }
         
     }
