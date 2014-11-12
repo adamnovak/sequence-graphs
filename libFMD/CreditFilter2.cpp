@@ -303,7 +303,7 @@ std::vector<Mapping> CreditFilter2::apply(
                 iterator = (iterator->second > z_max ? 
                     // This credit provider has too many mismatches. Delete it
                     // and move to the next one.
-                    activeMismatches.erase(iterator) 
+                    activeMismatches.erase(iterator)
                 : 
                     // Else keep it and move to the next one.
                     ++iterator)) {
@@ -340,6 +340,12 @@ std::vector<Mapping> CreditFilter2::apply(
                 
                 // If it gets too many mismatches, the loop update logic will
                 // remove it when advancing to the next credit provider.
+                
+                if(iterator->second > z_max) {
+                    // We're going to drop this, so talk about it.
+                    Log::debug() << "Credit provider " << iterator->first <<
+                        " drops out at position " << i << std::endl;
+                }
             }
             
             // TODO: Apply credit to this base from the left, if applicable.
@@ -382,8 +388,11 @@ std::vector<Mapping> CreditFilter2::apply(
                             
                             // Leave the loop since we modified the map.
                             break;
+                        } else {
+                            Log::debug() << "Credit provider at " << i << 
+                                " subsumed by that at " << keyValue.first <<
+                                std::endl;
                         }
-                        
                         // Else the old provider is no different than the new one in
                         // terms of how it gives credit, so we don't need to mess
                         // with the map.
@@ -397,6 +406,9 @@ std::vector<Mapping> CreditFilter2::apply(
                     // credit. Add the new entry with 0 mismatches.
                     // TODO: Can I refactor to do this once only?
                     activeMismatches[i] = 0;
+                    
+                    Log::debug() << "New credit provider at position " << i <<
+                        std::endl;
                 }
             } else if(i > leftSentinel && i < rightSentinel &&
                 !leftMappings[i].isMapped() && !rightMappings[i].isMapped()) {
@@ -404,11 +416,15 @@ std::vector<Mapping> CreditFilter2::apply(
                 // mapping on either side (i.e. is unmapped and not
                 // conflictingly mapped). We can apply credit to it.
                 
+                Log::debug() << "Position " << i <<
+                    " eligible for credit from " << activeMismatches.size() <<
+                    " providers" << std::endl; 
+                
                 if(activeMismatches.size() > 0) {
                     // What mapping are we going to make?
                     Mapping mapping;
                         
-                    if(activeMismatches.size() < 1) {
+                    if(activeMismatches.size() == 1) {
                         // There is exactly one outstanding source of credit.
                         
                         // Grab its position
