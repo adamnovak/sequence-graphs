@@ -84,11 +84,20 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # Plan out all the schemes as mismatch, credit, min_context,
         # add_context, mult_context, min_coding_cost
         return [
-            # Exact no credit min 100
-            (False, False, 100, 0, 0, 0),
-            # Inexact credit min 100
-            (True, True, 100, 0, 0, 0),
-            # MultContext without min
+            # Exact no credit
+            (False, False, 0, 0, 0, 0),
+            # Inexact no credit
+            (True, False, 0, 0, 0, 0),
+            # Inexact no credit min various
+            (True, False, 50, 0, 0, 0),
+            (True, False, 100, 0, 0, 0),
+            (True, False, 150, 0, 0, 0),
+            # Inexact no credit mult various
+            (True, False, 0, 0, 2.0, 0),
+            (True, False, 0, 0, 4.0, 0),
+            (True, False, 0, 0, 8.0, 0),
+            # Inexact credit mult various
+            (True, True, 0, 0, 2.0, 0),
             (True, True, 0, 0, 4.0, 0),
             (True, True, 0, 0, 8.0, 0)
         ]
