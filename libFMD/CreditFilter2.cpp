@@ -221,6 +221,9 @@ std::vector<Mapping> CreditFilter2::apply(
     // This holds which bases in the string are credit providers
     std::vector<bool> isCreditProvider(disambiguated.size(), false);
     
+    // How many are there?
+    size_t totalCreditProviders = 0;
+    
     for(size_t i = leftSentinel; i <= rightSentinel; i++) {
         // For each position between the sentinels (including them)...
         
@@ -252,6 +255,7 @@ std::vector<Mapping> CreditFilter2::apply(
         
         // If we get here, we can give credit.
         isCreditProvider[i] = true;
+        totalCreditProviders++;
         
         Log::trace() << "Position " << i << " is a credit provider." <<
             std::endl;
@@ -261,6 +265,9 @@ std::vector<Mapping> CreditFilter2::apply(
     // The sentinels always have to come out as credit providers.
     assert(isCreditProvider[leftSentinel]);
     assert(isCreditProvider[rightSentinel]);
+    
+    Log::info() << "Assigning credit from " << totalCreditProviders <<
+        " providers." << std::endl;
     
     // Now we can actually try applying credit.
     
@@ -285,7 +292,7 @@ std::vector<Mapping> CreditFilter2::apply(
     for(int direction = 1; direction >= -1; direction -= 2) {
         // Looking left to right first, then looking right to left.
     
-        Log::debug() << "Applying credit in direction " << direction <<
+        Log::info() << "Applying credit in direction " << direction <<
             std::endl;
     
         // We keep a table of how many mismatches each active credit provider
@@ -389,7 +396,7 @@ std::vector<Mapping> CreditFilter2::apply(
                             // Leave the loop since we modified the map.
                             break;
                         } else {
-                            Log::debug() << "Credit provider at " << i << 
+                            Log::trace() << "Credit provider at " << i << 
                                 " subsumed by that at " << keyValue.first <<
                                 std::endl;
                         }
@@ -416,7 +423,7 @@ std::vector<Mapping> CreditFilter2::apply(
                 // mapping on either side (i.e. is unmapped and not
                 // conflictingly mapped). We can apply credit to it.
                 
-                Log::debug() << "Position " << i <<
+                Log::trace() << "Position " << i <<
                     " eligible for credit from " << activeMismatches.size() <<
                     " providers" << std::endl; 
                 
@@ -491,6 +498,10 @@ std::vector<Mapping> CreditFilter2::apply(
         toReturn.push_back(disambiguated[i]);
     }
     
+    // How many bases successfully map on credit?
+    size_t mappedOnCredit = 0;
+    // How many bases got conflicting credit?
+    size_t conflictedCredit = 0;
 
     for(size_t i = leftSentinel + 1; i < rightSentinel; i++) {    
         // For each base between the sentinels
@@ -501,12 +512,27 @@ std::vector<Mapping> CreditFilter2::apply(
         } else if(credits.count(i) > 0) {
             // Some credit was offered to it. Take it.
             toReturn.push_back(credits[i]);
+            
+            if(credits[i].isMapped()) {
+                // Credit was a real mapping
+                mappedOnCredit++;
+            } else {
+                // Credit was conflicted.
+                conflictedCredit++;
+            }
+            
         } else {
             // No way to map it, say it is unmapped.
             toReturn.push_back(Mapping());
         }
         
     }
+    
+    // Dump some info about credit mappings
+    Log::info() << mappedOnCredit << 
+        " bases mapped on credit (before identity check)" << std::endl;
+    Log::info() << conflictedCredit << 
+        " bases did not map due to conflicting credit" << std::endl;
     
     for(size_t i = rightSentinel; i < disambiguated.size(); i++) {
         // Then for each base at or after the right sentinel, disambiguate
