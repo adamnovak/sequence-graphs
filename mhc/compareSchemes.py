@@ -99,7 +99,10 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             # Inexact credit mult various
             (True, True, 0, 0, 2.0, 0),
             (True, True, 0, 0, 4.0, 0),
-            (True, True, 0, 0, 8.0, 0)
+            (True, True, 0, 0, 8.0, 0),
+            # MultContext without min or credit
+            (True, False, 0, 0, 4.0, 0),
+            (True, False, 0, 0, 8.0, 0)
         ]
 
     def generateSchemes(self):
