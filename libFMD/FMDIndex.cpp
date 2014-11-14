@@ -1848,6 +1848,8 @@ MisMatchAttemptResults FMDIndex::misMatchExtend(MisMatchAttemptResults& prevMisM
         // done
     
         if(startExtension) {
+        
+            // We will only extend by the correct base.
                 
             m_position2.first = extend(m_position.first, c, backward);
             m_position2.second = m_position.second;
@@ -1856,7 +1858,9 @@ MisMatchAttemptResults FMDIndex::misMatchExtend(MisMatchAttemptResults& prevMisM
                 nextMisMatches.positions.push_back(m_position2);        
             }
             
-        } else if(finishExtension) {            
+        } else if(finishExtension) {
+            // We will only extend by the incorrect bases
+                    
             // Extend by all mismatched positions
             if(m_position.second < z_max) {
                 for(size_t base = 0; base < NUM_BASES; base++) {
@@ -1875,6 +1879,7 @@ MisMatchAttemptResults FMDIndex::misMatchExtend(MisMatchAttemptResults& prevMisM
                 }
             }
         } else {
+            // We will extend by both.
           
             m_position2.first = extend(m_position.first, c, backward);
             m_position2.second = m_position.second;

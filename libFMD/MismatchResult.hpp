@@ -1,0 +1,177 @@
+#ifndef MISMATCHRESULT_HPP
+#define MISMATCHRESULT_HPP
+
+#include "FMDPosition.hpp"
+#include <deque>
+
+/**
+ * Represents a single BWT range in a search that allows mismatches. Keeps track
+ * of the positions of its mismatches, and knows how to extend on the left and
+ * retract on the right.
+ */ 
+class MismatchResult {
+public:
+
+    // Default copy constructor, assignment operator, etc. OK.
+    
+    /**
+     * Make a new MismatchResult covering an entire index.
+     */
+    inline MismatchResult(const FMDIndex& index): 
+        result(index.getCoveringPosition()) {
+        
+        // Nothing to do
+    }
+    
+    
+    /**
+     * Return true if this MismatchResult is the same as the other one. Needed
+     * so we can make an std::set of these.
+     */
+    inline bool operator==(const MismatchResult& other) const {
+        
+        return result.getForwardStart() == other.result.getForwardStart() &&
+            // Note that we ignore the reverse start on purpose.
+            result.getEndOffset() == other.result.getEndOffset() &&
+            startIndex == other.startIndex && endIndex == other.endIndex &&
+            // We can just use the deque's built-in equality test.
+            mismatches == other.mismatches;
+    }
+    
+    /**
+     * Return true if this MismatchResult is the same as the other one. Needed
+     * for completeness.
+     */
+    inline bool operator!=(const MismatchResult& other) const {
+        
+        return !(*this == other);
+    }
+    
+    /**
+     * Return true if this MismatchResult belongs before the other one when
+     * sorting. Needed so we can make an std::set of these.
+     */
+    inline bool operator<(const MismatchResult& other) const {
+        return result.getForwardStart() < other.result.getForwardStart() ||
+            // Note that we ignore the reverse start on purpose.
+            result.getEndOffset() < other.result.getEndOffset() ||
+            startIndex < other.startIndex || endIndex < other.endIndex ||
+            // We can also use the deque's built-in less than operator.
+            mismatches < other.mismatches;
+    }
+    
+    /**
+     * Return true if this MismatchResult belongs before the other one when
+     * sorting. Needed for completeness.
+     */
+    inline bool operator>(const MismatchResult& other) const {
+        return result.getForwardStart() > other.result.getForwardStart() ||
+            // Note that we ignore the reverse start on purpose.
+            result.getEndOffset() > other.result.getEndOffset() ||
+            startIndex > other.startIndex || endIndex > other.endIndex ||
+            // We can also use the deque's built-in greater than operator.
+            mismatches > other.mismatches;
+    }
+    
+    /**
+     * Return the number of characters currently searched in this result.
+     */
+    inline size_t getCharacters() const {
+        return endIndex - startIndex;
+    }
+    
+    /**
+     * Return the number of mismatches in this result.
+     */
+    inline size_t getMismatches() const {
+        return mismatches.size();
+    }
+    
+    /**
+     * Return true if the leftmost character searched is a match, and false
+     * otherwise (or if there is no leftmost character).
+     */
+    inline bool leftIsMatch() const {
+        return (getCharacters() > 0) && ((getMismatches() == 0) ||
+            // Remember: new (lefter) characters go at the back.
+            mismatches.back() != endIndex); 
+    }
+    
+    /**
+     * Return true if the rightmost character searched is a match, and false
+     * otherwise (or if there is no rightmost character).
+     */
+    inline bool rightIsMatch() const {
+        return (getCharacters() > 0) && ((getMismatches() == 0) ||
+            // Remember: old (righter) characters come out the front.
+            mismatches.front() != startIndex); 
+    }
+    
+    /**
+     * Return true if we have no results under the given mask.
+     */
+    inline bool isEmpty(const GenericBitVector* mask = NULL) const {
+        return mismatches.isEmpty(mask);
+    }
+    
+    /**
+     * Return the number of positions actually found, under the given mask.
+     */
+    inline int64_t getLength(const GenericBitVector* mask = NULL) const {
+        return mismatches.getLength(mask):
+    }
+    
+    /**
+     * Return the range number that the result belongs to, or -1 if there is no
+     * such range.
+     */
+    inline int64_t range(const GenericBitVector& ranges, 
+        const GenericBitVector* mask = NULL) const {
+        
+        // Delegate to the FMDPosition.
+        return result.range(ranges, mask);
+    }
+    
+    /**
+     * Extend this result left with every possible character, producing four
+     * results (some of which may be empty, especially under a mask). If the
+     * caller wants to look at only exact matches or limit total mismatch count,
+     * the caller has to drop results (or not bother extending those at the
+     * mismatch limit already).
+     */
+    std::vector<MismatchResult> extendLeft(const FMDIndex& index, 
+        char match) const;
+        
+    /**
+     * Retract the rightmost character from this result, producing a new result.
+     */
+    MismatchResult retractRight(const FMDIndex& index) const;
+    
+
+private:
+    /**
+     * What BWT positions are our results? Only the forward interval is used.
+     */
+    FMDPosition result;
+    
+    /**
+     * Keep a queue of mismatch positions. Numbers in here are the number of the
+     * extension at which the mismatch occurred, and are inserted in extension
+     * order.
+     */
+    std::deque<size_t> mismatches = std::deque<size_t>();
+    
+    /**
+     * Keep track of what the earliest extension that hasn't been retracted is.
+     * This lets us know when to pick up a mismatch.
+     */
+    size_t startIndex = 0;
+    
+    /**
+     * Keep track of what the latest extension is is, so we can add mismatches
+     * there in our queue, to be picked up on the appropriate retract.
+     */
+    size_t endIndex = 0;
+};
+
+#endif
