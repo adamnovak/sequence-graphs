@@ -15,6 +15,12 @@ std::vector<MismatchResult> MismatchResult::extendLeft(const FMDIndex& index,
         
         // Extend the copy on that base.
         index.extendLeftOnly(extended.result, base);
+        
+        if(extended.result.isEmpty()) {
+            // Skip any extensions that are unconditionally empty.
+            continue;
+        }
+        
         // Note that we searched another character.
         extended.endIndex++;
         

@@ -246,7 +246,11 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
     // How many bases have we mapped or not mapped
     size_t mappedBases = 0;
     size_t unmappedBases = 0;
+    // How many are mapped on both the left and the right?
+    size_t leftRightMappedBases = 0;
+    // On credit?
     size_t creditBases = 0;
+    // Left and right are conflicted?
     size_t conflictedBases = 0;
     
     // Grab the contig as a string
@@ -399,6 +403,12 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
                 candidate.getStrand());
             mappedBases++;
             
+            if(leftMappings[i].isMapped() && rightMappings[i].isMapped()) {
+                // This base was left-mapped and right-mapped (and also not
+                // mapped on credit).
+                leftRightMappedBases++;
+            }
+            
             if(mappingsOut != NULL) {
                 // TODO: Assumes we have exactly one scaffold in this genome.
                 
@@ -417,9 +427,9 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
     }
 
     // Report that we're done.
-    // Report that we're done.
     Log::info() << taskName << " finished (" << mappedBases << " mapped|" << 
-        unmappedBases << " unmapped)" << std::endl;
+        unmappedBases << " unmapped|" << leftRightMappedBases <<
+        " LR-mapped)" << std::endl;
 }
 
 

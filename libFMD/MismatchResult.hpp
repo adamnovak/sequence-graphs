@@ -133,11 +133,12 @@ public:
     }
     
     /**
-     * Extend this result left with every possible character, producing four
-     * results (some of which may be empty, especially under a mask). If the
-     * caller wants to look at only exact matches or limit total mismatch count,
-     * the caller has to drop results (or not bother extending those at the
-     * mismatch limit already).
+     * Extend this result left with every possible character, and discard
+     * extensions that are completely empty. Gives a maximum of four results.
+     * (Some may still be empty under whatever BWT mask you happen to be using.)
+     * If the caller wants to look at only exact matches or limit total mismatch
+     * count, the caller has to drop results (or not bother extending those at
+     * the mismatch limit already).
      */
     std::vector<MismatchResult> extendLeft(const FMDIndex& index, 
         char match) const;
@@ -148,7 +149,7 @@ public:
     MismatchResult retractRight(const FMDIndex& index) const;
     
 
-private:
+protected:
     /**
      * What BWT positions are our results? Only the forward interval is used.
      */
