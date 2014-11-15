@@ -2,7 +2,7 @@
 #define MISMATCHRESULTSET_HPP
 
 #include <set>
-#include "GenericBitvector.hpp"
+#include "GenericBitVector.hpp"
 #include "MismatchResult.hpp"
 
 
