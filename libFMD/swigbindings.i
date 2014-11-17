@@ -79,6 +79,7 @@ using CSA::BitVectorEncoder;
 
 %include "Mapping.hpp"
 %include "TextPosition.hpp"
+%include "MismatchResultSet.hpp"
 %{
   #include "FMDIndex.hpp"
 %}
