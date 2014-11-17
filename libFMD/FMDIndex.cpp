@@ -1779,23 +1779,30 @@ Mapping FMDIndex::disambiguate(const Mapping& left,
     return toReturn;
 }
 
-MisMatchAttemptResults FMDIndex::misMatchCount(const GenericBitVector& ranges, 
+MismatchResultSet FMDIndex::mismatchCount(const GenericBitVector& ranges, 
     const std::string& pattern, size_t z_max, 
     const GenericBitVector* mask) const {
     
-    // Go out as far as you can right from the first base in the pattern,
-    // allowing a mismatch on the first base.
-    MisMatchAttemptResults intermediate = misMatchMapPosition(ranges, pattern,
-        0, z_max, true, true, mask);
+    // Make a new result set for nothing searched yet.
+    MismatchResultSet results(*this);
+    
+    for(size_t i = pattern.size() - 1; i != (size_t) -1; i--) {
+        // For each chartacter in the pattern from right to left
         
-    if(intermediate.characters < pattern.size()) {
-        // We didn't make it to the end. This means there are 0 results. Return
-        // an empty results. TODO: set characters or something?
-        return MisMatchAttemptResults();
+        // Extend left with it
+        results.extendLeft(pattern[i]);
+        
+        // Filter out results we don't want.
+        results.filter(z_max, mask);
+        
+        if(results.isEmpty()) {
+            // We have run out of results early.
+            return results;
+        }
     }
     
     // Otherwise we made it to the end and have some results.
-    return intermediate;
+    return results;
 
 }
 

@@ -1,8 +1,10 @@
 #include "MismatchResultSet.hpp"
+#include "FMDIndex.hpp"
 
 MismatchResultSet::MismatchResultSet(const FMDIndex& index): 
-    index(index), results() {
-
+    index(index), results({MismatchResult(index)}) {
+    // We started with a single result covering the whole index.
+    
     // Nothing to do!
 }
 
@@ -12,7 +14,7 @@ void MismatchResultSet::extendLeft(char base) {
     
     for(auto oldResult : results) {
         // For each current result
-        for(newResult : oldResults.extendLeft(index, base)) {
+        for(auto newResult : oldResult.extendLeft(index, base)) {
             // For each new result you would get by extending it, put it in the
             // set of new results (if we don't have it already, which we
             // shouldn't, because these are all subranges of originally unique
@@ -42,7 +44,7 @@ void MismatchResultSet::retractRight() {
     std::swap(results, newResults);
 }
 
-void MismatchResultSet::filter(size_t z_max, GenericBitVector* mask = NULL) {
+void MismatchResultSet::filter(size_t z_max, const GenericBitVector* mask) {
     // Make a new set to hold all the new results after retracting.
     std::set<MismatchResult> newResults;
     
@@ -65,7 +67,7 @@ void MismatchResultSet::filter(size_t z_max, GenericBitVector* mask = NULL) {
 }
 
 int64_t MismatchResultSet::range(const GenericBitVector& ranges, 
-    GenericBitVector* mask = NULL) {
+    const GenericBitVector* mask) const {
     
     // What range has been found?
     int64_t range = -1;
@@ -88,4 +90,42 @@ int64_t MismatchResultSet::range(const GenericBitVector& ranges,
     // Everybody agrees on this. Will be -1 if no results.
     return range;
 
+}
+
+bool MismatchResultSet::isEmpty(const GenericBitVector* mask) const {
+    for(auto result : results) {
+        // Go through each result
+        
+        if(!result.isEmpty(mask)) {
+            // And if it has anything under the mask, say we aren't empty
+            return false;
+        }
+    }
+    
+    // Otherwise we are empty.
+    return true;
+}
+
+int64_t MismatchResultSet::getLength(const GenericBitVector* mask) const {
+    // How many total result positions are there?
+    int64_t total = 0;
+    
+    for(auto result : results) {
+        // For each result
+    
+        // The positions in different results will all be distinct, so we can
+        // count all of them.
+        total += result.getLength(mask);
+    }
+    
+    // Return the total number of BWT positions in results in this result set,
+    // under the mask.
+    return total;
+}
+
+bool MismatchResultSet::isMapped(const GenericBitVector& ranges, 
+    const GenericBitVector* mask) const {
+    
+    // We are mapped if we overlap exactly one range.
+    return range(ranges, mask) != -1;    
 }

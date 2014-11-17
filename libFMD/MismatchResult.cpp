@@ -1,5 +1,12 @@
 #include "MismatchResult.hpp"
+#include "FMDIndex.hpp"
 #include "util.hpp"
+
+MismatchResult::MismatchResult(const FMDIndex& index): 
+    result(index.getCoveringPosition()) {
+
+    // Nothing to do
+}
 
 std::vector<MismatchResult> MismatchResult::extendLeft(const FMDIndex& index, 
     char match) const {
@@ -42,7 +49,9 @@ MismatchResult MismatchResult::retractRight(const FMDIndex& index) const {
     // Copy ourselves
     MismatchResult toReturn(*this);
     
-    if(toReturn.rightIsMismatch()) {
+    // TODO: Make sure we have sufficient characters?
+    
+    if(!toReturn.rightIsMatch()) {
         // We're about to retract a mismatched character. Remove the record of
         // its mismatch.
         toReturn.mismatches.pop_front();

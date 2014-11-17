@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cassert>
 #include "Log.hpp"
+#include "MismatchResultSet.hpp"
 
 /**
  * Given the forward strand of a reference text, a flag for whether we are
@@ -90,10 +91,12 @@ std::vector<Mapping> CreditFilter2::apply(
             
             // Count how many times the word appears within the right number of
             // mismatches.
-            MisMatchAttemptResults count = index.misMatchCount(ranges, word,
+            // Count how many times the word appears within the right number of
+            // mismatches.
+            MismatchResultSet count = index.mismatchCount(ranges, word,
                 z_max, mask);
             
-            if(count.is_mapped) {
+            if(count.isMapped(ranges, mask)) {
                 // This word appears exactly once within the specified number of
                 // mismatches. So this is the leftmost left sentinel.
                 leftSentinel = i;
@@ -101,16 +104,9 @@ std::vector<Mapping> CreditFilter2::apply(
                     std::endl;
                 break;
             } else {
-                Log::debug() << "Word candidate had " <<
-                    count.getLength(mask) << " results under mask " << mask <<
+                Log::debug() << "Left word candidate had " <<
+                    count.getLength(mask) << " positions under mask " << mask <<
                     " with " << z_max << " mismatches." << std::endl;
-                    
-                for(auto result : count.positions) {
-                    Log::debug() << result.first << "(" <<  
-                        index.locate(result.first.getForwardStart()) << ") ~" << 
-                        result.second << std::endl;
-                }
-                    
             }
         }
     }
@@ -135,10 +131,10 @@ std::vector<Mapping> CreditFilter2::apply(
             
             // Count how many times the word appears within the right number of
             // mismatches.
-            MisMatchAttemptResults count = index.misMatchCount(ranges, word,
+            MismatchResultSet count = index.mismatchCount(ranges, word,
                 z_max, mask);
             
-            if(count.is_mapped) {
+            if(count.isMapped(ranges, mask)) {
                 // This word appears exactly once within the specified number of
                 // mismatches. So this is the rightmost right sentinel.
                 rightSentinel = i;
@@ -146,16 +142,9 @@ std::vector<Mapping> CreditFilter2::apply(
                     std::endl;
                 break;
             } else {
-                Log::debug() << "Word candidate had " <<
-                    count.getLength(mask) << " results under mask " << mask <<
+                Log::debug() << "Right word candidate had " <<
+                    count.getLength(mask) << " positions under mask " << mask <<
                     " with " << z_max << " mismatches." << std::endl;
-                    
-                for(auto result : count.positions) {
-                    Log::debug() << result.first << "(" <<  
-                        index.locate(result.first.getForwardStart()) << ") ~" << 
-                        result.second << std::endl;
-                }                
-
             }
         }
     }

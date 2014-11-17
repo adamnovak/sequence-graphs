@@ -9,6 +9,7 @@
 
 #include "../FMDIndex.hpp"
 #include "../FMDIndexBuilder.hpp"
+#include "../MismatchResultSet.hpp"
 #include "../util.hpp"
 
 #include "FMDIndexMismatchTests.hpp"
@@ -169,27 +170,26 @@ void FMDIndexMismatchTests::testMismatchCount() {
     std::string query = "CAAAAAAAAAAAAAAAAAAAAATAAAAAAAAAAAAAAAAAG";
     
     // No results in 0 mismatches
-    MisMatchAttemptResults results = index->misMatchCount(bv, query, 0);
+    MismatchResultSet results = index->mismatchCount(bv, query, 0);
     CPPUNIT_ASSERT_EQUAL((size_t) 0, results.getLength());
-    CPPUNIT_ASSERT_EQUAL(false, results.is_mapped);
+    CPPUNIT_ASSERT_EQUAL(false, results.isMapped(bv));
     
     // 1 result in 1 mismatches
-    results = index->misMatchCount(bv, query, 1);
-    CPPUNIT_ASSERT_EQUAL((size_t) 1, results.positions.size());
+    results = index->mismatchCount(bv, query, 1);
     CPPUNIT_ASSERT_EQUAL((size_t) 1, results.getLength());
-    CPPUNIT_ASSERT_EQUAL(true, results.is_mapped);
+    CPPUNIT_ASSERT_EQUAL(true, results.isMapped(bv));
     
     // Many results in 1 mismatch for a shorter string.
     query = "CAAAAAAAAA";
-    results = index->misMatchCount(bv, query, 1);
-    CPPUNIT_ASSERT(results.positions.size() > 1);
+    results = index->mismatchCount(bv, query, 1);
+    CPPUNIT_ASSERT(results.getLength() > 1);
     CPPUNIT_ASSERT_EQUAL(false, results.is_mapped);
     
     // Only 1 result when counting with 0 mismatches
     query = "CAAAAAAAAA";
-    results = index->misMatchCount(bv, query, 0);
+    results = index->mismatchCount(bv, query, 0);
     CPPUNIT_ASSERT_EQUAL((size_t) 1, results.getLength());
-    CPPUNIT_ASSERT_EQUAL(true, results.is_mapped);
+    CPPUNIT_ASSERT_EQUAL(true, results.isMapped(bv));
     
 }
 

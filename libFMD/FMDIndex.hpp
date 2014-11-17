@@ -17,6 +17,7 @@
 #include "GenericBitVector.hpp"
 #include "Mapping.hpp"
 #include "MapAttemptResult.hpp"
+#include "MismatchResultSet.hpp"
 #include "LCPArray.hpp"
 
 // State that the test cases class exists, even though we can't see it.
@@ -437,11 +438,8 @@ public:
      * positions (which may be null), find all the strings in the index that are
      * within the specified number of mismatches of the query.
      *
-     * Returns a MisMatchAttemptResults which contains ranges for each string
-     * within the specified number of mismatches that has any results. If there
-     * is only one range with results for only one position, the is_mapped flag
-     * on the result will be set. The characters field of the result will only
-     * be accurate if there are any result ranges.
+     * Returns a MismatchResultSet which contains ranges for each string
+     * within the specified number of mismatches that has any results.
      *
      * ranges is a bit vector marking the ranges that belong to each position,
      * so that we can check for uniqueness and set the is_mapped flag
@@ -454,7 +452,7 @@ public:
      * mask indicates which BWT positions should be included by setting their
      * bits to 1. If it is null, all BWT positions are included.
      */
-    MisMatchAttemptResults misMatchCount(const GenericBitVector& ranges,
+    MismatchResultSet mismatchCount(const GenericBitVector& ranges,
         const std::string& pattern, size_t z_max, 
         const GenericBitVector* mask = NULL) const;
     

@@ -4,6 +4,9 @@
 #include "FMDPosition.hpp"
 #include <deque>
 
+// We use a reference to the index to do extensions.
+class FMDIndex;
+
 /**
  * Represents a single BWT range in a search that allows mismatches. Keeps track
  * of the positions of its mismatches, and knows how to extend on the left and
@@ -17,12 +20,7 @@ public:
     /**
      * Make a new MismatchResult covering an entire index.
      */
-    inline MismatchResult(const FMDIndex& index): 
-        result(index.getCoveringPosition()) {
-        
-        // Nothing to do
-    }
-    
+    MismatchResult(const FMDIndex& index);
     
     /**
      * Return true if this MismatchResult is the same as the other one. Needed
@@ -111,14 +109,14 @@ public:
      * Return true if we have no results under the given mask.
      */
     inline bool isEmpty(const GenericBitVector* mask = NULL) const {
-        return mismatches.isEmpty(mask);
+        return result.isEmpty(mask);
     }
     
     /**
      * Return the number of positions actually found, under the given mask.
      */
     inline int64_t getLength(const GenericBitVector* mask = NULL) const {
-        return mismatches.getLength(mask):
+        return result.getLength(mask);
     }
     
     /**
