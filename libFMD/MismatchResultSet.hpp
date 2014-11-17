@@ -15,11 +15,12 @@ class FMDIndex;
 class MismatchResultSet {
 public:
     
-    // Default copy constructor is OK, but assignment won't work because we
-    // contain a reference.
+    // Default copy constructor, assignment operator, and so on are OK. Our
+    // pointer to the index can get copied properly.
     
     /**
-     * Make a new MismatchResultSet that searches on the given index.
+     * Make a new MismatchResultSet that searches on the given index. The index
+     * must outlive the MismatchResultSet.
      */
     MismatchResultSet(const FMDIndex& index);
     
@@ -62,7 +63,7 @@ public:
     /**
      * Return the number of positions actually found, under the given mask.
      */
-    int64_t getLength(const GenericBitVector* mask = NULL) const;
+    size_t getLength(const GenericBitVector* mask = NULL) const;
     
     /**
      * Return true if we have found exactly one range, false otherwise.
@@ -71,8 +72,9 @@ public:
         const GenericBitVector* mask = NULL) const;
     
 protected:
-    // We need to keep track of the index we use
-    const FMDIndex& index;
+    // We need to keep track of the index we use. But we need a pointer so we
+    // can do assignment, like callers would expect.
+    const FMDIndex* index;
     // We need to keep our MismatchResults
     std::set<MismatchResult> results;
 };

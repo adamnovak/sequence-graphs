@@ -183,7 +183,7 @@ void FMDIndexMismatchTests::testMismatchCount() {
     query = "CAAAAAAAAA";
     results = index->mismatchCount(bv, query, 1);
     CPPUNIT_ASSERT(results.getLength() > 1);
-    CPPUNIT_ASSERT_EQUAL(false, results.is_mapped);
+    CPPUNIT_ASSERT_EQUAL(false, results.isMapped(bv));
     
     // Only 1 result when counting with 0 mismatches
     query = "CAAAAAAAAA";

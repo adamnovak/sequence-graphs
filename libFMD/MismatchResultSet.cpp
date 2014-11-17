@@ -2,7 +2,7 @@
 #include "FMDIndex.hpp"
 
 MismatchResultSet::MismatchResultSet(const FMDIndex& index): 
-    index(index), results({MismatchResult(index)}) {
+    index(&index), results({MismatchResult(index)}) {
     // We started with a single result covering the whole index.
     
     // Nothing to do!
@@ -14,7 +14,7 @@ void MismatchResultSet::extendLeft(char base) {
     
     for(auto oldResult : results) {
         // For each current result
-        for(auto newResult : oldResult.extendLeft(index, base)) {
+        for(auto newResult : oldResult.extendLeft(*index, base)) {
             // For each new result you would get by extending it, put it in the
             // set of new results (if we don't have it already, which we
             // shouldn't, because these are all subranges of originally unique
@@ -37,7 +37,7 @@ void MismatchResultSet::retractRight() {
         // For each current result, retract it and throw that in the new set.
         // This will never make an empty result, but it will make duplicates,
         // which is why we're using the set in the first place.
-        newResults.insert(oldResult.retractRight(index));
+        newResults.insert(oldResult.retractRight(*index));
     }
     
     // Replace the old result set.
@@ -106,7 +106,7 @@ bool MismatchResultSet::isEmpty(const GenericBitVector* mask) const {
     return true;
 }
 
-int64_t MismatchResultSet::getLength(const GenericBitVector* mask) const {
+size_t MismatchResultSet::getLength(const GenericBitVector* mask) const {
     // How many total result positions are there?
     int64_t total = 0;
     

@@ -15,7 +15,8 @@ class FMDIndex;
 class MismatchResult {
 public:
 
-    // Default copy constructor, assignment operator, etc. OK.
+    // Default copy constructor is OK, but assignment won't work because we
+    // contain a reference.
     
     /**
      * Make a new MismatchResult covering an entire index.
@@ -115,8 +116,12 @@ public:
     /**
      * Return the number of positions actually found, under the given mask.
      */
-    inline int64_t getLength(const GenericBitVector* mask = NULL) const {
-        return result.getLength(mask);
+    inline size_t getLength(const GenericBitVector* mask = NULL) const {
+        // Remember that this call can return a negative length if you get into
+        // a strange state (TODO: when?).
+        int64_t length = result.getLength(mask);
+        
+        return length < 0 ? 0 : length;
     }
     
     /**
