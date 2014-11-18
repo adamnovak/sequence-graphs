@@ -315,9 +315,9 @@ std::vector<Mapping> CreditFilter2::apply(
                     disambiguated[provider].getLocation();
                 
                 // Grab a reference to the reference string that the provider
-                // wants to put us on.
+                // wants to put us on. Make sure to convert from text to contig.
                 const std::string& referenceText = index.displayContigCached(
-                    providerPos.getText());
+                    providerPos.getText() / 2);
                     
                 // Advance the provider mapping position to get our implied
                 // mapping position.
