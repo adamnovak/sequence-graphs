@@ -565,8 +565,11 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 if os.path.exists(genome_source):
                     # They exist.
                     
-                    # Make the directory now
-                    os.makedirs("{}/{}".format(genes_dir, suffixed)) 
+                    # Where should the gene results og?
+                    gene_out_dir = "{}/{}".format(genes_dir, suffixed)
+                    if not os.path.exists(gene_out_dir):
+                        # Make the directory now
+                        os.makedirs(gene_out_dir) 
                     
                     # We need to change the contig name on every gene, which we
                     # can do with a BedSplitTarget. It will automatically decide
