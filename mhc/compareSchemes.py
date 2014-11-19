@@ -1091,8 +1091,13 @@ class WiggleCollateTarget(jobTree.scriptTree.target.Target):
             for (genome, suffix) in itertools.izip(self.genomes, self.suffixes)]
             
         for suffixed in suffixed_names:
-            # Make a directory for each genome with its suffix
-            os.makedirs(self.out_dir + "/" + suffixed)
+            try:
+                # Make a directory for each genome with its suffix
+                os.makedirs(self.out_dir + "/" + suffixed)
+            except:
+                # TODO: make sure this failed because the directory existed,
+                # without getting an error if its parent doesn't exist.
+                pass
         
         # Work out what each genome's wiggle should be called.
         out_filenames = [self.out_dir + "/{}/{}.wig".format(suffixed, suffixed) 
