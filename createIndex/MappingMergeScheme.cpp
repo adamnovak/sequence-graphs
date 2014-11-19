@@ -85,23 +85,32 @@ ConcurrentQueue<Merge>& MappingMergeScheme::run() {
     auto lock = contigsToMerge->lock();
     contigsToMerge->close(lock);
 
+    if(mapType == "LRexact") {
+        // Give a message saying we're doing LR matching (which, contrary to its
+        // "exact" name, supports mismatches)
+        Log::info() << "Using Left-Right exact contexts" << std::endl;
+    } else if(mapType == "natural") {
+        // Give a message saying we're doing Benedict's new natural mapping.
+        Log::info() << "Using natural contexts" << std::endl;
+        if(mismatch > 0) {
+            // Didn't write this code.
+            throw std::runtime_error("Natural mapping with mismatches is "
+                "probably not anywhere near efficient and thus not "
+                "implemented");
+        }
+    } else {
+        throw std::runtime_error(mapType + 
+            " is not an implemented context type.");
+    }
+
     // Start up a reasonable number of threads to do the work.
     for(size_t threadID = 0; threadID < numThreads; threadID++) {
-        // We require different contig merge generation methods for left-right
-        // schemes and for the centered schemes. Specification of mapping on
-        // credit and/or allowance for inexact matching are handled within
-        // these methods
+        // All the mapTypes can use the same method here, since there's lots of
+        // work scheduling and setup logic in common.
         
-        if(mapType == "LRexact") {
-            Log::info() << "Using Left-Right exact contexts" << std::endl;
-            threads.push_back(Thread(&MappingMergeScheme::generateMerges,
-                this, contigsToMerge));
-            
-        } else {
-            throw std::runtime_error(mapType + 
-                " is not an implemented context type.");
-          
-        }
+        // Start up a thread.
+        threads.push_back(Thread(&MappingMergeScheme::generateMerges,
+            this, contigsToMerge));
     }
 
     // Return a reference to the queue of merges, for our caller to do something
@@ -143,31 +152,6 @@ void MappingMergeScheme::join() {
 void MappingMergeScheme::generateMerge(size_t queryContig, size_t queryBase, 
     size_t referenceContig, size_t referenceBase, bool orientation) const {
         
-    // Right now credit merging schemes are attempting to merge off-contig
-    // positions but are otherwise behaving as expected. Throw warning and
-    // don't merge rather than runtime error until this is worked out.
-    
-    /*if(referenceBase > index.getContigLength(referenceContig) || 
-        referenceBase == 0) {
-        
-        // Complain that we're trying to talk about an off-the-contig position.
-        throw std::runtime_error("Reference base " + 
-            std::to_string(referenceBase) + 
-            " on contig " + std::to_string(referenceContig) + 
-            " is beyond 1-based bounds of length " + 
-            std::to_string(index.getContigLength(referenceContig)));
-    }
-    
-    if(queryBase > index.getContigLength(queryContig) || 
-        queryBase == 0) {
-        
-        // Complain that we're trying to talk about an off-the-contig position.
-        throw std::runtime_error("Query base " + std::to_string(queryBase) + 
-            " on contig " + std::to_string(queryContig) + 
-            " is beyond 1-based bounds of length " + 
-            std::to_string(index.getContigLength(queryContig)));
-    }*/
-    
     // Where in the query do we want to come from? Always on the forward strand.
     // Correct offset to 0-based.
     TextPosition queryPos(queryContig * 2, queryBase - 1);
@@ -243,193 +227,209 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
     std::string taskName = "T" + std::to_string(genome) + "." + 
         std::to_string(queryContig);
         
-    // How many bases have we mapped or not mapped
-    size_t mappedBases = 0;
-    size_t unmappedBases = 0;
-    // How many are mapped on both the left and the right?
-    size_t leftRightMappedBases = 0;
-    // On credit?
-    size_t creditBases = 0;
-    // Left and right are conflicted?
-    size_t conflictedBases = 0;
-    
     // Grab the contig as a string
     std::string contig = index.displayContig(queryContig);
-    
-    // Keep a cache of contigs by number so we don't constantly locate for
-    // credit.
-    // TODO: replace with displayContigCached calls.
-    std::map<size_t, std::string> contigCache;
-    contigCache[queryContig] = contig;
-    
-
-    //TODO: can conflicted bases be mapped on credit?
     
     // How many positions are available to map to?
     Log::info() << taskName << " mapping " << contig.size() << 
         " bases via " << includedPositions.rank(index.getBWTLength()) <<
         " bottom-level positions" << std::endl;
     
-    // We will fill these in with mappings that are to ranges, and then convert
-    // the ranges to TextPositions.
-    std::vector<Mapping> rightMappings;
-    std::vector<Mapping> leftMappings;    
-        
-    if (mismatch) {
-      
-        Log::info() << "Using mismatch mapping with z_max " << z_max << 
-            std::endl;
-        
-        // Map it on the right.
-        rightMappings = index.misMatchMap(rangeVector, contig,
-            &includedPositions, minContext, addContext, multContext, 
-            minCodingCost, z_max);
-        
-        // Map it on the left
-        leftMappings = index.misMatchMap(rangeVector, 
-            reverseComplement(contig), &includedPositions, minContext, 
-            addContext, multContext, minCodingCost, z_max); 
-                
-    } else {
-        
-        // We use the same function, with mismatches hardcoded to 0.
-                
-        // Map it on the right
-        rightMappings = index.misMatchMap(rangeVector, contig,
-            &includedPositions, minContext, addContext, multContext, 
-            minCodingCost, 0);
-        
-        // Map it on the left
-        leftMappings = index.misMatchMap(rangeVector, 
-            reverseComplement(contig), &includedPositions, minContext, 
-            addContext, multContext, minCodingCost, 0); 
+    if(mapType == "LRexact") {
     
-    }
-    
-    // Flip the left mappings back into the original order. They should stay
-    // as other-side ranges.
-    std::reverse(leftMappings.begin(), leftMappings.end());
-    
-    for(size_t i = 0; i < leftMappings.size(); i++) {
-        // Convert left and right mappings from ranges to base positions.
+        // How many bases have we mapped or not mapped
+        size_t mappedBases = 0;
+        size_t unmappedBases = 0;
+        // How many are mapped on both the left and the right?
+        size_t leftRightMappedBases = 0;
+        // On credit?
+        size_t creditBases = 0;
+        // Left and right are conflicted?
+        size_t conflictedBases = 0;
         
-        if(leftMappings[i].isMapped()) {
-            // Left is mapped, so go look up its TextPosition
-            leftMappings[i].setLocation(index.getTextPosition(
-                rangeBases[leftMappings[i].getRange()]));
-        }
-
-        if(rightMappings[i].isMapped()) {
-            // Right is mapped, so go look up its TextPosition
-            rightMappings[i].setLocation(index.getTextPosition(
-                rangeBases[rightMappings[i].getRange()]));
-        }
-    }
-
-    for(size_t i = 0; i < leftMappings.size(); i++) {
-        // Convert all the left mapping positions to right semantics
-        
-        if(leftMappings[i].isMapped()) {
-            // Flip anything that's mapped, using the length of the contig it
-            // mapped to.
-            leftMappings[i] = leftMappings[i].flip(index.getContigLength(
-                leftMappings[i].getLocation().getContigNumber()));
-        }
-    }
-    
-    // We need a vector of mappings integrated from both left and right
-    std::vector<Mapping> filteredMappings;
-    
-    if(credit) {
-        // Apply a credit filter to the mappings
-        filteredMappings = CreditFilter2(index, rangeVector, 
-            mismatch? z_max : 0,  &includedPositions).apply(leftMappings, 
-            rightMappings, index.displayContigCached(queryContig));
-    } else {
-        // Apply a disambiguate filter to the mappings
-        filteredMappings = DisambiguateFilter(index).apply(leftMappings,
-            rightMappings);
-    }
-    
-    for(size_t i = 0; i < filteredMappings.size(); i++) {
-        // Now go through all the bases and make sure they have matching
-        // characters before merging them. TODO: make this another filter.
-        
-        TextPosition candidate = filteredMappings[i].getLocation();
-        
-        if(!filteredMappings[i].isMapped()) {
-            // Skip anything unmapped
-            unmappedBases++;
-            continue;
-        }
-                        
-        // Grab the bases we are thinking of merging
-        char queryBase = contig[i];
-        
-        // Make sure we have the contig we are mapping to. TODO: Integrate this
-        // contig cache thing with the index so we can just ask the index to
-        // produce the base for a TextPosition efficiently. Or just make it do
-        // inverse locates fast.
-        if(!contigCache.count(candidate.getContigNumber())) {
-            // Grab out the other contig
-            contigCache[candidate.getContigNumber()] = 
-                index.displayContig(candidate.getContigNumber());
-        }
-        
-        // Grab the base from the contig.
-        char referenceBase;
-        if(candidate.getStrand()) {
-            // Flip around a copy and pull the complement of what's on the
-            // forward strand.
-            TextPosition flipped = candidate;
-            flipped.flip(index.getContigLength(candidate.getContigNumber()));
-            referenceBase = complement(contigCache[flipped.getContigNumber()][
-                flipped.getOffset()]);
-        } else {
-            // Pull from the forward strand
-            referenceBase = contigCache[candidate.getContigNumber()][
-            candidate.getOffset()];
-        }
-        
-        Log::trace() << queryBase << " vs. " << referenceBase << std::endl;
-        
-        if(queryBase == referenceBase) {
-            // Only merge them if they will be the same base
-            // when oriented right.
-        
-            // Merge coordinates are 1-based.
-            generateMerge(queryContig, i + 1, 
-                candidate.getContigNumber(), index.getOffset(candidate),
-                candidate.getStrand());
-            mappedBases++;
+        // We will fill these in with mappings that are to ranges, and then
+        // convert the ranges to TextPositions.
+        std::vector<Mapping> rightMappings;
+        std::vector<Mapping> leftMappings;    
             
-            if(leftMappings[i].isMapped() && rightMappings[i].isMapped()) {
-                // This base was left-mapped and right-mapped (and also not
-                // mapped on credit).
-                leftRightMappedBases++;
+        if (mismatch) {
+          
+            Log::info() << "Using mismatch mapping with z_max " << z_max << 
+                std::endl;
+            
+            // Map it on the right.
+            rightMappings = index.misMatchMap(rangeVector, contig,
+                &includedPositions, minContext, addContext, multContext, 
+                minCodingCost, z_max);
+            
+            // Map it on the left
+            leftMappings = index.misMatchMap(rangeVector, 
+                reverseComplement(contig), &includedPositions, minContext, 
+                addContext, multContext, minCodingCost, z_max); 
+                    
+        } else {
+            
+            // We use the same function, with mismatches hardcoded to 0.
+                    
+            // Map it on the right
+            rightMappings = index.misMatchMap(rangeVector, contig,
+                &includedPositions, minContext, addContext, multContext, 
+                minCodingCost, 0);
+            
+            // Map it on the left
+            leftMappings = index.misMatchMap(rangeVector, 
+                reverseComplement(contig), &includedPositions, minContext, 
+                addContext, multContext, minCodingCost, 0); 
+        
+        }
+        
+        // Flip the left mappings back into the original order. They should stay
+        // as other-side ranges.
+        std::reverse(leftMappings.begin(), leftMappings.end());
+        
+        for(size_t i = 0; i < leftMappings.size(); i++) {
+            // Convert left and right mappings from ranges to base positions.
+            
+            if(leftMappings[i].isMapped()) {
+                // Left is mapped, so go look up its TextPosition
+                leftMappings[i].setLocation(index.getTextPosition(
+                    rangeBases[leftMappings[i].getRange()]));
+            }
+
+            if(rightMappings[i].isMapped()) {
+                // Right is mapped, so go look up its TextPosition
+                rightMappings[i].setLocation(index.getTextPosition(
+                    rangeBases[rightMappings[i].getRange()]));
+            }
+        }
+
+        for(size_t i = 0; i < leftMappings.size(); i++) {
+            // Convert all the left mapping positions to right semantics
+            
+            if(leftMappings[i].isMapped()) {
+                // Flip anything that's mapped, using the length of the contig
+                // it mapped to.
+                leftMappings[i] = leftMappings[i].flip(index.getContigLength(
+                    leftMappings[i].getLocation().getContigNumber()));
+            }
+        }
+        
+        // We need a vector of mappings integrated from both left and right
+        std::vector<Mapping> filteredMappings;
+        
+        if(credit) {
+            // Apply a credit filter to the mappings
+            filteredMappings = CreditFilter2(index, rangeVector, 
+                mismatch? z_max : 0,  &includedPositions).apply(leftMappings, 
+                rightMappings, index.displayContigCached(queryContig));
+        } else {
+            // Apply a disambiguate filter to the mappings
+            filteredMappings = DisambiguateFilter(index).apply(leftMappings,
+                rightMappings);
+        }
+        
+        for(size_t i = 0; i < filteredMappings.size(); i++) {
+            // Now go through all the bases and make sure they have matching
+            // characters before merging them. TODO: make this another filter.
+            
+            TextPosition candidate = filteredMappings[i].getLocation();
+            
+            if(!filteredMappings[i].isMapped()) {
+                // Skip anything unmapped
+                unmappedBases++;
+                continue;
+            }
+                            
+            // Grab the bases we are thinking of merging
+            char queryBase = contig[i];
+            
+            // Make sure we have the contig we are mapping to.
+            const std::string& referenceContig = index.displayContigCached(
+                candidate.getContigNumber());
+            
+            // Grab the base from the contig.
+            char referenceBase;
+            if(candidate.getStrand()) {
+                // Flip around a copy of the position and pull the complement of
+                // what's on the forward strand, so we don't go and complement
+                // the whole contig.
+                TextPosition flipped = candidate;
+                flipped.flip(index.getContigLength(
+                    candidate.getContigNumber()));
+                
+                referenceBase = complement(
+                    referenceContig[flipped.getOffset()]);
+            } else {
+                // Pull from the forward strand
+                referenceBase = referenceContig[candidate.getOffset()];
             }
             
-            if(mappingsOut != NULL) {
-                // TODO: Assumes we have exactly one scaffold in this genome.
+            Log::trace() << queryBase << " vs. " << referenceBase << std::endl;
+            
+            if(queryBase == referenceBase) {
+                // Only merge them if they will be the same base
+                // when oriented right.
+            
+                // Merge coordinates are 1-based.
+                generateMerge(queryContig, i + 1, 
+                    candidate.getContigNumber(), index.getOffset(candidate),
+                    candidate.getStrand());
+                mappedBases++;
                 
-                // Offset from the start of this contig in its scaffold, and
-                // save the mapping.
-                (*mappingsOut)[index.getContigStart(queryContig) + i] = 
-                    filteredMappings[i];
+                if(leftMappings[i].isMapped() && rightMappings[i].isMapped()) {
+                    // This base was left-mapped and right-mapped (and also not
+                    // mapped on credit).
+                    leftRightMappedBases++;
+                }
                 
+                if(mappingsOut != NULL) {
+                    // TODO: Assumes we have exactly one scaffold in this
+                    // genome.
+                    
+                    // Offset from the start of this contig in its scaffold, and
+                    // save the mapping.
+                    (*mappingsOut)[index.getContigStart(queryContig) + i] = 
+                        filteredMappings[i];
+                    
+                }
+                
+            } else {
+                // This base didn't map
+                unmappedBases++;
             }
             
-        } else {
-            // This base didn't map
-            unmappedBases++;
         }
-        
-    }
 
-    // Report that we're done.
-    Log::info() << taskName << " finished (" << mappedBases << " mapped|" << 
-        unmappedBases << " unmapped|" << leftRightMappedBases <<
-        " LR-mapped)" << std::endl;
+        // Report that we're done.
+        Log::info() << taskName << " finished (" << mappedBases << " mapped|" << 
+            unmappedBases << " unmapped|" << leftRightMappedBases <<
+            " LR-mapped)" << std::endl;
+    } else if(mapType == "natural") {
+        // Map using the natural context scheme: get matchings from all the
+        // unique-in-the-reference strings that overlap you.
+        
+        // Call into the index. TODO: pass a parameters struct of some type.
+        // TODO: It would make sense to use a DisambiguateFilter or some such,
+        // but with this algorithm that's sort of integrated into the mapping.
+        std::vector<Mapping> naturalMappings = index.naturalMap(rangeVector,
+            contig, &includedPositions);
+        
+        for(size_t i = 0; i < naturalMappings.size(); i++) {
+            // For each query base
+            
+            if(naturalMappings[i].isMapped()) {
+                // If it actually mapped...
+                
+                // Work out where to
+                TextPosition candidate = naturalMappings[i].getLocation();
+                
+                // Make a merge to that position.
+                generateMerge(queryContig, i + 1, 
+                    candidate.getContigNumber(), index.getOffset(candidate),
+                    candidate.getStrand());
+            }
+        }
+    }
 }
 
 

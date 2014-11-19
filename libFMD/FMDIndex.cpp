@@ -1779,6 +1779,17 @@ Mapping FMDIndex::disambiguate(const Mapping& left,
     return toReturn;
 }
 
+std::vector<Mapping> FMDIndex::naturalMap(const GenericBitVector& ranges, 
+    const std::string& query, const GenericBitVector* mask) const {
+    
+    // What mappings will we return?
+    std::vector<Mapping> toReturn;
+    
+    // Return the mappings.
+    return toReturn;
+        
+}
+
 MismatchResultSet FMDIndex::mismatchCount(const GenericBitVector& ranges, 
     const std::string& pattern, size_t z_max, 
     const GenericBitVector* mask) const {
