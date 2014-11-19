@@ -1785,6 +1785,47 @@ std::vector<Mapping> FMDIndex::naturalMap(const GenericBitVector& ranges,
     // What mappings will we return?
     std::vector<Mapping> toReturn;
     
+    // Where will we keep matchings? We store them as vectors of TextPositions
+    // to which each base has been matched.
+    std::vector<std::vector<TextPosition>> matchings(query.size());
+    
+    // Start with everything selected.
+    FMDPosition results = getCOveringPosition();
+    
+    // How many characters are searched?
+    size_t patternLength = 0;
+    
+    for(size_t i = query.size() - 1; i != (size_t) -1; i--) {
+        // For each position in the query from right to left
+        
+        // We're going to extend backward with this new base.
+        FMDPosition extended = results;
+        extendLeftOnly(extended, query[i]);
+        
+        
+        while(extended.isEmpty(mask)) {
+            // If you can't extend, retract until you can. TODO: Assumes we can
+            // find at least one result for any character.
+            
+            // TODO: We found all the strings that can overlap this retracted
+            // character, so map it if possible.
+            
+            FMDPosition retracted = results;
+            // Make sure to drop characters from the total pattern length.
+            retractRightOnly(retracted, --patternLength);
+            
+            // Try extending again
+            extended = retracted;
+            extendLeftOnly(extended, query[i]);
+        }
+        
+        // We successfully extended.
+        patternLength++;
+        
+        
+        // TODO: If we are unique, record a matching.
+    }
+    
     // Return the mappings.
     return toReturn;
         
