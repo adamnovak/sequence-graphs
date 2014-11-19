@@ -77,13 +77,13 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
    
     def getSchemePlan(self):
         """
-        Return a list of tuples describing schemes.
+        Return a collection of tuples describing schemes.
         
         """
         
         # Plan out all the schemes as mismatch, credit, min_context,
         # add_context, mult_context, min_coding_cost
-        return [
+        return set([
             # Exact no credit
             (False, False, 0, 0, 0, 0),
             # Inexact no credit
@@ -99,11 +99,8 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             # Inexact credit mult various
             (True, True, 0, 0, 2.0, 0),
             (True, True, 0, 0, 4.0, 0),
-            (True, True, 0, 0, 8.0, 0),
-            # MultContext without min or credit
-            (True, False, 0, 0, 4.0, 0),
-            (True, False, 0, 0, 8.0, 0)
-        ]
+            (True, True, 0, 0, 8.0, 0)
+        ])
 
     def generateSchemes(self):
         """
@@ -111,7 +108,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         
         """
         
-        # Get a big list of tuples succinctly describing all the schemes we want
+        # Get a big set of tuples succinctly describing all the schemes we want
         # to run.
         scheme_plan = self.getSchemePlan()
         
