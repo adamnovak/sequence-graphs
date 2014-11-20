@@ -706,7 +706,7 @@ main(
         ("credit", "Mapping on credit for greedy scheme")
         ("mapType", boost::program_options::value<std::string>()
             ->default_value("LRexact"),
-            "Merging scheme (\"centered\" or \"LRexact\")")
+            "Merging scheme (\"natural\" or \"LRexact\")")
         ("mismatches", boost::program_options::value<size_t>()
             ->default_value(0), 
             "Maximum allowed number of mismatches")
@@ -821,6 +821,12 @@ main(
     
     // Grab the context types we are going to use to merge
     std::string mapType = options["mapType"].as<std::string>();
+    
+    if(mapType != "LRexact" && mapType != "natural") {
+        // They gave us a map type we don't have probably.
+        Log::critical() << "Invalid mapType: " << mapType << std::endl;
+        return 1;
+    }
     
     // Grab the merging scheme we are going to use to merge.
     std::string mergeScheme = options["scheme"].as<std::string>();
