@@ -435,12 +435,12 @@ public:
      * where the abse should be, and you can't get from the base off the end of
      * the query with multiple results, map the base.
      *
-     * Ranges determines where BWT positions are merged into unique, mapplable
-     * positions by dividing them with 1s, and the mask, if specified, has 1s on
-     * the BWT positions to include.
+     * Only possible to strings at the moment.
+     *
+     * minContext determines the minimum length of unique string to consider.
      */
-    std::vector<Mapping> naturalMap(const GenericBitVector& ranges, 
-        const std::string& query, const GenericBitVector* mask = NULL) const;
+    std::vector<Mapping> naturalMap(const std::string& query,
+        const GenericBitVector* mask = NULL, size_t minContext = 0) const;
         
     /***************************************************************************
      * Mismatch

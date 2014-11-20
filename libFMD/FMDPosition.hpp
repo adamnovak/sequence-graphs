@@ -108,8 +108,7 @@ public:
      * Return the actual number of matches represented by an FMDPosition. If a
      * mask is specified, only counts matches with 1s in the mask.
      */
-    inline int64_t getLength(const GenericBitVector* mask = NULL) const
-    {
+    inline int64_t getLength(const GenericBitVector* mask = NULL) const {
         if(mask == NULL || end_offset == -1) {
             // Fast path: no mask or an actually empty interval. Can just look
             // at our end offset.
@@ -130,6 +129,30 @@ public:
             return mask->rank(forward_start + end_offset) + 1 - 
                 mask->rank(forward_start, true);
         }
+    }
+    
+    /**
+     * Get the BWT index of each selected, masked-in position.
+     * TODO: Make this a single-item-only method?
+     */
+    inline std::vector<int64_t> getResults(
+        const GenericBitVector* mask = NULL) const {
+        // TODO: Implement based on rank and select. For now we just scan.
+        
+        std::vector<int64_t> toReturn;
+        
+        for(size_t i = getForwardStart();
+            i <= getForwardStart() + getEndOffset(); i++) {
+        
+            // For each base in the range
+            
+            if(!mask || mask->isSet(i)) {
+                // If there is no mask or we're in it, take this position.
+                toReturn.push_back(i);
+            }
+        }
+        
+        return toReturn;
     }
 
     /**

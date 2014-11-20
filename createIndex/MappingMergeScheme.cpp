@@ -411,8 +411,9 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
         // Call into the index. TODO: pass a parameters struct of some type.
         // TODO: It would make sense to use a DisambiguateFilter or some such,
         // but with this algorithm that's sort of integrated into the mapping.
-        std::vector<Mapping> naturalMappings = index.naturalMap(rangeVector,
-            contig, &includedPositions);
+        // TODO: This doesn't even use ranges.
+        std::vector<Mapping> naturalMappings = index.naturalMap(contig,
+            &includedPositions, minContext);
         
         for(size_t i = 0; i < naturalMappings.size(); i++) {
             // For each query base

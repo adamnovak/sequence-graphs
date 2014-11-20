@@ -1779,20 +1779,66 @@ Mapping FMDIndex::disambiguate(const Mapping& left,
     return toReturn;
 }
 
-std::vector<Mapping> FMDIndex::naturalMap(const GenericBitVector& ranges, 
-    const std::string& query, const GenericBitVector* mask) const {
+std::vector<Mapping> FMDIndex::naturalMap(const std::string& query,
+    const GenericBitVector* mask, size_t minContext) const {
     
-    // What mappings will we return?
-    std::vector<Mapping> toReturn;
+    // TODO: This could be dramatically simpler if we had a nice way to ban
+    // things from mapping without making sure to never match.
+    
+    // What mappings will we return? Make sure it is big enough; it should
+    // default to unmapped.
+    std::vector<Mapping> mappings(query.size());
     
     // Where will we keep matchings? We store them as vectors of TextPositions
     // to which each base has been matched.
     std::vector<std::vector<TextPosition>> matchings(query.size());
     
-    // Start with everything selected.
-    FMDPosition results = getCOveringPosition();
+    // When we retract bases, we'll call this to handle collating matchings into
+    // mappings.
+    std::function<void(size_t)> makeMapping = [&](size_t retracted) {
+        // We found all the strings that can overlap this retracted
+        // character, so map it if possible.
+        if(matchings[retracted].size() > 0) {
+            // There were some matchings for this base
+            
+            // Do they all agree?
+            bool matchingsAgree = true;
+            
+            for(size_t i = 1; i < matchings[retracted].size(); i++) {
+                // For each of them after the first
+                
+                if(matchings[retracted][i] != matchings[retracted][0]) {
+                    // Note if it disagrees
+                    matchingsAgree = false;
+                    break;
+                }
+            }
+            
+            if(matchingsAgree) {
+                // Make a mapping to this place all the matchings agree on.
+                mappings[retracted] = Mapping(matchings[retracted][0]);
+            } else {
+                // If they disagree we stay unmapped.
+                mappings[retracted] = Mapping();
+            }
+        } else {
+            // If there are no matchings we also stay unmapped.
+            mappings[retracted] = Mapping();
+        }
+    };
     
-    // How many characters are searched?
+    // Start with everything selected.
+    FMDPosition results = getCoveringPosition();
+    
+    // What is the end (inclusive) of the shortest unique string up against the
+    // left edge? Start past the end.
+    int64_t leftmostMappable = query.size();
+    
+    // And the beginning of the shortest unique string up against the right
+    // edge? Start past the beginning.
+    int64_t rightmostMappable = -1;
+    
+    // How many characters are currently searched?
     size_t patternLength = 0;
     
     for(size_t i = query.size() - 1; i != (size_t) -1; i--) {
@@ -1807,9 +1853,17 @@ std::vector<Mapping> FMDIndex::naturalMap(const GenericBitVector& ranges,
             // If you can't extend, retract until you can. TODO: Assumes we can
             // find at least one result for any character.
             
-            // TODO: We found all the strings that can overlap this retracted
-            // character, so map it if possible.
+            // We're retracting this base, so nothing more can overlap it. Safe
+            // to map.
+            if(i <= rightmostMappable) {
+                // This base is lefter than the rightmost base that can't sneak
+                // ambiguity out the right.
+                
+                // Make some mappings for it if it was consistently matched.
+                makeMapping(i + patternLength);
+            }
             
+            // Retract the character
             FMDPosition retracted = results;
             // Make sure to drop characters from the total pattern length.
             retractRightOnly(retracted, --patternLength);
@@ -1817,17 +1871,112 @@ std::vector<Mapping> FMDIndex::naturalMap(const GenericBitVector& ranges,
             // Try extending again
             extended = retracted;
             extendLeftOnly(extended, query[i]);
+            
+            // Say that last step we came from retracted.
+            results = retracted;
         }
         
         // We successfully extended.
         patternLength++;
         
+        if(extended.getLength(mask) == 1) {
+            // We are currently unique.
+            
+            // Grab the BWT index of the only selected BWT position.
+            // TODO: this is going to be super-hard to do with ranges.
+            int64_t bwtIndex = extended.getResults(mask)[0];
+            
+            // Work out the text position we have found. This corresponds to
+            // the newly added character.
+            TextPosition location = locate(bwtIndex);
+            
+            if(extended.getLength(mask) == 1) {
+                // We were previously unique. We jsut need to add a matching for
+                // this base.
+                
+                if(patternLength >= minContext) {
+                    // This is long enough to care about.
+                    
+                    // Say we match this query character to this text position.
+                    matchings[i].push_back(location);
+                }
+                
+            } else {
+                // We are newly unique. 
+                
+                if(i > rightmostMappable) {
+                    // This is the rightmost (first) mappable base, since it
+                    // can't get an ambiguous string to the right edge.
+                    rightmostMappable = i;
+                }
+                
+                if(patternLength >= minContext) {
+                    // This is long enough to care about.
+                
+                    for(size_t j = 0; 
+                        j < patternLength && i + j <= rightmostMappable; j++) {
+                        // Go through and add a matching for each selected base
+                        // that isn't so far right it was involved in non-unique
+                        // things touching the edge.
+                            
+                        // Make a new TextPosition to express where we are
+                        // mapping to.
+                        TextPosition mappedLocation = location;
+                        mappedLocation.addOffset(j);
+                        
+                        // Match to it.
+                        matchings[i + j].push_back(mappedLocation);
+                    }
+                }
+                
+            }
+            
+        } else if(i + patternLength < query.size()) {
+            // We are not unique, but we don't but up against the right edge.
+            // This means that we can't get an ambiguous string from this new
+            // base to the end of the query.
+            
+            if(i > rightmostMappable) {
+                //Note that we can match for this current base, if we ever find
+                // a unique string for it.
+                rightmostMappable = i;
+            }
+            
+        }
         
-        // TODO: If we are unique, record a matching.
+        // Save the results after doing this position so we can do the next
+        // query position.
+        results = extended;
     }
     
+    // Now we have made it to the left edge of the query, and seen all the
+    // unique strings that matter.
+    
+    
+    while(results.getLength(mask) == 1) {
+        // Retract until we aren't unique again. (We assume we are guaranteed to
+        // at some point become non-unique.)
+        
+        if(patternLength <= rightmostMappable) {
+            // This base is lefter than the rightmost base that can't sneak
+            // ambiguity out the right.
+            
+            // Make some mappings for it if it was consistently matched.
+            makeMapping(patternLength);
+        }
+        
+        // Retract that base and move on to the next one. TODO: Can we just get
+        // the point at which we would get more results and do the whole run to
+        // there at once somehow?
+        FMDPosition retracted = results;
+        retractRightOnly(retracted, --patternLength);
+    }
+    
+    // Once we retract until the search is not unique, we're at a base that can
+    // sneak ambiguity out the left, so we shouldn't map it.
+    
     // Return the mappings.
-    return toReturn;
+    return mappings;
         
 }
 
