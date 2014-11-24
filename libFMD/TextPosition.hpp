@@ -108,6 +108,26 @@ public:
         return !(*this == other);
     }
     
+    /**
+     * Provide less-than comparison for sets.
+     */
+    inline bool operator<(const TextPosition& other) const {
+        // Just compare our texts and offsets, with text ranked as more
+        // important.
+        return getText() < other.getText() || (getText() == other.getText() &&
+            getOffset() < other.getOffset());
+    }
+    
+    /**
+     * Provide greater-than comparison for sets.
+     */
+    inline bool operator>(const TextPosition& other) const {
+        // Just compare our texts and offsets, with text ranked as more
+        // important.
+        return getText() > other.getText() || (getText() == other.getText() &&
+            getOffset() > other.getOffset());
+    }
+    
 protected:
     // The text that the position is on.
     size_t text;

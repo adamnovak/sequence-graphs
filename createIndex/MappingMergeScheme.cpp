@@ -8,7 +8,7 @@
 
 #include "MappingMergeScheme.hpp"
 
-
+const size_t MappingMergeScheme::MAX_THREADS = 32;
 
 MappingMergeScheme::MappingMergeScheme(const FMDIndex& index, 
     const GenericBitVector& rangeVector, 
@@ -220,6 +220,34 @@ void MappingMergeScheme::generateMerges(
     
 }
 
+/**
+ * Get the character at the given TextPosition, using the contig cache.
+ *
+ * TODO: Move into FMDIndex now that it has that cache and can support this 
+ * somewhat efficiently.
+ */
+char getCharacter(const FMDIndex& index, TextPosition position) {
+    
+    if(position.getStrand()) {
+        // On the reverse strand.
+        
+        // Flip our copy of the position.
+        position.flip(index.getContigLength(position.getContigNumber()));
+        
+        // Get the character on the other strand and complement it.
+        return complement(getCharacter(index, position));
+    } else {
+        // On the forward strand
+        
+        // Grab the reference contig in the cache
+        const std::string& referenceContig = 
+            index.displayContigCached(position.getContigNumber());
+            
+        // Pull out the correct character.
+        return referenceContig[position.getOffset()];
+    }
+}
+
 void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
     
     
@@ -428,6 +456,157 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
                 generateMerge(queryContig, i + 1, 
                     candidate.getContigNumber(), index.getOffset(candidate),
                     candidate.getStrand());
+            }
+        }
+        
+        if(credit) {
+            // Each base zips matching bases inwards until it hits a mismatch, or another mapped base.
+            
+            // If zippings disagree, the base is not to be mapped.
+            
+            // Only bases between pairs of mapped bases can be mapped.
+            
+            // Make a set of all the zippings we will find for each position.
+            std::vector<std::set<TextPosition>> zippings(
+                naturalMappings.size());
+        
+            // Find the first mapped base (past the end if none)
+            size_t firstMapped = 0;
+            for(; firstMapped < naturalMappings.size() && 
+                !naturalMappings[firstMapped].isMapped(); firstMapped++);
+            
+            // Find the last mapped base (size_t version of -1 if none)
+            size_t lastMapped = naturalMappings.size() - 1;
+            for(; lastMapped != (size_t) -1 && 
+                !naturalMappings[lastMapped].isMapped(); lastMapped--);
+            
+            // This holds the index of the base currently providing credit.
+            size_t provider;
+            
+            // How many mismatches have we seen since the credit provider?
+            size_t mismatchesSeen;
+            
+            for(size_t i = firstMapped; i < naturalMappings.size() &&
+                i <= lastMapped; i++) {
+                
+                // From the first to the last, do all the zipping off the right
+                // sides of mapped bases.
+                
+                if(naturalMappings[i].isMapped()) {
+                    // This base is mapped and is now the credit provider
+                    provider = i;
+                    mismatchesSeen = 0;
+                } else {
+                    // This base is not mapped. We know we saw a mapped base
+                    // already and thus have a credit provider.
+                    
+                    // What position would we be implied to be at?
+                    TextPosition implied = 
+                        naturalMappings[provider].getLocation();
+                    implied.addOffset((int64_t) i - (int64_t) provider);
+                    
+                    if(implied.getOffset() >= index.getContigLength(
+                        implied.getContigNumber())) {
+                        
+                        // This position is implied to zip off the end of the
+                        // reference text. Skip to the next one.
+                        continue;
+                    }
+                        
+                    if(getCharacter(index, implied) != contig[i]) {
+                        // This is a mismatch
+                        mismatchesSeen++;
+                        
+                        Log::trace() << getCharacter(index, implied) << 
+                            " at " << implied << " mismatches " << contig[i] <<
+                            std::endl;
+                    }
+                    
+                    if(mismatchesSeen == 0) {
+                        // No mismatches since the last credit provider. We can
+                        // do credit.
+                        
+                        // Zip this base to the position it is implied as being
+                        // at by the credit provider.
+                        zippings[i].insert(implied);
+                        
+                        Log::trace() << "Right credit zips " << i << " to " <<
+                            implied << std::endl;
+                        
+                    }    
+                }
+                
+            }
+            
+            for(size_t i = lastMapped; i != (size_t) -1 && i >= firstMapped;
+                i--) {
+                
+                // From the last to the first, do all the zipping off the left
+                // sides of mapped bases.
+                
+                // TODO: Unify this stateful logic with the above; it's
+                // direction-independent.
+                
+                if(naturalMappings[i].isMapped()) {
+                    // This base is mapped and is now the credit provider
+                    provider = i;
+                    mismatchesSeen = 0;
+                } else {
+                    // This base is not mapped. We know we saw a mapped base
+                    // already and thus have a credit provider.
+                    
+                    // What position would we be implied to be at?
+                    TextPosition implied = 
+                        naturalMappings[provider].getLocation();
+                    implied.addOffset((int64_t) i - (int64_t) provider);
+                    
+                    if(implied.getOffset() >= index.getContigLength(
+                        implied.getContigNumber())) {
+                        
+                        // This position is implied to zip off the end of the
+                        // reference text. Skip to the next one.
+                        continue;
+                    }
+                        
+                    if(getCharacter(index, implied) != contig[i]) {
+                        // This is a mismatch
+                        mismatchesSeen++;
+                        
+                        Log::trace() << getCharacter(index, implied) <<
+                            " at " << implied << " mismatches " << contig[i] <<
+                            std::endl;
+                    }
+                    
+                    if(mismatchesSeen == 0) {
+                        // No mismatches since the last credit provider. We can
+                        // do credit.
+                        
+                        // Zip this base to the position it is implied as being
+                        // at by the credit provider.
+                        zippings[i].insert(implied);
+                        
+                        Log::trace() << "Left credit zips " << i << " to " <<
+                            implied << std::endl;
+                    }    
+                }
+                
+                // We don't need to do another pass, we can integrate here.
+                
+                if(zippings[i].size() == 1) {
+                    // This base got zipped to exactly one place.
+                    
+                    // Work out where to (the only element in the set)
+                    TextPosition candidate = *(zippings[i].begin());
+                    
+                    // Make a merge to that position.
+                    generateMerge(queryContig, i + 1, 
+                        candidate.getContigNumber(), index.getOffset(candidate),
+                        candidate.getStrand());
+                        
+                    Log::debug() << "Credit agrees on " << i << std::endl;
+                        
+                }
+                
             }
         }
     }
