@@ -1895,7 +1895,7 @@ std::vector<Mapping> FMDIndex::naturalMap(const std::string& query,
                 // to bring us up to minContext. We just need to add a matching
                 // for this base.
                 
-                Log::info() << "New unique position " << location << " len " << 
+                Log::debug() << "New unique position " << location << " len " << 
                     patternLength << " = " << i << std::endl;
                 
                 if(patternLength >= minContext) {
@@ -1915,8 +1915,8 @@ std::vector<Mapping> FMDIndex::naturalMap(const std::string& query,
                     rightmostMappable = i;
                 }
                 
-                Log::info() << "Gained uniqueness at " << location << " len " << 
-                    patternLength << " = " << i << std::endl;
+                Log::debug() << "Gained uniqueness at " << location << 
+                    " len " << patternLength << " = " << i << std::endl;
                 
                 if(patternLength >= minContext) {
                     // This is long enough to care about.
@@ -1932,8 +1932,8 @@ std::vector<Mapping> FMDIndex::naturalMap(const std::string& query,
                         TextPosition mappedLocation = location;
                         mappedLocation.addOffset(j);
                         
-                        Log::info() << "\tAdding matching " << mappedLocation <<
-                            " = " << i + j << std::endl;
+                        Log::trace() << "\tAdding matching " << 
+                            mappedLocation << " = " << i + j << std::endl;
                         
                         // Match to it.
                         matchings[i + j].push_back(mappedLocation);
