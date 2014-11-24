@@ -1953,7 +1953,7 @@ std::vector<Mapping> FMDIndex::naturalMap(const std::string& query,
     // unique strings that matter.
     
     
-    while(results.getLength(mask) == 1) {
+    while(results.getLength(mask) == 1 && patternLength != 0) {
         // Retract until we aren't unique again. (We assume we are guaranteed to
         // at some point become non-unique.)
         
@@ -1970,6 +1970,9 @@ std::vector<Mapping> FMDIndex::naturalMap(const std::string& query,
         // there at once somehow?
         FMDPosition retracted = results;
         retractRightOnly(retracted, --patternLength);
+        
+        // Update results with the retracted version.
+        results = retracted;
     }
     
     // Once we retract until the search is not unique, we're at a base that can
