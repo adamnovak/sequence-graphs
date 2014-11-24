@@ -91,7 +91,16 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             # Exact no credit min various, natural
             (False, False, 50, 0, 0, 0, "natural"),
             (False, False, 100, 0, 0, 0, "natural"),
-            (False, False, 150, 0, 0, 0, "natural")
+            (False, False, 150, 0, 0, 0, "natural"),
+            # Exact credit min various
+            (False, True, 50, 0, 0, 0, "LRexact"),
+            (False, True, 100, 0, 0, 0, "LRexact"),
+            (False, True, 150, 0, 0, 0, "LRexact"),
+            # Exact credit min various, natural
+            (False, True, 50, 0, 0, 0, "natural"),
+            (False, True, 100, 0, 0, 0, "natural"),
+            (False, True, 150, 0, 0, 0, "natural")
+            
         ])
 
     def generateSchemes(self):
