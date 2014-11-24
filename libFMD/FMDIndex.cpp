@@ -1890,9 +1890,13 @@ std::vector<Mapping> FMDIndex::naturalMap(const std::string& query,
             // the newly added character.
             TextPosition location = locate(bwtIndex);
             
-            if(extended.getLength(mask) == 1) {
-                // We were previously unique. We jsut need to add a matching for
-                // this base.
+            if(results.getLength(mask) == 1 && patternLength > minContext) {
+                // We were previously unique, and we didn't just add the 1 base
+                // to bring us up to minContext. We just need to add a matching
+                // for this base.
+                
+                Log::info() << "New unique position " << location << " len " << 
+                    patternLength << " = " << i << std::endl;
                 
                 if(patternLength >= minContext) {
                     // This is long enough to care about.
@@ -1902,13 +1906,17 @@ std::vector<Mapping> FMDIndex::naturalMap(const std::string& query,
                 }
                 
             } else {
-                // We are newly unique. 
+                // We are newly unique, or just added the 1 base to bring us up
+                // to minContext.
                 
                 if(i > rightmostMappable) {
                     // This is the rightmost (first) mappable base, since it
                     // can't get an ambiguous string to the right edge.
                     rightmostMappable = i;
                 }
+                
+                Log::info() << "Gained uniqueness at " << location << " len " << 
+                    patternLength << " = " << i << std::endl;
                 
                 if(patternLength >= minContext) {
                     // This is long enough to care about.
@@ -1923,6 +1931,9 @@ std::vector<Mapping> FMDIndex::naturalMap(const std::string& query,
                         // mapping to.
                         TextPosition mappedLocation = location;
                         mappedLocation.addOffset(j);
+                        
+                        Log::info() << "\tAdding matching " << mappedLocation <<
+                            " = " << i + j << std::endl;
                         
                         // Match to it.
                         matchings[i + j].push_back(mappedLocation);
