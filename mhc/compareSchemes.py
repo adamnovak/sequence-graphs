@@ -82,24 +82,16 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         """
         
         # Plan out all the schemes as mismatch, credit, min_context,
-        # add_context, mult_context, min_coding_cost
+        # add_context, mult_context, min_coding_cost, map_type
         return set([
-            # Exact no credit
-            (False, False, 0, 0, 0, 0),
-            # Inexact no credit
-            (True, False, 0, 0, 0, 0),
-            # Inexact no credit min various
-            (True, False, 50, 0, 0, 0),
-            (True, False, 100, 0, 0, 0),
-            (True, False, 150, 0, 0, 0),
-            # Inexact no credit mult various
-            (True, False, 0, 0, 2.0, 0),
-            (True, False, 0, 0, 4.0, 0),
-            (True, False, 0, 0, 8.0, 0),
-            # Inexact credit mult various
-            (True, True, 0, 0, 2.0, 0),
-            (True, True, 0, 0, 4.0, 0),
-            (True, True, 0, 0, 8.0, 0)
+            # Exact no credit min various
+            (False, False, 50, 0, 0, 0, "LRexact"),
+            (False, False, 100, 0, 0, 0, "LRexact"),
+            (False, False, 150, 0, 0, 0, "LRexact"),
+            # Exact no credit min various, natural
+            (False, False, 50, 0, 0, 0, "natural"),
+            (False, False, 100, 0, 0, 0, "natural"),
+            (False, False, 150, 0, 0, 0, "natural")
         ])
 
     def generateSchemes(self):
@@ -113,7 +105,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         scheme_plan = self.getSchemePlan()
         
         for mismatch, credit, min_context, add_context, mult_context, \
-            min_coding_cost in scheme_plan:
+            min_coding_cost, map_type in scheme_plan:
             # Unpack each planned scheme
             
             # Start out with the context args
@@ -167,6 +159,11 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 # Also, replace the decimal in the scheme name
                 scheme_name += "Bits{}".format(min_coding_cost).replace(".",
                     "p")
+                    
+            # Handle mapping types
+            scheme_name += map_type
+            extra_args.append("--mapType")
+            extra_args.append(map_type)
                 
             # Yield the name with the args.
             yield (scheme_name, extra_args)
