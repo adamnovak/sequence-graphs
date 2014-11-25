@@ -263,17 +263,20 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
         " bases via " << includedPositions.rank(index.getBWTLength()) <<
         " bottom-level positions" << std::endl;
     
+    // How many bases have we mapped or not mapped (credit or not).
+    size_t mappedBases = 0;
+    size_t unmappedBases = 0;
+    
+    // How many bases are mapped on credit?
+    size_t creditBases = 0;
+    // How many bases have conflicted credit?
+    size_t conflictedCredit = 0;
+    
     if(mapType == "LRexact") {
     
-        // How many bases have we mapped or not mapped
-        size_t mappedBases = 0;
-        size_t unmappedBases = 0;
+        
         // How many are mapped on both the left and the right?
         size_t leftRightMappedBases = 0;
-        // On credit?
-        size_t creditBases = 0;
-        // Left and right are conflicted?
-        size_t conflictedBases = 0;
         
         // We will fill these in with mappings that are to ranges, and then
         // convert the ranges to TextPositions.
@@ -456,6 +459,8 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
                 generateMerge(queryContig, i + 1, 
                     candidate.getContigNumber(), index.getOffset(candidate),
                     candidate.getStrand());
+                    
+                mappedBases++;
             }
         }
         
@@ -603,12 +608,23 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
                         candidate.getContigNumber(), index.getOffset(candidate),
                         candidate.getStrand());
                         
-                    Log::debug() << "Credit agrees on " << i << std::endl;
+                    mappedBases++;
                         
+                    Log::debug() << "Credit agrees on " << i << std::endl;
+                    
+                    creditBases++;
+                        
+                } else if(zippings[i].size() > 1) {
+                    // This base has conflicted credit.
+                    conflictedCredit++;
                 }
                 
             }
         }
+        
+        Log::output() << "Mapped " << mappedBases << " bases, " << 
+            creditBases << " on credit, " << conflictedCredit << 
+            " bases with conflicting credit." << std::endl;
     }
 }
 
