@@ -503,7 +503,7 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
                     // What position would we be implied to be at?
                     TextPosition implied = 
                         naturalMappings[provider].getLocation();
-                    implied.addOffset((int64_t) i - (int64_t) provider);
+                    implied.addLocalOffset((int64_t) i - (int64_t) provider);
                     
                     if(implied.getOffset() >= index.getContigLength(
                         implied.getContigNumber())) {
@@ -558,7 +558,7 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
                     // What position would we be implied to be at?
                     TextPosition implied = 
                         naturalMappings[provider].getLocation();
-                    implied.addOffset((int64_t) i - (int64_t) provider);
+                    implied.addLocalOffset((int64_t) i - (int64_t) provider);
                     
                     if(implied.getOffset() >= index.getContigLength(
                         implied.getContigNumber())) {

@@ -321,7 +321,7 @@ std::vector<Mapping> CreditFilter2::apply(
                     
                 // Advance the provider mapping position to get our implied
                 // mapping position.
-                providerPos.addOffset(i - provider);
+                providerPos.addLocalOffset(i - provider);
                 
                 // Work out how many mismatches exist at exactly this one
                 // implied position. Should be 0 or 1. TODO: See if we still
@@ -435,7 +435,7 @@ std::vector<Mapping> CreditFilter2::apply(
                             
                         // Advance the provider mapping position to get our
                         // implied mapping position.
-                        implied.addOffset(i - provider);
+                        implied.addLocalOffset(i - provider);
                         
                         Log::debug() << "Credit in direction " << direction <<
                             " maps " << i << " to " << implied << std::endl;

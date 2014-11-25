@@ -133,7 +133,7 @@ std::vector<Mapping> CreditFilter::apply(
                 TextPosition implied = disambiguated[j].getLocation();
                 // As i increases and j stays the same, we want offset to
                 // become more positive.
-                implied.addOffset((int64_t) i - (int64_t) j);
+                implied.addGlobalOffset((int64_t) i - (int64_t) j);
                 
                 Log::trace() << "Base " << j << " places base " << i << 
                     " at " << implied << " by right context" << std::endl;
@@ -190,7 +190,7 @@ std::vector<Mapping> CreditFilter::apply(
                 TextPosition implied = disambiguated[j].getLocation();
                 // As i increases and j stays the same, we want offset to
                 // become less negative.
-                implied.addOffset((int64_t) i - (int64_t) j);
+                implied.addGlobalOffset((int64_t) i - (int64_t) j);
                 
                 Log::trace() << "Base " << j << " places base " << i << 
                     " at " << implied << " by left context" << std::endl;

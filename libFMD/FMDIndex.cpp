@@ -1855,7 +1855,7 @@ std::vector<Mapping> FMDIndex::naturalMap(const std::string& query,
             
             // We're retracting this base, so nothing more can overlap it. Safe
             // to map.
-            if(i <= rightmostMappable) {
+            if((int64_t) i <= rightmostMappable) {
                 // This base is lefter than the rightmost base that can't sneak
                 // ambiguity out the right.
                 
@@ -1909,7 +1909,7 @@ std::vector<Mapping> FMDIndex::naturalMap(const std::string& query,
                 // We are newly unique, or just added the 1 base to bring us up
                 // to minContext.
                 
-                if(i > rightmostMappable) {
+                if((int64_t) i > rightmostMappable) {
                     // This is the rightmost (first) mappable base, since it
                     // can't get an ambiguous string to the right edge.
                     rightmostMappable = i;
@@ -1917,6 +1917,8 @@ std::vector<Mapping> FMDIndex::naturalMap(const std::string& query,
                 
                 Log::debug() << "Gained uniqueness at " << location << 
                     " len " << patternLength << " = " << i << std::endl;
+                    
+                Log::debug() << patternLength << " vs " << minContext << " vs " << rightmostMappable << std::endl;
                 
                 if(patternLength >= minContext) {
                     // This is long enough to care about.
@@ -1930,9 +1932,9 @@ std::vector<Mapping> FMDIndex::naturalMap(const std::string& query,
                         // Make a new TextPosition to express where we are
                         // mapping to.
                         TextPosition mappedLocation = location;
-                        mappedLocation.addOffset(j);
+                        mappedLocation.addLocalOffset(j);
                         
-                        Log::trace() << "\tAdding matching " << 
+                        Log::debug() << "\tAdding matching " << j << " for " << 
                             mappedLocation << " = " << i + j << std::endl;
                         
                         // Match to it.
@@ -1947,7 +1949,7 @@ std::vector<Mapping> FMDIndex::naturalMap(const std::string& query,
             // This means that we can't get an ambiguous string from this new
             // base to the end of the query.
             
-            if(i > rightmostMappable) {
+            if((int64_t) i > rightmostMappable) {
                 //Note that we can match for this current base, if we ever find
                 // a unique string for it.
                 rightmostMappable = i;
@@ -1968,7 +1970,7 @@ std::vector<Mapping> FMDIndex::naturalMap(const std::string& query,
         // Retract until we aren't unique again. (We assume we are guaranteed to
         // at some point become non-unique.)
         
-        if(patternLength <= rightmostMappable) {
+        if((int64_t) patternLength <= (int64_t) rightmostMappable) {
             // This base is lefter than the rightmost base that can't sneak
             // ambiguity out the right.
             

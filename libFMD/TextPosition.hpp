@@ -66,10 +66,20 @@ public:
      * Shift forwards along the forward strand, or backwards along the reverse
      * strand, by this amount.
      */
-    inline void addOffset(int64_t offset) {
+    inline void addGlobalOffset(int64_t offset) {
         // Offset in the correct direction depending on its strand. Go backwards
         // on reverse strands and forwards on forwards strands.
         setOffset(getOffset() + (getStrand() ? -1 : 1) * offset);
+    }
+    
+    /**
+     * Shift forwards or backwards along the strand this position is on, by this
+     * amount.
+     */
+    inline void addLocalOffset(int64_t offset) {
+        // Offset in the correct direction depending on its strand. Go backwards
+        // on reverse strands and forwards on forwards strands.
+        setOffset(getOffset() + offset);
     }
     
     /**
