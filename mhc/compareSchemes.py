@@ -85,21 +85,33 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # add_context, mult_context, min_coding_cost, map_type
         return set([
             # Exact no credit min various
+            (False, False, 0, 0, 0, 0, "LRexact"),
+            (False, False, 10, 0, 0, 0, "LRexact"),
+            (False, False, 20, 0, 0, 0, "LRexact"),
+            (False, False, 30, 0, 0, 0, "LRexact"),
+            (False, False, 40, 0, 0, 0, "LRexact"),
             (False, False, 50, 0, 0, 0, "LRexact"),
-            (False, False, 100, 0, 0, 0, "LRexact"),
-            (False, False, 150, 0, 0, 0, "LRexact"),
             # Exact no credit min various, natural
+            (False, False, 0, 0, 0, 0, "natural"),
+            (False, False, 10, 0, 0, 0, "natural"),
+            (False, False, 20, 0, 0, 0, "natural"),
+            (False, False, 30, 0, 0, 0, "natural"),
+            (False, False, 40, 0, 0, 0, "natural"),
             (False, False, 50, 0, 0, 0, "natural"),
-            (False, False, 100, 0, 0, 0, "natural"),
-            (False, False, 150, 0, 0, 0, "natural"),
-            # Exact credit min various
+            # Exact credit min various (automatically tolerates mismatches)
+            (False, True, 0, 0, 0, 0, "LRexact"),
+            (False, True, 10, 0, 0, 0, "LRexact"),
+            (False, True, 20, 0, 0, 0, "LRexact"),
+            (False, True, 30, 0, 0, 0, "LRexact"),
+            (False, True, 40, 0, 0, 0, "LRexact"),
             (False, True, 50, 0, 0, 0, "LRexact"),
-            (False, True, 100, 0, 0, 0, "LRexact"),
-            (False, True, 150, 0, 0, 0, "LRexact"),
-            # Exact credit min various, natural
-            (False, True, 50, 0, 0, 0, "natural"),
-            (False, True, 100, 0, 0, 0, "natural"),
-            (False, True, 150, 0, 0, 0, "natural")
+            # Exact credit (tolerating 1 mismatch) min various, natural
+            (True, True, 0, 0, 0, 0, "natural"),
+            (True, True, 10, 0, 0, 0, "natural"),
+            (True, True, 20, 0, 0, 0, "natural"),
+            (True, True, 30, 0, 0, 0, "natural"),
+            (True, True, 40, 0, 0, 0, "natural"),
+            (True, True, 50, 0, 0, 0, "natural"),
             
         ])
 
@@ -613,7 +625,14 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # And a target to make a hub from that. Make sure to pass all the track
         # directories.
         merged_hub_target = AssemblyHubOnlyTarget(merged_hal, self.hub_root + 
-            "/all", bed_dirs=list(bed_dirs), wiggle_dirs=list(wiggle_dirs))
+            "/all",
+                # TODO: Disabling liftovers of these things for faster hub
+                # generation. Make this a flag, preferably by type of track
+                # (genes vs. gene alignment evaluation vs. debug context length
+                # tracks vs. what have you).
+                # bed_dirs=list(bed_dirs), 
+                # wiggle_dirs=list(wiggle_dirs)
+            )
             
         # Do those last ones in order. TODO: express actual order restrictions
         # with a few more intermediate targets.

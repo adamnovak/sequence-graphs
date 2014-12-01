@@ -93,10 +93,21 @@ ConcurrentQueue<Merge>& MappingMergeScheme::run() {
         // Give a message saying we're doing Benedict's new natural mapping.
         Log::info() << "Using natural contexts" << std::endl;
         if(mismatch > 0) {
-            // Didn't write this code.
-            throw std::runtime_error("Natural mapping with mismatches is "
-                "probably not anywhere near efficient and thus not "
-                "implemented");
+            // Make sure the user doesn't think they're getting proper mismatch
+            // support.
+            Log::warning() << 
+                "Natural contexts only use mismatches for credit." << std::endl;
+            
+            if(!credit) {
+                // *Really* make sure the user doesn't think they're getting
+                // proper mismatch support, by exploding.
+                
+                Log::critical() << "Can't use mismatches for natural contexts "
+                    "without credit." << std::endl;
+                    
+                throw std::runtime_error("Can't use mismatches for natural "
+                    "contexts without credit.");
+            }
         }
     } else {
         throw std::runtime_error(mapType + 
