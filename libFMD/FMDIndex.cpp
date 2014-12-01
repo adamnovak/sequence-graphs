@@ -1796,6 +1796,8 @@ std::vector<Mapping> FMDIndex::naturalMap(const std::string& query,
     // When we retract bases, we'll call this to handle collating matchings into
     // mappings.
     std::function<void(size_t)> makeMapping = [&](size_t retracted) {
+        Log::debug() << "Making mappings for " << retracted << std::endl;
+        
         // We found all the strings that can overlap this retracted
         // character, so map it if possible.
         if(matchings[retracted].size() > 0) {
@@ -1901,6 +1903,10 @@ std::vector<Mapping> FMDIndex::naturalMap(const std::string& query,
                 if(patternLength >= minContext) {
                     // This is long enough to care about.
                     
+                    Log::debug() << "\tAdding matching " <<
+                        matchings[i].size() << " for " << i << " = " <<
+                        location << std::endl;
+                    
                     // Say we match this query character to this text position.
                     matchings[i].push_back(location);
                 }
@@ -1918,7 +1924,10 @@ std::vector<Mapping> FMDIndex::naturalMap(const std::string& query,
                 Log::debug() << "Gained uniqueness at " << location << 
                     " len " << patternLength << " = " << i << std::endl;
                     
-                Log::debug() << patternLength << " vs " << minContext << " vs " << rightmostMappable << std::endl;
+                Log::debug() << "Pattern length " << patternLength <<
+                    " vs min context " << minContext <<
+                    " vs rightmost mappable position " << rightmostMappable <<
+                    std::endl;
                 
                 if(patternLength >= minContext) {
                     // This is long enough to care about.
@@ -1934,8 +1943,9 @@ std::vector<Mapping> FMDIndex::naturalMap(const std::string& query,
                         TextPosition mappedLocation = location;
                         mappedLocation.addLocalOffset(j);
                         
-                        Log::debug() << "\tAdding matching " << j << " for " << 
-                            mappedLocation << " = " << i + j << std::endl;
+                        Log::debug() << "\tAdding matching " << 
+                            matchings[i].size() << " for " << i + j << " = " <<
+                            mappedLocation << std::endl;
                         
                         // Match to it.
                         matchings[i + j].push_back(mappedLocation);
@@ -1965,6 +1975,7 @@ std::vector<Mapping> FMDIndex::naturalMap(const std::string& query,
     // Now we have made it to the left edge of the query, and seen all the
     // unique strings that matter.
     
+    Log::debug() << "Doing final retractions" << std::endl;
     
     while(results.getLength(mask) == 1 && patternLength != 0) {
         // Retract until we aren't unique again. (We assume we are guaranteed to
@@ -1987,6 +1998,13 @@ std::vector<Mapping> FMDIndex::naturalMap(const std::string& query,
         // Update results with the retracted version.
         results = retracted;
     }
+    
+    Log::debug() << "Ended at " << patternLength << " with " <<
+        results.getLength(mask) << " results." << std::endl;
+        
+    Log::debug() << "Non-unique substring: " << query.substr(0, patternLength) << std::endl;
+        
+    Log::debug() << "Result count check: " << LOG_LAZY(count(query.substr(0, patternLength)).getLength(mask)) << std::endl;
     
     // Once we retract until the search is not unique, we're at a base that can
     // sneak ambiguity out the left, so we shouldn't map it.
