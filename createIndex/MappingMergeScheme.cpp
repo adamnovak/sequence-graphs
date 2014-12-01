@@ -465,11 +465,13 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
         }
         
         if(credit) {
-            // Each base zips matching bases inwards until it hits a mismatch, or another mapped base.
+            // Each base zips matching bases inwards until it hits a mismatch,
+            // or another mapped base. If zippings disagree, the base is not to
+            // be mapped. Only bases between pairs of mapped bases can be
+            // mapped.
             
-            // If zippings disagree, the base is not to be mapped.
-            
-            // Only bases between pairs of mapped bases can be mapped.
+            Log::info() << "Applying credit tolerating " << z_max <<
+                " mismatches." << std::endl;
             
             // Make a set of all the zippings we will find for each position.
             std::vector<std::set<TextPosition>> zippings(
@@ -527,9 +529,12 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
                             std::endl;
                     }
                     
-                    if(mismatchesSeen == 0) {
-                        // No mismatches since the last credit provider. We can
-                        // do credit.
+                    if(mismatchesSeen <= z_max) {
+                        // Not too many mismatches since the last credit
+                        // provider. We can do credit.
+                        
+                        // TODO: not checking base identity here lets credit
+                        // conflict even if it's wrong about base identity.
                         
                         // Zip this base to the position it is implied as being
                         // at by the credit provider.
@@ -582,9 +587,12 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
                             std::endl;
                     }
                     
-                    if(mismatchesSeen == 0) {
-                        // No mismatches since the last credit provider. We can
-                        // do credit.
+                    if(mismatchesSeen <= z_max) {
+                        // Not too many mismatches since the last credit
+                        // provider. We can do credit.
+                        
+                        // TODO: not checking base identity here lets credit
+                        // conflict even if it's wrong about base identity.
                         
                         // Zip this base to the position it is implied as being
                         // at by the credit provider.
@@ -603,19 +611,30 @@ void MappingMergeScheme::generateSomeMerges(size_t queryContig) const {
                     // Work out where to (the only element in the set)
                     TextPosition candidate = *(zippings[i].begin());
                     
-                    // Make a merge to that position.
-                    generateMerge(queryContig, i + 1, 
-                        candidate.getContigNumber(), index.getOffset(candidate),
-                        candidate.getStrand());
+                    if(getCharacter(index, candidate) == contig[i]) {
+                        // Make a merge to that position.
+                        generateMerge(queryContig, i + 1, 
+                            candidate.getContigNumber(),
+                            index.getOffset(candidate), candidate.getStrand());
+                            
+                        Log::debug() << "Credit agrees on " << i << std::endl;
                         
-                    mappedBases++;
+                        mappedBases++;
+                        creditBases++;     
+                    } else {
+                        // Merging to that position would merge mismatching
+                        // bases.
+                        Log::debug() << "Credit agrees on " << i <<
+                            " but would merge a mismatch." << std::endl;
+                    }
                         
-                    Log::debug() << "Credit agrees on " << i << std::endl;
                     
-                    creditBases++;
                         
                 } else if(zippings[i].size() > 1) {
                     // This base has conflicted credit.
+                    
+                    Log::debug() << "Credit disagrees on " << i << std::endl;
+                    
                     conflictedCredit++;
                 }
                 

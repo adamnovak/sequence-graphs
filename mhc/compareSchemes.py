@@ -568,7 +568,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 if os.path.exists(genome_source):
                     # They exist.
                     
-                    # Where should the gene results og?
+                    # Where should the gene results go?
                     gene_out_dir = "{}/{}".format(genes_dir, suffixed)
                     if not os.path.exists(gene_out_dir):
                         # Make the directory now
