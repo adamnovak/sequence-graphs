@@ -730,9 +730,9 @@ class C2hMergeTarget(jobTree.scriptTree.target.Target):
         
         """
         
-        # Make the base Target. Ask for 8gb of memory since the intermediate
+        # Make the base Target. Ask for 32gb of memory since the intermediate
         # graphs can get big.
-        super(C2hMergeTarget, self).__init__(memory=8589934592)
+        super(C2hMergeTarget, self).__init__(memory=34359738368)
         
         # Save the files to merge
         self.c2h_fasta_pairs = c2h_fasta_pairs
