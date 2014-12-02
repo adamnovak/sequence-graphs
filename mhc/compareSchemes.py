@@ -85,33 +85,33 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # add_context, mult_context, min_coding_cost, map_type
         return set([
             # Exact no credit min various
-            (False, False, 0, 0, 0, 0, "LRexact"),
-            (False, False, 10, 0, 0, 0, "LRexact"),
-            (False, False, 20, 0, 0, 0, "LRexact"),
-            (False, False, 30, 0, 0, 0, "LRexact"),
-            (False, False, 40, 0, 0, 0, "LRexact"),
-            (False, False, 50, 0, 0, 0, "LRexact"),
+            (False, False, 0, None, None, None, "LRexact"),
+            (False, False, 10, None, None, None, "LRexact"),
+            (False, False, 20, None, None, None, "LRexact"),
+            (False, False, 30, None, None, None, "LRexact"),
+            (False, False, 40, None, None, None, "LRexact"),
+            (False, False, 50, None, None, None, "LRexact"),
             # Exact no credit min various, natural
-            (False, False, 0, 0, 0, 0, "natural"),
-            (False, False, 10, 0, 0, 0, "natural"),
-            (False, False, 20, 0, 0, 0, "natural"),
-            (False, False, 30, 0, 0, 0, "natural"),
-            (False, False, 40, 0, 0, 0, "natural"),
-            (False, False, 50, 0, 0, 0, "natural"),
+            (False, False, 0, None, None, None, "natural"),
+            (False, False, 10, None, None, None, "natural"),
+            (False, False, 20, None, None, None, "natural"),
+            (False, False, 30, None, None, None, "natural"),
+            (False, False, 40, None, None, None, "natural"),
+            (False, False, 50, None, None, None, "natural"),
             # Exact credit min various (automatically tolerates mismatches)
-            (False, True, 0, 0, 0, 0, "LRexact"),
-            (False, True, 10, 0, 0, 0, "LRexact"),
-            (False, True, 20, 0, 0, 0, "LRexact"),
-            (False, True, 30, 0, 0, 0, "LRexact"),
-            (False, True, 40, 0, 0, 0, "LRexact"),
-            (False, True, 50, 0, 0, 0, "LRexact"),
+            (False, True, 0, None, None, None, "LRexact"),
+            (False, True, 10, None, None, None, "LRexact"),
+            (False, True, 20, None, None, None, "LRexact"),
+            (False, True, 30, None, None, None, "LRexact"),
+            (False, True, 40, None, None, None, "LRexact"),
+            (False, True, 50, None, None, None, "LRexact"),
             # Exact credit (tolerating 1 mismatch) min various, natural
-            (True, True, 0, 0, 0, 0, "natural"),
-            (True, True, 10, 0, 0, 0, "natural"),
-            (True, True, 20, 0, 0, 0, "natural"),
-            (True, True, 30, 0, 0, 0, "natural"),
-            (True, True, 40, 0, 0, 0, "natural"),
-            (True, True, 50, 0, 0, 0, "natural"),
+            (True, True, 0, None, None, None, "natural"),
+            (True, True, 10, None, None, None, "natural"),
+            (True, True, 20, None, None, None, "natural"),
+            (True, True, 30, None, None, None, "natural"),
+            (True, True, 40, None, None, None, "natural"),
+            (True, True, 50, None, None, None, "natural"),
             
         ])
 
@@ -129,11 +129,10 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             min_coding_cost, map_type in scheme_plan:
             # Unpack each planned scheme
             
-            # Start out with the context args
-            extra_args = ["--context", str(min_context), "--addContext",
-                str(add_context), "--multContext", str(mult_context)]
+            # Start out with no configuration arguments
+            extra_args = []
             
-            # And give it a name to stick on our output files
+            # Give the scheme a name to stick on our output files
             scheme_name = "E"
             if mismatch:
                 # Add the args and scheme name component for mismatch
@@ -148,23 +147,35 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             else:
                 # Add an N for no credit
                 scheme_name += "N"
+            
+            if min_context is not None:
+                # Require a min context
+                extra_args.append("--context")
+                extra_args.append(str(min_context))
                 
-            if min_context > 0:
                 # Include min conext in the name if in use
                 scheme_name += "Min{}".format(min_context)
-            
-            if add_context > 0:
-                # Include additional context if in use. No need for badding
+                
+            if add_context is not None:
+                # Require an additional context
+                extra_args.append("--addContext")
+                extra_args.append(str(add_context))
+                
+                # Include additional context if in use. No need for padding
                 # since we can now natural sort.
                 scheme_name += "Add{}".format(add_context)
                 
-            if mult_context > 0:
+            if mult_context is not None:
+                # Require a context multiplier
+                extra_args.append("--multContext")
+                extra_args.append(str(mult_context))
+                
                 # Include multiplicative context if in use. Don't let any .s
                 # into the scheme name since it needs to be a valid file
                 # extension.
                 scheme_name += "Mult{}".format(mult_context).replace(".", "p")
                 
-            if min_coding_cost > 0:
+            if min_coding_cost is not None:
                 # Say we're going to use a min coding cost
                 extra_args.append("--minCodingCost")
                 extra_args.append(str(min_coding_cost))
