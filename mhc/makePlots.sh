@@ -144,7 +144,7 @@ do
     
 done
 
-scatter.py ${OUTFILE} --x_label "Precision" --y_label "Recall" --title "Recall vs. Precision by Scheme" --sparse_ticks --save recallVsPrecision.png
+scatter.py ${OUTFILE} --x_label "Precision" --y_label "Recall" --title "Recall vs. Precision by Scheme" --sparse_ticks --lines --save recallVsPrecision.png
 
 # Go get the size-4 adjacency components from the spectrums, and the tandem
 # dupe counts, and see what portion of size-4 adjacency components are tandem
