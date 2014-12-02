@@ -148,6 +148,11 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 # Add an N for no credit
                 scheme_name += "N"
             
+            # Handle mapping types
+            scheme_name += map_type
+            extra_args.append("--mapType")
+            extra_args.append(map_type)
+            
             if min_context is not None:
                 # Require a min context
                 extra_args.append("--context")
@@ -192,11 +197,6 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 scheme_name += "Bits{}".format(min_coding_cost).replace(".",
                     "p")
                     
-            # Handle mapping types
-            scheme_name += map_type
-            extra_args.append("--mapType")
-            extra_args.append(map_type)
-                
             # Yield the name with the args.
             yield (scheme_name, extra_args)
         
