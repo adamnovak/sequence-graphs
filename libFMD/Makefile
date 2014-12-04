@@ -5,7 +5,7 @@ OBJS=FMDIndex.o FMDIndexBuilder.o util.o FMDIndexIterator.o Mapping.o \
 	FMDPosition.o LCPArray.o CSA/BitBuffer.o CSA/BitVectorBase.o \
 	CSA/BitVector.o Log.o GenericBitVector.o ResultRange.o Fasta.o \
 	MarkovModel.o DisambiguateFilter.o CreditFilter.o CreditFilter2.o \
-	MismatchResult.o MismatchResultSet.o
+	MismatchResult.o MismatchResultSet.o MappingScheme.o
 	
 # What are our SWIG JNI wrapper objects?
 SWIG_OBJS=swigbindings_wrap.o
