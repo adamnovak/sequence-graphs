@@ -133,7 +133,6 @@ public:
     
     /**
      * Get the BWT index of each selected, masked-in position.
-     * TODO: Make this a single-item-only method?
      */
     inline std::vector<int64_t> getResults(
         const GenericBitVector* mask = NULL) const {
@@ -153,6 +152,29 @@ public:
         }
         
         return toReturn;
+    }
+    
+    /**
+     * Get a single BWT position that is selected and masked in. Assumes such a
+     * position exists.
+     */
+    inline int64_t getResult(const GenericBitVector* mask = NULL) const {
+        // TODO: Implement based on rank and select. For now we just scan.
+        
+        std::vector<int64_t> toReturn;
+        
+        for(size_t i = getForwardStart();
+            i <= getForwardStart() + getEndOffset(); i++) {
+        
+            // For each base in the range
+            
+            if(!mask || mask->isSet(i)) {
+                // If there is no mask or we're in it, take this position.
+                return i;
+            }
+        }
+        
+        throw std::runtime_error("Attempted to get non-existent result.");
     }
 
     /**

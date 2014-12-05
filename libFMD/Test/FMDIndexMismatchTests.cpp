@@ -81,7 +81,7 @@ void FMDIndexMismatchTests::testMismatch() {
     // TODO: can we specify things by name=value in c++11 to avoid breaking this
     // sneakily when we add new arguments?
     std::vector<Mapping> mappings = index->misMatchMap(bv,
-        query, (GenericBitVector*)NULL, 0, 0, 0.0, 0.0, 1);
+        query, (GenericBitVector*)NULL, 0, 0, 0.0, 1);
         
     for(size_t i = 0; i < query.size(); i++) {
         if(query[i] == 'A') {
@@ -115,7 +115,7 @@ void FMDIndexMismatchTests::testMapOnMismatch() {
     // TODO: can we specify things by name=value in c++11 to avoid breaking this
     // sneakily when we add new arguments?
     std::vector<Mapping> mappings = index->misMatchMap(bv,
-        query, (GenericBitVector*)NULL, 0, 0, 0.0, 0.0, 1);
+        query, (GenericBitVector*)NULL, 0, 0, 0.0, 1);
         
     // Make sure nothing maps, the C is the last base and has no context to map
     // on.
@@ -127,7 +127,7 @@ void FMDIndexMismatchTests::testMapOnMismatch() {
     // Do the same thing in a different orientation, showing that it maps due to
     // a mismatch
     std::vector<Mapping> rcMappings = index->misMatchMap(bv,
-        reverseComplement(query), (GenericBitVector*)NULL, 0, 0, 0.0, 0.0, 1);
+        reverseComplement(query), (GenericBitVector*)NULL, 0, 0, 0.0, 1);
         
     // Make sure the C maps, due to the C being forced to match exactly and
     // having some context.
@@ -137,9 +137,9 @@ void FMDIndexMismatchTests::testMapOnMismatch() {
     // differentiate it from the reverse complement of the G and let it map.
     query = "AAAAAAAAAAACAA";
     mappings = index->misMatchMap(bv, query, (GenericBitVector*)NULL, 0, 0, 0.0,
-        0.0, 1);
+        1);
     rcMappings = index->misMatchMap(bv, reverseComplement(query),
-        (GenericBitVector*)NULL, 0, 0, 0.0, 0.0, 1);
+        (GenericBitVector*)NULL, 0, 0, 0.0, 1);
         
     // The C should map
     CPPUNIT_ASSERT(mappings[11].getRange() != -1);

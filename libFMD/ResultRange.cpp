@@ -84,6 +84,7 @@ std::array<ResultRange, 3> ResultRange::extendLeftMismatch(
     // Return the array of results.
     return toReturn;
 }
+
 ResultRange ResultRange::retractRight(const FMDIndex& index) const {
     // Copy ourselves.
     ResultRange toReturn(*this);
@@ -108,6 +109,10 @@ bool ResultRange::isEmpty(GenericBitVector* mask) const {
 
 size_t ResultRange::getLength(GenericBitVector* mask) const {
     return position.getLength(mask);
+}
+
+int64_t ResultRange::getResult(GenericBitVector* mask) const {
+    return position.getResult(mask);
 }
 
 size_t ResultRange::getSearchStringLength() const {

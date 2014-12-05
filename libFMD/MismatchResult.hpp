@@ -4,6 +4,8 @@
 #include "FMDPosition.hpp"
 #include <deque>
 
+// TODO: Unify this with ResultRange, they are both trying to do the same thing.
+
 // We use a reference to the index to do extensions.
 class FMDIndex;
 

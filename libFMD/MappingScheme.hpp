@@ -7,6 +7,7 @@
 
 #include <string>
 #include <functional>
+#include <map>
 
 /**
  * Represents a mapping algorithm and its associated parameters. Subclasses
@@ -26,13 +27,14 @@ public:
     MappingScheme(const FMDIndex& index, const GenericBitVector& ranges,
         const GenericBitVector* mask = NULL);
 
-    // Default copy constructors OK    
+    // Default copy/move constructors OK    
     MappingScheme(const MappingScheme& other) = default;
     MappingScheme(MappingScheme&& other) = default;
     
-    // Default move constructors OK, since we use reference wrappers.
-    MappingScheme& operator=(const MappingScheme& other) = default;
-    MappingScheme& operator=(MappingScheme&& other) = default;
+    // Assignment not OK, since we use references. But since we need
+    // polymorphism nobody will ever be able to use us by value anyway...
+    MappingScheme& operator=(const MappingScheme& other) = delete;
+    MappingScheme& operator=(MappingScheme&& other) = delete;
 
     // Defaut destructor also OK.
     
@@ -43,9 +45,11 @@ public:
      * direction.
      *
      * Must be defined by all implementations.
+     *
+     * Must be thread-safe.
      */
     virtual void map(const std::string& query,
-        std::function<void(size_t, TextPosition)> callback) = 0;
+        std::function<void(size_t, TextPosition)> callback) const = 0;
     
 protected:
     // These configuration parameters are ones that every MappingScheme that
@@ -54,12 +58,12 @@ protected:
     /**
      * The FMDIndex against which we are mapping.
      */
-    const std::reference_wrapper<const FMDIndex> index;
+    const FMDIndex& index;
     
     /**
      * The bit vector defining ranges to map to on the index.
      */
-    const std::reference_wrapper<const GenericBitVector> ranges;
+    const GenericBitVector& ranges;
     
     /**
      * The mask with which we are mapping.

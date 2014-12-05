@@ -65,6 +65,12 @@ public:
     size_t getLength(GenericBitVector* mask = NULL) const;
     
     /**
+     * Return a BWT position that is selected and masked in under the mask. The
+     * ResultRange must not be empty under the mask.
+     */
+    int64_t getResult(GenericBitVector* mask = NULL) const;
+    
+    /**
      * Return the number of characters in the search string for this result
      * range.
      */

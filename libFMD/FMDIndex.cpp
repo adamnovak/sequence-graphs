@@ -1886,7 +1886,7 @@ std::vector<Mapping> FMDIndex::naturalMap(const std::string& query,
             
             // Grab the BWT index of the only selected BWT position.
             // TODO: this is going to be super-hard to do with ranges.
-            int64_t bwtIndex = extended.getResults(mask)[0];
+            int64_t bwtIndex = extended.getResult(mask);
             
             // Work out the text position we have found. This corresponds to
             // the newly added character.
@@ -2171,8 +2171,8 @@ MisMatchAttemptResults FMDIndex::misMatchExtend(MisMatchAttemptResults& prevMisM
 std::vector<Mapping> FMDIndex::misMatchMap(
     const GenericBitVector& ranges, const std::string& query, 
     const GenericBitVector* mask, int minContext, int addContext,
-    double multContext, double minCodingCost, size_t z_max, 
-    bool keepIntermediates, int start, int length) const {
+    double multContext, size_t z_max, bool keepIntermediates, int start,
+    int length) const {
     
     if(length == -1) {
         // Fix up the length parameter if it is -1: that means the whole rest of
@@ -2182,14 +2182,14 @@ std::vector<Mapping> FMDIndex::misMatchMap(
         
     Log::debug() << "Mapping inexact (" << z_max << 
         " mismatches) with minimum " << minContext << " and additional +" << 
-        addContext << ", *" << multContext << " context, min coding cost " << 
-        minCodingCost << " bits." << std::endl;
+        addContext << ", *" << multContext << " context." << std::endl;
         
     // We need a vector to return.
     std::vector<Mapping> mappings;
     
     // Start a set of mismatch search results with everything selected, no
     // characters searched and no mismatches.
+    // TODO: Use a MismatchResultSet instead...
     MisMatchAttemptResults search;
     search.positions.push_back(std::make_pair(getCoveringPosition(), 0));
     
@@ -2268,9 +2268,15 @@ std::vector<Mapping> FMDIndex::misMatchMap(
             Log::debug() << "Correct-base extension with " << query[i] <<
                 " mapped and passed criteria" << std::endl;
         
-            // Make a mapping from the right range. TODO: can this ever be
+            // Make a mapping to the right range. TODO: can this ever be
             // -1?
             mapping = Mapping(matchExtended.range(ranges, mask));
+            
+            // Give that mapping a TextPosition that it actually maps to. If the
+            // range is only one element, this is the representative
+            // TextPosition. Otherwise it's just some TextPosition that got
+            // merged in there. Either way we can merge new stuff against it.
+            mapping.setLocation(locate(matchExtended.getResult(mask)));
             
             // Keep the context that was the max we could go out to.
             mapping.setMaxContext(0, matchExtended.characters);
@@ -2332,13 +2338,13 @@ std::vector<Mapping> FMDIndex::misMatchMap(
 
 std::vector<Mapping> FMDIndex::misMatchMap(
     const GenericBitVector& ranges, const std::string& query, int64_t genome, 
-    int minContext, int addContext, double multContext, double minCodingCost,
-    size_t z_max, bool keepIntermediates, int start, int length) const {
+    int minContext, int addContext, double multContext, size_t z_max,
+    bool keepIntermediates, int start, int length) const {
     
     // Get the appropriate mask, or NULL if given the special all-genomes value.
     return misMatchMap(ranges, query, genome == -1 ? NULL : genomeMasks[genome], 
-        minContext, addContext, multContext, minCodingCost, z_max,
-        keepIntermediates, start, length);    
+        minContext, addContext, multContext, z_max, keepIntermediates, start,
+        length);    
 }
 
 MisMatchAttemptResults FMDIndex::misMatchMapPosition(

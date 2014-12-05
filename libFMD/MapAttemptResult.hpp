@@ -61,8 +61,8 @@ struct MisMatchAttemptResults
     }
     
     /**
-     * Returns true if there are no for the search (when restricting ourselves
-     * to the BWT positions covered by the mask), false otherwise.
+     * Returns true if there are no results for the search (when restricting
+     * ourselves to the BWT positions covered by the mask), false otherwise.
      */
     inline bool isEmpty(const GenericBitVector* mask = NULL) const {
         for(auto position : positions) {
@@ -104,6 +104,25 @@ struct MisMatchAttemptResults
         
         // Everybody has the same range.
         return candidate;
+    }
+    
+    /**
+     * Return a BWT position that is selected. Assumes that there are some
+     * results for the search under the mask.
+     */
+    inline int64_t getResult(const GenericBitVector* mask = NULL) const {
+         for(auto position : positions) {
+            // For each position we include...
+            if(!position.first.isEmpty(mask)) {
+                // We found a range that includes something. Report that
+                // something.
+                return position.first.getResult(mask);
+            }
+         }
+         
+         // We couldn't find any selected positions.
+         throw std::runtime_error("Tried to get BWT position from an empty "
+            "MisMatchAttemptResults");
     }
     
     
