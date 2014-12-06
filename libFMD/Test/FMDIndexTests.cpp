@@ -395,6 +395,38 @@ void FMDIndexTests::testMap() {
         }
         
     }
+    
+    // Make sure we get a right mapping on the C with normal and mismatches=0
+    // mapping.
+    std::string query4 = "CTA";
+    
+    // Declare everything to be a range
+    GenericBitVector bv;
+    for(size_t i = 0; i < index->getBWTLength(); i++) {
+        bv.addBit(i);
+    }
+    bv.finish(index->getBWTLength());    
+    
+    // Mapps the same without mismatch code
+    rightMappings = index->mapRight(query4);
+    
+    Log::output() << "Exact mapping" << std::endl;
+    for(auto mapping : rightMappings) {
+        Log::output() << mapping << std::endl;
+    }
+    
+    CPPUNIT_ASSERT(rightMappings[0].is_mapped == true);
+    
+    // As with 0 mismatches
+    rightMappings = index->misMatchMap(bv, query4);
+    
+    Log::output() << "Inexact mapping" << std::endl;
+    for(auto mapping : rightMappings) {
+        Log::output() << mapping << std::endl;
+    }
+    
+    CPPUNIT_ASSERT(rightMappings[0].is_mapped == true);
+    
 }
 
 /**

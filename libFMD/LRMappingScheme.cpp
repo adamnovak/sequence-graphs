@@ -29,6 +29,22 @@ void LRMappingScheme::map(const std::string& query,
     rightMappings = index.misMatchMap(ranges, query, mask, minContext,
         addContext, multContext, z_max);
     
+    if(addContext == 0 && multContext == 0 && z_max == 0) {
+     
+        // Take a moment to make sure we are working properly wrt the exact
+        // match mappings.
+        
+        std::vector<Mapping> otherRightMappings = index.mapRight(query,
+            mask, minContext);
+            
+        for(size_t i = 0; i < rightMappings.size(); i++) {
+            if(rightMappings[i] != otherRightMappings[i]) {
+                throw std::runtime_error("Mapping mismatch!");
+            }
+        }
+        
+    }
+    
     // Map it on the left
     leftMappings = index.misMatchMap(ranges, reverseComplement(query), mask,
         minContext, addContext, multContext, z_max); 
@@ -60,6 +76,13 @@ void LRMappingScheme::map(const std::string& query,
         // Apply a disambiguate filter to the mappings
         filteredMappings = DisambiguateFilter(index).apply(leftMappings,
             rightMappings);
+    }
+    
+    Log::output() << "LR Mappings:" << std::endl;
+    
+    for(size_t i = 0; i < query.size(); i++ ) {
+        Log::output() << query[i] << "\t" << leftMappings[i] << "\t" << 
+            filteredMappings[i] << "\t" << rightMappings[i] << std::endl;
     }
     
     for(size_t i = 0; i < filteredMappings.size(); i++) {

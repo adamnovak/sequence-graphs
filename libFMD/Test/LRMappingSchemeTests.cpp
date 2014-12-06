@@ -114,20 +114,6 @@ void LRMappingSchemeTests::testMap() {
     // All bases should map.
     CPPUNIT_ASSERT_EQUAL(query2.size(), mappedBases);
     
-    // Test query again with the genome restriction on
-    delete scheme;
-    scheme = new LRMappingScheme(*index, *ranges, &index->getGenomeMask(0));
-    
-    mappedBases = 0;
-    scheme->map(query, [&](size_t i, TextPosition mappedTo) {
-        // Make sure each base maps in order still.
-        CPPUNIT_ASSERT_EQUAL((size_t) 0, mappedTo.getText());
-        CPPUNIT_ASSERT_EQUAL(i, mappedTo.getOffset());
-        mappedBases++;
-    });
-    // All bases should map.
-    CPPUNIT_ASSERT_EQUAL(query.size(), mappedBases);
-    
     // Concatenate them together
     std::string query3 = ("CATGCTTCGGCGATTCGACGCTCATCTGCGACTCTAGAGTCGCAGATGAGCG"
         "TCGAATCGCCGAAGCATG");
@@ -136,11 +122,13 @@ void LRMappingSchemeTests::testMap() {
     scheme->map(query3, [&](size_t i, TextPosition mappedTo) {
         // Make sure each part of the mapping is right
         if(i < 33) {
-            // Should be text 0 (but last 2 are unmapped)
+            // Should be text 0 (but last 2 are unmapped due to left vs right
+            // mapping conflict)
             CPPUNIT_ASSERT_EQUAL((size_t) 0, mappedTo.getText());
             CPPUNIT_ASSERT_EQUAL(i, mappedTo.getOffset());
         } else if(i >= 37){
-            // Should be text 1 (but first two are unmapped)
+            // Should be text 1 (but first two are unmapped due to left vs right
+            // mapping conflict)
             CPPUNIT_ASSERT_EQUAL((size_t) 1, mappedTo.getText());
             CPPUNIT_ASSERT_EQUAL(i - 35, mappedTo.getOffset());
         } else {
@@ -153,6 +141,26 @@ void LRMappingSchemeTests::testMap() {
     
     // All the bases not in that gap should have reported in.
     CPPUNIT_ASSERT_EQUAL(query3.size() - (37 - 33), mappedBases);
+}
+
+void LRMappingSchemeTests::testMapWithMask() {
+
+    // Grab all of the first contig.
+    std::string query = "CATGCTTCGGCGATTCGACGCTCATCTGCGACTCT";
+
+    // Turn the genome restriction on
+    delete scheme;
+    scheme = new LRMappingScheme(*index, *ranges, &index->getGenomeMask(0));
+    
+    size_t mappedBases = 0;
+    scheme->map(query, [&](size_t i, TextPosition mappedTo) {
+        // Make sure each base maps in order still.
+        CPPUNIT_ASSERT_EQUAL((size_t) 0, mappedTo.getText());
+        CPPUNIT_ASSERT_EQUAL(i, mappedTo.getOffset());
+        mappedBases++;
+    });
+    // All bases should map.
+    CPPUNIT_ASSERT_EQUAL(query.size(), mappedBases);    
 }
 
 

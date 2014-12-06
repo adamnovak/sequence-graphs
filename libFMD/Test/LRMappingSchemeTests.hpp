@@ -36,6 +36,7 @@ public:
     void tearDown();
 
     void testMap();
+    void testMapWithMask();
     
 };
 

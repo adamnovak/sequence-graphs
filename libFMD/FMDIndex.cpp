@@ -2195,10 +2195,10 @@ std::vector<Mapping> FMDIndex::misMatchMap(
     
     
     for(int i = start + length - 1; i >= start; i--) {
-         // OK, I need to start at the right.
-         
-         // Loop invariant: search holds the result for searching up through the
-         // previous position with all possible mismatches.
+        // OK, I need to start at the right.
+
+        // Loop invariant: search holds the result for searching up through the
+        // previous position with all possible mismatches.
         
         Log::debug() << "On position " << i << " from " <<
             start + length - 1 << " to " << start << std::endl;
@@ -2230,6 +2230,14 @@ std::vector<Mapping> FMDIndex::misMatchMap(
         if(matchExtended.range(ranges, mask) != -1) {
             // Flag it if it maps uniquely now.
             matchExtended.is_mapped = true;
+        } else {
+            // Make sure it's noted as not mapping.
+            matchExtended.is_mapped = false;
+        }
+        
+        if(matchExtended.isEmpty(mask)) {
+            // Say we aren't mapped if we ran out of results.
+            matchExtended.is_mapped = false;
         }
           
         // Make a Mapping to represent the result of this extension  
@@ -2268,8 +2276,7 @@ std::vector<Mapping> FMDIndex::misMatchMap(
             Log::debug() << "Correct-base extension with " << query[i] <<
                 " mapped and passed criteria" << std::endl;
         
-            // Make a mapping to the right range. TODO: can this ever be
-            // -1?
+            // Make a mapping to the right range. This may not be -1. 
             mapping = Mapping(matchExtended.range(ranges, mask));
             
             // Give that mapping a TextPosition that it actually maps to. If the
