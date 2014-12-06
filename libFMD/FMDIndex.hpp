@@ -287,7 +287,13 @@ public:
      * Get the character at a given offset into the given contig. Offset is
      * 1-based. TODO: this is not very efficient at all.
      */
-    char display(size_t offset, size_t contig) const;  
+    char display(size_t offset, size_t contig) const;
+    
+    /**
+     * Get the character at a given TextPosition. Efficient if characters are
+     * accessed with locality.
+     */
+    char displayCached(TextPosition position) const;  
     
     /**
      * Get the character in the first column of the given row in the BWT matrix.

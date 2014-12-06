@@ -815,6 +815,28 @@ char FMDIndex::display(size_t contig, size_t offset) const {
     return display(bwtIndex);
 }
 
+char FMDIndex::displayCached(TextPosition position) const {
+    
+    if(position.getStrand()) {
+        // On the reverse strand.
+        
+        // Flip our copy of the position.
+        position.flip(getContigLength(position.getContigNumber()));
+        
+        // Get the character on the other strand and complement it.
+        return complement(displayCached(position));
+    } else {
+        // On the forward strand
+        
+        // Grab the reference contig in the cache
+        const std::string& referenceContig = displayContigCached(
+            position.getContigNumber());
+            
+        // Pull out the correct character.
+        return referenceContig[position.getOffset()];
+    }
+}
+
 char FMDIndex::displayFirst(int64_t index) const {
     // Our BWT supports this natively.
     return bwt.getF(index);
