@@ -410,22 +410,24 @@ void FMDIndexTests::testMap() {
     // Mapps the same without mismatch code
     rightMappings = index->mapRight(query4);
     
-    Log::output() << "Exact mapping" << std::endl;
-    for(auto mapping : rightMappings) {
-        Log::output() << mapping << std::endl;
-    }
-    
     CPPUNIT_ASSERT(rightMappings[0].is_mapped == true);
     
     // As with 0 mismatches
-    rightMappings = index->misMatchMap(bv, query4);
+    std::vector<Mapping> rightMappings2 = index->misMatchMap(bv, query4);
     
-    Log::output() << "Inexact mapping" << std::endl;
-    for(auto mapping : rightMappings) {
-        Log::output() << mapping << std::endl;
+    CPPUNIT_ASSERT(rightMappings2[0].is_mapped == true);
+    
+    for(size_t i = 0; i < rightMappings.size(); i++) {
+        // The same bases should be mapped
+        CPPUNIT_ASSERT(rightMappings[i].is_mapped ==
+            rightMappings2[i].is_mapped);
+            
+        if(rightMappings[i].is_mapped) {
+            // And they should go to the same places
+            CPPUNIT_ASSERT(rightMappings[i].location ==
+                rightMappings2[i].location);
+        }
     }
-    
-    CPPUNIT_ASSERT(rightMappings[0].is_mapped == true);
     
 }
 

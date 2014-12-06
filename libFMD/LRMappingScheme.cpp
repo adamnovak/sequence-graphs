@@ -32,7 +32,8 @@ void LRMappingScheme::map(const std::string& query,
     if(addContext == 0 && multContext == 0 && z_max == 0) {
      
         // Take a moment to make sure we are working properly wrt the exact
-        // match mappings.
+        // match mappings, by running the exact match case too.
+        // TODO: this won't work if ranges are actually used.
         
         std::vector<Mapping> otherRightMappings = index.mapRight(query,
             mask, minContext);
@@ -41,6 +42,7 @@ void LRMappingScheme::map(const std::string& query,
             Log::debug() << i << "\t" << query[i] << "\t" << rightMappings[i] <<
                 " vs " << otherRightMappings[i] << std::endl;
             if(rightMappings[i].location != otherRightMappings[i].location) {
+                // We disagree when we should just reduce to that case.
                 throw std::runtime_error("Mapping mismatch!");
             }
         }
@@ -78,13 +80,6 @@ void LRMappingScheme::map(const std::string& query,
         // Apply a disambiguate filter to the mappings
         filteredMappings = DisambiguateFilter(index).apply(leftMappings,
             rightMappings);
-    }
-    
-    Log::output() << "LR Mappings:" << std::endl;
-    
-    for(size_t i = 0; i < query.size(); i++ ) {
-        Log::output() << query[i] << "\t" << leftMappings[i] << "\t" << 
-            filteredMappings[i] << "\t" << rightMappings[i] << std::endl;
     }
     
     for(size_t i = 0; i < filteredMappings.size(); i++) {

@@ -9,22 +9,22 @@
  */
 class FMDIndexTests : public CppUnit::TestFixture {
     CPPUNIT_TEST_SUITE(FMDIndexTests);
-    //CPPUNIT_TEST(testDump);
-    //CPPUNIT_TEST(testDisplay);
-    //CPPUNIT_TEST(testMetadata);
-    //CPPUNIT_TEST(testLF);
-    //CPPUNIT_TEST(testSearch);
-    //CPPUNIT_TEST(testLocate);
-    //CPPUNIT_TEST(testIterate);
-    //CPPUNIT_TEST(testDisambiguate);
+    CPPUNIT_TEST(testDump);
+    CPPUNIT_TEST(testDisplay);
+    CPPUNIT_TEST(testMetadata);
+    CPPUNIT_TEST(testLF);
+    CPPUNIT_TEST(testSearch);
+    CPPUNIT_TEST(testLocate);
+    CPPUNIT_TEST(testIterate);
+    CPPUNIT_TEST(testDisambiguate);
     CPPUNIT_TEST(testMap);
-    //CPPUNIT_TEST(testContextLimit);
-    //CPPUNIT_TEST(testMapOverMismatch);
-    //CPPUNIT_TEST(testContextWithoutMapping);
-    //CPPUNIT_TEST(testAddContext);
-    //CPPUNIT_TEST(testMultContext);
-    //CPPUNIT_TEST(testLCP);
-    //CPPUNIT_TEST(testRetract);
+    CPPUNIT_TEST(testContextLimit);
+    CPPUNIT_TEST(testMapOverMismatch);
+    CPPUNIT_TEST(testContextWithoutMapping);
+    CPPUNIT_TEST(testAddContext);
+    CPPUNIT_TEST(testMultContext);
+    CPPUNIT_TEST(testLCP);
+    CPPUNIT_TEST(testRetract);
     CPPUNIT_TEST_SUITE_END();
     
     // Keep a string saying where to get the haplotypes to test with.
