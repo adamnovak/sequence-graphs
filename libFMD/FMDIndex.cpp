@@ -2204,7 +2204,8 @@ std::vector<Mapping> FMDIndex::misMatchMap(
             start + length - 1 << " to " << start << std::endl;
     
         // For each base, search out right until it becomes unique, and no
-        // further. Don't consider any mismatches on the base itself.
+        // further. Don't consider any mismatches on the base itself. This gives
+        // us our min context.
         MisMatchAttemptResults mapUntilUnique = misMatchMapPosition(ranges, 
             query, i, z_max, false, false, mask);
         
@@ -2222,53 +2223,56 @@ std::vector<Mapping> FMDIndex::misMatchMap(
         // Search interval can never be empty at the start of an iteration, by
         // the loop invariant.
         
-        // Try extending left with the base we have. 
+        // Try extending left with the base we have, to get a max context.
         MisMatchAttemptResults matchExtended = misMatchExtend(search, query[i],
             true, z_max, mask, true, false);
         matchExtended.characters++;
         
-        if(matchExtended.range(ranges, mask) != -1) {
-            // Flag it if it maps uniquely now.
-            matchExtended.is_mapped = true;
-        } else {
-            // Make sure it's noted as not mapping.
-            matchExtended.is_mapped = false;
+        if(matchExtended.isEmpty(mask)) {
+            Log::debug() << "No results for exact extension, trying to map "
+                "base on its own." << std::endl;
+                
+            // If we have no results at all, look at the maximum rightward
+            // extension from an exact match here, instead, as our max context.
+            // We don't want to do a real restart because we might be able to
+            // get over this base as a mismatch and continue with the search we
+            // have been using.
+            matchExtended = misMatchMapPosition(ranges, query, i, z_max, true,
+                false, mask);
         }
         
-        if(matchExtended.isEmpty(mask)) {
-            // Say we aren't mapped if we ran out of results.
-            matchExtended.is_mapped = false;
-        }
-          
         // Make a Mapping to represent the result of this extension  
         Mapping mapping;
+        
+        // If we ran out of results, start here exactly and go as far right as
+        // we can and then use that.
          
-        if(!matchExtended.is_mapped) {
-            Log::debug() << "Correct-base extension with " << query[i] << 
+        if(matchExtended.range(ranges, mask) == -1) {
+            Log::debug() << "Base  " << query[i] << 
                 " is not uniquely mapped" << std::endl;
             
             for(auto result : matchExtended.positions) {
                 // Dump all the options.
-                Log::trace() << "\t" << result.first << "\t" << result.second <<
+                Log::debug() << "\t" << result.first << "\t" << result.second <<
                     std::endl;
             }
                 
         } else if(matchExtended.characters < minContext) {
-            Log::debug() << "Correct-base extension with " << query[i] << 
+            Log::debug() << "Base " << query[i] << 
                 " failed min context (" << matchExtended.characters << "/" << 
                 minContext << ")" << std::endl;
                 
         } else if(matchExtended.characters < 
             addContext + mapUntilUnique.characters) {
             
-            Log::debug() << "Correct-base extension with " << query[i] << 
+            Log::debug() << "Base " << query[i] << 
                 " failed add context (" << matchExtended.characters << "/" << 
                 addContext + mapUntilUnique.characters << ")" << std::endl;
         
         } else if(matchExtended.characters < multContext * 
             mapUntilUnique.characters) {
             
-            Log::debug() << "Correct-base extension failed mult context (" <<
+            Log::debug() << "Base " << query[i] << " failed mult context (" <<
                 matchExtended.characters << "/" << 
                 multContext * mapUntilUnique.characters << ")" << std::endl;
         } else {
@@ -2279,12 +2283,13 @@ std::vector<Mapping> FMDIndex::misMatchMap(
             // Make a mapping to the right range. This may not be -1. 
             mapping = Mapping(matchExtended.range(ranges, mask));
             
+            
             // Give that mapping a TextPosition that it actually maps to. If the
             // range is only one element, this is the representative
             // TextPosition. Otherwise it's just some TextPosition that got
             // merged in there. Either way we can merge new stuff against it.
             mapping.setLocation(locate(matchExtended.getResult(mask)));
-            
+                
             // Keep the context that was the max we could go out to.
             mapping.setMaxContext(0, matchExtended.characters);
         }
@@ -2294,6 +2299,7 @@ std::vector<Mapping> FMDIndex::misMatchMap(
                
         // Then add the Mapping
         mappings.push_back(mapping);
+        Log::debug() << " Added mapping: " << mapping << std::endl;
         
         // Now compose the extension we will want to actually build on, by
         // extending with all characters.

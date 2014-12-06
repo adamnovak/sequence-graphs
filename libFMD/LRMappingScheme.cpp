@@ -38,7 +38,9 @@ void LRMappingScheme::map(const std::string& query,
             mask, minContext);
             
         for(size_t i = 0; i < rightMappings.size(); i++) {
-            if(rightMappings[i] != otherRightMappings[i]) {
+            Log::debug() << i << "\t" << query[i] << "\t" << rightMappings[i] <<
+                " vs " << otherRightMappings[i] << std::endl;
+            if(rightMappings[i].location != otherRightMappings[i].location) {
                 throw std::runtime_error("Mapping mismatch!");
             }
         }
