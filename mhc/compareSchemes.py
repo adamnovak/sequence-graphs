@@ -24,14 +24,13 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
     
     """
     
-    def __init__(self, fasta_list, true_maf, markov_model, gene_bed_dir, seed,
-        stats_dir, hub_root):
+    def __init__(self, fasta_list, true_maf, gene_bed_dir, seed, stats_dir,
+    hub_root):
         """
         Make a new Target for building a several reference structures from the
-        given FASTAs, and comparing against the given truth MAF, using the given
-        Markov model to measure coding costs, using the specified RNG seed, and
-        writing statistics to one directory, and assembly hubs for different
-        pairs of genomes and schemes to another.
+        given FASTAs, and comparing against the given truth MAF, using the
+        specified RNG seed, and writing statistics to one directory, and
+        assembly hubs for different pairs of genomes and schemes to another.
         
         The BED files in gene_bed_dir, organized like
         gene_bed_dir/<genome>/<genome>.bed, will be used to evaluate alignment
@@ -42,7 +41,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         
         The alignment statistics are just <precision>\t<recall> TSVs per scheme.
         
-        true_maf and markov_model may be None.
+        true_maf  may be None.
         
         Runs each subsequent FASTA against the first in each scheme.
         
@@ -57,9 +56,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # Save the filename of a MAF to compare all our MAFs against (or None)
         self.true_maf = true_maf
         
-        # Save the Markov model file
-        self.markov_model = markov_model
-        
+        # Save the gene bed directory to search
         self.gene_bed_dir = gene_bed_dir
         
         # Save the random seed
@@ -82,36 +79,36 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         """
         
         # Plan out all the schemes as mismatch, credit, min_context,
-        # add_context, mult_context, min_coding_cost, map_type
+        # add_context, mult_context, map_type
         return set([
             # Exact no credit min various
-            (False, False, 0, None, None, None, "LRexact"),
-            (False, False, 10, None, None, None, "LRexact"),
-            (False, False, 20, None, None, None, "LRexact"),
-            (False, False, 30, None, None, None, "LRexact"),
-            (False, False, 40, None, None, None, "LRexact"),
-            (False, False, 50, None, None, None, "LRexact"),
+            (False, False, 0, None, None, "LRexact"),
+            (False, False, 10, None, None, "LRexact"),
+            (False, False, 20, None, None, "LRexact"),
+            (False, False, 30, None, None, "LRexact"),
+            (False, False, 40, None, None, "LRexact"),
+            (False, False, 50, None, None, "LRexact"),
             # Exact no credit min various, natural
-            (False, False, 0, None, None, None, "natural"),
-            (False, False, 10, None, None, None, "natural"),
-            (False, False, 20, None, None, None, "natural"),
-            (False, False, 30, None, None, None, "natural"),
-            (False, False, 40, None, None, None, "natural"),
-            (False, False, 50, None, None, None, "natural"),
+            (False, False, 0, None, None, "natural"),
+            (False, False, 10, None, None, "natural"),
+            (False, False, 20, None, None, "natural"),
+            (False, False, 30, None, None, "natural"),
+            (False, False, 40, None, None, "natural"),
+            (False, False, 50, None, None, "natural"),
             # Exact credit min various (automatically tolerates mismatches)
-            (False, True, 0, None, None, None, "LRexact"),
-            (False, True, 10, None, None, None, "LRexact"),
-            (False, True, 20, None, None, None, "LRexact"),
-            (False, True, 30, None, None, None, "LRexact"),
-            (False, True, 40, None, None, None, "LRexact"),
-            (False, True, 50, None, None, None, "LRexact"),
+            (False, True, 0, None, None, "LRexact"),
+            (False, True, 10, None, None, "LRexact"),
+            (False, True, 20, None, None, "LRexact"),
+            (False, True, 30, None, None, "LRexact"),
+            (False, True, 40, None, None, "LRexact"),
+            (False, True, 50, None, None, "LRexact"),
             # Exact credit (tolerating 1 mismatch) min various, natural
-            (True, True, 0, None, None, None, "natural"),
-            (True, True, 10, None, None, None, "natural"),
-            (True, True, 20, None, None, None, "natural"),
-            (True, True, 30, None, None, None, "natural"),
-            (True, True, 40, None, None, None, "natural"),
-            (True, True, 50, None, None, None, "natural"),
+            (True, True, 0, None, None, "natural"),
+            (True, True, 10, None, None, "natural"),
+            (True, True, 20, None, None, "natural"),
+            (True, True, 30, None, None, "natural"),
+            (True, True, 40, None, None, "natural"),
+            (True, True, 50, None, None, "natural"),
             
         ])
 
@@ -126,7 +123,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         scheme_plan = self.getSchemePlan()
         
         for mismatch, credit, min_context, add_context, mult_context, \
-            min_coding_cost, map_type in scheme_plan:
+            map_type in scheme_plan:
             # Unpack each planned scheme
             
             # Start out with no configuration arguments
@@ -180,23 +177,6 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 # extension.
                 scheme_name += "Mult{}".format(mult_context).replace(".", "p")
                 
-            if min_coding_cost is not None:
-                # Say we're going to use a min coding cost
-                extra_args.append("--minCodingCost")
-                extra_args.append(str(min_coding_cost))
-                    
-                # Make sure we have a Markov model
-                if self.markov_model is None:
-                    raise Exception("We need a Markov model for coding cost!")
-                    
-                # Send it along to the merger
-                extra_args.append("--markovModel")
-                extra_args.append(self.markov_model)
-            
-                # Also, replace the decimal in the scheme name
-                scheme_name += "Bits{}".format(min_coding_cost).replace(".",
-                    "p")
-                    
             # Yield the name with the args.
             yield (scheme_name, extra_args)
         
@@ -1210,8 +1190,6 @@ def parse_args(args):
         help="seed for a particular deterministic run")
     parser.add_argument("--trueMaf", default=None,
         help="filename of a MAF to compare all generated MAFs against")
-    parser.add_argument("--markovModel", default=None,
-        help="filename of a Markov model to model query sequences with")
     parser.add_argument("--geneBedDir", default=None,
         help="hal2assemblyHub.py --bedDirs entry for evaluating alignments")
         
@@ -1244,9 +1222,8 @@ def main(args):
         
     # Make a stack of jobs to run
     stack = jobTree.scriptTree.stack.Stack(SchemeAssessmentTarget(
-        options.fastas, options.trueMaf, options.markovModel, 
-        options.geneBedDir, options.seed, options.outDir, 
-        options.outDir + "/hubs"))
+        options.fastas, options.trueMaf, options.geneBedDir, options.seed,
+        options.outDir, options.outDir + "/hubs"))
     
     print "Starting stack"
     
