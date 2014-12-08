@@ -28,7 +28,6 @@
 #include <Mapping.hpp>
 #include <SmallSide.hpp>
 #include <Log.hpp>
-#include <MarkovModel.hpp>
 #include <MappingScheme.hpp>
 #include <LRMappingScheme.hpp>
 #include <NaturalMappingScheme.hpp>
@@ -655,20 +654,6 @@ main(
         ("nontrivialRearrangements", 
             boost::program_options::value<std::string>(), 
             "File in which to dump nontrivial rearrangements")
-        ("leftMaxWiggle", 
-            boost::program_options::value<std::string>(), 
-            "File in which to save left max context lengths")
-        ("rightMaxWiggle", 
-            boost::program_options::value<std::string>(), 
-            "File in which to save right max context lengths")
-        ("leftMinWiggle", 
-            boost::program_options::value<std::string>(), 
-            "File in which to save left min unique context lengths")
-        ("rightMinWiggle", 
-            boost::program_options::value<std::string>(), 
-            "File in which to save right min unique context lengths")
-        ("markovModel", boost::program_options::value<std::string>(), 
-            "File to load a Markov model of query sequences from")
         ("context", boost::program_options::value<size_t>()
             ->default_value(0), 
             "Minimum required context length to merge on")
@@ -678,9 +663,6 @@ main(
         ("multContext", boost::program_options::value<double>()
             ->default_value(0), 
             "Minimum context length as a fraction of uniqueness distance")
-        ("minCodingCost", boost::program_options::value<double>()
-            ->default_value(0), 
-            "Minimum encoding cost of mapped context in bits")
         ("sampleRate", boost::program_options::value<unsigned int>()
             ->default_value(64), 
             "Set the suffix array sample rate to use")
@@ -735,15 +717,6 @@ main(
             // These are required.
             throw boost::program_options::error("Missing important arguments!");
         }
-        
-        if(options.count("minCodingCost") > options.count("markovModel") && 
-            options["minCodingCost"].as<double>() > 0) {
-            // We can't do a nonzero min coding cost without a Markov model,
-            // since we can't measure coding cost.
-            throw boost::program_options::error(
-                "--minCodingCost needs --markovModel");
-        }
-            
     } catch(boost::program_options::error& error) {
         // Something is bad about our options. Complain on stderr
         std::cerr << "Option parsing error: " << error.what() << std::endl;
@@ -794,13 +767,6 @@ main(
         return 0;
     }
     
-    if(options.count("markovModel")) {
-        // Load up a Markov model to model query sequences and give it to the
-        // index.
-        index.setMarkovModel(new MarkovModel(
-            options["markovModel"].as<std::string>()));
-    }
-    
     // Grab a bool for whether we'll map on credit    
     bool creditBool = false;
     if(options.count("credit")) {
@@ -826,10 +792,6 @@ main(
     Timer* mergeTimer = new Timer("Merging");
     
     // We want to flag whether we want mismatches
-    
-    // We'll set this if we want to pull out all the mappings for making context
-    // wiggle tracks.
-    std::vector<Mapping>* mappingsOut = NULL;
     
     if(mergeScheme == "overlap") {
         // Make a thread set that's all merged, with the given minimum merge
@@ -984,91 +946,6 @@ main(
     
     // Clean up the thread set after we analyze everything about it.
     stPinchThreadSet_destruct(threadSet);
-    
-    if(options.count("leftMaxWiggle")) {
-        // We need to dump the left max contexts as a wiggle.
-        
-        // Open a file
-        std::ofstream out(options["leftMaxWiggle"].as<std::string>().c_str());
-        
-        // Write the wiggle header. TODO: get genome name better and not with a
-        // huge hack.
-        out << "fixedStep chrom=" << 
-            index.getContigName(index.getGenomeContigs(1).first) << 
-            " start=1 step=1" << std::endl;
-        
-        for(size_t i = 0; i < mappingsOut->size(); i++) {
-            // Write the left context for each position
-            out << (*mappingsOut)[i].getLeftMaxContext() << std::endl;
-        }
-        
-        out.close();
-    }
-    
-    if(options.count("leftMinWiggle")) {
-        // We need to dump the left min contexts as a wiggle.
-        
-        // Open a file
-        std::ofstream out(options["leftMinWiggle"].as<std::string>().c_str());
-        
-        // Write the wiggle header. TODO: get genome name better and not with a
-        // huge hack.
-        out << "fixedStep chrom=" << 
-            index.getContigName(index.getGenomeContigs(1).first) << 
-            " start=1 step=1" << std::endl;
-        
-        for(size_t i = 0; i < mappingsOut->size(); i++) {
-            // Write the left context for each position
-            out << (*mappingsOut)[i].getLeftMinContext() << std::endl;
-        }
-        
-        out.close();
-    }
-    
-    if(options.count("rightMaxWiggle")) {
-        // We need to dump the left contexts as a wiggle.
-        
-        // Open a file
-        std::ofstream out(options["rightMaxWiggle"].as<std::string>().c_str());
-        
-        // Write the wiggle header. TODO: get genome name better and not with a
-        // huge hack.
-        out << "fixedStep chrom=" << 
-            index.getContigName(index.getGenomeContigs(1).first) << 
-            " start=1 step=1" << std::endl;
-        
-        for(size_t i = 0; i < mappingsOut->size(); i++) {
-            // Write the right context for each position
-            out << (*mappingsOut)[i].getRightMaxContext() << std::endl;
-        }
-        
-        out.close();
-    }
-    
-    if(options.count("rightMinWiggle")) {
-        // We need to dump the left contexts as a wiggle.
-        
-        // Open a file
-        std::ofstream out(options["rightMinWiggle"].as<std::string>().c_str());
-        
-        // Write the wiggle header. TODO: get genome name better and not with a
-        // huge hack.
-        out << "fixedStep chrom=" << 
-            index.getContigName(index.getGenomeContigs(1).first) << 
-            " start=1 step=1" << std::endl;
-        
-        for(size_t i = 0; i < mappingsOut->size(); i++) {
-            // Write the right context for each position
-            out << (*mappingsOut)[i].getRightMinContext() << std::endl;
-        }
-        
-        out.close();
-    }
-    
-    if(mappingsOut != NULL) {
-        // Delete the mappings vector
-        delete mappingsOut;
-    }
     
     // Get rid of the range vector
     delete levelIndex.first;
