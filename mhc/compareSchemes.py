@@ -133,7 +133,6 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             scheme_name = "E"
             if mismatch:
                 # Add the args and scheme name component for mismatch
-                extra_args.append("--mismatch")
                 extra_args.append("--mismatches")
                 extra_args.append("1")
                 scheme_name = "I"
