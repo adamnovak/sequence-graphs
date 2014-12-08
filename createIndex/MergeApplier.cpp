@@ -42,12 +42,12 @@ void MergeApplier::run() {
         // Unpack the first TextPosition to be merged
         size_t firstContigNumber = index.getContigNumber(merge.first);
         size_t firstStrand = index.getStrand(merge.first);
-        size_t firstOffset = index.getOffset(merge.first);
+        size_t firstOffset = index.getContigOffset(merge.first);
         
         // And the second
         size_t secondContigNumber = index.getContigNumber(merge.second);
         size_t secondStrand = index.getStrand(merge.second);
-        size_t secondOffset = index.getOffset(merge.second);
+        size_t secondOffset = index.getContigOffset(merge.second);
         
         // What orientation should we use for the second strand, given that we
         // are pinching against the first strand in orientation 1 (reverse)?

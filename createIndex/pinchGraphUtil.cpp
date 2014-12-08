@@ -136,7 +136,7 @@ canonicalize(
     bool strand = (bool) index.getStrand(base);
     // And what base position is that from the front of the contig? This is
     // 1-based.
-    size_t offset = index.getOffset(base);
+    size_t offset = index.getContigOffset(base);
     
     if(offset <= 0 || offset > index.getContigLength(contigNumber)) {
         // Complain that we got an out of bounds offset from this thing.

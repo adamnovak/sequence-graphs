@@ -212,7 +212,7 @@ bool FMDIndex::getStrand(TextPosition base) const {
     return base.getStrand();
 }
 
-size_t FMDIndex::getOffset(TextPosition base) const {
+size_t FMDIndex::getContigOffset(TextPosition base) const {
     // What base offset, 1-based, from the left, corresponds to this pair_type,
     // which may be on either strand.
     if(getStrand(base) == 0) {
@@ -229,7 +229,7 @@ std::string FMDIndex::getName(TextPosition base) const {
 
     // Unpack the coordinate parts.
     size_t contig = getContigNumber(base);
-    size_t offset = getOffset(base);
+    size_t offset = getContigOffset(base);
     
     // Work out what to name the position.
     std::stringstream nameStream;
@@ -245,7 +245,7 @@ size_t FMDIndex::getBaseID(TextPosition base) const {
     
     // Add in the offset of this base from the start of its contig, convert back
     // to 0-based, and return.
-    return total + getOffset(base) - 1;
+    return total + getContigOffset(base) - 1;
 }
 
 size_t FMDIndex::getNumberOfContigs() const {

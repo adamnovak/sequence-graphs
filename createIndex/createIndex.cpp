@@ -29,6 +29,9 @@
 #include <SmallSide.hpp>
 #include <Log.hpp>
 #include <MarkovModel.hpp>
+#include <MappingScheme.hpp>
+#include <LRMappingScheme.hpp>
+#include <NaturalMappingScheme.hpp>
 
 // Grab timers from libsuffixtools
 #include <Timer.h>
@@ -444,35 +447,15 @@ mergeOverlap(
  * merge at the mappings, compute the upper-level index, map the next genome to
  * that, merge at the mappings, compute the upper level index, and so on.
  * 
- * If a context is specified, will not merge on fewer than that many bases of
- * context on a side, whether there is a unique mapping or not.
- *
- * If an addContext is specified, will require contexts extended out that far
- * beyond where a unique result is obtained in order to map.
- *
- * If multContext is specified, a base will only map if it has a maximum context
- * as long as or longer than multContext times the length of its minimum unique
- * context.
- *
- * If minCodingCost is specified, don't map on any contexts that have a coding
- * cost under the index's Markov model less than that (in bits).
- *
- * If mappingsOut is specified, we must have exactly two genomes of exactly one
- * scaffold each. It must be sufficiently large, and will be populated with
- * mappings for each mapped position on the second genome's scaffold.
+ * Takes a factory function that can allocate new MappingSchemes for an index
+ * and the ranges and mask bitvectors.
  */
 stPinchThreadSet*
 mergeGreedy(
     const FMDIndex& index,
-    size_t context = 0,
-    size_t addContext = 0,
-    double multContext = 0,
-    double minCodingCost = 0,
-    bool credit = false,
-    std::string mapType = "LRexact",
-    bool mismatch = false,
-    int z_max = 0,
-    std::vector<Mapping>* mappingsOut = NULL
+    std::function<MappingScheme*(const FMDIndex&,
+        const GenericBitVector& ranges, const GenericBitVector* mask)> 
+        mappingSchemeFactory
 ) {
 
     Log::info() << "Creating initial pinch thread set" << std::endl;
@@ -496,14 +479,16 @@ mergeGreedy(
     for(size_t genome = 1; genome < index.getNumberOfGenomes(); genome++) {
         // For each genome that we have to merge in...
         
+        // Allocate a new MappingScheme, giving it the ranges and mask bitvectors.
+        MappingScheme* mappingScheme = mappingSchemeFactory(index,
+            *mergedRuns.first, includedPositions);
+        
         // Make the merge scheme we want to use. We choose a mapping-to-second-
         // level-based merge scheme, to which we need to feed the details of the
         // second level (range vector, representative positions to merge into)
         // and also the bitmask of what bottom-level things to count. We also
         // need to tell it what genome to map the contigs of.
-        MappingMergeScheme scheme(index, *mergedRuns.first, mergedRuns.second,
-            *includedPositions, genome, context, addContext, multContext, 
-            minCodingCost, credit, mapType, mismatch, z_max, mappingsOut);
+        MappingMergeScheme scheme(index, mappingScheme, genome);
 
         // Set it running and grab the queue where its results come out.
         ConcurrentQueue<Merge>& queue = scheme.run();
@@ -541,10 +526,14 @@ mergeGreedy(
         // Join any trivial boundaries.
         stPinchThreadSet_joinTrivialBoundaries(threadSet);
         
+        // Delete the mapping scheme, so we can delete the stuff it uses
+        delete mappingScheme;
+        
         // Merge the new genome into includedPositions, replacing the old
         // bitvector.
         GenericBitVector* newIncludedPositions = includedPositions->createUnion(
             index.getGenomeMask(genome));
+        
         if(genome > 1) {
             // If we already alocated a new GenericBitVector that wasn't the one
             // that came when we loaded in the genomes, we need to delete it.
@@ -848,32 +837,51 @@ main(
     // wiggle tracks.
     std::vector<Mapping>* mappingsOut = NULL;
     
-    if(options.count("leftMaxWiggle") || options.count("rightMaxWiggle") || 
-        options.count("leftMinWiggle") || options.count("rightMinWiggle")) {
-        
-        // We want context wiggles!
-        // TODO: Only works for exactly 2 genomes with exactly 1 scaffold each.
-        
-        // Make a vector to hold all the mappings for the second genome.
-        mappingsOut = new std::vector<Mapping>(index.getGenomeLength(1));
-        for(size_t i = 0; i < mappingsOut->size(); i++) {
-            // And fill it in with unmapped Mappings.
-            (*mappingsOut)[i] = Mapping();
-        }
-    }
-    
     if(mergeScheme == "overlap") {
         // Make a thread set that's all merged, with the given minimum merge
         // context.
         threadSet = mergeOverlap(index, options["context"].as<size_t>());
     } else if(mergeScheme == "greedy") {
         // Use the greedy merge instead.
-        threadSet = mergeGreedy(index, options["context"].as<size_t>(), 
-            options["addContext"].as<size_t>(), 
-            options["multContext"].as<double>(), 
-            options["minCodingCost"].as<double>(), 
-            creditBool, mapType, mismatchb, options["mismatches"].as<size_t>(),
-            mappingsOut);
+        threadSet = mergeGreedy(index, [&](const FMDIndex& index,
+            const GenericBitVector& ranges, const GenericBitVector* mask) {
+        
+            // Make a new MappingScheme for this step and return a pointer to
+            // it. TODO: would it be better to just make one MappingScheme and
+            // let the ranges and mask be updated? Or passed to the map method?
+            // Hiding our parameters by sneaking an option struct into a closure
+            // seems a bit odd...
+        
+            if(options["mapType"].as<std::string>() == "LRExact") {
+                // We want an LRMappingScheme
+                LRMappingScheme* scheme = new LRMappingScheme(index, ranges,
+                    mask);
+                    
+                // Populate it
+                scheme->minContext = options["context"].as<size_t>();
+                scheme->addContext = options["addContext"].as<size_t>();
+                scheme->multContext = options["multContext"].as<double>();
+                scheme->credit = creditBool;
+                scheme->z_max = options["mismatches"].as<size_t>();
+                
+                return (MappingScheme*) scheme;
+            } else if(options["mapType"].as<std::string>() == "natural") {
+                // We want a NaturalMappingScheme
+                NaturalMappingScheme* scheme = new NaturalMappingScheme(index,
+                    ranges, mask);
+                    
+                // Populate it
+                scheme->minContext = options["context"].as<size_t>();
+                scheme->credit = creditBool;
+                scheme->z_max = options["mismatches"].as<size_t>();
+                
+                return (MappingScheme*) scheme;
+            } else {
+                // They asked for a mapping scheme we don't have.
+                throw std::runtime_error("Invalid mapping scheme: " +
+                    options["mapType"].as<std::string>());
+            }
+        });
     } else {
         // Complain that's not a real merge scheme. TODO: Can we make the
         // options parser parse an enum or something instead of this?

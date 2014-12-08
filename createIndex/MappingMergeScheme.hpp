@@ -6,6 +6,7 @@
 
 #include "MergeScheme.hpp"
 #include <GenericBitVector.hpp>
+#include <MappingScheme.hpp>
 
 
 /**
@@ -18,25 +19,11 @@ class MappingMergeScheme: public MergeScheme {
 public:
     
     /**
-     * Make a new MappingMergeScheme, which takes the index defined by the given
-     * range vector and vector of per-position 1-based canonicalized bases to
-     * merge with, and maps each contig in the given genome to it. Only maps on
-     * contexts provided by the positions marked in includedPositions, and
-     * requires at least the given minimum number of bases of context to map.
-     * Also takes a minimum coding cost for contexts to map on.
-     *
-     * TODO: Make this function take a less absurd number of things.
-     *
-     * If mappingsOut is set, the Mapping for each position along the first
-     * scaffold of the genome will be placed in the proper slot in the vector.
+     * Make a new MappingMergeScheme, which maps the given genome from the given
+     * index using the given mapping scheme.
      */
-    MappingMergeScheme(const FMDIndex& index, const GenericBitVector& rangeVector, 
-        const std::vector<std::pair<std::pair<size_t, size_t>, bool> >&
-        rangeBases, const GenericBitVector& includedPositions, size_t genome,
-        size_t minContext = 0, size_t addContext = 0, double multContext = 0, 
-        double minCodingCost = 0, bool credit = false, 
-        std::string mapType = "LRexact", bool mismatch = false, 
-        size_t z_max = 0, std::vector<Mapping>* mappingsOut = NULL);
+    MappingMergeScheme(const FMDIndex& index,
+        const MappingScheme* mappingScheme, size_t genome);
     
     /**
      * Get rid of a MappingMergeScheme (and delete its queue, if it has one).
@@ -69,12 +56,11 @@ protected:
     // from contigs? TODO: Magically know a good answer for all systems.
     static const size_t MAX_THREADS;
 
-    // Holds all the threads that are generating merges.
-    std::vector<Thread> threads;
-    
-    // Holds a pointer to a ConcurrentQueue, so we can create one and then
-    // destroy it only when we get destroyed.
-    ConcurrentQueue<Merge>* queue;
+    // Keep the index so we can pull the contigs from it.
+    const FMDIndex& index;
+
+    // Holds the number of the genome we are going to map.
+    size_t genome;
     
     // Holds a ConcurrentQueue of all the contig IDs that need to be processed.
     // We fill this up with contig IDs, and our merge threads read from it, so
@@ -82,49 +68,17 @@ protected:
     // have one writer, which is done pretty much as soon as the queue starts
     // getting used.
     ConcurrentQueue<size_t>* contigsToMerge;
+
+    // Holds all the threads that are generating merges.
+    std::vector<Thread> threads;
     
-    // Holds the bit vector marking out the BWT ranges that belong to higher-
-    // level positions.
-    const GenericBitVector& rangeVector;
+    // Holds a pointer to a ConcurrentQueue, so we can create one and then
+    // destroy it only when we get destroyed.
+    ConcurrentQueue<Merge>* queue;
     
-    // Holds the canonicalized position to merge into for a forward mapping to
-    // each range. Positions are 1-based.
-    const std::vector<std::pair<std::pair<size_t, size_t>, bool> >& rangeBases; 
-        
-    // Holds a mask; we should only consider positions with 1s here as actually
-    // being in the bottom level.
-    const GenericBitVector& includedPositions;
-    
-    // Holds the number of the genome we are going to map.
-    size_t genome;
-    
-    // Minimum amount of context that is allowed to motivate a merge.
-    size_t minContext;
-    
-    // Minimum distance you have to go out past where a context is unique in
-    // order to actually map.
-    size_t addContext;
-    
-    // Minimum length of the context as a fraction of the portion before
-    // uniqueness.
-    double multContext;
-    
-    // Minimum coding cost, in bits, of a context to map on
-    double minCodingCost;
-    
-    // Flag whether to use mapping on credit scheme   
-    bool credit;
-    
-    // Type of context used
-    std::string mapType;
-    
-    bool mismatch;
-    
-    size_t z_max;
-    
-    // Place to cram Mappings from the first scaffold, for debugging.
-    std::vector<Mapping>* mappingsOut;
-    
+    // Holds the mapping scheme we will use to map.
+    const MappingScheme* mappingScheme;
+
     /**
      * Create a Merge between two positions and enqueue it. Positions are
      * 1-based.

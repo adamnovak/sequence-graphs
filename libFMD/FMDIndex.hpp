@@ -83,7 +83,7 @@ public:
      * offset from the left of its contig, 1-based. Not to be confuised with the
      * position's internal offset along its text, from base.getOffset().
      */
-    size_t getOffset(TextPosition base) const;
+    size_t getContigOffset(TextPosition base) const;
     
     /**
      * Get a unique string name for a position.
