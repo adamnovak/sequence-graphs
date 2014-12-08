@@ -698,8 +698,7 @@ main(
             "Merging scheme (\"natural\" or \"LRexact\")")
         ("mismatches", boost::program_options::value<size_t>()
             ->default_value(0), 
-            "Maximum allowed number of mismatches")
-        ("mismatch", "Allow for mismatches");
+            "Maximum allowed number of mismatches");
         
     // And set up our positional arguments
     boost::program_options::positional_options_description positionals;
@@ -827,11 +826,6 @@ main(
     Timer* mergeTimer = new Timer("Merging");
     
     // We want to flag whether we want mismatches
-    
-    bool mismatchb = false;
-    if(options.count("mismatch")) {
-        mismatchb = true;
-    }
     
     // We'll set this if we want to pull out all the mappings for making context
     // wiggle tracks.
