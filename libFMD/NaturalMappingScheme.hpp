@@ -2,9 +2,13 @@
 #define NATURALMAPPINGSCHEME_HPP
 
 #include "MappingScheme.hpp"
+#include "Mapping.hpp"
 
 /**
- * Represents a natural mapping scheme with only inexact credit support.
+ * Mapping scheme implementing Benedict's "natural" mapping scheme. If all
+ * the unique-in-the-reference strings overlapping a query base agree about
+ * where the abse should be, and you can't get from the base off the end of
+ * the query with multiple results, map the base.
  */
 class NaturalMappingScheme: public MappingScheme {
 
@@ -15,10 +19,10 @@ public:
     using MappingScheme::MappingScheme;
     
     /**
-     * Map the given query string according to the natural mapping scheme.
-     * When a mapping is found, the callback function will be called with the
-     * query base index, and the TextPosition to which it maps in the forward
-     * direction.
+     * Map the given query string according to the natural mapping scheme with
+     * optional inexact credit. When a mapping is found, the callback function
+     * will be called with the query base index, and the TextPosition to which
+     * it maps in the forward direction.
      *
      */
     virtual void map(const std::string& query,
@@ -41,6 +45,13 @@ public:
      * What's the minimum context length to match on?
      */
     size_t minContext = 0;
+    
+protected:
+    /**
+     * Map the given query string, producing a vector of Mappings. Does not
+     * include credit yet.
+     */
+    std::vector<Mapping> naturalMap(const std::string& query) const;
     
 };
    

@@ -435,19 +435,6 @@ public:
      */
     Mapping disambiguate(const Mapping& left, const Mapping& right) const;
     
-    /**
-     * Mapping function implementing Benedict's "natural" mapping scheme. If all
-     * the unique-in-the-reference strings overlapping a query base agree about
-     * where the abse should be, and you can't get from the base off the end of
-     * the query with multiple results, map the base.
-     *
-     * Only possible to strings at the moment.
-     *
-     * minContext determines the minimum length of unique string to consider.
-     */
-    std::vector<Mapping> naturalMap(const std::string& query,
-        const GenericBitVector* mask = NULL, size_t minContext = 0) const;
-        
     /***************************************************************************
      * Mismatch
      **************************************************************************/
