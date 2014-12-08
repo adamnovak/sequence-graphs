@@ -269,14 +269,6 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # This holds pairs of c2h and FASTA files
         c2h_fasta_pairs = []
         
-        # This holds left and right context wiggle pairs. TODO: rename this to
-        # max_context_pairs, and all the plain context stuff to max context
-        # stuff.
-        context_pairs = []
-        
-        # This holds left and right min context wiggle pairs
-        min_context_pairs = []
-        
         # This holds the genomes to which those pairs correspond
         pair_genomes = []
         
@@ -330,22 +322,6 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             tandem_filenames = [sonLib.bioio.getTempFile(suffix=".tandem",
                 rootDir=self.getGlobalTempDir()) for _ in query_genomes]
                 
-            # And another one for left context length
-            left_context_filenames = [sonLib.bioio.getTempFile(suffix=".wig",
-                rootDir=self.getGlobalTempDir()) for _ in query_genomes]
-                
-            # And another one for right context length
-            right_context_filenames = [sonLib.bioio.getTempFile(suffix=".wig",
-                rootDir=self.getGlobalTempDir()) for _ in query_genomes]
-                
-            # And then for min contexts
-            left_min_context_filenames = [sonLib.bioio.getTempFile(
-                suffix=".wig", rootDir=self.getGlobalTempDir())
-                for _ in query_genomes]
-            right_min_context_filenames = [sonLib.bioio.getTempFile(
-                suffix=".wig", rootDir=self.getGlobalTempDir())
-                for _ in query_genomes]
-            
             # We also need files for the checkGenes category count outputs.
             checkgenes_count_filenames = [sonLib.bioio.getTempFile(
                 suffix=".tsv", rootDir=self.getGlobalTempDir()) 
@@ -387,10 +363,6 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 tandem_filename = tandem_filenames[i]
                 c2h_filename = c2h_filenames[i]
                 fasta_filename = fasta_filenames[i]
-                left_context_filename = left_context_filenames[i]
-                right_context_filename = right_context_filenames[i]
-                left_min_context_filename = left_min_context_filenames[i]
-                right_min_context_filename = right_min_context_filenames[i]
                 
                 # Make a child to produce those, giving it a seed. Make sure to
                 # give it only two FASTAs, reference first, so that when it
@@ -403,10 +375,6 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                     indel_filename=indel_filename,
                     tandem_filename=tandem_filename, c2h_filename=c2h_filename,
                     fasta_filename=fasta_filename,
-                    left_context_filename=left_context_filename,
-                    right_context_filename=right_context_filename,
-                    left_min_context_filename=left_min_context_filename,
-                    right_min_context_filename=right_min_context_filename,
                     extra_args=extra_args))
                     
             
@@ -508,15 +476,6 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             # lenght as pair_genomes.
             pair_schemes += [scheme for _ in query_genomes]
             
-            # Also save the context wiggle pairs.
-            context_pairs += zip(left_context_filenames,
-                right_context_filenames)
-                
-            # And the min context wiggle pairs.
-            min_context_pairs += zip(left_min_context_filenames,
-                right_min_context_filenames)
-            
-        
         # We want to combine all our c2h files into one massive hub.
         
         # What HAL will we use?
@@ -530,22 +489,6 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         merged_fasta = sonLib.bioio.getTempFile(suffix=".fa",
                 rootDir=self.getGlobalTempDir())
                 
-        # Where should we keep our left and right max context wiggles? They have
-        # to be under the output directory so we can read them later for context
-        # length plots.
-        left_context_dir = wiggle_root + "/leftMaxContext"
-        wiggle_dirs.add(left_context_dir)
-        
-        right_context_dir = wiggle_root + "/rightMaxContext"
-        wiggle_dirs.add(right_context_dir)
-                
-        # Where should we keep our left and right min context wiggles?
-        left_min_context_dir = wiggle_root + "/leftMinContext"
-        wiggle_dirs.add(left_min_context_dir)
-        
-        right_min_context_dir = wiggle_root + "/rightMinContext"
-        wiggle_dirs.add(right_min_context_dir)
-        
         # What suffixes should we put on genomes?
         suffixes = [scheme for scheme in pair_schemes]
         
@@ -615,23 +558,6 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # And a target to make the hal from them
         merged_hal_target = HalTarget(merged_c2h, merged_fasta, 
             reference_genome, genomes_with_suffixes, merged_hal)
-            
-        # And a target to sort out all of the left wiggles
-        track_targets.append(WiggleCollateTarget(
-            [pair[0] for pair in context_pairs], pair_genomes, suffixes,
-            left_context_dir))
-        # And the right ones
-        track_targets.append(WiggleCollateTarget(
-            [pair[1] for pair in context_pairs], pair_genomes, suffixes,
-            right_context_dir))
-            
-        # And for the minimum contexts for uniqueness
-        track_targets.append(WiggleCollateTarget(
-            [pair[0] for pair in min_context_pairs], pair_genomes, suffixes,
-            left_min_context_dir))
-        track_targets.append(WiggleCollateTarget(
-            [pair[1] for pair in min_context_pairs], pair_genomes, suffixes,
-            right_min_context_dir))
             
         # And a target to make a hub from that. Make sure to pass all the track
         # directories.
