@@ -3,6 +3,156 @@
 
 #include <vector>
 
+std::vector<NaturalMappingScheme::Matching>
+    NaturalMappingScheme::findMaxMatchings(const std::string& query) {
+ 
+    // What matchings have we found?
+    std::vector<Matching> toReturn;
+ 
+    // Start with everything selected.
+    FMDPosition results = index.getCoveringPosition();
+    
+    // How many characters are currently searched?
+    size_t patternLength = 0;
+    
+    for(size_t i = query.size() - 1; i != (size_t) -1; i--) {
+        // For each position in the query from right to left
+        
+        // We're going to extend backward with this new base.
+        FMDPosition extended = results;
+        index.extendLeftOnly(extended, query[i]);
+        
+        if(results.getLength(mask) == 1 && extended.isEmpty(mask)) {
+            // We are already a maximal unique match and can't extend any more.
+            // Report ourselves.
+            // Note that we can only ever do this once per left endpoint.
+            toReturn.push_back(Matching(i - 1,  index.locate(results.getResult(
+                mask)), patternLength));
+        }
+        
+        while(extended.isEmpty(mask)) {
+            // If you can't extend, retract until you can. TODO: Assumes we
+            // can find at least one result for any character.
+            
+            // Retract the character
+            FMDPosition retracted = results;
+            // Make sure to drop characters from the total pattern length.
+            index.retractRightOnly(retracted, --patternLength);
+            
+            // Try extending again
+            extended = retracted;
+            index.extendLeftOnly(extended, query[i]);
+            
+            // Say that last step we came from retracted.
+            results = retracted;
+        }
+    
+        // We successfully extended.
+        patternLength++;
+        results = extended;
+    }
+    
+    if(results.getLength(mask) == 1) {
+        // We are a maximal unique match butted up against the left edge. Report
+        // it.
+        toReturn.push_back(Matching(0,  index.locate(results.getResult(
+            mask)), patternLength));
+    }
+    
+    // This works: if there were a longer unique match on the right, we would
+    // not have retracted. And we explicitly check to see if there is a longer
+    // unique match on the left.
+    
+    return toReturn;
+}
+
+std::vector<NaturalMappingScheme::Matching>
+    NaturalMappingScheme::findMinMatchings(const std::string& query) {
+
+    // What matchings have we found?
+    std::vector<Matching> toReturn;
+ 
+    // Start with everything selected.
+    FMDPosition results = index.getCoveringPosition();
+    
+    // How many characters are currently searched?
+    size_t patternLength = 0;
+
+    // Flag that says whether we need to retract at least once before we can
+    // find another minimal unique match, since we just found one ending at a
+    // certain place. TODO: Find a cleaner way to do this.
+    bool mustRetract = false;
+    
+    for(size_t i = query.size() - 1; i != (size_t) -1; i--) {
+        // For each position in the query from right to left
+        
+        // Retract on the right until we can successfully extend on the left
+        // without running out of results.
+        
+        // We're going to extend backward with this new base.
+        FMDPosition extended = results;
+        index.extendLeftOnly(extended, query[i]);
+        
+        while(extended.isEmpty(mask)) {
+            // If you can't extend, retract until you can. TODO: Assumes we
+            // can find at least one result for any character.
+            
+            // Retract the character
+            FMDPosition retracted = results;
+            // Make sure to drop characters from the total pattern length.
+            index.retractRightOnly(retracted, --patternLength);
+            mustRetract = false;
+            
+            // Try extending again
+            extended = retracted;
+            index.extendLeftOnly(extended, query[i]);
+            
+            // Say that last step we came from retracted.
+            results = retracted;
+        }
+        
+        // Extend on the left.
+        results = extended;
+        patternLength++;
+        
+        // Retract on the right until the next retraction would make us not
+        // unique, and report a minimal unique match starting at this position.
+        FMDPosition retracted = results;
+        index.retractRightOnly(retracted, patternLength - 1);
+        
+        while(retracted.getLength(mask) == 1) {
+            // Retract until we would no longer be unique. Make sure to drop
+            // characters from the total pattern length.
+            results = retracted;
+            index.retractRightOnly(retracted, (--patternLength) - 1);
+            mustRetract = false;
+        }
+        
+        if(results.getLength(mask) == 1 && retracted.getLength(mask) > 1 &&
+            !mustRetract) {
+            
+            // We found a minimally unique match starting at this position and
+            // ending patternLength right from here.
+            toReturn.push_back(Matching(i,  index.locate(results.getResult(
+                mask)), patternLength));
+                
+            // We can't find another minimal match until we move the right
+            // endpoint.
+            mustRetract = true;
+        }
+    }
+    
+    // When we get here, we already know we retracted as much as we copuld for
+    // the leftmost extension, so there are no more results to report.
+    
+    // This works: if there were a shorter unique match on the right starting at
+    // this position, we would have retracted to find it. And if there were a
+    // shorter unique match on the left ending at this position, we would have
+    // already reported it and not reported any more until we retracted.
+    
+    return toReturn;
+}
+
 std::vector<Mapping> NaturalMappingScheme::naturalMap(
     const std::string& query) const {
     
