@@ -190,7 +190,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
     std::vector<Matching> maxMatchings = findMaxMatchings(query);
     
     for(Matching m : minMatchings) { 
-        Log::info() << "Min matching: " << m.start << " - " <<
+        Log::trace() << "Min matching: " << m.start << " - " <<
             m.start + m.length << std::endl;
     }
     
@@ -201,7 +201,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
     size_t minMatchingsUsed = 0;
     
     for(Matching matching : maxMatchings) {
-        Log::info() << "Max matching " << matching.start << " - " <<
+        Log::debug() << "Max matching " << matching.start << " - " <<
             matching.start + matching.length << " @ " << matching.location <<
             std::endl;
     
@@ -214,7 +214,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             minMatchings[minMatchingsUsed].length > matching.start +
             matching.length) {
             
-            Log::info() << "\tDiscard min matching " << minMatchingsUsed <<
+            Log::debug() << "\tDiscard min matching " << minMatchingsUsed <<
                 ": " << minMatchings[minMatchingsUsed].start << " - " <<
                 minMatchings[minMatchingsUsed].start +
                 minMatchings[minMatchingsUsed].length << " @ " <<
@@ -233,7 +233,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             minMatchings[minMatchingsUsed + minMatchingsTaken].start >=
             matching.start) {
             
-            Log::info() << "\tContains min matching " << 
+            Log::debug() << "\tContains min matching " << 
                 minMatchingsUsed + minMatchingsTaken << ": " <<
                 minMatchings[minMatchingsUsed + minMatchingsTaken].start <<
                 " - " <<
@@ -248,7 +248,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             minMatchingsTaken++;
         }
         
-        Log::info() << "\tTook " << minMatchingsTaken << " min matches" <<
+        Log::debug() << "\tTook " << minMatchingsTaken << " min matches" <<
             std::endl;
         
         if(minMatchingsTaken == 0) {
