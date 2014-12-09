@@ -81,34 +81,28 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # Plan out all the schemes as mismatch, credit, min_context,
         # add_context, mult_context, map_type
         return set([
-            # Exact no credit min various
-            (False, False, 0, None, None, "LRexact"),
-            (False, False, 10, None, None, "LRexact"),
-            (False, False, 20, None, None, "LRexact"),
-            (False, False, 30, None, None, "LRexact"),
-            (False, False, 40, None, None, "LRexact"),
-            (False, False, 50, None, None, "LRexact"),
-            # Exact no credit min various, natural
-            (False, False, 0, None, None, "natural"),
-            (False, False, 10, None, None, "natural"),
-            (False, False, 20, None, None, "natural"),
-            (False, False, 30, None, None, "natural"),
-            (False, False, 40, None, None, "natural"),
-            (False, False, 50, None, None, "natural"),
-            # Exact credit min various (automatically tolerates mismatches)
-            (False, True, 0, None, None, "LRexact"),
-            (False, True, 10, None, None, "LRexact"),
-            (False, True, 20, None, None, "LRexact"),
-            (False, True, 30, None, None, "LRexact"),
-            (False, True, 40, None, None, "LRexact"),
-            (False, True, 50, None, None, "LRexact"),
             # Exact credit (tolerating 1 mismatch) min various, natural
-            (True, True, 0, None, None, "natural"),
-            (True, True, 10, None, None, "natural"),
+            # Need to beat this. Also wanted to see it out further.
             (True, True, 20, None, None, "natural"),
-            (True, True, 30, None, None, "natural"),
-            (True, True, 40, None, None, "natural"),
             (True, True, 50, None, None, "natural"),
+            (True, True, 100, None, None, "natural"),
+            (True, True, 150, None, None, "natural"),
+            (True, True, 200, None, None, "natural"),
+            # Exact credit mult various (automatically tolerates mismatches)
+            # Need to beat this too.
+            (False, True, None, None, 2.0, "LRexact"),
+            (False, True, None, None, 4.0, "LRexact"),
+            (False, True, None, None, 6.0, "LRexact"),
+            (False, True, None, None, 8.0, "LRexact"),
+            # Exact credit (tolerating 1 mismatch) mult various, natural
+            # Thing under test
+            (True, True, None, None, 2.0, "natural"),
+            (True, True, None, None, 4.0, "natural"),
+            (True, True, None, None, 6.0, "natural"),
+            (True, True, None, None, 8.0, "natural"),
+            # LR Inexact Credit Mult 4 (current winner)
+            # Best known
+            (True, True, None, None, 4.0, "LRExact")
             
         ])
 
