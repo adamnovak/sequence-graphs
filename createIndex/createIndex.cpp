@@ -828,6 +828,7 @@ main(
                     
                 // Populate it
                 scheme->minContext = options["context"].as<size_t>();
+                scheme->multContext = options["multContext"].as<double>();
                 scheme->credit = creditBool;
                 scheme->z_max = options["mismatches"].as<size_t>();
                 

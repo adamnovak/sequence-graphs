@@ -190,9 +190,12 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
     // holds how many min matchings have been used up and were contained in
     // previous (i.e. further right) max matchings. Every min matching is
     // contained within exactly one max matching (but may overlap others).
-    size_t minMatchingsUsed = minMatchings.size();
+    size_t minMatchingsUsed = 0;
     
     for(Matching matching : maxMatchings) {
+        Log::info() << "Max matching " << matching.start << " - " <<
+            matching.start + matching.length << std::endl;
+    
         // For each maximal unique match (always nonoverlapping) from right to
         // left...
         
@@ -201,6 +204,10 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
         while(minMatchings[minMatchingsUsed].start + 
             minMatchings[minMatchingsUsed].length > matching.start +
             matching.length) {
+            
+            Log::info() << "\tDiscard min matching" << minMatchingsUsed <<
+                ": " << minMatchings[minMatchingsUsed].start +
+                minMatchings[minMatchingsUsed].length << std::endl;
             
             // Throw away min matchings while they end further right than our
             // end.
@@ -211,10 +218,19 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
         // matching? There will be at least one.
         size_t minMatchingsTaken = 0;
         
-        while(minMatchings[minMatchingsUsed + minMatchingsTaken].start >=
+        while(minMatchingsUsed + minMatchingsTaken < minMatchings.size() && 
+            minMatchings[minMatchingsUsed + minMatchingsTaken].start >=
             matching.start) {
             
-            // Take matchings while they start further right than our start.
+            Log::info() << "\tContains min matching " <<
+                minMatchings[minMatchingsUsed + minMatchingsTaken].start <<
+                " - " <<
+                minMatchings[minMatchingsUsed + minMatchingsTaken].start +
+                minMatchings[minMatchingsUsed + minMatchingsTaken].length <<
+                std::endl;
+            
+            // Take matchings while they start further right than our start,
+            // until we run out.
             minMatchingsTaken++;
         }
         
@@ -250,6 +266,8 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
         if(passedFilters && matching.length < minContext) {
             // Min context filter is on and we have failed it.
             passedFilters = false;
+            
+            Log::info() << "\tFailed min context filter" << std::endl;
         }
         
         if(passedFilters && multContext * averageMinLength >= matching.length) {
@@ -257,6 +275,8 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             // least multContext times as long as the average length of the min
             // unique matches we contain.
             passedFilters = false;
+            
+            Log::info() << "\tFailed mult context filter" << std::endl;
         }
         
         if(passedFilters) {
