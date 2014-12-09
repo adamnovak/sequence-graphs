@@ -193,7 +193,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
     size_t minMatchingsUsed = 0;
     
     for(Matching matching : maxMatchings) {
-        Log::info() << "Max matching " << matching.start << " - " <<
+        Log::debug() << "Max matching " << matching.start << " - " <<
             matching.start + matching.length << std::endl;
     
         // For each maximal unique match (always nonoverlapping) from right to
@@ -205,7 +205,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             minMatchings[minMatchingsUsed].length > matching.start +
             matching.length) {
             
-            Log::info() << "\tDiscard min matching" << minMatchingsUsed <<
+            Log::debug() << "\tDiscard min matching" << minMatchingsUsed <<
                 ": " << minMatchings[minMatchingsUsed].start +
                 minMatchings[minMatchingsUsed].length << std::endl;
             
@@ -222,7 +222,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             minMatchings[minMatchingsUsed + minMatchingsTaken].start >=
             matching.start) {
             
-            Log::info() << "\tContains min matching " <<
+            Log::debug() << "\tContains min matching " <<
                 minMatchings[minMatchingsUsed + minMatchingsTaken].start <<
                 " - " <<
                 minMatchings[minMatchingsUsed + minMatchingsTaken].start +
@@ -233,6 +233,9 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             // until we run out.
             minMatchingsTaken++;
         }
+        
+        Log::debug() << "\tTook " << minMatchingsTaken << " min matches" <<
+            std::endl;
         
         if(minMatchingsTaken == 0) {
             // There is clearly a problem if we find no contained minimal
@@ -257,7 +260,10 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
         
         // Calculate the average length of involved minimal unique matches.
         double averageMinLength = (double) totalMinLength / 
-            (double) minMatchingsUsed;
+            (double) minMatchingsTaken;
+            
+        Log::debug() << "\tAverage minimal unique match length: " <<
+            averageMinLength << std::endl;
     
         // This flag keeps track of whether we passed all the filters on
         // admissible max contexts to map on.
@@ -267,7 +273,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             // Min context filter is on and we have failed it.
             passedFilters = false;
             
-            Log::info() << "\tFailed min context filter" << std::endl;
+            Log::debug() << "\tFailed min context filter" << std::endl;
         }
         
         if(passedFilters && multContext * averageMinLength >= matching.length) {
@@ -276,7 +282,9 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             // unique matches we contain.
             passedFilters = false;
             
-            Log::info() << "\tFailed mult context filter" << std::endl;
+            Log::debug() << "\tFailed mult context filter: " <<
+                multContext * averageMinLength << " > " << matching.length <<
+                std::endl;
         }
         
         if(passedFilters) {
@@ -285,6 +293,9 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             
             for(size_t i = matching.start; i < matching.start + matching.length;
                 i++) {
+                
+                Log::trace() << "Matching " << i << " to " <<
+                    matching.location << std::endl;
                 
                 // For each position it covers, record the matching on that
                 // position.
@@ -344,6 +355,9 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
     // What is the rightmost position that can't get a non-unique context over
     // the right edge?
     size_t rightmostMappable = rightmostMinMatching.start;
+    
+    Log::info() << "Able to map in range " << leftmostMappable << " - " <<
+        rightmostMappable << std::endl;
     
     for(size_t i = leftmostMappable; i <= rightmostMappable; i++) {
         // For every mappable position between those two, inclusive.
