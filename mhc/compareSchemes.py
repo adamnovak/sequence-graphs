@@ -102,7 +102,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             (True, True, None, None, 8.0, "natural"),
             # LR Inexact Credit Mult 4 (current winner)
             # Best known
-            (True, True, None, None, 4.0, "LRExact")
+            (True, True, None, None, 4.0, "LRexact")
             
         ])
 
