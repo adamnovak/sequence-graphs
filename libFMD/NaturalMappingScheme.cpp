@@ -26,7 +26,10 @@ std::vector<NaturalMappingScheme::Matching>
             // We are already a maximal unique match and can't extend any more.
             // Report ourselves.
             // Note that we can only ever do this once per left endpoint.
-            toReturn.push_back(Matching(i - 1,  index.locate(results.getResult(
+            
+            // Make sure we fix the endpoint as i + 1, since we moved i left
+            // already and we want to talk about where it was last loop.
+            toReturn.push_back(Matching(i + 1,  index.locate(results.getResult(
                 mask)), patternLength));
         }
         
@@ -186,6 +189,11 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
     std::vector<Matching> minMatchings = findMinMatchings(query);
     std::vector<Matching> maxMatchings = findMaxMatchings(query);
     
+    for(Matching m : minMatchings) { 
+        Log::info() << "Min matching: " << m.start << " - " <<
+            m.start + m.length << std::endl;
+    }
+    
     // We need to work out which min matchings belong to each max matching. This
     // holds how many min matchings have been used up and were contained in
     // previous (i.e. further right) max matchings. Every min matching is
@@ -193,8 +201,9 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
     size_t minMatchingsUsed = 0;
     
     for(Matching matching : maxMatchings) {
-        Log::debug() << "Max matching " << matching.start << " - " <<
-            matching.start + matching.length << std::endl;
+        Log::info() << "Max matching " << matching.start << " - " <<
+            matching.start + matching.length << " @ " << matching.location <<
+            std::endl;
     
         // For each maximal unique match (always nonoverlapping) from right to
         // left...
@@ -205,9 +214,11 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             minMatchings[minMatchingsUsed].length > matching.start +
             matching.length) {
             
-            Log::debug() << "\tDiscard min matching" << minMatchingsUsed <<
-                ": " << minMatchings[minMatchingsUsed].start +
-                minMatchings[minMatchingsUsed].length << std::endl;
+            Log::info() << "\tDiscard min matching " << minMatchingsUsed <<
+                ": " << minMatchings[minMatchingsUsed].start << " - " <<
+                minMatchings[minMatchingsUsed].start +
+                minMatchings[minMatchingsUsed].length << " @ " <<
+                minMatchings[minMatchingsUsed].location << std::endl;
             
             // Throw away min matchings while they end further right than our
             // end.
@@ -222,11 +233,14 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             minMatchings[minMatchingsUsed + minMatchingsTaken].start >=
             matching.start) {
             
-            Log::debug() << "\tContains min matching " <<
+            Log::info() << "\tContains min matching " << 
+                minMatchingsUsed + minMatchingsTaken << ": " <<
                 minMatchings[minMatchingsUsed + minMatchingsTaken].start <<
                 " - " <<
                 minMatchings[minMatchingsUsed + minMatchingsTaken].start +
                 minMatchings[minMatchingsUsed + minMatchingsTaken].length <<
+                " @ " <<
+                minMatchings[minMatchingsUsed + minMatchingsTaken].location <<
                 std::endl;
             
             // Take matchings while they start further right than our start,
@@ -234,10 +248,20 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             minMatchingsTaken++;
         }
         
-        Log::debug() << "\tTook " << minMatchingsTaken << " min matches" <<
+        Log::info() << "\tTook " << minMatchingsTaken << " min matches" <<
             std::endl;
         
         if(minMatchingsTaken == 0) {
+            Log::critical() << "\tDoes not contain min matching " << 
+                minMatchingsUsed + minMatchingsTaken << ": " <<
+                minMatchings[minMatchingsUsed + minMatchingsTaken].start <<
+                " - " <<
+                minMatchings[minMatchingsUsed + minMatchingsTaken].start +
+                minMatchings[minMatchingsUsed + minMatchingsTaken].length <<
+                " @ " <<
+                minMatchings[minMatchingsUsed + minMatchingsTaken].location <<
+                std::endl;
+                
             // There is clearly a problem if we find no contained minimal
             // matching.
             throw std::runtime_error(
