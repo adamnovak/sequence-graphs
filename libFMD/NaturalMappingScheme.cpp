@@ -174,26 +174,126 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
     
     // Where will we keep unique matchings by base? We store them as sets of
     // TextPositions to which each base has been matched.
-    std::vector<std::set<TextPosition>> matchings(query.size());    
+    std::vector<std::set<TextPosition>> matchings(query.size());
+    
+    // We also need a blacklist to note bases that were part of a maximal unique
+    // match that was rejected. They can't be allowed to map inconsistently with
+    // that maximal match, which translates into not being able to map at all
+    // (since it was maximal) until credit comes along.
+    std::vector<bool> blacklist(query.size());
     
     // Get the min and max matchings.
     std::vector<Matching> minMatchings = findMinMatchings(query);
     std::vector<Matching> maxMatchings = findMaxMatchings(query);
     
+    // We need to work out which min matchings belong to each max matching. This
+    // holds how many min matchings have been used up and were contained in
+    // previous (i.e. further right) max matchings. Every min matching is
+    // contained within exactly one max matching (but may overlap others).
+    size_t minMatchingsUsed = minMatchings.size();
+    
     for(Matching matching : maxMatchings) {
-        // For each maximal unique match...
-        for(size_t i = matching.start; i < matching.start + matching.length;
-            i++) {
+        // For each maximal unique match (always nonoverlapping) from right to
+        // left...
+        
+        // See if this max matching passes the criteria for inclusion.
+        
+        while(minMatchings[minMatchingsUsed].start + 
+            minMatchings[minMatchingsUsed].length > matching.start +
+            matching.length) {
             
-            // For each position it matches, record the matching on that
-            // position.
-            matchings[i].insert(matching.location);
-            
-            // Bump the matching's location over by 1 for the next base. We're
-            // working on the copy that the range for loop made rather than the
-            // original.
-            matching.location.addLocalOffset(1);
+            // Throw away min matchings while they end further right than our
+            // end.
+            minMatchingsUsed++;
         }
+        
+        // How many min matchings have we grabbed that are contained in this max
+        // matching? There will be at least one.
+        size_t minMatchingsTaken = 0;
+        
+        while(minMatchings[minMatchingsUsed + minMatchingsTaken].start >=
+            matching.start) {
+            
+            // Take matchings while they start further right than our start.
+            minMatchingsTaken++;
+        }
+        
+        if(minMatchingsTaken == 0) {
+            // There is clearly a problem if we find no contained minimal
+            // matching.
+            throw std::runtime_error(
+                "Maximal matching contains no minimal matchings!");
+        }
+        
+        // We contain minMatchings[minMatchingsUsed] to
+        // minMatchings[minMatchings + minMatchingsTaken], inclusive on the low
+        // end.
+        
+        // What's the total length of all included minimal exact matches?
+        size_t totalMinLength = 0;
+        
+        for(size_t i = minMatchingsUsed;
+            i < minMatchingsUsed + minMatchingsTaken; i++) {
+            
+            // For each min matching that we contain, add in its length.
+            totalMinLength += minMatchings[i].length;
+        }
+        
+        // Calculate the average length of involved minimal unique matches.
+        double averageMinLength = (double) totalMinLength / 
+            (double) minMatchingsUsed;
+    
+        // This flag keeps track of whether we passed all the filters on
+        // admissible max contexts to map on.
+        bool passedFilters = true;
+    
+        if(passedFilters && matching.length < minContext) {
+            // Min context filter is on and we have failed it.
+            passedFilters = false;
+        }
+        
+        if(passedFilters && multContext * averageMinLength >= matching.length) {
+            // Mult context filter is on and we have failed it; we aren't at
+            // least multContext times as long as the average length of the min
+            // unique matches we contain.
+            passedFilters = false;
+        }
+        
+        if(passedFilters) {
+            // We passed all the filters. Add in matchings for the bases this
+            // maximal unique match covers.
+            
+            for(size_t i = matching.start; i < matching.start + matching.length;
+                i++) {
+                
+                // For each position it covers, record the matching on that
+                // position.
+                matchings[i].insert(matching.location);
+                
+                // Bump the matching's location over by 1 for the next base.
+                // We're working on the copy that the range for loop made rather
+                // than the original.
+                matching.location.addLocalOffset(1);
+            }
+        } else {
+            // We failed at least one filter.
+            
+            // We neet to blacklist all the bases in this match, so they can't
+            // map (without credit). Any mapping from some other mutually
+            // overlapping maximal unique match would necessarily be
+            // inconsistent with this maximal unique match, and we should
+            // prevent that matching even if we can't justify our own.
+            
+            for(size_t i = matching.start; i < matching.start + matching.length;
+                i++) {
+                // Blacklist each involved query position.
+                blacklist[i] = true;
+            }
+        }   
+        
+        // The next maximal matching has to use the minimal matchings that come
+        // later.
+        minMatchingsUsed += minMatchingsTaken;
     }
     
     // What mappings will we return? Make sure it is big enough; it should
@@ -227,8 +327,10 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
     
     for(size_t i = leftmostMappable; i <= rightmostMappable; i++) {
         // For every mappable position between those two, inclusive.
-        if(matchings[i].size() == 1) {
-            // If the position was matched to exactly one reference position...
+        if(!blacklist[i] && matchings[i].size() == 1) {
+            // If no matching for the position failed the filters, and the
+            // position was matched to exactly one reference position...
+            
             // TODO: Account for ranges here. Should be exactly one merged
             // position.
             
