@@ -4,7 +4,7 @@
 #include <vector>
 
 std::vector<NaturalMappingScheme::Matching>
-    NaturalMappingScheme::findMaxMatchings(const std::string& query) {
+    NaturalMappingScheme::findMaxMatchings(const std::string& query) const {
  
     // What matchings have we found?
     std::vector<Matching> toReturn;
@@ -67,7 +67,7 @@ std::vector<NaturalMappingScheme::Matching>
 }
 
 std::vector<NaturalMappingScheme::Matching>
-    NaturalMappingScheme::findMinMatchings(const std::string& query) {
+    NaturalMappingScheme::findMinMatchings(const std::string& query) const {
 
     // What matchings have we found?
     std::vector<Matching> toReturn;
@@ -156,239 +156,90 @@ std::vector<NaturalMappingScheme::Matching>
 std::vector<Mapping> NaturalMappingScheme::naturalMap(
     const std::string& query) const {
     
-    // TODO: This could be dramatically simpler if we had a nice way to ban
-    // things from mapping without making sure to never match.
+    // We need to find all the positions that map under the natural mapping
+    // scheme without credit.
+    
+    // A base maps if:
+    // It can't get to either end of the query without being unique.
+    // All maximal unique matchings it is part of agree on where to place it.
+    
+    // So we can start at the end of the leftmost minimal unique match, and go
+    // through the beginning of the rightmost (inclusive). Since anything
+    // outside those can get to the end of the query without being unique.
+    
+    // Then we can look at all the maximal unique matches and apply them to
+    // actual query bases.
+    
+    // Then we can apply credit in another function.
+    
+    // Where will we keep unique matchings by base? We store them as sets of
+    // TextPositions to which each base has been matched.
+    std::vector<std::set<TextPosition>> matchings(query.size());    
+    
+    // Get the min and max matchings.
+    std::vector<Matching> minMatchings = findMinMatchings(query);
+    std::vector<Matching> maxMatchings = findMaxMatchings(query);
+    
+    for(Matching matching : maxMatchings) {
+        // For each maximal unique match...
+        for(size_t i = matching.start; i < matching.start + matching.length;
+            i++) {
+            
+            // For each position it matches, record the matching on that
+            // position.
+            matchings[i].insert(matching.location);
+            
+            // Bump the matching's location over by 1 for the next base. We're
+            // working on the copy that the range for loop made rather than the
+            // original.
+            matching.location.addLocalOffset(1);
+        }
+    }
     
     // What mappings will we return? Make sure it is big enough; it should
     // default to unmapped.
     std::vector<Mapping> mappings(query.size());
     
-    // Where will we keep matchings? We store them as vectors of TextPositions
-    // to which each base has been matched.
-    std::vector<std::vector<TextPosition>> matchings(query.size());
-    
-    // When we retract bases, we'll call this to handle collating matchings into
-    // mappings.
-    std::function<void(size_t)> makeMapping = [&](size_t retracted) {
-        Log::debug() << "Making mappings for " << retracted << std::endl;
-        
-        // We found all the strings that can overlap this retracted
-        // character, so map it if possible.
-        if(matchings[retracted].size() > 0) {
-            // There were some matchings for this base
-            
-            // Do they all agree?
-            bool matchingsAgree = true;
-            
-            for(size_t i = 1; i < matchings[retracted].size(); i++) {
-                // For each of them after the first
-                
-                if(matchings[retracted][i] != matchings[retracted][0]) {
-                    // Note if it disagrees
-                    matchingsAgree = false;
-                    break;
-                }
-            }
-            
-            if(matchingsAgree) {
-                // Make a mapping to this place all the matchings agree on.
-                mappings[retracted] = Mapping(matchings[retracted][0]);
-            } else {
-                // If they disagree we stay unmapped.
-                mappings[retracted] = Mapping();
-            }
-        } else {
-            // If there are no matchings we also stay unmapped.
-            mappings[retracted] = Mapping();
-        }
-    };
-    
-    // Start with everything selected.
-    FMDPosition results = index.getCoveringPosition();
-    
-    // What is the end (inclusive) of the shortest unique string up against the
-    // left edge? Start past the end.
-    int64_t leftmostMappable = query.size();
-    
-    // And the beginning of the shortest unique string up against the right
-    // edge? Start past the beginning.
-    int64_t rightmostMappable = -1;
-    
-    // How many characters are currently searched?
-    size_t patternLength = 0;
-    
-    for(size_t i = query.size() - 1; i != (size_t) -1; i--) {
-        // For each position in the query from right to left
-        
-        // We're going to extend backward with this new base.
-        FMDPosition extended = results;
-        index.extendLeftOnly(extended, query[i]);
-        
-        
-        while(extended.isEmpty(mask)) {
-            // If you can't extend, retract until you can. TODO: Assumes we can
-            // find at least one result for any character.
-            
-            // We're retracting this base, so nothing more can overlap it. Safe
-            // to map.
-            if((int64_t) i <= rightmostMappable) {
-                // This base is lefter than the rightmost base that can't sneak
-                // ambiguity out the right.
-                
-                // Make some mappings for it if it was consistently matched.
-                makeMapping(i + patternLength);
-            }
-            
-            // Retract the character
-            FMDPosition retracted = results;
-            // Make sure to drop characters from the total pattern length.
-            index.retractRightOnly(retracted, --patternLength);
-            
-            // Try extending again
-            extended = retracted;
-            index.extendLeftOnly(extended, query[i]);
-            
-            // Say that last step we came from retracted.
-            results = retracted;
-        }
-        
-        // We successfully extended.
-        patternLength++;
-        
-        if(extended.getLength(mask) == 1) {
-            // We are currently unique.
-            
-            // Grab the BWT index of the only selected BWT position.
-            // TODO: this is going to be super-hard to do with ranges.
-            int64_t bwtIndex = extended.getResult(mask);
-            
-            // Work out the text position we have found. This corresponds to
-            // the newly added character.
-            TextPosition location = index.locate(bwtIndex);
-            
-            if(results.getLength(mask) == 1 && patternLength > minContext) {
-                // We were previously unique, and we didn't just add the 1 base
-                // to bring us up to minContext. We just need to add a matching
-                // for this base.
-                
-                Log::debug() << "New unique position " << location << " len " << 
-                    patternLength << " = " << i << std::endl;
-                
-                if(patternLength >= minContext) {
-                    // This is long enough to care about.
-                    
-                    Log::debug() << "\tAdding matching " <<
-                        matchings[i].size() << " for " << i << " = " <<
-                        location << std::endl;
-                    
-                    // Say we match this query character to this text position.
-                    matchings[i].push_back(location);
-                }
-                
-            } else {
-                // We are newly unique, or just added the 1 base to bring us up
-                // to minContext.
-                
-                if((int64_t) i > rightmostMappable) {
-                    // This is the rightmost (first) mappable base, since it
-                    // can't get an ambiguous string to the right edge.
-                    rightmostMappable = i;
-                }
-                
-                Log::debug() << "Gained uniqueness at " << location << 
-                    " len " << patternLength << " = " << i << std::endl;
-                    
-                Log::debug() << "Pattern length " << patternLength <<
-                    " vs min context " << minContext <<
-                    " vs rightmost mappable position " << rightmostMappable <<
-                    std::endl;
-                
-                if(patternLength >= minContext) {
-                    // This is long enough to care about.
-                
-                    for(size_t j = 0; 
-                        j < patternLength && i + j <= rightmostMappable; j++) {
-                        // Go through and add a matching for each selected base
-                        // that isn't so far right it was involved in non-unique
-                        // things touching the edge.
-                            
-                        // Make a new TextPosition to express where we are
-                        // mapping to.
-                        TextPosition mappedLocation = location;
-                        mappedLocation.addLocalOffset(j);
-                        
-                        Log::debug() << "\tAdding matching " << 
-                            matchings[i].size() << " for " << i + j << " = " <<
-                            mappedLocation << std::endl;
-                        
-                        // Match to it.
-                        matchings[i + j].push_back(mappedLocation);
-                    }
-                }
-                
-            }
-            
-        } else if(i + patternLength < query.size()) {
-            // We are not unique, but we don't but up against the right edge.
-            // This means that we can't get an ambiguous string from this new
-            // base to the end of the query.
-            
-            if((int64_t) i > rightmostMappable) {
-                //Note that we can match for this current base, if we ever find
-                // a unique string for it.
-                rightmostMappable = i;
-            }
-            
-        }
-        
-        // Save the results after doing this position so we can do the next
-        // query position.
-        results = extended;
+    if(minMatchings.size() == 0) {
+        // There were not any unique matchings actually. Just say everything is
+        // unmapped.
+        return mappings;
     }
     
-    // Now we have made it to the left edge of the query, and seen all the
-    // unique strings that matter.
+    // Otherwise we know there is at least one unique match.
     
-    Log::debug() << "Doing final retractions" << std::endl;
+    // What is the leftmost min unique matching? They are in order from right to
+    // left.
+    Matching leftmostMinMatching = minMatchings[minMatchings.size() - 1];
     
-    while(results.getLength(mask) == 1 && patternLength != 0) {
-        // Retract until we aren't unique again. (We assume we are guaranteed to
-        // at some point become non-unique.)
+    // What is the rightmost min unique matching? They are in order from right
+    // to left.
+    Matching rightmostMinMatching = minMatchings[0];
+    
+    // What is the leftmost position that can't get a non-unique context over
+    // the left edge?
+    size_t leftmostMappable = leftmostMinMatching.start +
+        leftmostMinMatching.length - 1;
         
-        if((int64_t) patternLength <= (int64_t) rightmostMappable) {
-            // This base is lefter than the rightmost base that can't sneak
-            // ambiguity out the right.
+    // What is the rightmost position that can't get a non-unique context over
+    // the right edge?
+    size_t rightmostMappable = rightmostMinMatching.start;
+    
+    for(size_t i = leftmostMappable; i <= rightmostMappable; i++) {
+        // For every mappable position between those two, inclusive.
+        if(matchings[i].size() == 1) {
+            // If the position was matched to exactly one reference position...
+            // TODO: Account for ranges here. Should be exactly one merged
+            // position.
             
-            // Make some mappings for it if it was consistently matched.
-            makeMapping(patternLength);
+            // Grab that one TextPosition and make a Mapping to it for this
+            // query base.
+            mappings[i] = Mapping(*(matchings[i].begin()));
         }
-        
-        // Retract that base and move on to the next one. TODO: Can we just get
-        // the point at which we would get more results and do the whole run to
-        // there at once somehow?
-        FMDPosition retracted = results;
-        index.retractRightOnly(retracted, --patternLength);
-        
-        // Update results with the retracted version.
-        results = retracted;
     }
     
-    Log::debug() << "Ended at " << patternLength << " with " <<
-        results.getLength(mask) << " results." << std::endl;
-        
-    Log::debug() << "Non-unique substring: " <<
-        query.substr(0, patternLength) << std::endl;
-        
-    Log::debug() << "Result count check: " <<
-        LOG_LAZY(index.count(query.substr(0, patternLength)).getLength(mask)) <<
-        std::endl;
-    
-    // Once we retract until the search is not unique, we're at a base that can
-    // sneak ambiguity out the left, so we shouldn't map it.
-    
-    // Return the mappings.
+    // Now we've made all the mappings we need.
     return mappings;
-        
 }
 
 void NaturalMappingScheme::map(const std::string& query,
