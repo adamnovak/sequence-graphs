@@ -808,7 +808,7 @@ main(
             // Hiding our parameters by sneaking an option struct into a closure
             // seems a bit odd...
         
-            if(options["mapType"].as<std::string>() == "LRExact") {
+            if(options["mapType"].as<std::string>() == "LRexact") {
                 // We want an LRMappingScheme
                 LRMappingScheme* scheme = new LRMappingScheme(index, ranges,
                     mask);
