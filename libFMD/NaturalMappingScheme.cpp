@@ -16,7 +16,8 @@ std::vector<NaturalMappingScheme::Matching>
     size_t patternLength = 0;
     
     for(size_t i = query.size() - 1; i != (size_t) -1; i--) {
-        // For each position in the query from right to left
+        // For each position in the query from right to left, we're going to
+        // consider any maximal unique matches with left endpoints here.
         
         // We're going to extend backward with this new base.
         FMDPosition extended = results;
@@ -87,7 +88,8 @@ std::vector<NaturalMappingScheme::Matching>
     bool mustRetract = false;
     
     for(size_t i = query.size() - 1; i != (size_t) -1; i--) {
-        // For each position in the query from right to left
+        // For each position in the query from right to left, we're going to
+        // consider any minimal unique matches with left endpoints here.
         
         // Retract on the right until we can successfully extend on the left
         // without running out of results.
@@ -145,13 +147,15 @@ std::vector<NaturalMappingScheme::Matching>
         }
     }
     
-    // When we get here, we already know we retracted as much as we copuld for
+    // When we get here, we already know we retracted as much as we could for
     // the leftmost extension, so there are no more results to report.
     
     // This works: if there were a shorter unique match on the right starting at
     // this position, we would have retracted to find it. And if there were a
     // shorter unique match on the left ending at this position, we would have
     // already reported it and not reported any more until we retracted.
+    
+    // Results will also come out in descending order by left endpoint.
     
     return toReturn;
 }
@@ -201,7 +205,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
     size_t minMatchingsUsed = 0;
     
     for(Matching matching : maxMatchings) {
-        Log::debug() << "Max matching " << matching.start << " - " <<
+        Log::info() << "Max matching " << matching.start << " - " <<
             matching.start + matching.length << " @ " << matching.location <<
             std::endl;
     
@@ -229,27 +233,58 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
         // matching? There will be at least one.
         size_t minMatchingsTaken = 0;
         
+        // How many of those are non-overlapping?
+        size_t nonOverlapping = 0;
+        
+        // What was the left endpoint of the last non-overlapping minimal unique
+        // matching we counted? We need this in order to implement the optimal
+        // greedy algorithm for the "Activity Selection Problem"
+        // <http://en.wikipedia.org/wiki/Activity_selection_problem>. Basically,
+        // when reading from right to left, we can get the maximum number of
+        // non-overlapping intervals by taking the non-overlapping interval with
+        // the largest left endpoint (which, conveniently, we will encounter
+        // first).
+        size_t previousLeftEndpoint = query.size();
+        
         while(minMatchingsUsed + minMatchingsTaken < minMatchings.size() && 
             minMatchings[minMatchingsUsed + minMatchingsTaken].start >=
             matching.start) {
             
-            Log::debug() << "\tContains min matching " << 
+            // What's the next min matching?
+            const Matching& minMatching = minMatchings[minMatchingsUsed +
+                minMatchingsTaken];
+            
+            Log::info() << "\tContains min matching " << 
                 minMatchingsUsed + minMatchingsTaken << ": " <<
-                minMatchings[minMatchingsUsed + minMatchingsTaken].start <<
-                " - " <<
-                minMatchings[minMatchingsUsed + minMatchingsTaken].start +
-                minMatchings[minMatchingsUsed + minMatchingsTaken].length <<
-                " @ " <<
-                minMatchings[minMatchingsUsed + minMatchingsTaken].location <<
-                std::endl;
+                minMatching.start << " - " <<
+                minMatching.start + minMatching.length << " @ " <<
+                minMatching.location << std::endl;
+            
+            if(minMatching.start + minMatching.length <= previousLeftEndpoint) {
+                // This min matching does not overlap the last non-overlapping
+                // matching we collected. (Remember, it's start and length, so
+                // start is inclusive and start+length is exclusive.) Since
+                // we're taking min matchings in order of descending left
+                // endpoint, it also must have the greatest left endpoint. So we
+                // need to count it as non- overlapping and look only to the
+                // left of it.
+                nonOverlapping++;
+                previousLeftEndpoint = minMatching.start;
+                
+                Log::info() <<
+                    "\t\tMatching is on maximal non-overlapping path" <<
+                    std::endl;
+            }
             
             // Take matchings while they start further right than our start,
             // until we run out.
             minMatchingsTaken++;
+            
+            
         }
         
-        Log::debug() << "\tTook " << minMatchingsTaken << " min matches" <<
-            std::endl;
+        Log::info() << "\tTook " << minMatchingsTaken << " min matches, " <<
+            nonOverlapping << " non-overlapping" << std::endl;
         
         if(minMatchingsTaken == 0) {
             Log::critical() << "\tDoes not contain min matching " << 

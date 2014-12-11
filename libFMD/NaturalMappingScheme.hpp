@@ -87,13 +87,13 @@ protected:
     
     /**
      * Find all of the maximal unique matchings between query string characters
-     * and the reference, in order from right to left.
+     * and the reference, in descending order by left endpoint.
      */
     std::vector<Matching> findMaxMatchings(const std::string& query) const;
         
     /**
      * Find all of the minimal unique matchings between query string characters
-     * and the reference, in order from right to left.
+     * and the reference, in descending order by left endpoint.
      */
     std::vector<Matching> findMinMatchings(const std::string& query) const;
     
