@@ -205,7 +205,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
     size_t minMatchingsUsed = 0;
     
     for(Matching matching : maxMatchings) {
-        Log::info() << "Max matching " << matching.start << " - " <<
+        Log::debug() << "Max matching " << matching.start << " - " <<
             matching.start + matching.length << " @ " << matching.location <<
             std::endl;
     
@@ -254,7 +254,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             const Matching& minMatching = minMatchings[minMatchingsUsed +
                 minMatchingsTaken];
             
-            Log::info() << "\tContains min matching " << 
+            Log::debug() << "\tContains min matching " << 
                 minMatchingsUsed + minMatchingsTaken << ": " <<
                 minMatching.start << " - " <<
                 minMatching.start + minMatching.length << " @ " <<
@@ -271,7 +271,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
                 nonOverlapping++;
                 previousLeftEndpoint = minMatching.start;
                 
-                Log::info() <<
+                Log::debug() <<
                     "\t\tMatching is on maximal non-overlapping path" <<
                     std::endl;
             }
@@ -283,7 +283,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             
         }
         
-        Log::info() << "\tTook " << minMatchingsTaken << " min matches, " <<
+        Log::debug() << "\tTook " << minMatchingsTaken << " min matches, " <<
             nonOverlapping << " non-overlapping" << std::endl;
         
         if(minMatchingsTaken == 0) {
