@@ -205,14 +205,14 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
     size_t minMatchingsUsed = 0;
     
     for(Matching matching : maxMatchings) {
-        Log::info() << "Max matching " << matching.start << " - " <<
+        Log::debug() << "Max matching " << matching.start << " - " <<
             matching.start + matching.length << " @ " << matching.location <<
             std::endl;
             
         if(matching.length < ignoreMatchesBelow) {
             // This matching is too short even to prevent mapping on bases it
             // overlaps. Skip it entirely. Pretend it isn't even there.
-            Log::info() << "\tSkipping matching entirely due to length " <<
+            Log::debug() << "\tSkipping matching entirely due to length " <<
                 matching.length << " < " << ignoreMatchesBelow << std::endl;
             continue;
         }
@@ -293,7 +293,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             
         }
         
-        Log::info() << "\tTook " << minMatchingsTaken << " min matches, " <<
+        Log::debug() << "\tTook " << minMatchingsTaken << " min matches, " <<
             nonOverlapping << " non-overlapping" << std::endl;
         
         if(minMatchingsTaken == 0) {
@@ -360,7 +360,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             // Hamming distance lower bound filter is on and we have failed it.
             passedFilters = false;
             
-            Log::info() << "\tFailed Hamming filter: " << nonOverlapping <<
+            Log::debug() << "\tFailed Hamming filter: " << nonOverlapping <<
                 " < " << minHammingBound << std::endl;
         }
         
