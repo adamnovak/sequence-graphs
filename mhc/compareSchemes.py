@@ -79,30 +79,25 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         """
         
         # Plan out all the schemes as mismatch, credit, min_context,
-        # add_context, mult_context, map_type
+        # add_context, mult_context, ignore_below, hamming_bound, map_type
         return set([
-            # Exact credit (tolerating 1 mismatch) min various, natural
-            # Need to beat this. Also wanted to see it out further.
-            (True, True, 20, None, None, "natural"),
-            (True, True, 50, None, None, "natural"),
-            (True, True, 100, None, None, "natural"),
-            (True, True, 150, None, None, "natural"),
-            (True, True, 200, None, None, "natural"),
-            # Exact credit mult various (automatically tolerates mismatches)
-            # Need to beat this too.
-            (False, True, None, None, 2.0, "LRexact"),
-            (False, True, None, None, 4.0, "LRexact"),
-            (False, True, None, None, 6.0, "LRexact"),
-            (False, True, None, None, 8.0, "LRexact"),
             # Exact credit (tolerating 1 mismatch) mult various, natural
-            # Thing under test
-            (True, True, None, None, 2.0, "natural"),
-            (True, True, None, None, 4.0, "natural"),
-            (True, True, None, None, 6.0, "natural"),
-            (True, True, None, None, 8.0, "natural"),
-            # LR Inexact Credit Mult 4 (current winner)
-            # Best known
-            (True, True, None, None, 4.0, "LRexact")
+            # Current best natural thing.
+            (True, True, None, None, 2.0, None, None, "natural"),
+            (True, True, None, None, 4.0, None, None, "natural"),
+            (True, True, None, None, 6.0, None, None, "natural"),
+            (True, True, None, None, 8.0, None, None, "natural"),
+            # Exact credit (tolerating 1 mismatch) with Hamming bound and
+            # ignoring super short things.
+            # Scheme under test
+            (True, True, None, None, None, 10, 1, "natural"),
+            (True, True, None, None, None, 10, 2, "natural"),
+            (True, True, None, None, None, 10, 3, "natural"),
+            (True, True, None, None, None, 10, 4, "natural"),
+            (True, True, None, None, None, 10, 5, "natural"),
+            (True, True, None, None, None, 10, 6, "natural"),
+            (True, True, None, None, None, 10, 7, "natural"),
+            (True, True, None, None, None, 10, 8, "natural")
             
         ])
 
@@ -117,7 +112,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         scheme_plan = self.getSchemePlan()
         
         for mismatch, credit, min_context, add_context, mult_context, \
-            map_type in scheme_plan:
+            ignore_below, hamming_bound, map_type in scheme_plan:
             # Unpack each planned scheme
             
             # Start out with no configuration arguments
@@ -169,6 +164,27 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 # into the scheme name since it needs to be a valid file
                 # extension.
                 scheme_name += "Mult{}".format(mult_context).replace(".", "p")
+                
+            if ignore_below is not None:
+                # For the natrual mapping scheme, require a minimum length to
+                # even count a maximum unique match (so short by-chance ones
+                # can't cause conflicts that blacklist bases.)
+                extra_args.append("--ignoreMatchesBelow")
+                extra_args.append(str(ignore_below))
+                
+                # Mention it in the scheme name
+                scheme_name += "Ign{}".format(ignore_below)
+                
+            if hamming_bound is not None:
+                # For the natural mapping scheme, don't map on a maximum unique
+                # match unless we can get a lower bound on its Hamming distance
+                # from all other reference locations that is at least this high.
+                extra_args.append("--minHammingBound")
+                extra_args.append(str(hamming_bound))
+                
+                # Mention it in the scheme name
+                scheme_name += "Ham{}".format(hamming_bound)
+                
                 
             # Yield the name with the args.
             yield (scheme_name, extra_args)
