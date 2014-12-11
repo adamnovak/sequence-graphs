@@ -52,6 +52,23 @@ public:
      */
     size_t minContext = 0;
     
+    /**
+     * What is the minimum length that a maximal unique match has to be to even
+     * contribute to conflicts? Maximal unique matches shorter than this will be
+     * completely ignored, and won't be able to stop any bases from mapping on
+     * other maximal unique matches.
+     */
+    size_t ignoreMatchesBelow = 0;
+    
+    /**
+     * How many non-overlapping minimal unique matches does a maximal unique
+     * match need in order to map?
+     *
+     * This is a lower bound on the maximal unique match's Hamming distance from
+     * every other place in the reference except the place it mapped to.
+     */
+    size_t minHammingBound = 0;
+    
 protected:
     /**
      * Map the given query string, producing a vector of Mappings. Does not

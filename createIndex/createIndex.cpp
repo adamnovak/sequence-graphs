@@ -680,7 +680,13 @@ main(
             "Merging scheme (\"natural\" or \"LRexact\")")
         ("mismatches", boost::program_options::value<size_t>()
             ->default_value(0), 
-            "Maximum allowed number of mismatches");
+            "Maximum allowed number of mismatches")
+        ("ignoreMatchesBelow", boost::program_options::value<size_t>()
+            ->default_value(0), 
+            "Length below which to ignore maximal unique matches")
+        ("minHammingBound", boost::program_options::value<size_t>()
+            ->default_value(0), 
+            "Minimum Hamming distance lower bound on a maximum unique match");
         
     // And set up our positional arguments
     boost::program_options::positional_options_description positionals;
@@ -831,6 +837,10 @@ main(
                 scheme->multContext = options["multContext"].as<double>();
                 scheme->credit = creditBool;
                 scheme->z_max = options["mismatches"].as<size_t>();
+                scheme->ignoreMatchesBelow = options[
+                    "ignoreMatchesBelow"].as<size_t>();
+                scheme->minHammingBound = options[
+                    "minHammingBound"].as<size_t>();
                 
                 return (MappingScheme*) scheme;
             } else {

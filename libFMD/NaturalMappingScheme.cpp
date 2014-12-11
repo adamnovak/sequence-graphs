@@ -205,9 +205,17 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
     size_t minMatchingsUsed = 0;
     
     for(Matching matching : maxMatchings) {
-        Log::debug() << "Max matching " << matching.start << " - " <<
+        Log::info() << "Max matching " << matching.start << " - " <<
             matching.start + matching.length << " @ " << matching.location <<
             std::endl;
+            
+        if(matching.length < ignoreMatchesBelow) {
+            // This matching is too short even to prevent mapping on bases it
+            // overlaps. Skip it entirely. Pretend it isn't even there.
+            Log::info() << "\tSkipping matching entirely due to length " <<
+                matching.length << " < " << ignoreMatchesBelow << std::endl;
+            continue;
+        }
     
         // For each maximal unique match (always nonoverlapping) from right to
         // left...
@@ -233,7 +241,9 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
         // matching? There will be at least one.
         size_t minMatchingsTaken = 0;
         
-        // How many of those are non-overlapping?
+        // How many of those are non-overlapping? We know this maximal unique
+        // match is at least this Hamming distance away from any other places in
+        // the reference.
         size_t nonOverlapping = 0;
         
         // What was the left endpoint of the last non-overlapping minimal unique
@@ -283,7 +293,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             
         }
         
-        Log::debug() << "\tTook " << minMatchingsTaken << " min matches, " <<
+        Log::info() << "\tTook " << minMatchingsTaken << " min matches, " <<
             nonOverlapping << " non-overlapping" << std::endl;
         
         if(minMatchingsTaken == 0) {
@@ -344,6 +354,14 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             Log::debug() << "\tFailed mult context filter: " <<
                 multContext * averageMinLength << " > " << matching.length <<
                 std::endl;
+        }
+        
+        if(passedFilters && nonOverlapping < minHammingBound) {
+            // Hamming distance lower bound filter is on and we have failed it.
+            passedFilters = false;
+            
+            Log::info() << "\tFailed Hamming filter: " << nonOverlapping <<
+                " < " << minHammingBound << std::endl;
         }
         
         if(passedFilters) {
