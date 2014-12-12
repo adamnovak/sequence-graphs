@@ -179,16 +179,6 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
     
     // Then we can apply credit in another function.
     
-    // Where will we keep unique matchings by base? We store them as sets of
-    // TextPositions to which each base has been matched.
-    std::vector<std::set<TextPosition>> matchings(query.size());
-    
-    // We also need a blacklist to note bases that were part of a maximal unique
-    // match that was rejected. They can't be allowed to map inconsistently with
-    // that maximal match, which translates into not being able to map at all
-    // (since it was maximal) until credit comes along.
-    std::vector<bool> blacklist(query.size());
-    
     // Get the min and max matchings.
     std::vector<Matching> minMatchings = findMinMatchings(query);
     std::vector<Matching> maxMatchings = findMaxMatchings(query);
@@ -197,6 +187,12 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
         Log::trace() << "Min matching: " << m.start << " - " <<
             m.start + m.length << std::endl;
     }
+    
+    // We're creating a list of all the SyntenyBlocks.
+    std::vector<SyntenyBlock> syntenyBlocks;
+    
+    // We need a SyntenyBlock to be adding Matchings to.
+    SyntenyBlock block;
     
     // We need to work out which min matchings belong to each max matching. This
     // holds how many min matchings have been used up and were contained in
@@ -220,7 +216,8 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
         // For each maximal unique match (always nonoverlapping) from right to
         // left...
         
-        // See if this max matching passes the criteria for inclusion.
+        // See if this max matching is good enough to attach to the previous
+        // one, or if we need to make a new SyntenyBlock.
         
         while(minMatchings[minMatchingsUsed].start + 
             minMatchings[minMatchingsUsed].length > matching.start +
@@ -289,8 +286,6 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             // Take matchings while they start further right than our start,
             // until we run out.
             minMatchingsTaken++;
-            
-            
         }
         
         Log::debug() << "\tTook " << minMatchingsTaken << " min matches, " <<
@@ -327,81 +322,99 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             totalMinLength += minMatchings[i].length;
         }
         
-        // Calculate the average length of involved minimal unique matches.
-        double averageMinLength = (double) totalMinLength / 
-            (double) minMatchingsTaken;
+        // OK, now we know everything we need to know about this maximal unique
+        // matching. We just need to figure out if it should connect with the
+        // current SyntanyBlock or create a new one, and then add the matching's
+        // contribution to the block's statistics.
+        
+        if(!block.isConsistent(matching) || !block.worthConnecting(matching,
+            nonOverlapping)) {
             
-        Log::debug() << "\tAverage minimal unique match length: " <<
-            averageMinLength << std::endl;
+            // This matching can't go in the current block, so start a new
+            // block. But save the old one first.
+            syntenyBlocks.push_back(block);
+            block = SyntenyBlock();
+        }
+        
+        // Put this matching into this block, sending along the statistics that
+        // are needed to see if the block turns out to be good enough. TODO:
+        // Won't we be copying the vector all the time? Make this muatble.
+        block = block.extendLeft(matching, minMatchingsTaken, totalMinLength,
+            nonOverlapping);
     
-        // This flag keeps track of whether we passed all the filters on
-        // admissible max contexts to map on.
-        bool passedFilters = true;
+        // The next maximal matching has to use the minimal matchings that come
+        // later.
+        minMatchingsUsed += minMatchingsTaken;
+    }
     
-        if(passedFilters && matching.length < minContext) {
-            // Min context filter is on and we have failed it.
-            passedFilters = false;
+    if(!block.maximalMatchings.empty()) {
+        // Save the last block if it had anything in it.
+        syntenyBlocks.push_back(block);
+    }
+    
+    // See which of the completed synteny blocks pass the filters.
+    std::vector<bool> passedFilters = filter(syntenyBlocks);
+    
+    // Where will we keep unique matchings by base? We store them as sets of
+    // TextPositions to which each base has been matched.
+    std::vector<std::set<TextPosition>> matchings(query.size());
+    
+    // We also need a blacklist to note bases that were part of a maximal unique
+    // match that was rejected. They can't be allowed to map inconsistently with
+    // that maximal match, which translates into not being able to map at all
+    // (since it was maximal) until credit comes along.
+    std::vector<bool> blacklist(query.size());
+    
+    for(size_t i = 0; i < syntenyBlocks.size(); i++) {
+        // For each SyntenyBlock we made, we need to see if it gets Mappings or
+        // not.
+    
+        if(passedFilters[i]) {
+            // This block passed all the filters. Add in matchings for the bases
+            // this maximal unique match covers.
             
-            Log::debug() << "\tFailed min context filter" << std::endl;
-        }
-        
-        if(passedFilters && multContext * averageMinLength >= matching.length) {
-            // Mult context filter is on and we have failed it; we aren't at
-            // least multContext times as long as the average length of the min
-            // unique matches we contain.
-            passedFilters = false;
+            for(Matching matching : syntenyBlocks[i].maximalMatchings) {
+                // For each maximal matching in the block, we need to make some
+                // mappings.
             
-            Log::debug() << "\tFailed mult context filter: " <<
-                multContext * averageMinLength << " > " << matching.length <<
-                std::endl;
-        }
-        
-        if(passedFilters && nonOverlapping < minHammingBound) {
-            // Hamming distance lower bound filter is on and we have failed it.
-            passedFilters = false;
-            
-            Log::debug() << "\tFailed Hamming filter: " << nonOverlapping <<
-                " < " << minHammingBound << std::endl;
-        }
-        
-        if(passedFilters) {
-            // We passed all the filters. Add in matchings for the bases this
-            // maximal unique match covers.
-            
-            for(size_t i = matching.start; i < matching.start + matching.length;
-                i++) {
-                
-                Log::trace() << "Matching " << i << " to " <<
-                    matching.location << std::endl;
-                
-                // For each position it covers, record the matching on that
-                // position.
-                matchings[i].insert(matching.location);
-                
-                // Bump the matching's location over by 1 for the next base.
-                // We're working on the copy that the range for loop made rather
-                // than the original.
-                matching.location.addLocalOffset(1);
+                for(size_t i = matching.start;
+                    i < matching.start + matching.length; i++) {
+                    
+                    Log::trace() << "Matching " << i << " to " <<
+                        matching.location << std::endl;
+                    
+                    // For each position it covers, record the matching on that
+                    // position.
+                    matchings[i].insert(matching.location);
+                    
+                    // Bump the matching's location over by 1 for the next base.
+                    // We're working on the copy that the range for loop made
+                    // rather than the original.
+                    matching.location.addLocalOffset(1);
+                }
             }
         } else {
             // We failed at least one filter.
             
-            // We neet to blacklist all the bases in this match, so they can't
-            // map (without credit). Any mapping from some other mutually
-            // overlapping maximal unique match would necessarily be
-            // inconsistent with this maximal unique match, and we should
-            // prevent that matching even if we can't justify our own.
+            for(Matching matching : syntenyBlocks[i].maximalMatchings) {
             
-            for(size_t i = matching.start; i < matching.start + matching.length;
-                i++) {
-                // Blacklist each involved query position.
-                blacklist[i] = true;
+                // We need to blacklist all the bases in this match, so they
+                // can't map (without credit). Any mapping from some other
+                // mutually overlapping maximal unique match would necessarily
+                // be inconsistent with this maximal unique match, and we should
+                // prevent that matching even if we can't justify our own.
+                
+                for(size_t j = matching.start;
+                    j < matching.start + matching.length; j++) {
+                    // Blacklist each involved query position.
+                    blacklist[j] = true;
+                }
             }
-        }   
+            
+            // We don't need to blacklist the bases between matchings, since
+            // there can't be a different maximal unique match overlapping them.
+        }    
         
-        // The next maximal matching has to use the minimal matchings that come
-        // later.
-        minMatchingsUsed += minMatchingsTaken;
     }
     
     // What mappings will we return? Make sure it is big enough; it should
@@ -453,6 +466,57 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
     
     // Now we've made all the mappings we need.
     return mappings;
+}
+
+std::vector<bool> NaturalMappingScheme::filter(
+    const std::vector<NaturalMappingScheme::SyntenyBlock>& blocks) const {
+
+    std::vector<bool> toReturn;
+    
+    for(SyntenyBlock block : blocks) {
+        // This flag keeps track of whether we passed all the filters on
+        // admissible max contexts to map on.
+        bool passedFilters = true;
+    
+        if(passedFilters && block.length < minContext) {
+            // Min context filter is on and we have failed it.
+            passedFilters = false;
+            
+            Log::debug() << "\tFailed min context filter" << std::endl;
+        }
+        
+        // Compute the average length of contained minimal matchings.
+        double averageMinLength = (
+            double) block.totalMinimalExactMatchingBases / 
+            (double) block.minimalExactMatchings;
+        
+        if(passedFilters && multContext * averageMinLength >= block.length) {
+            // Mult context filter is on and we have failed it; we aren't at
+            // least multContext times as long as the average length of the min
+            // unique matches we contain.
+            passedFilters = false;
+            
+            Log::debug() << "\tFailed mult context filter: " <<
+                multContext * averageMinLength << " > " << block.length <<
+                std::endl;
+        }
+        
+        if(passedFilters && block.nonOverlapping - block.mismatches <
+            minHammingBound) {
+            
+            // Hamming distance clearance lower bound filter is on and we have
+            // failed it.
+            passedFilters = false;
+            
+            Log::debug() << "\tFailed Hamming filter: " <<
+                block.nonOverlapping << " - " << block.mismatches << " < " <<
+                minHammingBound << std::endl;
+        }
+        
+        toReturn.push_back(passedFilters);
+    }
+    
+    return toReturn;
 }
 
 void NaturalMappingScheme::map(const std::string& query,

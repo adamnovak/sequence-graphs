@@ -119,12 +119,12 @@ protected:
         /**
          * What is the first (leftmost) base in the query in this synteny block?
          */
-        size_t start;
+        size_t start = 0;
         
         /**
          * How many many bases are in the block?
          */
-        size_t length;
+        size_t length = 0;
         
         /**
          * How many minimal exact matchings are contained by the maximal exact
@@ -145,39 +145,60 @@ protected:
          */
         size_t totalMinimalExactMatchingBases = 0;
         
+        // How many non-overlapping minimal unique matchings were contained in
+        // the last maximal unique matching that was added? This is used to
+        // compute if it is worth connecting a new maximal unique matching to
+        // the block.
+        size_t lastNonOverlapping = 0;
+        
         /**
          * How many mismatches are crossed by this SyntenyBlock?
          */
         size_t mismatches = 0;
         
-        /**
-         * Make a new SyntenyBlock of a single maximal unique Matching.
-         */
-        inline SyntenyBlock(Matching maximal): maximalMatchings(), 
-            start(maximal.start), length(maximal.length) {
-            
-            // Record that we're keeping this maximal matching.
-            maximalMatchings.push_back(maximal);
-        }
+        // Default constructor is OK, we always start empty.
         
         // Default copy constructor, assignment operator, and so on are fine.
         
         /**
          * Extend a SyntenyBlock with the next maximal unique Matching to the
-         * left.
+         * left. Takes the new Matching, the number of minimal exact matchings
+         * it contains, the number of total bases in those matchings, and the
+         * numebr of those matchings that are non-overlapping.
          */
-        inline SyntenyBlock extendLeft(Matching maximal) const {
+        inline SyntenyBlock extendLeft(Matching maximal,
+            size_t newMinimalExatMatchings,
+            size_t newMinimalExactMatchingBases,
+            size_t newNonOverlapping) const {
+            
             // Make a new SyntenyBlock to extend.
             SyntenyBlock toReturn = *this;
             
             // Incur the mismatch cost
-            toReturn.mismatches += cost(maximal);
+            toReturn.mismatches += toReturn.cost(maximal);
             
-            // Grab all the bases through to the start of this new leftmost
-            // Matching.
-            toReturn.length += toReturn.start - maximal.start;
+            if(toReturn.maximalMatchings.empty()) {
+                // We were empty, so grab only the bases from this new Matching.
+                toReturn.length = maximal.length;
+            } else {
+                // Grab all the bases through to the start of this new leftmost
+                // Matching.
+                toReturn.length += toReturn.start - maximal.start;
+            }
+            
+            // Set the start position
             toReturn.start = maximal.start;
             
+            // Update all the statistics
+            toReturn.minimalExactMatchings += newMinimalExatMatchings;
+            toReturn.totalMinimalExactMatchingBases +=
+                newMinimalExactMatchingBases;
+            toReturn.nonOverlapping += newNonOverlapping;
+            
+            // Remember the nonOverlapping score of the last added matching.
+            toReturn.lastNonOverlapping = newNonOverlapping;
+            
+            // And add in the matching
             toReturn.maximalMatchings.push_back(maximal);
             
             // Return it.
@@ -189,7 +210,35 @@ protected:
          * with this maximal unique matching?
          */
         inline size_t cost(Matching maximal) const {
+            if(maximalMatchings.empty()) {
+                // It costs nothing to connect if we're empty.
+                return 0;
+            }
+        
             return start - (maximal.start + maximal.length);
+        }
+        
+        /**
+         * Given that it's possible to connect this new maximal unique matching
+         * containing the given number of non-overlapping minimal unique
+         * matchings, is it worth it?
+         */
+        inline bool worthConnecting(Matching maximal,
+            size_t newNonOverlapping) const {
+            
+            // If we are empty, it's always worth it.
+            if(maximalMatchings.empty()) {
+                return true;
+            }
+            
+            // A connection to the most recent maximal matching we have is worth
+            // it (in both directions) if the cost of the connection (in
+            // mismatches crossed) is less than or equal to the number of
+            // minimal unique matchings contained in each maximal unique
+            // matching on its own.
+            size_t connectionCost = cost(maximal);
+            return connectionCost <= newNonOverlapping &&
+                connectionCost <= lastNonOverlapping;
         }
         
         /**
@@ -199,7 +248,23 @@ protected:
          * locations the offsets are wrong.
          */
         inline bool isConsistent(Matching maximal) const {
-            throw std::runtime_error("isConsistent not implemented!");
+            if(maximalMatchings.empty()) {
+                // Anything is consistent with an empty SyntenyBlock.
+                return true;
+            }
+        
+            // How many bases from the start of this new thing to the leftmost
+            // thing we are holding?
+            size_t observedOffset = maximalMatchings.rbegin()->start -
+                maximal.start;
+            
+            // Get the position at which the new matching maps    
+            TextPosition position = maximal.location;
+            // And budge it forward by that same offset            
+            position.addLocalOffset(observedOffset);
+            
+            // Make sure it ends up being the corresponding location.
+            return position == maximalMatchings.rbegin()->location;
         }
     };
     
