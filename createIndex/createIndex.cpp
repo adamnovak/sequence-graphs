@@ -674,10 +674,10 @@ main(
         ("fastas", boost::program_options::value<std::vector<std::string> >()
             ->multitoken(),
             "FASTA files to load")
-        ("credit", "Mapping on credit for greedy scheme")
+        ("credit", "Enable mapping on credit")
         ("mapType", boost::program_options::value<std::string>()
-            ->default_value("LRexact"),
-            "Merging scheme (\"natural\" or \"LRexact\")")
+            ->default_value("LR"),
+            "Merging scheme (\"natural\" or \"LR\")")
         ("mismatches", boost::program_options::value<size_t>()
             ->default_value(0), 
             "Maximum allowed number of mismatches")
@@ -686,7 +686,8 @@ main(
             "Length below which to ignore maximal unique matches")
         ("minHammingBound", boost::program_options::value<size_t>()
             ->default_value(0), 
-            "Minimum Hamming distance lower bound on a maximum unique match");
+            "Minimum Hamming distance lower bound on a maximum unique match")
+        ("synteny", "Enable synteny for the natural mapping scheme");
         
     // And set up our positional arguments
     boost::program_options::positional_options_description positionals;
@@ -773,16 +774,10 @@ main(
         return 0;
     }
     
-    // Grab a bool for whether we'll map on credit    
-    bool creditBool = false;
-    if(options.count("credit")) {
-        creditBool = true;
-    }
-    
     // Grab the context types we are going to use to merge
     std::string mapType = options["mapType"].as<std::string>();
     
-    if(mapType != "LRexact" && mapType != "natural") {
+    if(mapType != "LR" && mapType != "natural") {
         // They gave us a map type we don't have probably.
         Log::critical() << "Invalid mapType: " << mapType << std::endl;
         return 1;
@@ -814,7 +809,7 @@ main(
             // Hiding our parameters by sneaking an option struct into a closure
             // seems a bit odd...
         
-            if(options["mapType"].as<std::string>() == "LRexact") {
+            if(options["mapType"].as<std::string>() == "LR") {
                 // We want an LRMappingScheme
                 LRMappingScheme* scheme = new LRMappingScheme(index, ranges,
                     mask);
@@ -823,7 +818,7 @@ main(
                 scheme->minContext = options["context"].as<size_t>();
                 scheme->addContext = options["addContext"].as<size_t>();
                 scheme->multContext = options["multContext"].as<double>();
-                scheme->credit = creditBool;
+                scheme->credit = options.count("credit");
                 scheme->z_max = options["mismatches"].as<size_t>();
                 
                 return (MappingScheme*) scheme;
@@ -835,12 +830,13 @@ main(
                 // Populate it
                 scheme->minContext = options["context"].as<size_t>();
                 scheme->multContext = options["multContext"].as<double>();
-                scheme->credit = creditBool;
+                scheme->credit = options.count("credit");
                 scheme->z_max = options["mismatches"].as<size_t>();
                 scheme->ignoreMatchesBelow = options[
                     "ignoreMatchesBelow"].as<size_t>();
                 scheme->minHammingBound = options[
                     "minHammingBound"].as<size_t>();
+                scheme->synteny = options.count("synteny");
                 
                 return (MappingScheme*) scheme;
             } else {

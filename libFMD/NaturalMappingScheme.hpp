@@ -3,6 +3,7 @@
 
 #include "MappingScheme.hpp"
 #include "Mapping.hpp"
+#include "Log.hpp"
 
 /**
  * Mapping scheme implementing Benedict's "natural" mapping scheme. If all
@@ -46,6 +47,11 @@ public:
      * Should credit be used to create more mappings?
      */
     bool credit = false;
+    
+    /**
+     * Should synteny blocking be used to bridge mismatches?
+     */
+    bool synteny = false;
     
     /**
      * What's the minimum context length to match on?
