@@ -99,7 +99,108 @@ protected:
          */
         inline Matching(size_t start, TextPosition location, size_t length): 
             start(start), location(location), length(length) {
-        };
+        }
+    };
+    
+    /**
+     * Keep track of a run of maximal exact matchings which we have decided form
+     * a synteny block, and ought to be presented to the filters as a group.
+     * This keeps track of all of the state that is needed to implement the
+     * various filters, as well as the information needed to actually make the
+     * mappings.
+     */
+    struct SyntenyBlock {
+        /**
+         * What maximal matchings are in this block (in right to left order)?
+         */
+        std::vector<Matching> maximalMatchings;
+    
+        // TODO: No forgery?
+        /**
+         * What is the first (leftmost) base in the query in this synteny block?
+         */
+        size_t start;
+        
+        /**
+         * How many many bases are in the block?
+         */
+        size_t length;
+        
+        /**
+         * How many minimal exact matchings are contained by the maximal exact
+         * matchings of this synteny block?
+         */
+        size_t minimalExactMatchings = 0;
+        
+        /**
+         * How many *non-overlapping* minimal exact matchings are contained by
+         * the maximal exact matchings of this SyntenyBlock?
+         */
+        size_t nonOverlapping = 0;
+        
+        /**
+         * How many bases of minimal exact matchings are contained in the
+         * maximal exact matchings of this block? We need this for calculating
+         * their average length.
+         */
+        size_t totalMinimalExactMatchingBases = 0;
+        
+        /**
+         * How many mismatches are crossed by this SyntenyBlock?
+         */
+        size_t mismatches = 0;
+        
+        /**
+         * Make a new SyntenyBlock of a single maximal unique Matching.
+         */
+        inline SyntenyBlock(Matching maximal): maximalMatchings(), 
+            start(maximal.start), length(maximal.length) {
+            
+            // Record that we're keeping this maximal matching.
+            maximalMatchings.push_back(maximal);
+        }
+        
+        // Default copy constructor, assignment operator, and so on are fine.
+        
+        /**
+         * Extend a SyntenyBlock with the next maximal unique Matching to the
+         * left.
+         */
+        inline SyntenyBlock extendLeft(Matching maximal) const {
+            // Make a new SyntenyBlock to extend.
+            SyntenyBlock toReturn = *this;
+            
+            // Incur the mismatch cost
+            toReturn.mismatches += cost(maximal);
+            
+            // Grab all the bases through to the start of this new leftmost
+            // Matching.
+            toReturn.length += toReturn.start - maximal.start;
+            toReturn.start = maximal.start;
+            
+            toReturn.maximalMatchings.push_back(maximal);
+            
+            // Return it.
+            return toReturn;
+        }
+        
+        /**
+         * How many mismatches would we need to cross if we were to extend left
+         * with this maximal unique matching?
+         */
+        inline size_t cost(Matching maximal) const {
+            return start - (maximal.start + maximal.length);
+        }
+        
+        /**
+         * Is this next maximal Matching to the left consistent with this
+         * synteny block, and therefore elligible to be a member of it? It is
+         * not consistent if it overlaps into our block, or if when we get the
+         * locations the offsets are wrong.
+         */
+        inline bool isConsistent(Matching maximal) const {
+            throw std::runtime_error("isConsistent not implemented!");
+        }
     };
     
     /**
@@ -113,6 +214,12 @@ protected:
      * and the reference, in descending order by left endpoint.
      */
     std::vector<Matching> findMinMatchings(const std::string& query) const;
+    
+    /**
+     * Given a vector of SyntenyBlocks, decide if each one passes the filters or
+     * not.
+     */
+    std::vector<bool> filter(const std::vector<SyntenyBlock>& blocks) const;
     
 };
    
