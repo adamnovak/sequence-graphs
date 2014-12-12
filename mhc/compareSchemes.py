@@ -78,27 +78,36 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         
         """
         
-        # Plan out all the schemes as mismatch, credit, min_context,
+        # Plan out all the schemes as mismatch, credit, synteny, min_context,
         # add_context, mult_context, ignore_below, hamming_bound, map_type
         return set([
             # Exact credit (tolerating 1 mismatch) mult various, natural
-            # Current best natural thing.
-            (True, True, None, None, 2.0, None, None, "natural"),
-            (True, True, None, None, 4.0, None, None, "natural"),
-            (True, True, None, None, 6.0, None, None, "natural"),
-            (True, True, None, None, 8.0, None, None, "natural"),
+            (True, True, False, None, None, 2.0, None, None, "natural"),
+            (True, True, False, None, None, 4.0, None, None, "natural"),
+            (True, True, False, None, None, 6.0, None, None, "natural"),
+            (True, True, False, None, None, 8.0, None, None, "natural"),
             # Exact credit (tolerating 1 mismatch) with Hamming bound and
             # ignoring super short things.
-            # Scheme under test
-            (True, True, None, None, None, 10, 1, "natural"),
-            (True, True, None, None, None, 10, 2, "natural"),
-            (True, True, None, None, None, 10, 3, "natural"),
-            (True, True, None, None, None, 10, 4, "natural"),
-            (True, True, None, None, None, 10, 5, "natural"),
-            (True, True, None, None, None, 10, 6, "natural"),
-            (True, True, None, None, None, 10, 7, "natural"),
-            (True, True, None, None, None, 10, 8, "natural")
-            
+            # Current best natural thing.
+            (True, True, False, None, None, None, 10, 1, "natural"),
+            (True, True, False, None, None, None, 10, 2, "natural"),
+            (True, True, False, None, None, None, 10, 3, "natural"),
+            (True, True, False, None, None, None, 10, 4, "natural"),
+            (True, True, False, None, None, None, 10, 5, "natural"),
+            (True, True, False, None, None, None, 10, 6, "natural"),
+            (True, True, False, None, None, None, 10, 7, "natural"),
+            (True, True, False, None, None, None, 10, 8, "natural"),
+            # Exact credit (tolerating 1 mismatch) with Hamming bound and
+            # ignoring super short things, but allowing synteny to rescue stuff.
+            # Scheme under test.
+            (True, True, True, None, None, None, 10, 1, "natural"),
+            (True, True, True, None, None, None, 10, 2, "natural"),
+            (True, True, True, None, None, None, 10, 3, "natural"),
+            (True, True, True, None, None, None, 10, 4, "natural"),
+            (True, True, True, None, None, None, 10, 5, "natural"),
+            (True, True, True, None, None, None, 10, 6, "natural"),
+            (True, True, True, None, None, None, 10, 7, "natural"),
+            (True, True, True, None, None, None, 10, 8, "natural")
         ])
 
     def generateSchemes(self):
@@ -111,7 +120,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # to run.
         scheme_plan = self.getSchemePlan()
         
-        for mismatch, credit, min_context, add_context, mult_context, \
+        for mismatch, credit, synteny, min_context, add_context, mult_context, \
             ignore_below, hamming_bound, map_type in scheme_plan:
             # Unpack each planned scheme
             
@@ -184,6 +193,14 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 
                 # Mention it in the scheme name
                 scheme_name += "Ham{}".format(hamming_bound)
+                
+            if synteny:
+                # Allow maximal unique matches that otherwise wouldn't pass the
+                # filters to join together.
+                extra_args.append("--synteny")
+                
+                # Mention it in the scheme name
+                scheme_name += "Syn"
                 
                 
             # Yield the name with the args.

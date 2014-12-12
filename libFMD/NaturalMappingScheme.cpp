@@ -210,7 +210,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             continue;
         }
         
-        Log::info() << "Max matching " << matching.start << " - " <<
+        Log::debug() << "Max matching " << matching.start << " - " <<
             matching.start + matching.length << " @ " << matching.location <<
             std::endl;
     
@@ -289,7 +289,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             minMatchingsTaken++;
         }
         
-        Log::info() << "\tTook " << minMatchingsTaken << " min matches, " <<
+        Log::debug() << "\tTook " << minMatchingsTaken << " min matches, " <<
             nonOverlapping << " non-overlapping" << std::endl;
         
         if(minMatchingsTaken == 0) {
@@ -332,9 +332,9 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             // Look for some reasons why we might not connect to the current
             // block and log about them.
             if(!block.isConsistent(matching)) {
-                Log::info() << "\tInconsistent with current block" << std::endl;
+                Log::debug() << "\tInconsistent with current block" << std::endl;
             } else if(!block.worthConnecting(matching, nonOverlapping)) { 
-                Log::info() <<
+                Log::debug() <<
                     "\tNot worth connecting to current block (cost " <<
                     block.cost(matching) << " vs scores " << nonOverlapping <<
                     ", " << block.lastNonOverlapping << ")" << std::endl;
@@ -351,7 +351,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             syntenyBlocks.push_back(block);
             block = SyntenyBlock();
             
-            Log::info() << "Created new block." << std::endl;
+            Log::debug() << "Created new block." << std::endl;
             
         }
         
@@ -392,13 +392,13 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             // This block passed all the filters. Add in matchings for the bases
             // this maximal unique match covers.
             
-            Log::info() << "+++ Block " << i << " passed filters." << std::endl;
+            Log::debug() << "+++ Block " << i << " passed filters." << std::endl;
             
             for(Matching matching : syntenyBlocks[i].maximalMatchings) {
                 // For each maximal matching in the block, we need to make some
                 // mappings.
             
-                Log::info() << "\tMax matching " << matching.start << " - " <<
+                Log::debug() << "\tMax matching " << matching.start << " - " <<
                     matching.start + matching.length << " @ " <<
                     matching.location << std::endl;
             
@@ -421,12 +421,12 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
         } else {
             // We failed at least one filter.
             
-             Log::info() << "--- Block " << i << " failed filters." <<
+             Log::debug() << "--- Block " << i << " failed filters." <<
                 std::endl;
             
             for(Matching matching : syntenyBlocks[i].maximalMatchings) {
             
-                Log::info() << "\tMax matching " << matching.start << " - " <<
+                Log::debug() << "\tMax matching " << matching.start << " - " <<
                     matching.start + matching.length << " @ " <<
                     matching.location << std::endl;
             
@@ -540,7 +540,7 @@ std::vector<bool> NaturalMappingScheme::filter(
             // failed it.
             passedFilters = false;
             
-            Log::info() << "\tFailed Hamming filter: " <<
+            Log::debug() << "\tFailed Hamming filter: " <<
                 block.nonOverlapping << " - " << block.mismatches << " < " <<
                 minHammingBound << std::endl;
         }
