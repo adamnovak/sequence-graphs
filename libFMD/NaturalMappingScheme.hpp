@@ -176,18 +176,19 @@ protected:
          * Extend a SyntenyBlock with the next maximal unique Matching to the
          * left. Takes the new Matching, the number of minimal exact matchings
          * it contains, the number of total bases in those matchings, and the
-         * numebr of those matchings that are non-overlapping.
+         * numebr of those matchings that are non-overlapping. Also takes the
+         * cost to incur, which only the caller knows.
          */
         inline SyntenyBlock extendLeft(Matching maximal,
             size_t newMinimalExatMatchings,
             size_t newMinimalExactMatchingBases,
-            size_t newNonOverlapping) const {
+            size_t newNonOverlapping, size_t cost) const {
             
             // Make a new SyntenyBlock to extend.
             SyntenyBlock toReturn = *this;
             
             // Incur the mismatch cost
-            toReturn.mismatches += toReturn.cost(maximal);
+            toReturn.mismatches += cost;
             
             if(toReturn.maximalMatchings.empty()) {
                 // We were empty, so grab only the bases from this new Matching.
@@ -215,44 +216,6 @@ protected:
             
             // Return it.
             return toReturn;
-        }
-        
-        /**
-         * How many mismatches would we need to cross if we were to extend left
-         * with this maximal unique matching?
-         */
-        inline size_t cost(Matching maximal) const {
-            if(maximalMatchings.empty()) {
-                // It costs nothing to connect if we're empty.
-                return 0;
-            }
-        
-            // Make each mismatch block count for 1.
-            return 1;
-            //return start - (maximal.start + maximal.length);
-        }
-        
-        /**
-         * Given that it's possible to connect this new maximal unique matching
-         * containing the given number of non-overlapping minimal unique
-         * matchings, is it worth it?
-         */
-        inline bool worthConnecting(Matching maximal,
-            size_t newNonOverlapping) const {
-            
-            // If we are empty, it's always worth it.
-            if(maximalMatchings.empty()) {
-                return true;
-            }
-            
-            // A connection to the most recent maximal matching we have is worth
-            // it (in both directions) if the cost of the connection (in
-            // mismatches crossed) is less than or equal to the number of
-            // minimal unique matchings contained in each maximal unique
-            // matching on its own.
-            size_t connectionCost = cost(maximal);
-            return connectionCost <= newNonOverlapping &&
-                connectionCost <= lastNonOverlapping;
         }
         
         /**

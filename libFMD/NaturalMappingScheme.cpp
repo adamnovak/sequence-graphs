@@ -365,7 +365,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
         // are needed to see if the block turns out to be good enough. TODO:
         // Won't we be copying the vector all the time? Make this muatble.
         block = block.extendLeft(matching, minMatchingsTaken, totalMinLength,
-            nonOverlapping);
+            nonOverlapping, cost(matching, block));
     
         // The next maximal matching has to use the minimal matchings that come
         // later.
