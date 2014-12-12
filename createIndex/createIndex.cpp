@@ -687,7 +687,8 @@ main(
         ("minHammingBound", boost::program_options::value<size_t>()
             ->default_value(0), 
             "Minimum Hamming distance lower bound on a maximum unique match")
-        ("synteny", "Enable synteny for the natural mapping scheme");
+        ("synteny", "Enable synteny for the natural mapping scheme")
+        ("flatCost", "Make synteny block gap cost flat");
         
     // And set up our positional arguments
     boost::program_options::positional_options_description positionals;
@@ -837,6 +838,7 @@ main(
                 scheme->minHammingBound = options[
                     "minHammingBound"].as<size_t>();
                 scheme->synteny = options.count("synteny");
+                scheme->flatCost = options.count("flatCost");
                 
                 return (MappingScheme*) scheme;
             } else {

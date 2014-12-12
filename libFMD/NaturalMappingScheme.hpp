@@ -54,6 +54,12 @@ public:
     bool synteny = false;
     
     /**
+     * Should costs for breaks between maximal matches in a synteny block be a
+     * flat 1, as opposed to scaling with gap length?
+     */
+    bool flatCost = false;
+    
+    /**
      * What's the minimum context length to match on?
      */
     size_t minContext = 0;
@@ -221,7 +227,9 @@ protected:
                 return 0;
             }
         
-            return start - (maximal.start + maximal.length);
+            // Make each mismatch block count for 1.
+            return 1;
+            //return start - (maximal.start + maximal.length);
         }
         
         /**
@@ -291,6 +299,50 @@ protected:
      * not.
      */
     std::vector<bool> filter(const std::vector<SyntenyBlock>& blocks) const;
+    
+    /**
+     * What should the cost be for attacking this Matching to this SyntenyBlock?
+     * Part of the MappingScheme since it needs scheme parameters.
+     */
+    inline size_t cost(Matching maximal, const SyntenyBlock& block) const {
+        if(block.maximalMatchings.empty()) {
+            // It costs nothing to connect if we're empty.
+            return 0;
+        }
+    
+        if(flatCost) {
+            // Make each mismatch block count for 1.
+            return 1;
+        } else {
+            // Use the length as the cost.
+            return block.start - (maximal.start + maximal.length);
+        }
+        // TODO: Try scanning and counting up actual mismatches.
+    }
+    
+    /**
+     * Given that it's possible to connect this new maximal unique matching
+     * containing the given number of non-overlapping minimal unique matchings
+     * to this synteny block, is it worth it? Part of the MappingScheme since it
+     * needs scheme parameters.
+     */
+    inline bool worthConnecting(Matching maximal,
+        size_t newNonOverlapping, const SyntenyBlock& block) const {
+        
+        // If we are empty, it's always worth it.
+        if(block.maximalMatchings.empty()) {
+            return true;
+        }
+        
+        // A connection to the most recent maximal matching we have is worth
+        // it (in both directions) if the cost of the connection (in
+        // mismatches crossed) is less than or equal to the number of
+        // minimal unique matchings contained in each maximal unique
+        // matching on its own.
+        size_t connectionCost = cost(maximal, block);
+        return connectionCost <= newNonOverlapping &&
+            connectionCost <= block.lastNonOverlapping;
+    }
     
 };
    

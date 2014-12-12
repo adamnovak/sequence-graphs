@@ -185,7 +185,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
     
     for(Matching m : minMatchings) { 
         Log::trace() << "Min matching: " << m.start << " - " <<
-            m.start + m.length << std::endl;
+            m.start + m.length << " (+" << m.length << ")" << std::endl;
     }
     
     // We're creating a list of all the SyntenyBlocks that we divide maximal
@@ -211,8 +211,8 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
         }
         
         Log::debug() << "Max matching " << matching.start << " - " <<
-            matching.start + matching.length << " @ " << matching.location <<
-            std::endl;
+            matching.start + matching.length << " (+" << matching.length <<
+            ") @ " << matching.location << std::endl;
     
         // For each maximal unique match (always nonoverlapping) from right to
         // left...
@@ -224,10 +224,11 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             minMatchings[minMatchingsUsed].length > matching.start +
             matching.length) {
             
-            Log::debug() << "\tDiscard min matching " << minMatchingsUsed <<
+            Log::trace() << "\tDiscard min matching " << minMatchingsUsed <<
                 ": " << minMatchings[minMatchingsUsed].start << " - " <<
                 minMatchings[minMatchingsUsed].start +
-                minMatchings[minMatchingsUsed].length << " @ " <<
+                minMatchings[minMatchingsUsed].length << " (+ " <<
+                minMatchings[minMatchingsUsed].length << ") @ " <<
                 minMatchings[minMatchingsUsed].location << std::endl;
             
             // Throw away min matchings while they end further right than our
@@ -262,7 +263,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             const Matching& minMatching = minMatchings[minMatchingsUsed +
                 minMatchingsTaken];
             
-            Log::debug() << "\tContains min matching " << 
+            Log::trace() << "\tContains min matching " << 
                 minMatchingsUsed + minMatchingsTaken << ": " <<
                 minMatching.start << " - " <<
                 minMatching.start + minMatching.length << " @ " <<
@@ -279,7 +280,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
                 nonOverlapping++;
                 previousLeftEndpoint = minMatching.start;
                 
-                Log::debug() <<
+                Log::trace() <<
                     "\t\tMatching is on maximal non-overlapping path" <<
                     std::endl;
             }
@@ -289,8 +290,23 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             minMatchingsTaken++;
         }
         
-        Log::debug() << "\tTook " << minMatchingsTaken << " min matches, " <<
-            nonOverlapping << " non-overlapping" << std::endl;
+        // We contain minMatchings[minMatchingsUsed] to
+        // minMatchings[minMatchings + minMatchingsTaken], inclusive on the low
+        // end.
+        
+        // What's the total length of all included minimal exact matches?
+        size_t totalMinLength = 0;
+        
+        for(size_t i = minMatchingsUsed;
+            i < minMatchingsUsed + minMatchingsTaken; i++) {
+            
+            // For each min matching that we contain, add in its length.
+            totalMinLength += minMatchings[i].length;
+        }
+        
+        Log::debug() << "\tTook " << minMatchingsTaken << " min matches (" <<
+            totalMinLength << "bp), " << nonOverlapping << " non-overlapping" <<
+            std::endl;
         
         if(minMatchingsTaken == 0) {
             Log::critical() << "\tDoes not contain min matching " << 
@@ -309,20 +325,6 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
                 "Maximal matching contains no minimal matchings!");
         }
         
-        // We contain minMatchings[minMatchingsUsed] to
-        // minMatchings[minMatchings + minMatchingsTaken], inclusive on the low
-        // end.
-        
-        // What's the total length of all included minimal exact matches?
-        size_t totalMinLength = 0;
-        
-        for(size_t i = minMatchingsUsed;
-            i < minMatchingsUsed + minMatchingsTaken; i++) {
-            
-            // For each min matching that we contain, add in its length.
-            totalMinLength += minMatchings[i].length;
-        }
-        
         // OK, now we know everything we need to know about this maximal unique
         // matching. We just need to figure out if it should connect with the
         // current SyntanyBlock or create a new one, and then add the matching's
@@ -333,17 +335,20 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             // block and log about them.
             if(!block.isConsistent(matching)) {
                 Log::debug() << "\tInconsistent with current block" << std::endl;
-            } else if(!block.worthConnecting(matching, nonOverlapping)) { 
+            } else if(!worthConnecting(matching, nonOverlapping, block)) { 
                 Log::debug() <<
                     "\tNot worth connecting to current block (cost " <<
-                    block.cost(matching) << " vs scores " << nonOverlapping <<
+                    cost(matching, block) << " vs scores " << nonOverlapping <<
                     ", " << block.lastNonOverlapping << ")" << std::endl;
+            } else {
+                Log::debug() << "Connecting to block " <<
+                    syntenyBlocks.size() << "!" << std::endl;
             }
         }
         
         if((!block.maximalMatchings.empty() && !synteny) ||
             !block.isConsistent(matching) ||
-            !block.worthConnecting(matching, nonOverlapping)) {
+            !worthConnecting(matching, nonOverlapping, block)) {
             
             // This matching can't go in the current block, so start a new
             // block. But save the old one first.
@@ -351,7 +356,8 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             syntenyBlocks.push_back(block);
             block = SyntenyBlock();
             
-            Log::debug() << "Created new block." << std::endl;
+            Log::debug() << "Created block " << syntenyBlocks.size() << 
+                "." << std::endl;
             
         }
         

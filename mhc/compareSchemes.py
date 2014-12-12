@@ -78,36 +78,41 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         
         """
         
-        # Plan out all the schemes as mismatch, credit, synteny, min_context,
-        # add_context, mult_context, ignore_below, hamming_bound, map_type
+        # Plan out all the schemes as mismatch, credit, synteny, flat_cost,
+        # min_context, add_context, mult_context, ignore_below, hamming_bound,
+        # map_type
         return set([
             # Exact credit (tolerating 1 mismatch) mult various, natural
-            (True, True, False, None, None, 2.0, None, None, "natural"),
-            (True, True, False, None, None, 4.0, None, None, "natural"),
-            (True, True, False, None, None, 6.0, None, None, "natural"),
-            (True, True, False, None, None, 8.0, None, None, "natural"),
+            (True, True, False, False, None, None, 2.0, None, None, "natural"),
+            (True, True, False, False, None, None, 4.0, None, None, "natural"),
+            (True, True, False, False, None, None, 6.0, None, None, "natural"),
+            (True, True, False, False, None, None, 8.0, None, None, "natural"),
             # Exact credit (tolerating 1 mismatch) with Hamming bound and
             # ignoring super short things.
             # Current best natural thing.
-            (True, True, False, None, None, None, 10, 1, "natural"),
-            (True, True, False, None, None, None, 10, 2, "natural"),
-            (True, True, False, None, None, None, 10, 3, "natural"),
-            (True, True, False, None, None, None, 10, 4, "natural"),
-            (True, True, False, None, None, None, 10, 5, "natural"),
-            (True, True, False, None, None, None, 10, 6, "natural"),
-            (True, True, False, None, None, None, 10, 7, "natural"),
-            (True, True, False, None, None, None, 10, 8, "natural"),
+            (True, True, False, False, None, None, None, 10, 1, "natural"),
+            (True, True, False, False, None, None, None, 10, 2, "natural"),
+            (True, True, False, False, None, None, None, 10, 3, "natural"),
+            (True, True, False, False, None, None, None, 10, 4, "natural"),
+            (True, True, False, False, None, None, None, 10, 5, "natural"),
+            (True, True, False, False, None, None, None, 10, 6, "natural"),
+            (True, True, False, False, None, None, None, 10, 7, "natural"),
+            (True, True, False, False, None, None, None, 10, 8, "natural"),
             # Exact credit (tolerating 1 mismatch) with Hamming bound and
-            # ignoring super short things, but allowing synteny to rescue stuff.
-            # Scheme under test.
-            (True, True, True, None, None, None, 10, 1, "natural"),
-            (True, True, True, None, None, None, 10, 2, "natural"),
-            (True, True, True, None, None, None, 10, 3, "natural"),
-            (True, True, True, None, None, None, 10, 4, "natural"),
-            (True, True, True, None, None, None, 10, 5, "natural"),
-            (True, True, True, None, None, None, 10, 6, "natural"),
-            (True, True, True, None, None, None, 10, 7, "natural"),
-            (True, True, True, None, None, None, 10, 8, "natural")
+            # ignoring super short things, but allowing synteny with flat costs
+            # to rescue stuff. Scheme under test.
+            (True, True, True, True, None, None, None, 10, 1, "natural"),
+            (True, True, True, True, None, None, None, 0, 2, "natural"),
+            (True, True, True, True, None, None, None, 10, 2, "natural"),
+            (True, True, True, True, None, None, None, 20, 2, "natural"),
+            (True, True, True, True, None, None, None, 30, 2, "natural"),
+            (True, True, True, True, None, None, None, 40, 2, "natural"),
+            (True, True, True, True, None, None, None, 10, 3, "natural"),
+            (True, True, True, True, None, None, None, 10, 4, "natural"),
+            (True, True, True, True, None, None, None, 10, 5, "natural"),
+            (True, True, True, True, None, None, None, 10, 6, "natural"),
+            (True, True, True, True, None, None, None, 10, 7, "natural"),
+            (True, True, True, True, None, None, None, 10, 8, "natural")
         ])
 
     def generateSchemes(self):
@@ -120,8 +125,8 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # to run.
         scheme_plan = self.getSchemePlan()
         
-        for mismatch, credit, synteny, min_context, add_context, mult_context, \
-            ignore_below, hamming_bound, map_type in scheme_plan:
+        for mismatch, credit, synteny, flat_cost, min_context, add_context, \
+            mult_context, ignore_below, hamming_bound, map_type in scheme_plan:
             # Unpack each planned scheme
             
             # Start out with no configuration arguments
@@ -201,6 +206,13 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 
                 # Mention it in the scheme name
                 scheme_name += "Syn"
+                
+            if flat_cost:
+                # Make synteny gap costs flat.
+                extra_args.append("--flatCost")
+                
+                # Mention it in the scheme name
+                scheme_name += "Flat"
                 
                 
             # Yield the name with the args.
