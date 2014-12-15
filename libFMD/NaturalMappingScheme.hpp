@@ -74,12 +74,18 @@ public:
     
     /**
      * How many non-overlapping minimal unique matches does a maximal unique
-     * match need in order to map?
+     * match (or region of a synteny block) need in order to map?
      *
      * This is a lower bound on the maximal unique match's Hamming distance from
      * every other place in the reference except the place it mapped to.
      */
     size_t minHammingBound = 0;
+    
+    /**
+     * How many mismatches are we allowed to have in gaps between maximal unique
+     * matches that are working together to map?
+     */
+    size_t maxHammingDistance = 0;
     
 protected:
     /**
@@ -202,8 +208,9 @@ protected:
     
     /**
      * Count the mismatches between a query and a text in the index, in a range.
-     * If threshold is not -1, will count until the end or until that many
-     * mismatches are found. Direction can be 1 or -1 and determines the
+     * If the range would go out of the query or the reference, styop counting
+     * there. If threshold is not -1, will count until the end or until that
+     * many mismatches are found. Direction can be 1 or -1 and determines the
      * direction to count in (forwards or backwards).
      */
     size_t countMismatches(const std::string& query, size_t queryStart,

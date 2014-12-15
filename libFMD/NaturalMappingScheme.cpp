@@ -475,6 +475,166 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
     return mappings;
 }
 
+void NaturalMappingScheme::scan(SyntenyBlock& block,
+    const std::string& query) const {
+    
+    // Scan through the SyntenyBlock, deciding what Mappings should make
+    // matches, and what ones should be blacklisted.
+    
+    // We go along with an inchworm algorithm, sort of like we use to find the
+    // matchngs in the first place: add as many as you can without going over
+    // the mismatch threshold, and then, if you can't add one, throw off old
+    // ones until you can.
+    
+    // Pull out a reference to the matching vector.
+    std::vector<Matching>& matchings = block.maximalMatchings;
+    
+    // What's the index of the block that will be the next to remove? If it's
+    // equal to the loop index, there aren't any left to remove.
+    size_t nextToRemove = 0;
+    
+    // What's the index of the next matching that we have not yet flagged as
+    // able to provide matchings? We use this so we don't have to fully scan
+    // each run that makes matchings able to map.
+    size_t nextToFlag = 0;
+    
+    // How many total non-overlapping minimal matches do we currently have
+    // selected?
+    size_t nonOverlapping = 0;
+    
+    // How many mismatches do we currently have selected?
+    size_t mismatches = 0;
+    
+    for(size_t i = 0; i < matchings.size(); i++) {
+        // We're going to extend with each block in turn.
+        
+        if(mismatches + matchings[i].mismatchesBefore > maxHammingDistance) {
+            // Extending with this next block would put us over the max Hamming
+            // distance between the query and the reference.
+            
+            if(nextToRemove < i) {
+                // We can retract a block. Try that.
+                nonOverlapping -= matchings[nextToRemove].nonOverlapping;
+                
+                if(nextToRemove != i - 1) {
+                    // We can drop the gap after the thing we are removing, too.
+                    mismatches -= matchings[nextToRemove].mismatchesBefore;
+                }
+                
+                // Next time we will remove the next thing, if we have to.
+                nextToRemove++;
+                
+                // Try adding this matching again.
+                i--;
+                continue;                
+            }
+        }
+        
+        // If we get here, we can add in this new matching.
+        nonOverlapping += matchings[i].nonOverlapping;
+        if(nextToRemove < i) {
+            // We have the matching before this one, so we need to count the
+            // gap.
+            mismatches += matchings[i].mismatchesBefore;
+        }
+        
+        // OK, we now have the matchings from nextToRemove to i, inclusive, and
+        // we need to figure out if we pass the test.
+        
+        if(nonOverlapping >= minHammingBound &&
+            mismatches <= maxHammingDistance) {
+            
+            // We're close enough to the reference and far enough from
+            // everything else. Flag everything we have selected as able to
+            // provide matchings to bases.
+            
+            for(size_t j = std::max(nextToRemove, nextToFlag); j <= i; j++) {
+                // For each selected matching after the point where we have
+                // flagged up to the newly added matching, flag it as able to
+                // match up bases.
+                matchings[j].canMatch = true;
+                
+                // Note that we have flagged through here. Nothing un-flagged
+                // and to the left of here needs to be flagged.
+                nextToFlag = j + 1;
+            }
+        }
+    }
+    
+    // Now that we've flagged all the maximal unique matchings that can actually
+    // produce useful base-to-base matchings, we need to look for the ones that
+    // aren't flagged but might become flagged on extension, and which therefore
+    // need to have their bases blacklisted so they don't map anywhere else
+    // until that extension happens.
+    
+    // Grab the text and offset of the base before after first matching.
+    TextPosition rightUnmatchedStart = matchings[0].location;
+    rightUnmatchedStart.addLocalOffset(matchings[0].length);
+    
+    // Count the mismatches between the query starting to the right of
+    // the first matching, and the reference starting to the right of
+    // where the first matching maps. Count until we finish or get more
+    // mismatches than are allowed with the ones we have selected. Count
+    // left to right.
+    size_t rightMismatches = countMismatches(query,
+        matchings[0].start + matchings[0].length, rightUnmatchedStart,
+        query.size() - matchings[0].length,
+        maxHammingDistance + 1, 1);
+        
+    for(size_t i = 0; i < matchings.size(); i++) {
+        // For each matching coming in from the right
+        
+        // Add in their mismatches (the rightmost will have 0).
+        rightMismatches += matchings[i].mismatchesBefore;
+        
+        if(rightMismatches <= maxHammingDistance) {
+            // This one needs to be blacklisted.
+            matchings[i].blacklist = true;
+            // Which means we need to mark it as important for making base-to-
+            // base matchings.
+            matchings[i].canMatch = true;
+        } else {
+            // We finally got too many mismatches before hitting this matching.
+            // We can stop now.
+            break;
+        }
+    }
+    
+    // And on the left? TODO: unify with above, somehow abstracting out
+    // direction.
+    TextPosition leftUnmatchedStart = matchings.rbegin()->location;
+    leftUnmatchedStart.addLocalOffset(-1);
+    
+    // Count left from the left end of the last maximal unique matching, and see
+    // how many mismatches there are (or if there are enough to block any new
+    // matchings from connecting).
+    size_t leftMismatches = countMismatches(query,
+        matchings.rbegin()->start - 1, leftUnmatchedStart,
+        matchings.rbegin()->start, maxHammingDistance + 1, -1);
+    
+    for(size_t i = matchings.size() - 1; i != (size_t) -1; i--) {
+        // For each matching coming in from the left
+        
+        if(i != matchings.size() - 1) {
+            // Add in their mismatches (the leftmost maximal unique matching
+            // will not even have a corresponding field).
+            leftMismatches += matchings[i + 1].mismatchesBefore;
+        }
+        
+        if(leftMismatches <= maxHammingDistance) {
+            // This one needs to be blacklisted.
+            matchings[i].blacklist = true;
+            // Which means we need to mark it as important for making base-to-
+            // base matchings.
+            matchings[i].canMatch = true;
+        } else {
+            // We finally got too many mismatches before hitting this matching.
+            // We can stop now.
+            break;
+        }
+    }
+}
+
 void NaturalMappingScheme::map(const std::string& query,
     std::function<void(size_t, TextPosition)> callback) const {
     
@@ -689,6 +849,4 @@ void NaturalMappingScheme::map(const std::string& query,
     Log::output() << "Mapped " << mappedBases << " bases, " << 
         creditBases << " on credit, " << conflictedCredit << 
         " bases with conflicting credit." << std::endl;
-
-    
 }
