@@ -49,22 +49,6 @@ public:
     bool credit = false;
     
     /**
-     * Should synteny blocking be used to bridge mismatches?
-     */
-    bool synteny = false;
-    
-    /**
-     * Should costs for breaks between maximal matches in a synteny block be a
-     * flat 1, as opposed to scaling with gap length?
-     */
-    bool flatCost = false;
-    
-    /**
-     * What's the minimum context length to match on?
-     */
-    size_t minContext = 0;
-    
-    /**
      * What is the minimum length that a maximal unique match has to be to even
      * contribute to conflicts? Maximal unique matches shorter than this will be
      * completely ignored, and won't be able to stop any bases from mapping on
