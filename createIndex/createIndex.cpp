@@ -689,7 +689,7 @@ main(
             "Minimum Hamming distance lower bound on a maximum unique match")
         ("maxHammingDistance", boost::program_options::value<size_t>()
             ->default_value(0), 
-            "Minimum Hamming distance lower bound on a maximum unique match");
+            "Maximum Hamming distance from reference location");
         
     // And set up our positional arguments
     boost::program_options::positional_options_description positionals;

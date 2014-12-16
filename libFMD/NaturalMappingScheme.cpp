@@ -330,6 +330,9 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
         // negative.
         int64_t queryOffset = (int64_t) matching.location.getOffset() -
             (int64_t) matching.start;
+
+        Log::debug() << "\tGoing into synteny block " << text << ", " <<
+            queryOffset << std::endl;
             
         // Go get the SyntenyBlock we should be adding to, or insert a new
         // default-constructed (i.e. empty) one if there isn't one already.
@@ -352,6 +355,9 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             // Go count up the mismatches in that gap.
             matching.mismatchesBefore = countMismatches(query,
                 matching.start + matching.length, afterMatching, gapLength);
+                
+            Log::debug() << "\t" << matching.mismatchesBefore <<
+                " associated mismatches" << std::endl;
         }
         
         // Add this matching and its statistics to the appropriate synteny
@@ -378,6 +384,9 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
     for(auto& entry : syntenyBlocks) { 
         // Do the scan of each SyntenyBlock to figure out whether it matchings
         // should count, and whether they should be blacklisted.
+        
+        Log::debug() << "Scanning frame " << entry.first.first << ", " <<
+            entry.first.second << std::endl;
         
         // Get a reference to the block, so we can update it in place.
         SyntenyBlock& block = entry.second;
@@ -512,7 +521,20 @@ void NaturalMappingScheme::scan(SyntenyBlock& block,
             // Extending with this next block would put us over the max Hamming
             // distance between the query and the reference.
             
+            Log::debug() << mismatches + matchings[i].mismatchesBefore << 
+                " mismatches (+" << matchings[i].mismatchesBefore <<
+                ") is too many (>" << maxHammingDistance << ")" << std::endl;
+            
             if(nextToRemove < i) {
+            
+                Log::debug() << "Retracting matching " << nextToRemove <<
+                    " (" << matchings[nextToRemove].start << " - " <<
+                    matchings[nextToRemove].start +
+                    matchings[nextToRemove].length << "): " <<
+                    matchings[nextToRemove].mismatchesBefore <<
+                    " mismatches, " << matchings[nextToRemove].nonOverlapping <<
+                    " minimal matches." << std::endl;
+                
                 // We can retract a block. Try that.
                 nonOverlapping -= matchings[nextToRemove].nonOverlapping;
                 
@@ -530,6 +552,11 @@ void NaturalMappingScheme::scan(SyntenyBlock& block,
             }
         }
         
+        Log::debug() << "Adding matching " << i << " (" << matchings[i].start << 
+            " - " << matchings[i].start + matchings[i].length << "): " <<
+            matchings[i].mismatchesBefore << " mismatches, " <<
+            matchings[i].nonOverlapping << " minimal matches." << std::endl;
+        
         // If we get here, we can add in this new matching.
         nonOverlapping += matchings[i].nonOverlapping;
         if(nextToRemove < i) {
@@ -537,6 +564,14 @@ void NaturalMappingScheme::scan(SyntenyBlock& block,
             // gap.
             mismatches += matchings[i].mismatchesBefore;
         }
+        
+        Log::debug() << "Run: " <<i << " (query pos " << matchings[i].start <<
+            ") - " << nextToRemove << " (query pos " << 
+            matchings[nextToRemove].start + matchings[nextToRemove].length <<
+            ")" << std::endl;
+            
+        Log::debug() << "\t" << mismatches << " mismatches, " <<
+            nonOverlapping << " non-overlapping minimal matches" << std::endl;
         
         // OK, we now have the matchings from nextToRemove to i, inclusive, and
         // we need to figure out if we pass the test.
@@ -553,6 +588,8 @@ void NaturalMappingScheme::scan(SyntenyBlock& block,
                 // flagged up to the newly added matching, flag it as able to
                 // match up bases.
                 matchings[j].canMatch = true;
+                
+                Log::debug() << "\tFlagged as useful for mapping" << std::endl;
                 
                 // Note that we have flagged through here. Nothing un-flagged
                 // and to the left of here needs to be flagged.
@@ -587,6 +624,10 @@ void NaturalMappingScheme::scan(SyntenyBlock& block,
         // Add in their mismatches (the rightmost will have 0).
         rightMismatches += matchings[i].mismatchesBefore;
         
+        Log::debug() << rightMismatches << "/" << maxHammingDistance <<
+            " mismatches at or right of query position " <<
+            matchings[i].start + matchings[i].length << std::endl; 
+        
         if(rightMismatches <= maxHammingDistance) {
             // This one needs to be blacklisted.
             matchings[i].blacklist = true;
@@ -620,6 +661,10 @@ void NaturalMappingScheme::scan(SyntenyBlock& block,
             // will not even have a corresponding field).
             leftMismatches += matchings[i + 1].mismatchesBefore;
         }
+        
+        Log::debug() << leftMismatches << "/" << maxHammingDistance <<
+            " mismatches left of query position " <<
+            matchings[i].start << std::endl; 
         
         if(leftMismatches <= maxHammingDistance) {
             // This one needs to be blacklisted.
