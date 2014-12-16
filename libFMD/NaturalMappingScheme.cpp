@@ -591,12 +591,19 @@ void NaturalMappingScheme::scan(SyntenyBlock& block,
                 // match up bases.
                 matchings[j].canMatch = true;
                 
-                Log::debug() << "\tFlagged as useful for mapping" << std::endl;
+                Log::debug() << "\t+++ Flagged " << matchings[j].start <<
+                    " - " << matchings[j].start + matchings[j].length <<
+                    " (+" << matchings[j].length <<
+                    ") as useful for mapping!" << std::endl;
                 
                 // Note that we have flagged through here. Nothing un-flagged
                 // and to the left of here needs to be flagged.
                 nextToFlag = j + 1;
             }
+        } else {
+            // This run isn't good enough to let us actually use its component
+            // matchings.
+            Log::debug() << "\t--- Rejected!" << std::endl;
         }
     }
     
@@ -634,7 +641,7 @@ void NaturalMappingScheme::scan(SyntenyBlock& block,
             // This one could be in a run extending off the end, and it didn't
             // get flagged already.
             
-            Log::debug() << "\tBlacklisting matching!" << std::endl;
+            Log::debug() << "\t--- Blacklisting matching!" << std::endl;
             
             // This one needs to be blacklisted.
             matchings[i].blacklist = true;
@@ -677,7 +684,7 @@ void NaturalMappingScheme::scan(SyntenyBlock& block,
             // This one could be in a run extending off the end, and it didn't
             // get flagged already.
         
-            Log::debug() << "\tBlacklisting matching!" << std::endl;
+            Log::debug() << "\t--- Blacklisting matching!" << std::endl;
         
             // This one needs to be blacklisted.
             matchings[i].blacklist = true;
