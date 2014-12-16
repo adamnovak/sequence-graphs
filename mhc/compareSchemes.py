@@ -118,7 +118,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         scheme_plan = self.getSchemePlan()
         
         for mismatch, credit, min_context, add_context, mult_context, \
-            ignore_below, hamming_bound hamming_max, map_type in scheme_plan:
+            ignore_below, hamming_bound, hamming_max, map_type in scheme_plan:
             # Unpack each planned scheme
             
             # Start out with no configuration arguments
