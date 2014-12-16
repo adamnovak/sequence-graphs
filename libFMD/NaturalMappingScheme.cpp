@@ -635,6 +635,50 @@ void NaturalMappingScheme::scan(SyntenyBlock& block,
     }
 }
 
+size_t NaturalMappingScheme::countMismatches(const std::string& query,
+    size_t queryStart, TextPosition referenceStart, size_t length, 
+    int64_t threshold, char direction) const {
+
+    // Count mismatches between both sequences starting at the inclusive start
+    // positions and wandering off in the appropriate direction, until one or
+    // the other ends, we see the threshold number of mismatches, or we hit the
+    // length requested.
+    
+    // Get the length of the reference text we are on.
+    int64_t textLength = index.getContigLength(
+        referenceStart.getContigNumber());
+    
+    size_t mismatchesFound = 0;
+    
+    // We're going to work on our arguments: advance referenceStart and
+    // queryStart and knock down length.
+    
+    while(
+        // We're in-bounds on the reference
+        referenceStart.getOffset() != (size_t) -1 &&
+        referenceStart.getOffset() < textLength &&
+        // We're in-bounds on the query
+        queryStart != (size_t) -1 &&
+        queryStart < query.size() &&
+        // We haven't gotten to the end of length yet.
+        length > 0 &&
+        // We haven't found enough mismatches yet.
+        mismatchesFound < threshold) {
+        
+        
+        // Counjt the number of mismatches at this character.
+        mismatchesFound +=
+            (query[queryStart] != index.displayCached(referenceStart));
+        
+        // Update our arguments and tail-recurse
+        length--;
+        queryStart += direction;
+        referenceStart.addLocalOffset(direction);
+    }
+    
+    return mismatchesFound;
+}
+
 void NaturalMappingScheme::map(const std::string& query,
     std::function<void(size_t, TextPosition)> callback) const {
     

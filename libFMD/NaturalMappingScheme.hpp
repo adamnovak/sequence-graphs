@@ -192,10 +192,11 @@ protected:
     
     /**
      * Count the mismatches between a query and a text in the index, in a range.
-     * If the range would go out of the query or the reference, styop counting
+     * If the range would go out of the query or the reference, stop counting
      * there. If threshold is not -1, will count until the end or until that
      * many mismatches are found. Direction can be 1 or -1 and determines the
-     * direction to count in (forwards or backwards).
+     * direction to count in (forwards or backwards from the inclusive start
+     * positions given).
      */
     size_t countMismatches(const std::string& query, size_t queryStart,
         TextPosition referenceStart, size_t length,
