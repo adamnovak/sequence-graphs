@@ -43,12 +43,63 @@ def parse_args(args):
         help="offset all reference coordinates by the given amount")
     parser.add_argument("--referenceSequence", type=str, default=None,
         help="override reference sequence nemae with this one")
+    parser.add_argument("--noMismatch", action="store_true",
+        help="only align bases which match")
     
     # The command line arguments start with the program name, which we don't
     # want to treat as an argument for argparse. So we remove it.
     args = args[1:]
         
     return parser.parse_args(args)
+    
+def gapMismatches(alignment):
+    """
+    Given an alignment (an MSA with just a reference and a query), replace any
+    mismatches with gaps in each sequence.
+    
+    Return the processed alignment.
+    """
+    
+    # Make lists of characters that we will join into the new reference and
+    # query sequences.
+    gappedReference = []
+    gappedQuery = []
+    
+    # Where are we in the alignment? 
+    for column in xrange(len(alignment[0])):
+        # Just go through all the columns in the alignment's reference.
+        
+        # Pull out the reference and query characters at this position.
+        refChar = alignment[0, column]
+        queryChar = alignment[1, column]
+        
+        if "-" in [refChar, queryChar] or refChar == queryChar:
+            # We have a gap or a match. Pass it through to bioth sequences.
+            gappedReference.append(refChar)
+            gappedQuery.append(queryChar)
+        else:
+            # We have a mismatch. Gap one and then the other.
+            gappedReference.append("-")
+            gappedQuery.append(queryChar)
+            
+            gappedReference.append(refChar)
+            gappedQuery.append("-")
+            
+    # Now we need to manufacture the MultipleSeqAlignment to return from these
+    # lists of characters.
+
+    # What names do the sequences in this alignment have?
+    seqNames = [record.id for record in alignment]
+    
+    # Make a SeqRecord for each list of properly gapped-out characters, with the
+    # appropriate name.
+    seqRecords = [SeqRecord(Seq("".join(alignedList)), name) 
+        for alignedList, name in zip([gappedReference, gappedQuery], seqNames)]
+        
+    # Make the records into a proper MSA and return it.
+    return Align.MultipleSeqAlignment(seqRecords)
+            
+    
     
 def mergeMSAs(msa1, msa2):
     """
@@ -150,6 +201,10 @@ def mergeMSAs(msa1, msa2):
             # Say we used a reference character
             refChars += 1
             
+        for otherMerged in merged[1:]:
+            # Make sure we aren't dropping characters anywhere.
+            assert(len(otherMerged) == len(merged[0]))
+            
     # Now we have finished populating these aligned lists. We need to make a
     # MultipleSeqAlignment from them.
     
@@ -239,7 +294,7 @@ def main(args):
                     
                     The MSA must have the hit first and the query second. If the
                     MSA is None, the alignment is padded out to the given
-                    lrngths in each sequence.
+                    lengths in each sequence.
                     
                     Indexes are assumed to be on whatever strand would make them
                     go up as new MSAs are added.
@@ -292,9 +347,12 @@ def main(args):
                         # Add in the new alignment we actually wanted to add.
                         hitMSA += newMSA
                         
-                        # Update the indicators of where we're up to
-                        hitMSAHitPos = hitStart + len(newMSA[0])
-                        hitMSAQueryPos = queryStart + len(newMSA[1])
+                        # Update the indicators of where we're up to. Don't
+                        # count gaps that were in the hits themselves.
+                        hitMSAHitPos = hitStart + len([char for char in 
+                            newMSA[0] if char != "-"])
+                        hitMSAQueryPos = queryStart + len([char for char in 
+                            newMSA[1] if char != "-"])
                     
                     if  queryPaddingNeeded > 0 or hitPaddingNeeded > 0:
                         print("Padding {} in query and {} in hit".format(
@@ -355,6 +413,12 @@ def main(args):
                         # creates.
                         alignment = fragment.aln
                         
+                        if options.noMismatch:
+                            # We only want to have match operations in our
+                            # alignment. If two bases don't match, we need to
+                            # gap them apart.
+                            alignment = gapMismatches(alignment)
+                            
                         # Stick that onto the end of our growing MSA for this
                         # hit. Padding to align this alignment to the right
                         # place in each sequence will be automatically added.
