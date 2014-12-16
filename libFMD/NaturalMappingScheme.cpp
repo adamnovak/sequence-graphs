@@ -556,8 +556,9 @@ void NaturalMappingScheme::scan(SyntenyBlock& block,
         
         Log::debug() << "Adding matching " << i << " (" << matchings[i].start << 
             " - " << matchings[i].start + matchings[i].length << "): +" <<
-            matchings[i].mismatchesBefore << " mismatches, +" <<
-            matchings[i].nonOverlapping << " minimal matches." << std::endl;
+            ((nextToRemove < i) ? matchings[i].mismatchesBefore : 0) <<
+            " mismatches, +" << matchings[i].nonOverlapping <<
+            " minimal matches." << std::endl;
         
         // If we get here, we can add in this new matching.
         nonOverlapping += matchings[i].nonOverlapping;
@@ -736,6 +737,19 @@ size_t NaturalMappingScheme::countMismatches(const std::string& query,
         referenceStart.addLocalOffset(direction);
     }
     
+    if((referenceStart.getOffset() == (size_t) -1 ||
+        referenceStart.getOffset() >= textLength) && threshold != -1) {
+        // We ran out of reference, and we have a threshold set. Running out of
+        // reference is sufficiently bad that we will never be able to extend
+        // anything over it with fewer than any number of mismatches. So we're
+        // just going to return that threshold. TODO: this is kind of a hack,
+        // just make our callers do their own bounds checking, or make a
+        // canExtendOverEnd function.
+        return threshold;
+    }
+    
+    // We didn't fall off the reference and return our threshold, so return the
+    // mismatches we actually found so far.
     return mismatchesFound;
 }
 
