@@ -630,7 +630,12 @@ void NaturalMappingScheme::scan(SyntenyBlock& block,
             " mismatches at or right of query position " <<
             matchings[i].start + matchings[i].length << std::endl; 
         
-        if(rightMismatches <= maxHammingDistance) {
+        if(rightMismatches <= maxHammingDistance && !matchings[i].canMatch) {
+            // This one could be in a run extending off the end, and it didn't
+            // get flagged already.
+            
+            Log::debug() << "\tBlacklisting matching!" << std::endl;
+            
             // This one needs to be blacklisted.
             matchings[i].blacklist = true;
             // Which means we need to mark it as important for making base-to-
@@ -668,7 +673,12 @@ void NaturalMappingScheme::scan(SyntenyBlock& block,
             " mismatches left of query position " <<
             matchings[i].start << std::endl; 
         
-        if(leftMismatches <= maxHammingDistance) {
+        if(leftMismatches <= maxHammingDistance && !matchings[i].canMatch) {
+            // This one could be in a run extending off the end, and it didn't
+            // get flagged already.
+        
+            Log::debug() << "\tBlacklisting matching!" << std::endl;
+        
             // This one needs to be blacklisted.
             matchings[i].blacklist = true;
             // Which means we need to mark it as important for making base-to-
