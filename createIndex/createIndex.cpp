@@ -687,8 +687,9 @@ main(
         ("minHammingBound", boost::program_options::value<size_t>()
             ->default_value(0), 
             "Minimum Hamming distance lower bound on a maximum unique match")
-        ("synteny", "Enable synteny for the natural mapping scheme")
-        ("flatCost", "Make synteny block gap cost flat");
+        ("maxHammingDistance", boost::program_options::value<size_t>()
+            ->default_value(0), 
+            "Minimum Hamming distance lower bound on a maximum unique match");
         
     // And set up our positional arguments
     boost::program_options::positional_options_description positionals;
@@ -829,16 +830,14 @@ main(
                     ranges, mask);
                     
                 // Populate it
-                scheme->minContext = options["context"].as<size_t>();
-                scheme->multContext = options["multContext"].as<double>();
                 scheme->credit = options.count("credit");
                 scheme->z_max = options["mismatches"].as<size_t>();
                 scheme->ignoreMatchesBelow = options[
                     "ignoreMatchesBelow"].as<size_t>();
                 scheme->minHammingBound = options[
                     "minHammingBound"].as<size_t>();
-                scheme->synteny = options.count("synteny");
-                scheme->flatCost = options.count("flatCost");
+                scheme->maxHammingDistance = options[
+                    "maxHammingDistance"].as<size_t>();
                 
                 return (MappingScheme*) scheme;
             } else {
