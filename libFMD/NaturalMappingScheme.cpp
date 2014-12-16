@@ -517,39 +517,41 @@ void NaturalMappingScheme::scan(SyntenyBlock& block,
     for(size_t i = 0; i < matchings.size(); i++) {
         // We're going to extend with each block in turn.
         
-        if(mismatches + matchings[i].mismatchesBefore > maxHammingDistance) {
-            // Extending with this next block would put us over the max Hamming
-            // distance between the query and the reference.
+        if(nextToRemove < i && 
+            mismatches + matchings[i].mismatchesBefore > maxHammingDistance) {
+            
+            // We can retract (i.e. our range isn't empty), so we have to count
+            // the mismatches before the next block, and extending with this
+            // next block would put us over the max Hamming distance between the
+            // query and the reference.
             
             Log::debug() << mismatches + matchings[i].mismatchesBefore << 
                 " mismatches (+" << matchings[i].mismatchesBefore <<
                 ") is too many (>" << maxHammingDistance << ")" << std::endl;
             
-            if(nextToRemove < i) {
             
-                Log::debug() << "Retracting matching " << nextToRemove <<
-                    " (" << matchings[nextToRemove].start << " - " <<
-                    matchings[nextToRemove].start +
-                    matchings[nextToRemove].length << "): " <<
-                    matchings[nextToRemove].mismatchesBefore <<
-                    " mismatches, " << matchings[nextToRemove].nonOverlapping <<
-                    " minimal matches." << std::endl;
-                
-                // We can retract a block. Try that.
-                nonOverlapping -= matchings[nextToRemove].nonOverlapping;
-                
-                if(nextToRemove != i - 1) {
-                    // We can drop the gap after the thing we are removing, too.
-                    mismatches -= matchings[nextToRemove].mismatchesBefore;
-                }
-                
-                // Next time we will remove the next thing, if we have to.
-                nextToRemove++;
-                
-                // Try adding this matching again.
-                i--;
-                continue;                
+            Log::debug() << "Retracting matching " << nextToRemove <<
+                " (" << matchings[nextToRemove].start << " - " <<
+                matchings[nextToRemove].start +
+                matchings[nextToRemove].length << "): " <<
+                matchings[nextToRemove].mismatchesBefore <<
+                " mismatches, " << matchings[nextToRemove].nonOverlapping <<
+                " minimal matches." << std::endl;
+            
+            // We can retract a block. Try that.
+            nonOverlapping -= matchings[nextToRemove].nonOverlapping;
+            
+            if(nextToRemove != i - 1) {
+                // We can drop the gap after the thing we are removing, too.
+                mismatches -= matchings[nextToRemove].mismatchesBefore;
             }
+            
+            // Next time we will remove the next thing, if we have to.
+            nextToRemove++;
+            
+            // Try adding this matching again.
+            i--;
+            continue;                
         }
         
         Log::debug() << "Adding matching " << i << " (" << matchings[i].start << 
