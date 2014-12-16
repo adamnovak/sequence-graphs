@@ -533,9 +533,9 @@ void NaturalMappingScheme::scan(SyntenyBlock& block,
             Log::debug() << "Retracting matching " << nextToRemove <<
                 " (" << matchings[nextToRemove].start << " - " <<
                 matchings[nextToRemove].start +
-                matchings[nextToRemove].length << "): " <<
-                matchings[nextToRemove].mismatchesBefore <<
-                " mismatches, " << matchings[nextToRemove].nonOverlapping <<
+                matchings[nextToRemove].length << "): -" <<
+                matchings[nextToRemove + 1].mismatchesBefore <<
+                " mismatches, -" << matchings[nextToRemove].nonOverlapping <<
                 " minimal matches." << std::endl;
             
             // We can retract a block. Try that.
@@ -543,7 +543,7 @@ void NaturalMappingScheme::scan(SyntenyBlock& block,
             
             if(nextToRemove != i - 1) {
                 // We can drop the gap after the thing we are removing, too.
-                mismatches -= matchings[nextToRemove].mismatchesBefore;
+                mismatches -= matchings[nextToRemove + 1].mismatchesBefore;
             }
             
             // Next time we will remove the next thing, if we have to.
@@ -555,8 +555,8 @@ void NaturalMappingScheme::scan(SyntenyBlock& block,
         }
         
         Log::debug() << "Adding matching " << i << " (" << matchings[i].start << 
-            " - " << matchings[i].start + matchings[i].length << "): " <<
-            matchings[i].mismatchesBefore << " mismatches, " <<
+            " - " << matchings[i].start + matchings[i].length << "): +" <<
+            matchings[i].mismatchesBefore << " mismatches, +" <<
             matchings[i].nonOverlapping << " minimal matches." << std::endl;
         
         // If we get here, we can add in this new matching.
@@ -567,13 +567,9 @@ void NaturalMappingScheme::scan(SyntenyBlock& block,
             mismatches += matchings[i].mismatchesBefore;
         }
         
-        Log::debug() << "Run: " <<i << " (query pos " << matchings[i].start <<
-            ") - " << nextToRemove << " (query pos " << 
-            matchings[nextToRemove].start + matchings[nextToRemove].length <<
-            ")" << std::endl;
-            
-        Log::debug() << "\t" << mismatches << " mismatches, " <<
-            nonOverlapping << " non-overlapping minimal matches" << std::endl;
+        Log::debug() << "Run: " << nextToRemove << " - " << i << ": " <<
+            mismatches << " mismatches, " << nonOverlapping <<
+            " minimal matches." << std::endl;
         
         // OK, we now have the matchings from nextToRemove to i, inclusive, and
         // we need to figure out if we pass the test.
