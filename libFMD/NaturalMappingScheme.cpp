@@ -477,6 +477,9 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             // Grab that one TextPosition and make a Mapping to it for this
             // query base.
             mappings[i] = Mapping(*(matchings[i].begin()));
+        } else if(matchings[i].size() > 1) {
+            Log::debug() << "Conflict: " << matchings[i].size() <<
+                " matchings for base " << i << std::endl;
         }
     }
     
@@ -864,8 +867,8 @@ void NaturalMappingScheme::map(const std::string& query,
                     // at by the credit provider.
                     zippings[i].insert(implied);
                     
-                    Log::trace() << "Right credit zips " << i << " to " <<
-                        implied << std::endl;
+                    Log::debug() << "Right credit zips " << i << " to " <<
+                        implied << " from " << provider << std::endl;
                     
                 }    
             }
@@ -922,8 +925,8 @@ void NaturalMappingScheme::map(const std::string& query,
                     // at by the credit provider.
                     zippings[i].insert(implied);
                     
-                    Log::trace() << "Left credit zips " << i << " to " <<
-                        implied << std::endl;
+                    Log::debug() << "Left credit zips " << i << " to " <<
+                        implied << " from " << provider << std::endl;
                 }    
             }
             
