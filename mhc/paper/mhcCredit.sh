@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# mhcPrecisionRecall.sh: Make the recall vs. precision plots for the MHC for the
-# paper. Execute from the cluster run output directory.
+# mhcCredit.sh: Make the recall vs. precision plots showing how credit is a
+# good idea for the MHC for the paper. Execute from the cluster run output
+# directory.
 
 # Die on errors
 set -e
@@ -8,9 +9,9 @@ set -e
 # We want to put output in this directory
 OUTDIR="paper"
 # We will make this data file
-TSV="${OUTDIR}/mhcPrecisionRecall.tsv"
+TSV="${OUTDIR}/mhcCredit.tsv"
 # And this plot image
-GRAPH="${OUTDIR}/mhcPrecisionRecall.png"
+GRAPH="${OUTDIR}/mhcCredit.png"
 
 function series {
     # Append a series to the given file with the given name, consisting of the
@@ -65,35 +66,21 @@ truncate -s 0 ${TSV}
 
 # Define all the series we want
 
-# Vary the minimum length
-series "${TSV}" "Flat Length Threshold" \
-    truth.ICnaturalMin20 \
-    truth.ICnaturalMin50 \
-    truth.ICnaturalMin100 \
-    truth.ICnaturalMin150 \
-    truth.ICnaturalMin200 \
-    truth.ICnaturalMin250
-
-# Do all the other series
-for HAMMING_CLEARANCE in {1..6}
-do
-    # For each minimum Hamming clearance we used...
+series "${TSV}" "No Credit" \
+    truth.INnaturalHam6 \
+    truth.INnaturalHam6Mis1 \
+    truth.INnaturalHam6Mis2 \
+    truth.INnaturalHam6Mis3 \
+    truth.INnaturalHam6Mis4 \
+    truth.INnaturalHam6Mis5
     
-    # Make an array of points
-    POINTS=("truth.ICnaturalHam${HAMMING_CLEARANCE}")
-    
-    for HAMMING_DISTANCE in $(seq 1 $((HAMMING_CLEARANCE - 1)))
-    do
-        # For each maximum Hamming distance we used that's strictly smaller than
-        # the clearance...
-        
-        # Make a point at this maximum Hamming distance
-        POINTS+=("${POINTS[0]}Mis${HAMMING_DISTANCE}")
-    done
-    
-    # Make a series for this Hamming clearance
-    series "${TSV}" "Hamming Clearance ${HAMMING_CLEARANCE}" ${POINTS[*]}
-done
+series "${TSV}" "Credit" \
+    truth.ICnaturalHam6 \
+    truth.ICnaturalHam6Mis1 \
+    truth.ICnaturalHam6Mis2 \
+    truth.ICnaturalHam6Mis3 \
+    truth.ICnaturalHam6Mis4 \
+    truth.ICnaturalHam6Mis5 \
 
 # Make the actual plot
-scatter.py ${TSV} --tsv --no_sort --x_label "Precision" --y_label "Recall" --title "Recall vs. Precision by Filter Criterion" --save ${GRAPH} --max_x 1 --max_y 1 --lines --legend_overlay best
+scatter.py ${TSV} --tsv --no_sort --x_label "Precision" --y_label "Recall" --title "Recall vs. Precision With and Without Credit" --save ${GRAPH} --max_x 1 --max_y 1 --lines --legend_overlay best
