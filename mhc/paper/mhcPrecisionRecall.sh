@@ -66,7 +66,7 @@ truncate -s 0 ${TSV}
 # Define all the series we want
 
 # Vary the minimum length
-series "${TSV}" "Min Length" \
+series "${TSV}" "Flat Length Threshold" \
     truth.ICnaturalMin20 \
     truth.ICnaturalMin50 \
     truth.ICnaturalMin100 \
@@ -82,7 +82,7 @@ do
     # Make an array of points
     POINTS=("truth.ICnaturalHam${HAMMING_CLEARANCE}")
     
-    for HAMMING_DISTANCE in $(seq 2 ${HAMMING_CLEARANCE})
+    for HAMMING_DISTANCE in $(seq 1 ${HAMMING_CLEARANCE})
     do
         # For each maximum Hamming distance we used...
         
@@ -95,4 +95,4 @@ do
 done
 
 # Make the actual plot
-scatter.py ${TSV} --tsv --x_label "Precision" --y_label "Recall" --title "Recall vs. Precision by Scheme" --save ${GRAPH} --max_x 1 --max_y 1 --lines
+scatter.py ${TSV} --tsv --no_sort --x_label "Precision" --y_label "Recall" --title "Recall vs. Precision by Scheme" --save ${GRAPH} --max_x 1 --max_y 1 --lines --legend_overlay best
