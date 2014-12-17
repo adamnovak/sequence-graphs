@@ -39,6 +39,17 @@ public:
     double multContext = 0.0;
     
     /**
+     * What's the minimum run length in bases to use?
+     */
+    size_t minContext = 0;
+    
+    /**
+     * Should maximal unique matchings not in an admissible run still produce
+     * conflict?
+     */
+    bool conflictBelowThreshold = false;
+    
+    /**
      * How many mismatches can be tolerated when applying credit?
      */
     size_t z_max = 0;

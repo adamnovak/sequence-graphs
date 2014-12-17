@@ -831,6 +831,7 @@ main(
                     
                 // Populate it
                 scheme->credit = options.count("credit");
+                scheme->minContext = options["context"].as<size_t>();
                 scheme->z_max = options["mismatches"].as<size_t>();
                 scheme->ignoreMatchesBelow = options[
                     "ignoreMatchesBelow"].as<size_t>();

@@ -571,19 +571,28 @@ void NaturalMappingScheme::scan(SyntenyBlock& block,
             mismatches += matchings[i].mismatchesBefore;
         }
         
-        Log::debug() << "Run: " << nextToRemove << " - " << i << ": " <<
-            mismatches << " mismatches, " << nonOverlapping <<
-            " minimal matches." << std::endl;
-        
         // OK, we now have the matchings from nextToRemove to i, inclusive, and
         // we need to figure out if we pass the test.
         
+        // Work out the length of the run, in bases. It's from the start of what
+        // we just added on the left to the end of the thing we next have to
+        // remove on the right.
+        size_t runBases = matchings[nextToRemove].start +
+            matchings[nextToRemove].length - matchings[i].start;
+        
+        
+        Log::debug() << "Run (" << runBases << " bp): " << nextToRemove <<
+            " - " << i << ": " << mismatches << " mismatches, " <<
+            nonOverlapping << " minimal matches." << std::endl;
+        
         if(nonOverlapping >= minHammingBound &&
-            mismatches <= maxHammingDistance) {
+            mismatches <= maxHammingDistance &&
+            runBases > minContext) {
             
             // We're close enough to the reference and far enough from
-            // everything else. Flag everything we have selected as able to
-            // provide matchings to bases.
+            // everything else, and above the minimum context length. Flag
+            // everything we have selected as able to provide matchings to
+            // bases.
             
             for(size_t j = std::max(nextToRemove, nextToFlag); j <= i; j++) {
                 // For each selected matching after the point where we have
@@ -602,8 +611,22 @@ void NaturalMappingScheme::scan(SyntenyBlock& block,
             }
         } else {
             // This run isn't good enough to let us actually use its component
-            // matchings.
+            // matchings. But the matchings may get picked up by a logner run.
             Log::debug() << "\t--- Rejected!" << std::endl;
+        }
+    }
+    
+    if(conflictBelowThreshold) {
+        // We're supposed to cause conflict for any maximal unique match
+        // that doesn't make the cut.
+        for(Matching& matching : matchings) {
+            // For each maximal unique match
+            if(!matching.canMatch) {
+                // It can't match up bases, it needs to be blacklisted so
+                // nothing else can take its bases.
+                matching.canMatch = true;
+                matching.blacklist = true;
+            }    
         }
     }
     

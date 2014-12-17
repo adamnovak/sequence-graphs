@@ -82,17 +82,23 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # add_context, mult_context, ignore_below, hamming_bound, hamming_max,
         # map_type
         return set([
-            # Exact credit (tolerating 1 mismatch) with Hamming bound and
-            # ignoring super short things.
-            # Current best natural thing.
-            (True, True, None, None, None, 10, 1, None, "natural"),
-            (True, True, None, None, None, 10, 2, None, "natural"),
-            (True, True, None, None, None, 10, 3, None, "natural"),
-            (True, True, None, None, None, 10, 4, None, "natural"),
-            (True, True, None, None, None, 10, 5, None, "natural"),
-            (True, True, None, None, None, 10, 6, None, "natural"),
-            (True, True, None, None, None, 10, 7, None, "natural"),
-            (True, True, None, None, None, 10, 8, None, "natural"),
+            # Exact credit (tolerating 1 mismatch) with Hamming bound, but no
+            # mismatches.
+            (True, True, None, None, None, None, 1, None, "natural"),
+            (True, True, None, None, None, None, 2, None, "natural"),
+            (True, True, None, None, None, None, 3, None, "natural"),
+            (True, True, None, None, None, None, 4, None, "natural"),
+            (True, True, None, None, None, None, 5, None, "natural"),
+            (True, True, None, None, None, None, 6, None, "natural"),
+            (True, True, None, None, None, None, 7, None, "natural"),
+            (True, True, None, None, None, None, 8, None, "natural"),
+            # Min lengths instead of Hamming bound
+            (True, True, 20, None, None, None, None, None, "natural"),
+            (True, True, 50, None, None, None, None, None, "natural"),
+            (True, True, 100, None, None, None, None, None, "natural"),
+            (True, True, 150, None, None, None, None, None, "natural"),
+            (True, True, 200, None, None, None, None, None, "natural"),
+            (True, True, 250, None, None, None, None, None, "natural"),
             # Exact credit (tolerating 1 mismatch) with Hamming bound and
             # Hamming distance allowance (i.e. mismatches again). Scheme under
             # test.
@@ -102,9 +108,6 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             (True, True, None, None, None, None, 6, 4, "natural"),
             (True, True, None, None, None, None, 6, 5, "natural"),
             (True, True, None, None, None, None, 6, 6, "natural"),
-            (True, True, None, None, None, None, 6, 7, "natural"),
-            (True, True, None, None, None, None, 6, 8, "natural"),
-            (True, True, None, None, None, None, 6, 9, "natural"),
             # Same thing without credit
             (True, False, None, None, None, None, 6, 1, "natural"),
             (True, False, None, None, None, None, 6, 2, "natural"),
@@ -112,9 +115,26 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             (True, False, None, None, None, None, 6, 4, "natural"),
             (True, False, None, None, None, None, 6, 5, "natural"),
             (True, False, None, None, None, None, 6, 6, "natural"),
-            (True, False, None, None, None, None, 6, 7, "natural"),
-            (True, False, None, None, None, None, 6, 8, "natural"),
-            (True, False, None, None, None, None, 6, 9, "natural")
+            # Lower Hamming bounds: 5
+            (True, True, None, None, None, None, 5, 1, "natural"),
+            (True, True, None, None, None, None, 5, 2, "natural"),
+            (True, True, None, None, None, None, 5, 3, "natural"),
+            (True, True, None, None, None, None, 5, 4, "natural"),
+            (True, True, None, None, None, None, 5, 5, "natural"),
+            # 4
+            (True, True, None, None, None, None, 4, 1, "natural"),
+            (True, True, None, None, None, None, 4, 2, "natural"),
+            (True, True, None, None, None, None, 4, 3, "natural"),
+            (True, True, None, None, None, None, 4, 4, "natural"),
+            # 3
+            (True, True, None, None, None, None, 3, 1, "natural"),
+            (True, True, None, None, None, None, 3, 2, "natural"),
+            (True, True, None, None, None, None, 3, 3, "natural"),
+            # 2
+            (True, True, None, None, None, None, 2, 1, "natural"),
+            (True, True, None, None, None, None, 2, 2, "natural"),
+            # 1
+            (True, True, None, None, None, None, 1, 1, "natural")
         ])
 
     def generateSchemes(self):
