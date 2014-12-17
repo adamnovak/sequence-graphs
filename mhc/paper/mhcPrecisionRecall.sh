@@ -96,4 +96,12 @@ do
 done
 
 # Make the actual plot
-scatter.py ${TSV} --tsv --no_sort --x_label "Precision" --y_label "Recall" --title "Recall vs. Precision by Filter Criterion" --save ${GRAPH} --max_x 1 --max_y 1 --lines --legend_overlay best
+scatter.py ${TSV} --tsv --no_sort \
+    --colors 'b' 'g' 'r' 'c' 'm' 'y' 'k' \
+    --markers 'o' 's' '>' 'v' '+' '_' 'D'  \
+    --x_label "Precision" --y_label "Recall" \
+    --title "Recall vs. Precision by Filter Criterion" \
+    --max_x 1 --max_y 1 \
+    --lines \
+    --legend_overlay best \
+    --save ${GRAPH}

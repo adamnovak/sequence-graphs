@@ -67,7 +67,6 @@ truncate -s 0 ${TSV}
 # Define all the series we want
 
 series "${TSV}" "No Credit" \
-    truth.INnaturalHam6 \
     truth.INnaturalHam6Mis1 \
     truth.INnaturalHam6Mis2 \
     truth.INnaturalHam6Mis3 \
@@ -75,7 +74,6 @@ series "${TSV}" "No Credit" \
     truth.INnaturalHam6Mis5
     
 series "${TSV}" "Credit" \
-    truth.ICnaturalHam6 \
     truth.ICnaturalHam6Mis1 \
     truth.ICnaturalHam6Mis2 \
     truth.ICnaturalHam6Mis3 \
@@ -83,4 +81,14 @@ series "${TSV}" "Credit" \
     truth.ICnaturalHam6Mis5 \
 
 # Make the actual plot
-scatter.py ${TSV} --tsv --no_sort --x_label "Precision" --y_label "Recall" --title "Recall vs. Precision With and Without Credit" --save ${GRAPH} --max_x 1 --max_y 1 --lines --legend_overlay best
+
+# Make the actual plot
+scatter.py ${TSV} --tsv --no_sort \
+    --colors 'r' 'k'  \
+    --markers 'd' 'D'  \
+    --x_label "Precision" --y_label "Recall" \
+    --title "$(printf 'Recall vs. Precision With and Without Credit\nHamming Clearance 6')" \
+    --max_x 1 --max_y 1 \
+    --lines \
+    --legend_overlay best \
+    --save ${GRAPH}
