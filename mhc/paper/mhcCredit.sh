@@ -29,7 +29,7 @@ function series {
     while (( $# ))
     do
         # Make a point for this instantiation of a scheme.
-        POINT_FILE="$1"; shift
+        POINT_FILE="truth.${1}"; shift
         
         # We want totals for this file to make an average point
         TOTAL_PRECISION=0
@@ -67,20 +67,18 @@ truncate -s 0 ${TSV}
 # Define all the series we want
 
 series "${TSV}" "No Credit" \
-    truth.INnaturalHam6Mis1 \
-    truth.INnaturalHam6Mis2 \
-    truth.INnaturalHam6Mis3 \
-    truth.INnaturalHam6Mis4 \
-    truth.INnaturalHam6Mis5
+    INnaturalHam6Mis1 \
+    INnaturalHam6Mis2 \
+    INnaturalHam6Mis3 \
+    INnaturalHam6Mis4 \
+    INnaturalHam6Mis5
     
 series "${TSV}" "Credit" \
-    truth.ICnaturalHam6Mis1 \
-    truth.ICnaturalHam6Mis2 \
-    truth.ICnaturalHam6Mis3 \
-    truth.ICnaturalHam6Mis4 \
-    truth.ICnaturalHam6Mis5 \
-
-# Make the actual plot
+    ICnaturalHam6Mis1 \
+    ICnaturalHam6Mis2 \
+    ICnaturalHam6Mis3 \
+    ICnaturalHam6Mis4 \
+    ICnaturalHam6Mis5
 
 # Make the actual plot
 scatter.py ${TSV} --tsv --no_sort \
