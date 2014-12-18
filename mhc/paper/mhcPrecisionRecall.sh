@@ -10,7 +10,7 @@ OUTDIR="paper"
 # We will make this data file
 TSV="${OUTDIR}/mhcPrecisionRecall.tsv"
 # And this plot image
-GRAPH="${OUTDIR}/mhcPrecisionRecall.png"
+GRAPH="${OUTDIR}/mhcPrecisionRecall.svg"
 
 function series {
     # Append a series to the given file with the given name, consisting of the

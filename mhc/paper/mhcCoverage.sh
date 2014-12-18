@@ -11,7 +11,7 @@ OUTDIR="paper"
 # We will make this data file
 TSV="${OUTDIR}/mhcCoverage.tsv"
 # And this plot image
-GRAPH="${OUTDIR}/mhcCoverage.png"
+GRAPH="${OUTDIR}/mhcCoverage.svg"
 
 function series {
     # Append a series to the given file with the given name, consisting of the
@@ -133,7 +133,7 @@ scatter.py ${TSV} --tsv --no_sort \
 # We will make this data file
 TSV="${OUTDIR}/mhcCoverageBar.tsv"
 # And this plot image
-GRAPH="${OUTDIR}/mhcCoverageBar.png"
+GRAPH="${OUTDIR}/mhcCoverageBar.svg"
 
 # Start fresh
 truncate -s 0 ${TSV}
@@ -167,7 +167,7 @@ CATEGORY_OPTS=()
 LABEL_OPTS=()
 
 # Do just the min length one
-GROUPING_OPTS+=("--grouping" "Flat Length Threshold")
+GROUPING_OPTS+=("--grouping" "Minimum Length")
 CATEGORY_OPTS+=("--categories" \
     "ICnaturalMin20" \
     "ICnaturalMin50" \
@@ -183,7 +183,7 @@ do
     # For each minimum Hamming clearance we used...
     
     # Title the grouping
-    GROUPING_OPTS+=("--grouping" "Clearance ${HAMMING_CLEARANCE}, Mismatches")
+    GROUPING_OPTS+=("--grouping" "Clearance ${HAMMING_CLEARANCE}")
     
     # Add category for 0 mismatches
     CATEGORY_OPTS+=("--categories" "ICnaturalHam${HAMMING_CLEARANCE}")
@@ -203,10 +203,13 @@ do
 done
     
 boxplot.py "${TSV}" \
-    --x_label "Merging Scheme" --y_label "Portion Aligned to Reference" \
+    --x_label "Scheme Parameter (Min Length, Mismatches)" \
+    --y_label "Portion Aligned to Reference" \
     --title "Coverage vs. Merging Scheme" \
     "${GROUPING_OPTS[@]}" "${CATEGORY_OPTS[@]}" "${LABEL_OPTS[@]}" \
-    --grouping_colors 'b' 'g' 'r' 'c' 'm' 'y' 'k'
+    --grouping_colors 'b' 'g' 'r' 'c' 'm' 'y' 'k' \
+    --legend_overlay 'lower right' --legend_columns 2 \
+    --x_sideways \
     --save "${GRAPH}"
     
 # We put the arrays in quotes and use @ above because that uses the array

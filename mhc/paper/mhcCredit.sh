@@ -11,7 +11,7 @@ OUTDIR="paper"
 # We will make this data file
 TSV="${OUTDIR}/mhcCredit.tsv"
 # And this plot image
-GRAPH="${OUTDIR}/mhcCredit.png"
+GRAPH="${OUTDIR}/mhcCredit.svg"
 
 function series {
     # Append a series to the given file with the given name, consisting of the

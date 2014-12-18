@@ -11,7 +11,7 @@ OUTDIR="paper"
 # We will make this data file
 TSV="${OUTDIR}/mhcRearrangements.tsv"
 # And this plot image
-GRAPH="${OUTDIR}/mhcRearrangements.png"
+GRAPH="${OUTDIR}/mhcRearrangements.svg"
 
 # Make sure the out directory exists
 mkdir -p "${OUTDIR}"
