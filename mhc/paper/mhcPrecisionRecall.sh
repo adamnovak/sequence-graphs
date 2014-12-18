@@ -1,16 +1,20 @@
 #!/usr/bin/env bash
+
 # mhcPrecisionRecall.sh: Make the recall vs. precision plots for the MHC for the
-# paper. Execute from the cluster run output directory.
+# paper. Execute from the cluster run output directory. Takes an optional
+# argument, which is the format to generate graphs in.
 
 # Die on errors
 set -e
 
 # We want to put output in this directory
 OUTDIR="paper"
+# And save it in SVG unless someone tells us different.
+GRAPH_FORMAT=${1-svg}
 # We will make this data file
 TSV="${OUTDIR}/mhcPrecisionRecall.tsv"
 # And this plot image
-GRAPH="${OUTDIR}/mhcPrecisionRecall.svg"
+GRAPH="${OUTDIR}/mhcPrecisionRecall.${GRAPH_FORMAT}"
 
 function series {
     # Append a series to the given file with the given name, consisting of the

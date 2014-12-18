@@ -1,17 +1,20 @@
 #!/usr/bin/env bash
 
 # mhcRearrangements.sh: Make a plot about rearrangements. Execute from the
-# cluster run output directory.
+# cluster run output directory. Takes an optional argument, which is the format
+# to generate graphs in.
 
 # Die on errors
 set -e
 
 # We want to put output in this directory
 OUTDIR="paper"
+# And save it in SVG unless someone tells us different.
+GRAPH_FORMAT=${1-svg}
 # We will make this data file
 TSV="${OUTDIR}/mhcRearrangements.tsv"
 # And this plot image
-GRAPH="${OUTDIR}/mhcRearrangements.svg"
+GRAPH="${OUTDIR}/mhcRearrangements.${GRAPH_FORMAT}"
 
 # Make sure the out directory exists
 mkdir -p "${OUTDIR}"

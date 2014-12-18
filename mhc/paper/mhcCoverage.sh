@@ -1,17 +1,20 @@
 #!/usr/bin/env bash
 
 # mhcCoverage.sh: Make the coverage vs. precision and coverage barchart for the
-# MHC for the paper. Execute from the cluster run output directory.
+# MHC for the paper. Execute from the cluster run output directory. Takes an
+# optional argument, which is the format to generate graphs in.
 
 # Die on errors
 set -e
 
 # We want to put output in this directory
 OUTDIR="paper"
+# And save it in SVG unless someone tells us different.
+GRAPH_FORMAT=${1-svg}
 # We will make this data file
 TSV="${OUTDIR}/mhcCoverage.tsv"
 # And this plot image
-GRAPH="${OUTDIR}/mhcCoverage.svg"
+GRAPH="${OUTDIR}/mhcCoverage.${GRAPH_FORMAT}"
 
 function series {
     # Append a series to the given file with the given name, consisting of the
@@ -133,7 +136,7 @@ scatter.py ${TSV} --tsv --no_sort \
 # We will make this data file
 TSV="${OUTDIR}/mhcCoverageBar.tsv"
 # And this plot image
-GRAPH="${OUTDIR}/mhcCoverageBar.svg"
+GRAPH="${OUTDIR}/mhcCoverageBar.${GRAPH_FORMAT}"
 
 # Start fresh
 truncate -s 0 ${TSV}
