@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-# mhcCoverage.sh: Make the coverage (vs. precision) plot for the MHC for the
-# paper. Execute from the cluster run output directory.
+# mhcCoverage.sh: Make the coverage vs. precision and coverage barchart for the
+# MHC for the paper. Execute from the cluster run output directory.
 
 # Die on errors
 set -e
@@ -127,3 +127,88 @@ scatter.py ${TSV} --tsv --no_sort \
     --lines \
     --legend_overlay best \
     --save ${GRAPH}
+    
+# OK now we do the bar chart
+
+# We will make this data file
+TSV="${OUTDIR}/mhcCoverageBar.tsv"
+# And this plot image
+GRAPH="${OUTDIR}/mhcCoverageBar.png"
+
+# Start fresh
+truncate -s 0 ${TSV}
+
+for FILE in `ls coverage.*`
+do
+    # Collect all the coverage info into one file.
+    
+    # Grab the scheme
+    SCHEME=${FILE##*.}
+    
+    cat ${FILE} | cut -f 2 | while read LINE
+    do
+        # Tag each entry with its scheme
+        printf "${SCHEME}\t${LINE}\n" >> ${TSV}
+    done
+    
+done
+
+# We can specify "groupings" of "categories", where each category becomes a
+# boxplot column and each grouping a collection of same. This is accomplished by
+# three options, each of which can be specified multiple times, where the nth
+# specification of each is associated with the nth grouping. We want to group up
+# all the schemes, so we need to generate these options.
+
+# This array stores the "--grouping" options
+GROUPING_OPTS=()
+# This array stores the "--categories" options
+CATEGORY_OPTS=()
+# This array stores the "--category_labels" options
+LABEL_OPTS=()
+
+# Do just the min length one
+GROUPING_OPTS+=("--grouping" "Flat Length Threshold")
+CATEGORY_OPTS+=("--categories" \
+    "ICnaturalMin20" \
+    "ICnaturalMin50" \
+    "ICnaturalMin100" \
+    "ICnaturalMin150" \
+    "ICnaturalMin200" \
+    "ICnaturalMin250")
+LABEL_OPTS+=("--category_labels" "20" "50" "100" "150" "200" "250")
+
+# Do all the other series
+for HAMMING_CLEARANCE in {1..6}
+do
+    # For each minimum Hamming clearance we used...
+    
+    # Title the grouping
+    GROUPING_OPTS+=("--grouping" "Clearance ${HAMMING_CLEARANCE}, Mismatches")
+    
+    # Add category for 0 mismatches
+    CATEGORY_OPTS+=("--categories" "ICnaturalHam${HAMMING_CLEARANCE}")
+    
+    # And label
+    LABEL_OPTS+=("--category_labels" "0")
+    
+    for HAMMING_DISTANCE in $(seq 1 $((HAMMING_CLEARANCE - 1)))
+    do
+        # For each maximum Hamming distance we used that's strictly smaller than
+        # the clearance...
+        
+        # Add and label a category for this number of mismatches
+        CATEGORY_OPTS+=("ICnaturalHam${HAMMING_CLEARANCE}Mis${HAMMING_DISTANCE}")
+        LABEL_OPTS+=("${HAMMING_DISTANCE}")
+    done
+done
+    
+boxplot.py "${TSV}" \
+    --x_label "Merging Scheme" --y_label "Portion Aligned to Reference" \
+    --title "Coverage vs. Merging Scheme" \
+    "${GROUPING_OPTS[@]}" "${CATEGORY_OPTS[@]}" "${LABEL_OPTS[@]}" \
+    --save "${GRAPH}"
+    
+# We put the arrays in quotes and use @ above because that uses the array
+# elements as tokens. If we omit *either* of those, Bash will re-split
+# everything on spaces.
+
