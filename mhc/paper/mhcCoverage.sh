@@ -175,7 +175,7 @@ CATEGORY_OPTS+=("--categories" \
     "ICnaturalMin150" \
     "ICnaturalMin200" \
     "ICnaturalMin250")
-LABEL_OPTS+=("--category_labels" "20" "50" "100" "150" "200" "250")
+LABEL_OPTS+=("--category_labels" "250" "200" "150" "100" "50" "20")
 
 # Do all the other series
 for HAMMING_CLEARANCE in {1..6}
@@ -206,6 +206,7 @@ boxplot.py "${TSV}" \
     --x_label "Merging Scheme" --y_label "Portion Aligned to Reference" \
     --title "Coverage vs. Merging Scheme" \
     "${GROUPING_OPTS[@]}" "${CATEGORY_OPTS[@]}" "${LABEL_OPTS[@]}" \
+    --grouping_colors 'b' 'g' 'r' 'c' 'm' 'y' 'k'
     --save "${GRAPH}"
     
 # We put the arrays in quotes and use @ above because that uses the array
