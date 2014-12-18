@@ -108,4 +108,5 @@ scatter.py ${TSV} --tsv --no_sort \
     --max_x 1 --max_y 1 \
     --lines \
     --legend_overlay best \
+    --no_n \
     --save ${GRAPH}

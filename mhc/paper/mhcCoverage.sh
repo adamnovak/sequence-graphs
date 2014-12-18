@@ -129,6 +129,7 @@ scatter.py ${TSV} --tsv --no_sort \
     --max_x 1 --max_y 1 \
     --lines \
     --legend_overlay best \
+    --no_n \
     --save ${GRAPH}
     
 # OK now we do the bar chart
@@ -205,6 +206,45 @@ do
     done
 done
     
+# Work out the average coverage for the GRC alignment We can't just directly use
+# the MAF coverage output, since we don't want to count Ns in the query against
+# the coverage, since those can naver be aligned.
+
+# Count up the total coverage and number of genomes, to divide.
+TOTAL_COVERAGE=0
+TOTAL_GENOMES=0
+
+while read LINE || [[ -n $LINE ]]
+do
+    # Grab the clipped and cut table of MAF coverage info from the
+    # mafPairCoverage tool, and parse each line.
+
+    # Split on spaces
+    PARTS=(${LINE})
+    
+    # Pull out contig, character count, and aligned bases
+    CONTIG=${PARTS[0]}
+    LENGTH=${PARTS[1]}
+    ALIGNED=${PARTS[2]}
+    
+    # Find the number of Ns
+    N_COUNT=$(cat ../${CONTIG}.fa  | grep -v ">" | grep -o "N" | tr -d '[:space:]' | wc -c)
+    
+    # Find the coverage
+    COVERAGE=$(echo "${ALIGNED} / (${LENGTH} - ${N_COUNT})" | bc -l)
+    
+    echo "Genome ${CONTIG} has N-corrected coverage ${COVERAGE} = ${ALIGNED} / (${LENGTH} - ${N_COUNT})"
+    
+    # Add in for averaging
+    TOTAL_COVERAGE=$(echo "${TOTAL_COVERAGE} + ${COVERAGE}" | bc -l)
+    TOTAL_GENOMES=$((${TOTAL_GENOMES} + 1))
+    
+done <<< "`mafPairCoverage --maf ../GRCAltAlignmentNoMismatch.maf --seq1 refmhc --seq2 \"GI*\" | tail -n +9 | sed 's/\s\s\+/ /g' | sed 's/^\s//g' | cut -f 1,3,4 -d ' '`"
+
+GRC_AVERAGE=$(echo ${TOTAL_COVERAGE} / ${TOTAL_GENOMES} | bc -l)
+    
+echo "GRC average coverage: ${GRC_AVERAGE}"
+    
 boxplot.py "${TSV}" \
     --x_label "Scheme Parameter (Min Length, Mismatches)" \
     --y_label "Portion Aligned to Reference" \
@@ -213,9 +253,10 @@ boxplot.py "${TSV}" \
     --grouping_colors 'b' 'g' 'r' 'c' 'm' 'y' 'k' \
     --legend_overlay 'lower right' --legend_columns 2 \
     --x_sideways \
+    --no_n \
+    --hline ${GRC_AVERAGE} \
     --save "${GRAPH}"
     
 # We put the arrays in quotes and use @ above because that uses the array
 # elements as tokens. If we omit *either* of those, Bash will re-split
 # everything on spaces.
-

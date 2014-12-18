@@ -37,4 +37,5 @@ histogram.py "spectrum.${SCHEME}" \
     --title "$(printf 'Adjacency Component Size Spectrum\n6 Clearance, 5 Mismatches')" \
     --label \
     --redWeight 0 --redWeight 0 --redWeight 0 --redWeight 0 --redWeight "${TANDEM_COUNT}" \
+    --no_n \
     --save "${GRAPH}"
