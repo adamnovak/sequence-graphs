@@ -589,11 +589,73 @@ deduplicateIsomorphicAdjacencyComponents(
     static const int SEQUENCE_EDGE = 0;
     static const int ADJACENCY_EDGE = 1;
     
-    // We need a vector of vflib Graphs that we can go through in a dumb n^2
+    // We need a vector of vflib graphs that we can go through in a dumb n^2
     // deduplication way (since we can't really index them any better AFAIK). We
     // also want to keep adjacency components associated with them.
-    std::vector<std::pair<Graph*, std::vector<stPinchEnd>>> uniqueSet;
+    std::vector<std::pair<ARGraph<void, int>*, std::vector<stPinchEnd>>>
+        uniqueSet;
     
+    for(auto& component : components) {
+        // For each adjacency component
+        
+        // Make it into a vflib graph with appropriate annotations
+        
+        // We need an ARGEdit to build up the graph.
+        ARGEdit builder;
+        
+        // We need this map to keep track of which indexes are used for which
+        // pinch ends. Pinch ends are pretty simple, so we make an inline lambda
+        // comparison function and pass it to our set constructor.
+        typedef std::map<stPinchEnd, size_t,
+            std::function<bool(const stPinchEnd&, const stPinchEnd&)>> EndMap;
+            
+        // Strangely, this doesn't work at all without the typedef.
+        // TODO: Figure out why.
+        EndMap endToIndex([](const stPinchEnd& a, const stPinchEnd& b) {
+            return a.block < b.block ||
+                (a.block == b.block && a.orientation < b.orientation);
+        });
+        
+        for(size_t i = 0; i < component.size(); i++) {
+            // Add each end in the component as a node. Nodes will be referenced
+            // by index.
+            builder.InsertNode(NULL);
+            
+            // Record the index of the end, under the actual value of the
+            // stPinchEnd.
+            endToIndex[component[i]] = i;
+        }
+        
+        for(size_t i = 0; i < component.size(); i++) {
+            // Now we insert edgesfor each node to higher-valued nodes.
+            
+            // Go through all the other ends and connect them to this one.
+            // We need to pass a non-const pointer
+            stPinchEnd endCopy = component[i];
+            stSet* otherEnds = stPinchEnd_getConnectedPinchEnds(&endCopy);
+            
+            // Make an iterator to loop over all the other ends we connect to.
+            stSetIterator* iterator = stSet_getIterator(otherEnds); 
+            
+            // Start out with the first one
+            stPinchEnd* otherEnd = (stPinchEnd*) stSet_getNext(iterator);
+            
+            while(otherEnd != NULL) {
+                // For each other end we actually have...
+                
+                // See if the edge is in the right direction, and add it.
+                
+                // Advance to the next edge
+                otherEnd = (stPinchEnd*) stSet_getNext(iterator);
+            }
+            
+            
+        }
+        
+        // See if that graph is isomorphic to any we have seen so far
+        
+        // If not, put the new graph and component on the list
+    }
     
     // What componsnts will we return?
     std::vector<std::vector<stPinchEnd>> toReturn;
