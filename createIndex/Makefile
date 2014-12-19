@@ -73,7 +73,7 @@ clean:
 	
 # We can automagically get header dependencies.
 dependencies.mk: *.cpp *.hpp
-	g++ $(CXXFLAGS) -MM *.cpp > dependencies.mk
+	$(CXX) $(CXXFLAGS) -MM *.cpp > dependencies.mk
 	
 # Include auto-generated dependencies.
 include dependencies.mk
