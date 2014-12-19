@@ -3,7 +3,7 @@
 #include <vector>
 #include <cstdlib>
 #include <sstream>
-#include <set>
+#include <unordered_set>
 #include <algorithm>
 #include <utility>
 #include <ctime>
@@ -126,8 +126,7 @@ writeDegrees(
 
     // We're going go through each thread one segment at a time, to make sure we
     // catch all the single segments.
-    // TODO: When we get c++11, make this an unordered_set
-    std::set<stPinchBlock*> seen;
+    std::unordered_set<stPinchBlock*> seen;
     
     // Make an iterator over pinch threads
     stPinchThreadSetIt threadIterator = stPinchThreadSet_getIt(threadSet);

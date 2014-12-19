@@ -4,3 +4,6 @@
 [submodule "deps/sonLib"]
 	path = deps/sonLib
 	url = git@github.com:benedictpaten/sonLib.git
+[submodule "deps/vflib"]
+	path = deps/vflib
+	url = https://github.com/adamnovak/vflib.git
