@@ -9,8 +9,8 @@ set -e
 
 # We want to put output in this directory
 OUTDIR="paper"
-# And save it in SVG unless someone tells us different.
-GRAPH_FORMAT=${1-svg}
+# Do this one in pdf by default since histogram with log scale hates SVG.
+GRAPH_FORMAT=${1-pdf}
 # We will make this data file
 TSV="${OUTDIR}/mhcRearrangements.tsv"
 # And this plot image
