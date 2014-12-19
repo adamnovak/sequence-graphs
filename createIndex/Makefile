@@ -14,11 +14,12 @@ MAPREADS_OBJS=mapReads.o
 CACTUSMERGE_OBJS=cactusMerge.o 
 
 # What projects do we depend on? We have rules for each of these.
-DEPS=pinchesAndCacti sonLib libsuffixtools libfmd
+DEPS=pinchesAndCacti sonLib vflib libsuffixtools libfmd
 
 # Specify all the libs to link with.
 LDLIBS += ../deps/sonLib/lib/stPinchesAndCacti.a ../deps/sonLib/lib/sonLib.a \
 ../libFMD/libfmd.a ../libsuffixtools/libsuffixtools.a \
+../deps/vflib/lib/libvf.a \
 -lboost_filesystem -lboost_program_options -lpthread -lz -lboost_system -lsdsl
 
 # We need to make sure all our dependency header files are where our other
@@ -27,7 +28,7 @@ LDLIBS += ../deps/sonLib/lib/stPinchesAndCacti.a ../deps/sonLib/lib/sonLib.a \
 # to grab all the internal include directories from libsuffixtools.
 CXXFLAGS += -std=c++11 -O3 -g -rdynamic -I../deps \
 -I../deps/pinchesAndCacti/inc -I../deps/sonLib/C/inc -I../libFMD \
--I../libsuffixtools
+-I../libsuffixtools -I../deps/vflib/include
 
 # Stop deleting intermediate files I might need to use in the final program!
 .SECONDARY:
@@ -44,6 +45,11 @@ pinchesAndCacti: sonLib
 # transitive sonLib dependency
 sonLib:
 	$(MAKE) -C ../deps/sonLib
+	
+# dependency on VFLib graph matching library for analyzing rearrangement
+# structures
+vflib:
+	$(MAKE) -C ../deps/vflib
 	
 # libsuffixtools dependency
 libsuffixtools:
