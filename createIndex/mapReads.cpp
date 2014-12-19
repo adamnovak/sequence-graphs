@@ -30,10 +30,10 @@
 #include <Mapping.hpp>
 #include <SmallSide.hpp>
 #include <Log.hpp>
-#include <MarkovModel.hpp>
 #include <Fasta.hpp>
-#include <CreditFilter2.hpp>
-#include <DisambiguateFilter.hpp>
+#include <MappingScheme.hpp>
+#include <LRMappingScheme.hpp>
+#include <NaturalMappingScheme.hpp>
 
 // Grab timers from libsuffixtools
 #include <Timer.h>
@@ -155,9 +155,8 @@ saveLines(
 
 /**
  * Read FASTA sequence names and sequences from the input queue, map them to the
- * reference in the given index, with the given range vector, following the
- * given scheme parameters, and send lines of mapping TSV output to the output
- * queue.
+ * reference in the given index, according to the given mapping scheme, and send
+ * lines of mapping TSV output to the output queue.
  *
  * Returns the total mappings made.
  */
@@ -166,12 +165,7 @@ mapSomeReads(
     ConcurrentQueue<std::pair<std::string, std::string>>* recordsIn, 
     const std::pair<std::string, std::string>& referenceRecord,
     const FMDIndex& index,
-    const GenericBitVector& ranges,
-    size_t minContext,
-    size_t addContext,
-    double multContext,
-    size_t mismatches,
-    bool credit,
+    const MappingScheme* mappingScheme,
     ConcurrentQueue<std::string>* linesOut
 ) {
 
@@ -189,69 +183,21 @@ mapSomeReads(
         std::string recordName = record.first;
         std::string sequence = record.second;
         
-        // Map the sequence with credit
-
-        // Map it on the right.
-        std::vector<Mapping> rightMappings = index.misMatchMap(ranges,
-            sequence, -1, minContext, addContext, multContext, 0,
-            mismatches);
-
-        // Map it on the left
-        std::vector<Mapping> leftMappings = index.misMatchMap(ranges, 
-            reverseComplement(sequence), -1, minContext, 
-            addContext, multContext, 0, mismatches);
-
-        // Flip the left mappings back into the original order. They should
-        // stay as other-side ranges.
-        std::reverse(leftMappings.begin(), leftMappings.end());
-
-        for(size_t i = 0; i < leftMappings.size(); i++) {
-            // Convert left and right mappings from ranges to base
-            // positions.
-            
-            if(leftMappings[i].isMapped()) {
-                // Locate by the BWT index we infer from the range number.
-                // We can do this since we made each BWT position its own
-                // range.
-                leftMappings[i].setLocation(index.locate(
-                    leftMappings[i].getRange() - 1));
-            }
-
-            if(rightMappings[i].isMapped()) {
-                // Locate by the BWT index we infer from the range number.
-                rightMappings[i].setLocation(index.locate(
-                    rightMappings[i].getRange() - 1));
-            }
-        }
-
-        for(size_t i = 0; i < leftMappings.size(); i++) {
-            // Convert all the left mapping positions to right semantics
-            
-            if(leftMappings[i].isMapped()) {
-                // Flip anything that's mapped, using the length of the
-                // contig it mapped to.
-                leftMappings[i] = leftMappings[i].flip(index.getContigLength(
-                    leftMappings[i].getLocation().getContigNumber()));
-            }
-        }
+        // Map the sequence with the mapping scheme
         
-        // Run the mappings through a filter to disambiguate and possibly
-        // apply credit.
-        std::vector<Mapping> filteredMappings;    
-        if(credit) {
-            // Apply a credit filter to the mappings
-            filteredMappings = CreditFilter2(index, ranges, mismatches).apply(
-                leftMappings, rightMappings, sequence);
-        } else {
-            // Apply only a disambiguate filter to the mappings
-            filteredMappings = DisambiguateFilter(index).apply(leftMappings,
-                rightMappings);
-        }
+        // Make a vector of mappings to populate.
+        std::vector<Mapping> mappings(sequence.size());
         
-        // Do one final pass to remove mappings of the wrong base, and
-        // output. TODO: Make a real filter.
+        // Go and map
+        mappingScheme->map(sequence, [&](size_t base, TextPosition mappedTo) {
+            // For each TextPosition we get, make a Mapping
+            mappings[base] = Mapping(mappedTo);
+        });
+        
+        
+        // Output each query base, noting which mapped and to where.
         for(size_t i = 0; i < sequence.size(); i++) {
-            Mapping mapping = filteredMappings[i];
+            Mapping mapping = mappings[i];
             
             if(mapping.isMapped()) {
             
@@ -282,47 +228,35 @@ mapSomeReads(
                     // character on a character it doesn't match.
                     mapping = Mapping();
                     
-                    Log::info() << "Tried mapping " << recordName << ":" <<
+                    Log::critical() << "Tried mapping " << recordName << ":" <<
                         i << " (" << mapped << ") to " << 
                         referenceRecord.first << ":" << 
                         mapping.getLocation().getOffset() << "." << backwards <<
                         " (" << mappedTo << ")" << std::endl;
-                        
-                    // Report that this base is unmapped.
-                    // TODO: don't duplicate this stringstream code 3 times.
-                    std::stringstream mappingStream;
-                    mappingStream << recordName << "\t" << i << std::endl;
                     
-                    // Make a string of the output
-                    std::string line(mappingStream.str());
-                    
-                    // Send it
-                    auto lineLock = linesOut->lock();
-                    linesOut->enqueue(line, lineLock);
-                    
-                } else {
-                
-                    // Now do the output for this line, because this
-                    // position mapped. Do it as reference, then query.
-                    // And do it to this stringstream.
-                    std::stringstream mappingStream;
-                    mappingStream << referenceRecord.first << "\t" << 
-                        mapping.getLocation().getOffset() << "\t" << 
-                        recordName << "\t" << 
-                        i << "\t" << 
-                        backwards << std::endl;
-                    
-                    // Make a string of the output
-                    std::string line(mappingStream.str());
-                    
-                    // Send it
-                    auto lineLock = linesOut->lock();
-                    linesOut->enqueue(line, lineLock);
-                        
-                    // Count that we had a mapping
-                    totalMappings++;
-                        
+                    throw std::runtime_error("Non-matching mapping!");
                 }
+                
+                
+                // Now do the output for this line, because this position
+                // mapped. Do it as reference, then query. And do it to this
+                // stringstream.
+                std::stringstream mappingStream;
+                mappingStream << referenceRecord.first << "\t" << 
+                    mapping.getLocation().getOffset() << "\t" << 
+                    recordName << "\t" << 
+                    i << "\t" << 
+                    backwards << std::endl;
+                
+                // Make a string of the output
+                std::string line(mappingStream.str());
+                
+                // Send it
+                auto lineLock = linesOut->lock();
+                linesOut->enqueue(line, lineLock);
+                    
+                // Count that we had a mapping
+                totalMappings++;
                 
             } else {
                 // Report this query base as unaligned (just its contig and
@@ -411,13 +345,25 @@ main(
         ("alignment", boost::program_options::value<std::string>()
             ->required(), 
             "File to save alignment in, as a TSV of mappings")
+        ("threads", boost::program_options::value<size_t>()
+            ->default_value(16),
+            "Number of mapping threads to run")
         ("credit", "Mapping on credit for greedy scheme")
         ("mismatches", boost::program_options::value<size_t>()
             ->default_value(0), 
             "Maximum allowed number of mismatches")
-        ("threads", boost::program_options::value<size_t>()
-            ->default_value(16),
-            "Number of mapping threads to run");
+        ("mapType", boost::program_options::value<std::string>()
+            ->default_value("LR"),
+            "Merging scheme (\"natural\" or \"LR\")")
+        ("ignoreMatchesBelow", boost::program_options::value<size_t>()
+            ->default_value(0), 
+            "Length below which to ignore maximal unique matches")
+        ("minHammingBound", boost::program_options::value<size_t>()
+            ->default_value(0), 
+            "Minimum Hamming distance lower bound on a maximum unique match")
+        ("maxHammingDistance", boost::program_options::value<size_t>()
+            ->default_value(0), 
+            "Maximum Hamming distance from reference location");
         
     // And set up our positional arguments
     boost::program_options::positional_options_description positionals;
@@ -507,17 +453,46 @@ main(
     }
     ranges.finish(index.getBWTLength());
     
-    // Grab a bool for whether we'll map on credit    
-    bool credit = options.count("credit");
-    
-    // Parse out the rest of the mapping scheme parameters
-    size_t minContext = options["context"].as<size_t>();
-    size_t addContext = options["addContext"].as<size_t>();
-    size_t mismatches = options["mismatches"].as<size_t>();
-    double multContext = options["multContext"].as<double>();
-    
-    // And the number of threads to use
+    // Parse the number of threads to use
     size_t numThreads = options["threads"].as<size_t>();
+    
+    // Make a mapping scheme from the command-line options. TODO: unify with
+    // createIndex's code for this.
+    MappingScheme* mappingScheme;
+    
+    if(options["mapType"].as<std::string>() == "LR") {
+        // We want an LRMappingScheme
+        LRMappingScheme* scheme = new LRMappingScheme(index, ranges);
+            
+        // Populate it
+        scheme->minContext = options["context"].as<size_t>();
+        scheme->addContext = options["addContext"].as<size_t>();
+        scheme->multContext = options["multContext"].as<double>();
+        scheme->credit = options.count("credit");
+        scheme->z_max = options["mismatches"].as<size_t>();
+        
+        mappingScheme = (MappingScheme*) scheme;
+    } else if(options["mapType"].as<std::string>() == "natural") {
+        // We want a NaturalMappingScheme
+        NaturalMappingScheme* scheme = new NaturalMappingScheme(index, ranges);
+            
+        // Populate it
+        scheme->credit = options.count("credit");
+        scheme->minContext = options["context"].as<size_t>();
+        scheme->z_max = options["mismatches"].as<size_t>();
+        scheme->ignoreMatchesBelow = options[
+            "ignoreMatchesBelow"].as<size_t>();
+        scheme->minHammingBound = options[
+            "minHammingBound"].as<size_t>();
+        scheme->maxHammingDistance = options[
+            "maxHammingDistance"].as<size_t>();
+        
+        mappingScheme = (MappingScheme*) scheme;
+    } else {
+        // They asked for a mapping scheme we don't have.
+        throw std::runtime_error("Invalid mapping scheme: " +
+            options["mapType"].as<std::string>());
+    }
     
     // Open the alignment file for writing
     std::ofstream alignment(options["alignment"].as<std::string>());
@@ -540,8 +515,7 @@ main(
     for(size_t i = 0; i < numThreads; i++) {
         // Then some threads to process the reads
         threads.push_back(Thread(&mapSomeReads, &recordQueue, referenceRecord,
-            std::ref(index), std::ref(ranges), minContext, addContext, 
-            multContext, mismatches, credit, &lineQueue));
+            std::ref(index), mappingScheme, &lineQueue));
     }
     
     // Then a thread to do the writing
@@ -551,6 +525,10 @@ main(
         // Wait for all the threads to be done
         thread.join();
     }
+    
+    
+    // Get rid of the mapping scheme now that everyone is done with it.
+    delete mappingScheme;
     
     // Get rid of the index itself. Invalidates the index reference.
     delete indexPointer;
