@@ -1,6 +1,11 @@
 #include "adjacencyComponentUtil.hpp"
 #include <Log.hpp>
 
+// Pull in VFLib for graph matching, to deduplicate isomorphic components.
+#include <argraph.h>
+#include <argedit.h>
+#include <vf2_sub_state.h>
+
 #include <algorithm>
 #include <unordered_set>
 #include <fstream>
@@ -77,7 +82,7 @@ getAdjacencyComponents(
 
 std::map<size_t, size_t>
 getAdjacencyComponentSpectrum(
-    std::vector<std::vector<stPinchEnd>> components
+    const std::vector<std::vector<stPinchEnd>>& components
 ) {
     
     Log::info() << "Making adjacency component spectrum..." << std::endl;
@@ -106,7 +111,7 @@ getAdjacencyComponentSpectrum(
 
 std::vector<std::vector<stPinchEnd>>
 filterComponentsBySize(
-    std::vector<std::vector<stPinchEnd>> components,
+    const std::vector<std::vector<stPinchEnd>>& components,
     size_t size,
     std::function<bool(size_t, size_t)> comparison
 ) {
@@ -234,7 +239,7 @@ getAllPaths(
 
 std::vector<int64_t>
 getIndelLengths(
-    std::vector<std::vector<stPinchEnd>> components
+    const std::vector<std::vector<stPinchEnd>>& components
 ) {
 
     Log::info() << "Getting indel lengths from " << components.size() << 
@@ -333,7 +338,7 @@ getIndelLengths(
 
 size_t
 countTandemDuplications(
-    std::vector<std::vector<stPinchEnd>> components
+    const std::vector<std::vector<stPinchEnd>>& components
 ) {
 
     Log::info() << "Counting tandem duplications in " << components.size() << 
@@ -456,7 +461,7 @@ countTandemDuplications(
 
 void
 writeAdjacencyComponents(
-    std::vector<std::vector<stPinchEnd>> components,
+    const std::vector<std::vector<stPinchEnd>>& components,
     const std::string& filename
 ) {
     // Open file for writing
@@ -572,6 +577,46 @@ writeAdjacencyComponents(
     
     // Close up
     out.close();
+}
+
+std::vector<std::vector<stPinchEnd>>
+deduplicateIsomorphicAdjacencyComponents(
+    const std::vector<std::vector<stPinchEnd>>& components
+) {
+
+    // We need these for tracking whether edges are sequence edges or adjacency
+    // edges. We put pointers to them on the vflib graph edges.
+    static const int SEQUENCE_EDGE = 0;
+    static const int ADJACENCY_EDGE = 1;
+    
+    // We need a vector of vflib Graphs that we can go through in a dumb n^2
+    // deduplication way (since we can't really index them any better AFAIK). We
+    // also want to keep adjacency components associated with them.
+    std::vector<std::pair<Graph*, std::vector<stPinchEnd>>> uniqueSet;
+    
+    
+    // What componsnts will we return?
+    std::vector<std::vector<stPinchEnd>> toReturn;
+    // Hint to the vector how big it will get, because someone on StackOverflow
+    // somewhere said that that was smart.
+    // <http://stackoverflow.com/a/7671804/402891>
+    toReturn.reserve(uniqueSet.size());
+    
+    for(auto& pair : uniqueSet) {
+        // Go through the final deduplicated set
+        
+        // Kill all the Graphs left in the deduplicated set.
+        delete pair.first;
+        
+        // Move the component into the new vector, so we can return it.
+        toReturn.push_back(std::move(pair.second));
+    }
+    
+    // Return the deduplicated components
+    return toReturn;
+    
+     
+    
 }
 
 

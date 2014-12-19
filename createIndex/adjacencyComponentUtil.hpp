@@ -32,7 +32,7 @@ getAdjacencyComponents(
  */
 std::map<size_t, size_t>
 getAdjacencyComponentSpectrum(
-    std::vector<std::vector<stPinchEnd>> components
+    const std::vector<std::vector<stPinchEnd>>& components
 );
 
 /**
@@ -41,7 +41,7 @@ getAdjacencyComponentSpectrum(
  */
 std::vector<std::vector<stPinchEnd>>
 filterComponentsBySize(
-    std::vector<std::vector<stPinchEnd>> components,
+    const std::vector<std::vector<stPinchEnd>>& components,
     size_t size,
     std::function<bool(size_t, size_t)> = [](size_t a, size_t b) { 
         return a == b;
@@ -66,7 +66,7 @@ getAllPaths(
  */
 std::vector<int64_t>
 getIndelLengths(
-    std::vector<std::vector<stPinchEnd>> components
+    const std::vector<std::vector<stPinchEnd>>& components
 );
 
 /**
@@ -76,7 +76,7 @@ getIndelLengths(
  */
 size_t
 countTandemDuplications(
-    std::vector<std::vector<stPinchEnd>> components
+    const std::vector<std::vector<stPinchEnd>>& components
 );
 
 /**
@@ -84,10 +84,20 @@ countTandemDuplications(
  */
 void
 writeAdjacencyComponents(
-    std::vector<std::vector<stPinchEnd>> components,
+    const std::vector<std::vector<stPinchEnd>>& components,
     const std::string& filename
 );
 
+/**
+ * Given a vector of adjacency components (vectors of pinch ends), will keep
+ * only one representative member of any set of isomorphic components. So if you
+ * throw in 10 different 2-break rearrangement components with 4 nodes, 2
+ * sequence edges, and 2 adjacency edges, you will only get one of them back.
+ */
+std::vector<std::vector<stPinchEnd>>
+deduplicateIsomorphicAdjacencyComponents(
+    const std::vector<std::vector<stPinchEnd>>& components
+);
 
 
 #endif
