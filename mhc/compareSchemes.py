@@ -139,7 +139,8 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
 
     def generateSchemes(self):
         """
-        Whatever schemes I want to test at the moment
+        Yield tuples of scheme names and the extra arguments createIndex needs
+        to use those mapping schemes.
         
         """
         

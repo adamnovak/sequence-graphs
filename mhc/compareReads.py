@@ -155,16 +155,19 @@ class AlignerAssessmentTarget(jobTree.scriptTree.target.Target):
         """
         
         # Plan out all the schemes as mismatch, credit, min_context,
-        # add_context, mult_context, min_coding_cost
-        return [
-            # Exact no credit min 100
-            (False, False, 100, 0, 0, 0),
-            # Inexact credit min 100
-            (True, True, 100, 0, 0, 0),
-            # MultContext without min
-            (True, True, 0, 0, 4.0, 0),
-            (True, True, 0, 0, 8.0, 0)
-        ]
+        # add_context, mult_context, ignore_below, hamming_bound, hamming_max,
+        # map_type
+        return set([
+            # Exact credit (tolerating 1 mismatch) with Hamming bound, but no
+            # mismatches.
+            (True, True, None, None, None, None, 1, None, "natural"),
+            # Natural,  Hamming bound 6, 5 mismatches in gaps.
+            (True, True, None, None, None, None, 6, 5, "natural"),
+            # Natural, Hamming bound 3, 2 mismatches.
+            (True, True, None, None, None, None, 3, 2, "natural"), 
+            # Natural Hamming bound 1
+            (True, True, None, None, None, None, 1, None, "natural")
+        ])
 
         
    
@@ -175,19 +178,18 @@ class AlignerAssessmentTarget(jobTree.scriptTree.target.Target):
         
         """
         
-        # Get a big list of tuples succinctly describing all the schemes we want
+        # Get a big set of tuples succinctly describing all the schemes we want
         # to run.
         scheme_plan = self.getSchemePlan()
         
         for mismatch, credit, min_context, add_context, mult_context, \
-            min_coding_cost in scheme_plan:
+            ignore_below, hamming_bound, hamming_max, map_type in scheme_plan:
             # Unpack each planned scheme
             
-            # Start out with the context args
-            extra_args = ["--context", str(min_context), "--addContext",
-                str(add_context), "--multContext", str(mult_context)]
+            # Start out with no configuration arguments
+            extra_args = []
             
-            # And give it a name to stick on our output files
+            # Give the scheme a name to stick on our output files
             scheme_name = "E"
             if mismatch:
                 # Add the args and scheme name component for mismatch
@@ -201,24 +203,72 @@ class AlignerAssessmentTarget(jobTree.scriptTree.target.Target):
             else:
                 # Add an N for no credit
                 scheme_name += "N"
+            
+            # Handle mapping types
+            scheme_name += map_type
+            extra_args.append("--mapType")
+            extra_args.append(map_type)
+            
+            if min_context is not None:
+                # Require a min context
+                extra_args.append("--context")
+                extra_args.append(str(min_context))
                 
-            if min_context > 0:
                 # Include min conext in the name if in use
                 scheme_name += "Min{}".format(min_context)
-            
-            if add_context > 0:
-                # Include additional context if in use. No need for badding
+                
+            if add_context is not None:
+                # Require an additional context
+                extra_args.append("--addContext")
+                extra_args.append(str(add_context))
+                
+                # Include additional context if in use. No need for padding
                 # since we can now natural sort.
                 scheme_name += "Add{}".format(add_context)
                 
-            if mult_context > 0:
+            if mult_context is not None:
+                # Require a context multiplier
+                extra_args.append("--multContext")
+                extra_args.append(str(mult_context))
+                
                 # Include multiplicative context if in use. Don't let any .s
                 # into the scheme name since it needs to be a valid file
                 # extension.
                 scheme_name += "Mult{}".format(mult_context).replace(".", "p")
                 
+            if ignore_below is not None:
+                # For the natrual mapping scheme, require a minimum length to
+                # even count a maximum unique match (so short by-chance ones
+                # can't cause conflicts that blacklist bases.)
+                extra_args.append("--ignoreMatchesBelow")
+                extra_args.append(str(ignore_below))
+                
+                # Mention it in the scheme name
+                scheme_name += "Ign{}".format(ignore_below)
+                
+            if hamming_bound is not None:
+                # For the natural mapping scheme, don't map on a maximum unique
+                # match run unless we can get a lower bound on its Hamming
+                # distance from all other reference locations that is at least
+                # this high.
+                extra_args.append("--minHammingBound")
+                extra_args.append(str(hamming_bound))
+                
+                # Mention it in the scheme name
+                scheme_name += "Ham{}".format(hamming_bound)
+                
+            if hamming_max is not None:
+                # For the natural mapping scheme, allow this many mismatches in
+                # maximal unique match runs.
+                extra_args.append("--maxHammingDistance")
+                extra_args.append(str(hamming_max))
+                
+                # Mention it in the scheme name
+                scheme_name += "Mis{}".format(hamming_max)
+                
             # Yield the name with the args.
             yield (scheme_name, extra_args)
+        
         
         
         
