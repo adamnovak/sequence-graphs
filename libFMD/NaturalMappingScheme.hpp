@@ -82,6 +82,13 @@ public:
      */
     size_t maxHammingDistance = 0;
     
+    /**
+     * Should we enable potentially unstable (as in, mappings can change on
+     * extension, not as in may crash the program) mapping hacks to increase
+     * coverage when mapping reads?
+     */
+    bool unstable = false;
+    
 protected:
     /**
      * Map the given query string, producing a vector of Mappings. Does not

@@ -462,6 +462,13 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
     // the right edge?
     size_t rightmostMappable = rightmostMinMatching.start;
     
+    if(unstable) {
+        // Cheat out of the above and let us map right up to the edge if we have
+        // a unique matching.
+        leftmostMappable = 0;
+        rightmostMappable = query.size() - 1;
+    }
+    
     Log::info() << "Able to map in range " << leftmostMappable << " - " <<
         rightmostMappable << std::endl;
     

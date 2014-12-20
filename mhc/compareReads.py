@@ -154,19 +154,24 @@ class AlignerAssessmentTarget(jobTree.scriptTree.target.Target):
         
         """
         
-        # Plan out all the schemes as mismatch, credit, min_context,
+        # Plan out all the schemes as mismatch, credit, unstable, min_context,
         # add_context, mult_context, ignore_below, hamming_bound, hamming_max,
         # map_type
         return set([
             # Exact credit (tolerating 1 mismatch) with Hamming bound, but no
             # mismatches.
-            (True, True, None, None, None, None, 1, None, "natural"),
+            (True, True, False, None, None, None, None, 1, None, "natural"),
             # Natural,  Hamming bound 6, 5 mismatches in gaps.
-            (True, True, None, None, None, None, 6, 5, "natural"),
+            (True, True, False, None, None, None, None, 6, 5, "natural"),
             # Natural, Hamming bound 3, 2 mismatches.
-            (True, True, None, None, None, None, 3, 2, "natural"), 
+            (True, True, False, None, None, None, None, 3, 2, "natural"), 
             # Natural Hamming bound 1
-            (True, True, None, None, None, None, 1, None, "natural")
+            (True, True, False, None, None, None, None, 1, None, "natural"),
+            # Unstable versions
+            (True, True, True, None, None, None, None, 1, None, "natural"),
+            (True, True, True, None, None, None, None, 6, 5, "natural"),
+            (True, True, True, None, None, None, None, 3, 2, "natural"),
+            (True, True, True, None, None, None, None, 1, None, "natural")
         ])
 
         
@@ -182,8 +187,9 @@ class AlignerAssessmentTarget(jobTree.scriptTree.target.Target):
         # to run.
         scheme_plan = self.getSchemePlan()
         
-        for mismatch, credit, min_context, add_context, mult_context, \
-            ignore_below, hamming_bound, hamming_max, map_type in scheme_plan:
+        for mismatch, credit, unstable, min_context, add_context, \
+            mult_context, ignore_below, hamming_bound, hamming_max, map_type \
+            in scheme_plan:
             # Unpack each planned scheme
             
             # Start out with no configuration arguments
@@ -265,6 +271,11 @@ class AlignerAssessmentTarget(jobTree.scriptTree.target.Target):
                 
                 # Mention it in the scheme name
                 scheme_name += "Mis{}".format(hamming_max)
+                
+            if unstable:
+                # Allow some instability
+                extra_args.append("--unstable")
+                scheme_name += "U"
                 
             # Yield the name with the args.
             yield (scheme_name, extra_args)
