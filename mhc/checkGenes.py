@@ -445,7 +445,7 @@ def main(args):
         options.classCounts.write("{}\t{}\n".format(classification, total))
         
     # Add in a fake class for total query contigs mapped
-    options.classCounts.write("!queriesMapped\t{}".format(len(mapped_queries)))
+    options.classCounts.write("!queriesMapped\t{}\n".format(len(mapped_queries)))
         
     for classification, gene_mappings in gene_sets.iteritems():
         # For each set of query genes with mappings in a class
