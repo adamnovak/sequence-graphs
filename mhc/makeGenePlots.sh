@@ -36,6 +36,10 @@ do
         then
             # This one was unmapped. Add it in.
             TOTAL_UNMAPPED=$((${TOTAL_UNMAPPED} + ${COUNT}))
+        elif [[ ${CATEGORY} == "!*" ]]
+        then
+            # Skip this one
+            echo "Metadata category ${CATEGORY}"
         else
             # This one was mapped. Add it in.
             TOTAL_MAPPED=$((${TOTAL_MAPPED} + ${COUNT}))

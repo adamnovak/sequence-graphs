@@ -236,10 +236,11 @@ def get_mappings_from_tsv(tsv_stream):
 
 def classify_mappings(mappings, genes):
     """
-    Given a source of (contig, base, other contig, other base, orientation) or
-    (other contig, other base) mappings (in reference, query order), and a
-    soucre of (contig, start, end, gene name, strand number) genes, yield a
-    (class, fromGene, toGene, mapping) tuple for each mapping.
+    Given a source of (contig, base, other contig, other base, query read label,
+    orientation) or (other contig, other base, query read label) mappings (in
+    reference, query order), and a soucre of (contig, start, end, gene name,
+    strand number) genes, yield a (class, fromGene, toGene, mapping) tuple for
+    each mapping.
     
     """
     
@@ -254,7 +255,7 @@ def classify_mappings(mappings, genes):
     for mapping in mappings:
         # Look at each mapping
         
-        if len(mapping) == 5:
+        if len(mapping) == 6:
         
             # Unpack the mapping
             contig1, base1, contig2, base2, query_read, orientation = mapping
@@ -323,9 +324,9 @@ def classify_mappings(mappings, genes):
                 
             # OK that's all the cases for mapped bases.
             
-        elif len(mapping) == 2:
+        elif len(mapping) == 3:
             # Unpack the mapping (numbered 2 for consistency with above)
-            contig2, base2 = mapping
+            contig2, base2, query_read = mapping
             
             # Pull a set of name, strand pairs for this position
             genes2 = set(geneTrees[contig2].find(base2, base2))
@@ -418,13 +419,13 @@ def main(args):
         if len(mapping) == 6:
             # We have query and reference positions
             _, _, contig2, base2, query_read, _ = mapping
+            
+            # Note that we had a mapping in this query read
+            mapped_queries.add(query_read)
         elif len(mapping) == 3:
             # We only have the query position
             contig2, base2, query_read = mapping
             
-        # Note that wehad a mapping in this query read
-        mapped_queries.add(query_read)
-        
         # Record it in its class for its gene pair (which may be Nones)
         class_counts[classification][gene_from][gene_to] += 1
         
