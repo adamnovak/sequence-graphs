@@ -106,7 +106,9 @@ def get_mappings_from_maf(maf_stream):
     query contig, yield individual base mappings from the alignment.
     
     Each mappings is a tuple of (reference contig, reference base, query contig,
-    query base, is backwards).
+    query base, query read name, is backwards).
+    
+    The query read name is just the query contig name in a MAF.
     
     """
     
@@ -159,7 +161,7 @@ def get_mappings_from_maf(maf_stream):
             for char1, char2 in itertools.izip(record1, record2):
                 if char1 != "-" and char2 != "-":
                     # This is an aligned character. Yield a base mapping.
-                    yield (reference, index1, query, index2, 
+                    yield (reference, index1, query, index2, query,
                         (delta1 != delta2))
                         
                 if char1 != "-":
@@ -171,11 +173,18 @@ def get_mappings_from_maf(maf_stream):
                     
 def get_mappings_from_tsv(tsv_stream):
     """
-    Given a TSV stream of mappings like
-    <reference>\t<position>\t<query>\t<position>\t<isBackwards> (or
-    <query>\t<position> for unmapped bases), where the query name is of the form
-    <actual query contig>:<start>-<end>, parse out and yield mappings between
-    the actual full query sequence and the reference.
+    Given a TSV stream of read mappings like
+    <reference>\t<position>\t<query>\t<position>\t<isBackwards>
+    (or <query>\t<position> for unmapped bases), where the query name is of the
+    form <actual query contig>:<start>-<end>, parse out and yield mappings
+    between the actual full query sequence and the reference.
+    
+    Mappings are of the form (reference, position, query, position, query read
+    name, is backwards), where query is the query contig name, and query read
+    name is the query:start-end name of the read on which the mapping came from.
+    
+    Unmapped positions come out as tuples of the form (query, position, query
+    read name)
     
     """
     
@@ -205,7 +214,7 @@ def get_mappings_from_tsv(tsv_stream):
             
             # Assemble a mapping of the original query sequence and yield it.
             yield (reference_name, reference_position, query_name, 
-                query_position + query_offset, is_backwards)
+                query_position + query_offset, query, is_backwards)
         elif len(parts) == 2:
             # This base is unmapped
             # Parse out everything
@@ -222,7 +231,7 @@ def get_mappings_from_tsv(tsv_stream):
             # Where on it did this sequence start?
             query_offset = int(query_parts[0])
             
-            yield (query_name, query_position + query_offset)
+            yield (query_name, query_position + query_offset, query)
             
 
 def classify_mappings(mappings, genes):
@@ -248,7 +257,7 @@ def classify_mappings(mappings, genes):
         if len(mapping) == 5:
         
             # Unpack the mapping
-            contig1, base1, contig2, base2, orientation = mapping
+            contig1, base1, contig2, base2, query_read, orientation = mapping
             
             # Pull the name, strand tuples for both ends
             genes1 = set(geneTrees[contig1].find(base1, base1))
@@ -372,7 +381,9 @@ def main(args):
         for bed in options.beds])
     
     if options.maf is not None:
-        # Get all the mappings
+        # Get all the mappings. Mappings are tuples in the form (reference, 
+        # offset, query, offset, query read name, is backwards). In a maf the
+        # query read name is just the query name.
         mappings = get_mappings_from_maf(options.maf)
     elif options.tsv is not None:
         # Get all the mappings by re-assembling reads mapped in a TSV
@@ -382,7 +393,8 @@ def main(args):
         raise Exception("No mappings provided")
         
     
-    # Classify each mapping in light of the genes
+    # Classify each mapping in light of the genes, tagging it with a
+    # classiication, and the genes it is from and to (which may be None).
     classified = classify_mappings(mappings, genes)
     
     # This will count up the instances of each class, by source and destination
@@ -395,23 +407,23 @@ def main(args):
     gene_sets = collections.defaultdict(lambda: collections.defaultdict(
         lambda: collections.defaultdict(set)))
     
-    # This set keeps track of the names of the queries in which we have observed
-    # any mappings.
+    # This set keeps track of the names of the query reads in which we have
+    # observed any mappings.
     mapped_queries = set()
     
     for classification, gene_from, gene_to, mapping in classified:
         # For each classified mapping
         
         # Unpack the mapping
-        if len(mapping) == 5:
+        if len(mapping) == 6:
             # We have query and reference positions
-            _, _, contig2, base2, _ = mapping
-        elif len(mapping) == 2:
+            _, _, contig2, base2, query_read, _ = mapping
+        elif len(mapping) == 3:
             # We only have the query position
-            contig2, base2 = mapping
+            contig2, base2, query_read = mapping
             
-        # Note that wehad a mapping in this query
-        mapped_queries.add(contig2)
+        # Note that wehad a mapping in this query read
+        mapped_queries.add(query_read)
         
         # Record it in its class for its gene pair (which may be Nones)
         class_counts[classification][gene_from][gene_to] += 1
