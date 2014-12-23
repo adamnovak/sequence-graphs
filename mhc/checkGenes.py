@@ -395,6 +395,10 @@ def main(args):
     gene_sets = collections.defaultdict(lambda: collections.defaultdict(
         lambda: collections.defaultdict(set)))
     
+    # This set keeps track of the names of the queries in which we have observed
+    # any mappings.
+    mapped_queries = set()
+    
     for classification, gene_from, gene_to, mapping in classified:
         # For each classified mapping
         
@@ -403,8 +407,11 @@ def main(args):
             # We have query and reference positions
             _, _, contig2, base2, _ = mapping
         elif len(mapping) == 2:
-            # We only have the wuery position
+            # We only have the query position
             contig2, base2 = mapping
+            
+        # Note that wehad a mapping in this query
+        mapped_queries.add(contig2)
         
         # Record it in its class for its gene pair (which may be Nones)
         class_counts[classification][gene_from][gene_to] += 1
@@ -436,6 +443,9 @@ def main(args):
         
         # Dump a TSV of base counts (over all gene pairs) by classification
         options.classCounts.write("{}\t{}\n".format(classification, total))
+        
+    # Add in a fake class for total query contigs mapped
+    options.classCounts.write("!queriesMapped\t{}".format(len(mapped_queries)))
         
     for classification, gene_mappings in gene_sets.iteritems():
         # For each set of query genes with mappings in a class
