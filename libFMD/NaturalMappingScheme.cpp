@@ -522,6 +522,15 @@ void NaturalMappingScheme::scan(SyntenyBlock& block,
     // Scan through the SyntenyBlock, deciding what Mappings should make
     // matches, and what ones should be blacklisted.
     
+    // We go through from right to left and do a DP algorithm. For each Mapping,
+    // we look to see which previous Mappings it could have come from. We then
+    // look at the runs for each, and tack on this new Mapping, retracting old
+    // Mappings if the new Mapping won't fit. We also need to make sure to
+    // deduplicate the runs, and to consider starting a new run here.
+    
+    // If this Mapping ends up in any run that passes our threshold, we flag it
+    // as able to match up query bases.
+    
     // We go along with an inchworm algorithm, sort of like we use to find the
     // matchngs in the first place: add as many as you can without going over
     // the mismatch threshold, and then, if you can't add one, throw off old
