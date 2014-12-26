@@ -83,6 +83,12 @@ public:
     size_t maxHammingDistance = 0;
     
     /**
+     * How big of an alignment will we tolerate doing for edit distance
+     * calculations?
+     */
+    size_t maxAlignmentSize = 10;
+    
+    /**
      * Should we enable potentially unstable (as in, mappings can change on
      * extension, not as in may crash the program) mapping hacks to increase
      * coverage when mapping reads?
@@ -220,6 +226,18 @@ protected:
     size_t countMismatches(const std::string& query, size_t queryStart,
         TextPosition referenceStart, size_t length,
         int64_t threshold = -1, char direction = 1) const;
+        
+    /**
+     * Compute the edit distance between the specified region of the query and
+     * the specified region of the reference. If the distance would be greater
+     * than the threshold, return th threshold value instead. Also returns the
+     * threshold value if the alignment that would need to be done is larger
+     * than maxAlignmentSize.
+     */
+    size_t countEdits(const std::string& query, size_t queryStart,
+        size_t queryLength, TextPosition referenceStart, size_t referenceLength,
+        int64_t threshold = -1) const;
+    
     
 };
    

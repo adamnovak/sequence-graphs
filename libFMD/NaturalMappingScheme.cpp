@@ -2,6 +2,7 @@
 #include "Log.hpp"
 
 #include <vector>
+#include <algorithm>
 
 std::vector<NaturalMappingScheme::Matching>
     NaturalMappingScheme::findMaxMatchings(const std::string& query) const {
@@ -354,7 +355,20 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             
             // Go count up the mismatches in that gap.
             matching.mismatchesBefore = countMismatches(query,
-                matching.start + matching.length, afterMatching, gapLength);
+                matching.start + matching.length, afterMatching, gapLength,
+                maxHammingDistance);
+                
+            // Count the edits too
+            size_t edits = countEdits(query,
+                matching.start + matching.length, gapLength, afterMatching,
+                gapLength, maxHammingDistance);
+                
+            if(matching.mismatchesBefore != edits) {
+                
+                Log::critical() << matching.mismatchesBefore <<
+                    " mismatches with " << edits << " edits" << std::endl;
+                
+            } 
                 
             Log::debug() << "\t" << matching.mismatchesBefore <<
                 " associated mismatches" << std::endl;
@@ -643,31 +657,21 @@ void NaturalMappingScheme::scan(SyntenyBlock& block,
     // need to have their bases blacklisted so they don't map anywhere else
     // until that extension happens.
     
-    // Grab the text and offset of the base before after first matching.
-    TextPosition rightUnmatchedStart = matchings[0].location;
-    rightUnmatchedStart.addLocalOffset(matchings[0].length);
-    
-    // Count the mismatches between the query starting to the right of
-    // the first matching, and the reference starting to the right of
-    // where the first matching maps. Count until we finish or get more
-    // mismatches than are allowed with the ones we have selected. Count
-    // left to right.
-    size_t rightMismatches = countMismatches(query,
-        matchings[0].start + matchings[0].length, rightUnmatchedStart,
-        query.size() - matchings[0].length,
-        maxHammingDistance + 1, 1);
+    // We're just going to blacklist any matchings that aren't flagged and that
+    // are within maxAlignmentSize of the ends
         
     for(size_t i = 0; i < matchings.size(); i++) {
         // For each matching coming in from the right
         
-        // Add in their mismatches (the rightmost will have 0).
-        rightMismatches += matchings[i].mismatchesBefore;
+        // TODO: Only look at matchings near the ends somehow.
         
-        Log::debug() << rightMismatches << "/" << maxHammingDistance <<
-            " mismatches at or right of query position " <<
-            matchings[i].start + matchings[i].length << std::endl; 
+        if((matchings[i].start < maxAlignmentSize || query.size() - 
+            (matchings[i].start + matchings[i].length) <= maxAlignmentSize) &&
+            !matchings[i].canMatch && !unstable) {
         
-        if(rightMismatches <= maxHammingDistance && !matchings[i].canMatch) {
+            // We're too close to one end or the other, and aren't flagged as
+            // part of a good enough run. And we cae about stability.
+            
             // This one could be in a run extending off the end, and it didn't
             // get flagged already.
             
@@ -678,53 +682,7 @@ void NaturalMappingScheme::scan(SyntenyBlock& block,
             // Which means we need to mark it as important for making base-to-
             // base matchings.
             matchings[i].canMatch = true;
-        } else {
-            // We finally got too many mismatches before hitting this matching.
-            // We can stop now.
-            break;
-        }
-    }
-    
-    // And on the left? TODO: unify with above, somehow abstracting out
-    // direction.
-    TextPosition leftUnmatchedStart = matchings.rbegin()->location;
-    leftUnmatchedStart.addLocalOffset(-1);
-    
-    // Count left from the left end of the last maximal unique matching, and see
-    // how many mismatches there are (or if there are enough to block any new
-    // matchings from connecting).
-    size_t leftMismatches = countMismatches(query,
-        matchings.rbegin()->start - 1, leftUnmatchedStart,
-        matchings.rbegin()->start, maxHammingDistance + 1, -1);
-    
-    for(size_t i = matchings.size() - 1; i != (size_t) -1; i--) {
-        // For each matching coming in from the left
         
-        if(i != matchings.size() - 1) {
-            // Add in their mismatches (the leftmost maximal unique matching
-            // will not even have a corresponding field).
-            leftMismatches += matchings[i + 1].mismatchesBefore;
-        }
-        
-        Log::debug() << leftMismatches << "/" << maxHammingDistance <<
-            " mismatches left of query position " <<
-            matchings[i].start << std::endl; 
-        
-        if(leftMismatches <= maxHammingDistance && !matchings[i].canMatch) {
-            // This one could be in a run extending off the end, and it didn't
-            // get flagged already.
-        
-            Log::debug() << "\t--- Blacklisting matching!" << std::endl;
-        
-            // This one needs to be blacklisted.
-            matchings[i].blacklist = true;
-            // Which means we need to mark it as important for making base-to-
-            // base matchings.
-            matchings[i].canMatch = true;
-        } else {
-            // We finally got too many mismatches before hitting this matching.
-            // We can stop now.
-            break;
         }
     }
 }
@@ -784,6 +742,68 @@ size_t NaturalMappingScheme::countMismatches(const std::string& query,
     // We didn't fall off the reference and return our threshold, so return the
     // mismatches we actually found so far.
     return mismatchesFound;
+}
+
+size_t NaturalMappingScheme::countEdits(const std::string& query,
+    size_t queryStart, size_t queryLength, TextPosition referenceStart,
+    size_t referenceLength, int64_t threshold) const {
+    
+    if(((queryLength > referenceLength) &&
+        (queryLength - referenceLength >= threshold)) ||
+        ((referenceLength > queryLength) &&
+        (referenceLength - queryLength >= threshold))) {
+    
+        // We know the difference in lengths is at least the threshold. In that
+        // case, there must be at least threshold edits.
+        return threshold;
+        
+    }
+    
+    if(queryLength > maxAlignmentSize ||
+        referenceLength > maxAlignmentSize) {
+    
+        // This alignment would be bigger than the biggest one we want to do.
+        Log::warning() << "Skipping " << queryLength << " x " <<
+            referenceLength << " alignment" << std::endl;
+            
+        return threshold;
+    }
+
+    // Make the DP matrix for aligning these two strings. Indexed by query, then
+    // by reference. Start it full of 0s.
+    std::vector<std::vector<int>> matrix(queryLength + 1);
+    for(std::vector<int>& row : matrix) {
+        for(size_t i = 0; i < referenceLength + 1; i++) {
+            row.push_back(0);
+        }
+    } 
+    
+    for(size_t i = 1; i < queryLength + 1; i++) {
+        for(size_t j = 1; j < referenceLength + 1; j++) {
+        
+            // For each interior position, see if you should have a gap in one,
+            // a gap in the other, or a match/mismatch
+            
+            // Don't advance in the query, and pay 1 for a gap.
+            int queryGapCost = matrix[i - 1][j] + 1;
+            // Don't advance in the reference, and pay 1 for a gap.
+            int referenceGapCost = matrix[i][j - 1] + 1;
+            
+            // Advance in both, and pay 1 if this isn't a match.
+            TextPosition referencePosition = referenceStart;
+            referencePosition.addLocalOffset(j - 1);
+            int matchMismatchCost = matrix[i - 1][j - 1] + 
+                (query[queryStart + i - 1] !=
+                index.displayCached(referencePosition));
+                
+            // Adopt the cost of whatever the best choice was.
+            matrix[i][j] = std::min(std::min(queryGapCost, referenceGapCost),
+                matchMismatchCost);
+        }
+    }
+    
+    // Read off the cost in the lower right
+    return matrix[queryLength][referenceLength];
 }
 
 void NaturalMappingScheme::map(const std::string& query,
