@@ -366,7 +366,15 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             if(matching.mismatchesBefore != edits) {
                 
                 Log::critical() << matching.mismatchesBefore <<
-                    " mismatches with " << edits << " edits" << std::endl;
+                    " mismatches with " << edits << " edits in " << gapLength <<
+                    " bases" << std::endl;
+                    
+                TextPosition pos = afterMatching;
+                    
+                for(size_t i = 0; i < gapLength; i++) {
+                    Log::critical() << query[matching.start + matching.length + i] << " vs " << index.displayCached(afterMatching) << std::endl;
+                    afterMatching.addLocalOffset(1);
+                }
                 
             } 
                 
@@ -696,29 +704,56 @@ size_t NaturalMappingScheme::countMismatches(const std::string& query,
     // the other ends, we see the threshold number of mismatches, or we hit the
     // length requested.
     
+    Log::trace() << "Counting mismatches between " << referenceStart <<
+        " and query index " << queryStart << " in " << length << " bases" <<
+        std::endl;
+    
     // Get the length of the reference text we are on.
     int64_t textLength = index.getContigLength(
         referenceStart.getContigNumber());
     
     size_t mismatchesFound = 0;
     
+    // Count total bases looked at.
+    size_t basesChecked = 0;
+    
     // We're going to work on our arguments: advance referenceStart and
     // queryStart and knock down length.
     
-    while(
-        // We're in-bounds on the reference
-        referenceStart.getOffset() != (size_t) -1 &&
-        referenceStart.getOffset() < textLength &&
-        // We're in-bounds on the query
-        queryStart != (size_t) -1 &&
-        queryStart < query.size() &&
-        // We haven't gotten to the end of length yet.
-        length > 0 &&
-        // We haven't found enough mismatches yet.
-        mismatchesFound < threshold) {
+    while(true) {
+        if(referenceStart.getOffset() == (size_t) -1) {
+            Log::trace() << "Ran off left of reference" << std::endl;
+            break;
+        }
+        
+        if(referenceStart.getOffset() >= textLength) {
+            Log::trace() << "Ran off right of reference" << std::endl;
+            break; 
+        }
+        
+        if(queryStart == (size_t) -1) {
+            Log::trace() << "Ran off left of query" << std::endl;
+            break;
+        }
+        
+        if(queryStart >= query.size()) {
+            Log::trace() << "Ran off right of query" << std::endl;
+            break;
+        }
+        
+        if(length == (size_t) -1) {
+            Log::trace() << "Ran out of length" << std::endl;
+            break;
+        }
+        
+        if(mismatchesFound >= threshold && threshold != -1) {
+            Log::trace() << mismatchesFound << " hit threshold of " <<
+                threshold << std::endl;
+            break;
+        }
         
         
-        // Counjt the number of mismatches at this character.
+        // Count the number of mismatches at this character.
         mismatchesFound +=
             (query[queryStart] != index.displayCached(referenceStart));
         
@@ -726,7 +761,12 @@ size_t NaturalMappingScheme::countMismatches(const std::string& query,
         length--;
         queryStart += direction;
         referenceStart.addLocalOffset(direction);
+        
+        basesChecked++;
     }
+    
+    Log::trace() << "Found " << mismatchesFound << " in " << basesChecked <<
+        " bases checked." << std::endl;
     
     if((referenceStart.getOffset() == (size_t) -1 ||
         referenceStart.getOffset() >= textLength) && threshold != -1) {
