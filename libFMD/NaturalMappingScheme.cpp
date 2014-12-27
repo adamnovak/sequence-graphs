@@ -192,6 +192,10 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
     // We keep a map of SyntenyBlocks by (text, query offset) pairs.
     std::map<std::pair<size_t, int64_t>, SyntenyBlock> syntenyBlocks;
     
+    // We need to build a graph from maximal Matchings to the previous maximal
+    // Matchings they might be in runs with.
+    std::vector<std::vector<size_t>> matchingGraph(maxMatchings.size());
+    
     // We need to work out which min matchings belong to each max matching. This
     // holds how many min matchings have been used up and were contained in
     // previous (i.e. further right) max matchings. Every min matching is
@@ -320,78 +324,48 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
         }
         
         // OK, now we know everything we need to know about this maximal unique
-        // matching. We need to throw it into the appropriate synteny block
-        // based on the text (i.e. contig and orientation) to which it matches,
-        // and the offset it implies between that text and the query.
+        // matching. We need to see which previous matchings it could possibly
+        // be in a run with.
         
-        // What text are we mapped to?
-        size_t text = matching.location.getText();
-        
-        // Where is the first base of the query string in that text? It may be
-        // negative.
-        int64_t queryOffset = (int64_t) matching.location.getOffset() -
-            (int64_t) matching.start;
+        for(size_t prevMatching = matchingNumber; prevMatching != (size_t) -1;
+            prevMatching--) {
+            
+            // For each previous matching
+            
+            if(maxMatchings[prevMatching].start - matching.start >
+                maxAlignmentSize) {
+                
+                // If the distance in the query is too far, we can't connect at
+                // all, and nothing further away can either.
+                break;
+            }
 
-        Log::debug() << "\tGoing into synteny block " << text << ", " <<
-            queryOffset << std::endl;
+            // We need to compare these two reference positions to see if these
+            // could make any sense in the same run.
+            TextPosition& curPos = matching.location;
+            TextPosition& prevPos = maxMatchings[prevMatching].location;
             
-        // Go get the SyntenyBlock we should be adding to, or insert a new
-        // default-constructed (i.e. empty) one if there isn't one already.
-        SyntenyBlock& block = syntenyBlocks[std::make_pair(text, queryOffset)];
-        
-        if(block.maximalMatchings.size() > 0) {
-            // We need to work out the mismatches in the gap between the end of
-            // this new block and the start of the previous one.
+            if(curPos.getText() == prevPos.getText() &&
+                curPos.getOffset() < prevPos.getOffset()) {
             
-            // Where does the last block start (inclusive). This is also the
-            // exclusive end of the gap.
-            size_t prevStart = block.maximalMatchings.rbegin()->start;
-            // How long is the gap between blocks?
-            size_t gapLength = prevStart - matching.start - matching.length;            
+                // They have to be on the same text and going in the correct
+                // direction to chain, and they are. We'll have to look at the
+                // bit between these two matchings.
+                matchingGraph[matchingNumber].push_back(prevMatching);
+            }
             
-            // Get a TextPosition to the first base in the gap
-            TextPosition afterMatching = matching.location;
-            afterMatching.addLocalOffset(matching.length);
-            
-            // Go count up the mismatches in that gap.
-            matching.mismatchesBefore = countMismatches(query,
-                matching.start + matching.length, afterMatching, gapLength,
-                maxHammingDistance);
-                
-            // Count the edits too
-            size_t edits = countEdits(query,
-                matching.start + matching.length, gapLength, afterMatching,
-                gapLength, maxHammingDistance);
-                
-            if(matching.mismatchesBefore != edits) {
-                
-                Log::critical() << matching.mismatchesBefore <<
-                    " mismatches with " << edits << " edits in " << gapLength <<
-                    " bases" << std::endl;
-                    
-                TextPosition pos = afterMatching;
-                    
-                for(size_t i = 0; i < gapLength; i++) {
-                    Log::critical() << query[matching.start + matching.length + i] << " vs " << index.displayCached(afterMatching) << std::endl;
-                    afterMatching.addLocalOffset(1);
-                }
-                
-            } 
-                
-            Log::debug() << "\t" << matching.mismatchesBefore <<
-                " associated mismatches" << std::endl;
         }
-        
-        // Add this matching and its statistics to the appropriate synteny
-        // block.
-        block.extendLeft(matching);
         
         // The next maximal matching has to use the minimal matchings that come
         // later.
         minMatchingsUsed += matching.minMatchings;
     }
     
-    // OK, now we have to process those synteny blocks.
+    // OK, now we have to do the DP, identify blocks that should create base to
+    // base mappings, and make those.
+    
+    // Do the DP to find the good runs, and flag matchings in them.
+    identifyGoodMatchingRuns(maxMatchings, matchingGraph);
     
     // Where will we keep unique matchings by base? We store them as sets of
     // TextPositions to which each base has been matched.
@@ -514,6 +488,76 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
     
     // Now we've made all the mappings we need.
     return mappings;
+}
+
+void NaturalMappingScheme::identifyGoodMatchingRuns(
+    const std::string& query, std::vector<Matching>& maxMatchings,
+    const std::vector<std::vector<size_t>>& matchingGraph) {
+
+    // This holds all the runs ending at a certain matching without getting too
+    // many mismatches/edits.
+    // TODO: No set because no retraction
+    std::vector<std::set<Run>> runs;
+
+    for(size_t i = 0; i < maxMatchings.size(); i++) {
+        // For each matching from right to left
+        
+        // Get a reference to this matcing we're on.
+        Matching& matching = maxMatchings[i];
+        
+        for(size_t previous : matchingGraph[i]) {
+            // Consider arriving at matching i from matching previous.
+            
+            // Where does the previous block start (inclusive). This is also the
+            // exclusive end of the gap.
+            size_t prevStart = maxMatchings[previous].start;
+            
+            // How long is the gap between blocks? This may be negative if the
+            // blocks overlap due to a deletion.
+            int64_t gapLength = prevStart - (int64_t) matching.start -
+                (int64_t) matching.length;      
+            
+            // How much would it cost to connect these blocks?
+            size_t cost;
+            
+            if(gapLength < 0) {
+                // If they overlap, we just need to charge one deletion per base
+                // of overlap.
+                cost = -gapLength;
+            } else {
+                // Get a TextPosition to the first base in the gap
+                TextPosition afterMatching = matching.location;
+                afterMatching.addLocalOffset(matching.length);
+            
+                // The cost is the number of edits from there to the start of
+                // the previous Matching. There can't be maxHammingDistance + 1
+                // or more.
+                cost = countEdits(query,
+                    matching.start + matching.length, gapLength, afterMatching,
+                    gapLength, maxHammingDistance + 1);
+            }
+            
+            for(const Run& prevRun : runs[previous]) {
+                // For each run ending with this other matching
+                
+                if(cost + prevRun.totalCost > maxHammingDistance) {
+                    // Skip it if it costs to much to extend
+                    continue;
+                }
+                
+                // Otherwise, extend it with this new matching.
+                Run newRun = prevRun;
+                
+                newRun.matchings.push_back(i);
+                newRun.costs.push_back(cost);
+                newRun.totalCost += cost;
+                newRun.totalClearance += matching.nonOverlapping;
+                
+                // And add the extension as a run for this matching
+                runs[i].insert(newRun);
+            }
+        }
+    }
 }
 
 void NaturalMappingScheme::scan(SyntenyBlock& block,

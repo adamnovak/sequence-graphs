@@ -166,6 +166,60 @@ protected:
     };
     
     /**
+     * A Run of Matchings (referenced by indices) with a certain total min
+     * unique matchings and total Hamming/edit distance.
+     */
+    struct Run {
+        /**
+         * Holds indices of the Matchings in this run.
+         */
+        std::deque<size_t> matchings;
+        
+        /**
+         * One shorter than the matchings vector. Holds the Hamming/edit distance
+         * cost for the gap after the corresponding entry in the matchings
+         * vector.
+         */
+        std::deque<size_t> costs;
+        
+        /**
+         * Holds the total number of non-overlapping minimal unique matchings in
+         * the run. TODO: Need to account for overlap in a run when maximal
+         * unique matches in the same run overlap.
+         */
+        size_t totalClearance;
+        
+        /**
+         * Total Hamming/edit distance between the query ant the reference for
+         * this run.
+         */
+        size_t totalCost;
+        
+        /**
+         * Equality comparison so we can put these in a set.
+         */
+        inline bool operator==(const Run& other) const {
+            return(matchings == other.matchings && costs == other.costs &&
+                totalClearance == other.tolalClearance &&
+                totalCost == other.totalCost);
+        }
+        
+        /**
+         * Ordering defined so we can put these in a set.
+         */
+        inline bool operator<(const Run& other) const {
+            return matchings < other.matchings ||
+                matchings == other.matchings && 
+                (costs < other.costs || 
+                costs == other.costs && 
+                (totalClearance < other.totalClearance || 
+                totalClearance == other.totalClearance && 
+                totalCost == other.totalCost));
+        }
+        
+    };
+    
+    /**
      * Keep track of a run of maximal exact matchings which we have decided form
      * a synteny block, and ought to be presented to the filters as a group.
      * This keeps track of all of the state that is needed to implement the
