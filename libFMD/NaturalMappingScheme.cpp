@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <algorithm>
+#include <cstdlib>
 
 std::vector<NaturalMappingScheme::Matching>
     NaturalMappingScheme::findMaxMatchings(const std::string& query) const {
@@ -334,12 +335,15 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             // And where do they start on he left?
             size_t theirStart = maxMatchings[prevMatching].start;
             
+            // TODO: These limits are asymetrical due to inclusive/exclusive
+            // bounds.
+            
             if(ourEnd > theirStart &&
                 ourEnd - theirStart > maxAlignmentSize) {
              
                 Log::info() << matching << " can't come from " <<
                     maxMatchings[prevMatching] <<
-                    " because it overlaps too much." << std::endl;
+                    " because it overlaps too much in query." << std::endl;
              
                 // They overlap too far into us.
                 continue;   
@@ -357,7 +361,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
                 
                 Log::info() << matching << " can't come from " <<
                     maxMatchings[prevMatching] <<
-                    " because it's too far upstream." << std::endl;
+                    " because it's too far upstream in query." << std::endl;
                 
                 break;
             }
@@ -371,7 +375,47 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
                 curPos.getOffset() < prevPos.getOffset()) {
             
                 // They have to be on the same text and going in the correct
-                // direction to chain, and they are. We'll have to look at the
+                // direction to chain, and they are.
+                
+                // Now we need to check to make sure the requested alignment
+                // won't be too big on the referece side.
+                TextPosition curEnd = curPos;
+                curEnd.addLocalOffset(matching.length);
+                
+                // Pull out the reference offsets, which we can treat just lke
+                // query ofsets for distance finding. Works because these
+                // offsets are always on the stran (text) we are mapping to.
+                ourEnd = curEnd.getOffset();
+                theirStart = prevPos.getOffset();
+                
+                if(ourEnd > theirStart &&
+                    ourEnd - theirStart > maxAlignmentSize) {
+                 
+                    Log::info() << matching << " can't come from " <<
+                        maxMatchings[prevMatching] <<
+                        " because it overlaps too much in reference." <<
+                        std::endl;
+                 
+                    // They overlap too far into us.
+                    continue;   
+                }
+                
+                if(ourEnd <= theirStart &&
+                    theirStart - ourEnd > maxAlignmentSize) {
+                    
+                
+                    // The distance between our right end and their left end is
+                    // too great.
+                    
+                    Log::info() << matching << " can't come from " <<
+                        maxMatchings[prevMatching] <<
+                        " because it's too far upstream in reference." <<
+                        std::endl;
+                    
+                    continue;
+                }
+                
+                // We'll have to look at the
                 // bit between these two matchings.
                 matchingGraph[matchingNumber].push_back(prevMatching);
                 
@@ -379,7 +423,8 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
                     maxMatchings[prevMatching] << std::endl;
             } else {
                 Log::info() << matching << " can't come from " << 
-                    maxMatchings[prevMatching] << std::endl;
+                    maxMatchings[prevMatching] <<
+                    " due to text/direction issue" << std::endl;
             }
             
         }
@@ -526,19 +571,40 @@ void NaturalMappingScheme::identifyGoodMatchingRuns(
             // exclusive end of the gap.
             size_t prevStart = maxMatchings[previous].start;
             
-            // How long is the gap between blocks? This may be negative if the
-            // blocks overlap due to a deletion.
-            int64_t gapLength = prevStart - (int64_t) matching.start -
+            // How long is the gap between blocks i the query? This may be
+            // negative if the blocks overlap due to a deletion.
+            int64_t queryGapLength = prevStart - (int64_t) matching.start -
                 (int64_t) matching.length;      
+            
+            // And now we need to find the same distance in the reference?
+            TextPosition prevStartPos = maxMatchings[previous].location;
+            TextPosition endPos = matching.location;
+            endPos.addLocalOffset(matching.length);
+            
+            // Get the number of intervening (+) or shared (-) bases in the
+            // reference. Works because these offsets are always on the stran
+            // (text) we are mapping to.
+            int64_t referenceGapLength = (int64_t) prevStartPos.getOffset() -
+                (int64_t) endPos.getOffset();
             
             // How much would it cost to connect these blocks?
             size_t cost;
             
-            if(gapLength < 0) {
-                // If they overlap, we just need to charge one deletion per base
-                // of overlap.
-                cost = -gapLength;
-            } else {
+            if(queryGapLength < 0 && referenceGapLength >= 0) {
+                // They overlap in query and are separated in reference; charge
+                // the bases that were deleted.
+                cost = -queryGapLength + referenceGapLength;
+            } else if(queryGapLength >= 0 && referenceGapLength < 0) {
+                // They overlap in the reference and are separated in the query;
+                // charge the bases that were inserted.
+                cost = queryGapLength - referenceGapLength;
+            } else if(queryGapLength < 0 && referenceGapLength < 0) {
+                // They overlap in both, but must be inconsistent. Charge the
+                // difference.
+                cost = std::abs(queryGapLength - referenceGapLength);
+            } else if(queryGapLength > 0 && referenceGapLength > 0) {
+                // They are separated by some distance in both.
+                
                 // Get a TextPosition to the first base in the gap
                 TextPosition afterMatching = matching.location;
                 afterMatching.addLocalOffset(matching.length);
@@ -547,8 +613,12 @@ void NaturalMappingScheme::identifyGoodMatchingRuns(
                 // the previous Matching. There can't be maxHammingDistance + 1
                 // or more.
                 cost = countEdits(query,
-                    matching.start + matching.length, gapLength, afterMatching,
-                    gapLength, maxHammingDistance + 1);
+                    matching.start + matching.length, queryGapLength, afterMatching,
+                    referenceGapLength, maxHammingDistance + 1);
+            } else {
+                throw std::runtime_error(
+                    "Grave error: Can't have query and reference matchings "
+                    "both up against each other");
             }
             
             Log::info() << "Arriving at " << maxMatchings[i] << " from " <<
