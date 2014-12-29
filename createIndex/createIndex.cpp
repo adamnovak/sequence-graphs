@@ -31,6 +31,7 @@
 #include <MappingScheme.hpp>
 #include <LRMappingScheme.hpp>
 #include <NaturalMappingScheme.hpp>
+#include <OldNaturalMappingScheme.hpp>
 
 // Grab timers from libsuffixtools
 #include <Timer.h>
@@ -676,7 +677,7 @@ main(
         ("credit", "Enable mapping on credit")
         ("mapType", boost::program_options::value<std::string>()
             ->default_value("LR"),
-            "Merging scheme (\"natural\" or \"LR\")")
+            "Merging scheme (\"natural\", \"old\", or \"LR\")")
         ("mismatches", boost::program_options::value<size_t>()
             ->default_value(0), 
             "Maximum allowed number of mismatches")
@@ -827,6 +828,23 @@ main(
                 // We want a NaturalMappingScheme
                 NaturalMappingScheme* scheme = new NaturalMappingScheme(index,
                     ranges, mask);
+                    
+                // Populate it
+                scheme->credit = options.count("credit");
+                scheme->minContext = options["context"].as<size_t>();
+                scheme->z_max = options["mismatches"].as<size_t>();
+                scheme->ignoreMatchesBelow = options[
+                    "ignoreMatchesBelow"].as<size_t>();
+                scheme->minHammingBound = options[
+                    "minHammingBound"].as<size_t>();
+                scheme->maxHammingDistance = options[
+                    "maxHammingDistance"].as<size_t>();
+                
+                return (MappingScheme*) scheme;
+            } else if(options["mapType"].as<std::string>() == "old") {
+                // We want an OldNaturalMappingScheme
+                OldNaturalMappingScheme* scheme = new OldNaturalMappingScheme(
+                    index, ranges, mask);
                     
                 // Populate it
                 scheme->credit = options.count("credit");
