@@ -162,8 +162,11 @@ protected:
          * not map? If this is true, canMatch must also be true.
          */
         bool blacklist = false;
-         
+        
     };
+    
+    // Make sure the output overload for Matchings has access to the type.
+    friend std::ostream& operator<<(std::ostream& out, const Matching& thing);
     
     /**
      * A Run of Matchings (referenced by indices) with a certain total min
@@ -276,5 +279,14 @@ protected:
     
     
 };
+
+/**
+ * Write this Matching to an output stream. Reports query coordinates.
+ */
+inline std::ostream& operator<<(std::ostream& out, 
+    const NaturalMappingScheme::Matching& thing) {
+
+    return out << thing.start << " - " << thing.start + thing.length;
+}
    
 #endif

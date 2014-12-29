@@ -491,6 +491,9 @@ void NaturalMappingScheme::identifyGoodMatchingRuns(
         for(size_t previous : matchingGraph[i]) {
             // Consider arriving at matching i from matching previous.
             
+            Log::info() << "Arriving at " << maxMatchings[i] << " from " <<
+                maxMatchings[previous] << std::endl;
+            
             // Where does the previous block start (inclusive). This is also the
             // exclusive end of the gap.
             size_t prevStart = maxMatchings[previous].start;
@@ -566,12 +569,19 @@ void NaturalMappingScheme::identifyGoodMatchingRuns(
             if(run.totalCost <= maxHammingDistance &&
                 run.totalClearance >= minHammingBound) {
                 
+                Log::info() << "Found acceptable run" << std::endl;
+                
                 // The run has enough Hamming clearance, and doesn't have too
                 // many mismatches/edits.
                 
                 for(size_t included : run.matchings) {
                     // For each matching in the run, flag it
                     maxMatchings[included].canMatch = true;
+                    
+                    Log::info() << "\tContains matching " <<
+                        maxMatchings[included].start << " - " <<
+                        maxMatchings[included].start +
+                        maxMatchings[included].length << std::endl;
                 }
             
             }
