@@ -218,7 +218,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             continue;
         }
         
-        Log::debug() << "Max matching " << matching.start << " - " <<
+        Log::info() << "Max matching " << matching.start << " - " <<
             matching.start + matching.length << " (+" << matching.length <<
             ") @ " << matching.location << std::endl;
     
@@ -329,8 +329,28 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             
             // For each previous matching
             
-            if(maxMatchings[prevMatching].start - matching.start >
-                maxAlignmentSize) {
+            // Where do we end on the right?
+            size_t ourEnd = matching.start + matching.length;
+            // And where do they start on he left?
+            size_t theirStart = maxMatchings[prevMatching].start;
+            
+            if(ourEnd > theirStart &&
+                ourEnd - theirStart > maxAlignmentSize) {
+             
+                Log::info() << matching << " can't come from " <<
+                    maxMatchings[prevMatching] <<
+                    " because it overlaps too much." << std::endl;
+             
+                // They overlap too far into us.
+                continue;   
+            }
+            
+            if(ourEnd <= theirStart &&
+                theirStart - ourEnd > maxAlignmentSize) {
+                
+            
+                // The distance between our right end and their left end is too
+                // great.
                 
                 // If the distance in the query is too far, we can't connect at
                 // all, and nothing further away can either.
