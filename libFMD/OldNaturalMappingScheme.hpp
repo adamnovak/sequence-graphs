@@ -1,5 +1,5 @@
-#ifndef NATURALMAPPINGSCHEME_HPP
-#define NATURALMAPPINGSCHEME_HPP
+#ifndef OLDNATURALMAPPINGSCHEME_HPP
+#define OLDNATURALMAPPINGSCHEME_HPP
 
 #include "MappingScheme.hpp"
 #include "Mapping.hpp"
@@ -11,9 +11,9 @@
  * where the abse should be, and you can't get from the base off the end of
  * the query with multiple results, map the base.
  *
- * This version counts edit distance when linking maximal matchings.
+ * This version counts Hamming distance only.
  */
-class NaturalMappingScheme: public MappingScheme {
+class OldNaturalMappingScheme: public MappingScheme {
 
 public:
     /**
@@ -83,12 +83,6 @@ public:
      * matches that are working together to map?
      */
     size_t maxHammingDistance = 0;
-    
-    /**
-     * How big of an alignment will we tolerate doing for edit distance
-     * calculations?
-     */
-    size_t maxAlignmentSize = 10;
     
     /**
      * Should we enable potentially unstable (as in, mappings can change on
@@ -164,35 +158,7 @@ protected:
          * not map? If this is true, canMatch must also be true.
          */
         bool blacklist = false;
-        
-    };
-    
-    // Make sure the output overload for Matchings has access to the type.
-    friend std::ostream& operator<<(std::ostream& out, const Matching& thing);
-    
-    /**
-     * A Run of Matchings (referenced by indices) with a certain total min
-     * unique matchings and total Hamming/edit distance.
-     */
-    struct Run {
-        /**
-         * Holds indices of the Matchings in this run.
-         */
-        std::deque<size_t> matchings;
-        
-        /**
-         * Holds the total number of non-overlapping minimal unique matchings in
-         * the run. TODO: Need to account for overlap in a run when maximal
-         * unique matches in the same run overlap.
-         */
-        size_t totalClearance;
-        
-        /**
-         * Total Hamming/edit distance between the query ant the reference for
-         * this run.
-         */
-        size_t totalCost;
-        
+         
     };
     
     /**
@@ -245,17 +211,6 @@ protected:
     void scan(SyntenyBlock& block, const std::string& query) const;
     
     /**
-     * Go through the maximal unique matchings in the query, and see which of
-     * them are in Runs sufficiently good to be accepted, and which of them are
-     * in substandard runs but are still not trivially short, or are close
-     * enough to the edges that they could join better runs eventually and thus
-     * need to be blacklisted.
-     */
-    void identifyGoodMatchingRuns(const std::string& query,
-        std::vector<Matching>& maxMatchings,
-        const std::vector<std::vector<size_t>>& matchingGraph) const;
-    
-    /**
      * Count the mismatches between a query and a text in the index, in a range.
      * If the range would go out of the query, stop counting there. If the range
      * would go out of the reference, return the threshold number of mismatches
@@ -267,28 +222,7 @@ protected:
     size_t countMismatches(const std::string& query, size_t queryStart,
         TextPosition referenceStart, size_t length,
         int64_t threshold = -1, char direction = 1) const;
-        
-    /**
-     * Compute the edit distance between the specified region of the query and
-     * the specified region of the reference. If the distance would be greater
-     * than the threshold, return th threshold value instead. Also returns the
-     * threshold value if the alignment that would need to be done is larger
-     * than maxAlignmentSize.
-     */
-    size_t countEdits(const std::string& query, size_t queryStart,
-        size_t queryLength, TextPosition referenceStart, size_t referenceLength,
-        int64_t threshold = -1) const;
-    
     
 };
-
-/**
- * Write this Matching to an output stream. Reports query coordinates.
- */
-inline std::ostream& operator<<(std::ostream& out, 
-    const NaturalMappingScheme::Matching& thing) {
-
-    return out << thing.start << " - " << thing.start + thing.length;
-}
    
 #endif
