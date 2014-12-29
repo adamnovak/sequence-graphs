@@ -90,15 +90,15 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             (True, True, None, None, None, None, 4, None, "natural"),
             (True, True, None, None, None, None, 5, None, "natural"),
             (True, True, None, None, None, None, 6, None, "natural"),
-            (True, True, None, None, None, None, 7, None, "natural"),
-            (True, True, None, None, None, None, 8, None, "natural"),
-            # Min lengths instead of Hamming bound
-            (True, True, 20, None, None, None, None, None, "natural"),
-            (True, True, 50, None, None, None, None, None, "natural"),
-            (True, True, 100, None, None, None, None, None, "natural"),
-            (True, True, 150, None, None, None, None, None, "natural"),
-            (True, True, 200, None, None, None, None, None, "natural"),
-            (True, True, 250, None, None, None, None, None, "natural"),
+            # Exact credit (tolerating 1 mismatch) with Hamming bound, but no
+            # mismatches. Use the old scheme, but with no mismatches should be
+            # identical to the above.
+            (True, True, None, None, None, None, 1, None, "old"),
+            (True, True, None, None, None, None, 2, None, "old"),
+            (True, True, None, None, None, None, 3, None, "old"),
+            (True, True, None, None, None, None, 4, None, "old"),
+            (True, True, None, None, None, None, 5, None, "old"),
+            (True, True, None, None, None, None, 6, None, "old"),
             # Exact credit (tolerating 1 mismatch) with Hamming bound and
             # Hamming distance allowance (i.e. mismatches again). Scheme under
             # test.
@@ -107,34 +107,22 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             (True, True, None, None, None, None, 6, 3, "natural"),
             (True, True, None, None, None, None, 6, 4, "natural"),
             (True, True, None, None, None, None, 6, 5, "natural"),
-            (True, True, None, None, None, None, 6, 6, "natural"),
-            # Same thing without credit
-            (True, False, None, None, None, None, 6, 1, "natural"),
-            (True, False, None, None, None, None, 6, 2, "natural"),
-            (True, False, None, None, None, None, 6, 3, "natural"),
-            (True, False, None, None, None, None, 6, 4, "natural"),
-            (True, False, None, None, None, None, 6, 5, "natural"),
-            (True, False, None, None, None, None, 6, 6, "natural"),
+            # Vs. old
+            (True, True, None, None, None, None, 6, 1, "old"),
+            (True, True, None, None, None, None, 6, 2, "old"),
+            (True, True, None, None, None, None, 6, 3, "old"),
+            (True, True, None, None, None, None, 6, 4, "old"),
+            (True, True, None, None, None, None, 6, 5, "old"),
             # Lower Hamming bounds: 5
             (True, True, None, None, None, None, 5, 1, "natural"),
             (True, True, None, None, None, None, 5, 2, "natural"),
             (True, True, None, None, None, None, 5, 3, "natural"),
             (True, True, None, None, None, None, 5, 4, "natural"),
-            (True, True, None, None, None, None, 5, 5, "natural"),
-            # 4
-            (True, True, None, None, None, None, 4, 1, "natural"),
-            (True, True, None, None, None, None, 4, 2, "natural"),
-            (True, True, None, None, None, None, 4, 3, "natural"),
-            (True, True, None, None, None, None, 4, 4, "natural"),
-            # 3
-            (True, True, None, None, None, None, 3, 1, "natural"),
-            (True, True, None, None, None, None, 3, 2, "natural"),
-            (True, True, None, None, None, None, 3, 3, "natural"),
-            # 2
-            (True, True, None, None, None, None, 2, 1, "natural"),
-            (True, True, None, None, None, None, 2, 2, "natural"),
-            # 1
-            (True, True, None, None, None, None, 1, 1, "natural")
+            # Vs old
+            (True, True, None, None, None, None, 5, 1, "old"),
+            (True, True, None, None, None, None, 5, 2, "old"),
+            (True, True, None, None, None, None, 5, 3, "old"),
+            (True, True, None, None, None, None, 5, 4, "old")
         ])
 
     def generateSchemes(self):
