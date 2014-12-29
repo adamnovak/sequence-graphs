@@ -160,14 +160,19 @@ class AlignerAssessmentTarget(jobTree.scriptTree.target.Target):
         return set([
             # Exact credit (tolerating 1 mismatch) with Hamming bound, but no
             # mismatches.
-            (True, True, False, None, None, None, None, 1, None, "natural"),
+            (True, True, False, None, None, None, None, 1, None, "old"),
             # Natural,  Hamming bound 6, 5 mismatches in gaps.
-            (True, True, False, None, None, None, None, 6, 5, "natural"),
+            (True, True, False, None, None, None, None, 6, 5, "old"),
             # Natural, Hamming bound 3, 2 mismatches.
-            (True, True, False, None, None, None, None, 3, 2, "natural"), 
+            (True, True, False, None, None, None, None, 3, 2, "old"), 
             # Natural Hamming bound 1
-            (True, True, False, None, None, None, None, 1, None, "natural"),
+            (True, True, False, None, None, None, None, 1, None, "old"),
             # Unstable versions
+            (True, True, True, None, None, None, None, 1, None, "old"),
+            (True, True, True, None, None, None, None, 6, 5, "old"),
+            (True, True, True, None, None, None, None, 3, 2, "old"),
+            (True, True, True, None, None, None, None, 1, None, "old"),
+            # Unstable new versions
             (True, True, True, None, None, None, None, 1, None, "natural"),
             (True, True, True, None, None, None, None, 6, 5, "natural"),
             (True, True, True, None, None, None, None, 3, 2, "natural"),

@@ -88,7 +88,7 @@ public:
      * How big of an alignment will we tolerate doing for edit distance
      * calculations?
      */
-    size_t maxAlignmentSize = 10;
+    size_t maxAlignmentSize = 100;
     
     /**
      * Should we enable potentially unstable (as in, mappings can change on
