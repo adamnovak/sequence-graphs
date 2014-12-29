@@ -779,12 +779,6 @@ main(
     // Grab the context types we are going to use to merge
     std::string mapType = options["mapType"].as<std::string>();
     
-    if(mapType != "LR" && mapType != "natural") {
-        // They gave us a map type we don't have probably.
-        Log::critical() << "Invalid mapType: " << mapType << std::endl;
-        return 1;
-    }
-    
     // Grab the merging scheme we are going to use to merge.
     std::string mergeScheme = options["scheme"].as<std::string>();
     
