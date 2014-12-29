@@ -1039,6 +1039,17 @@ size_t NaturalMappingScheme::countEdits(const std::string& query,
     size_t queryStart, size_t queryLength, TextPosition referenceStart,
     size_t referenceLength, int64_t threshold) const {
     
+    // We can get more accurate costs for these for free, and keep 0s out of our
+    // DP problem
+    if(queryLength == 0) {
+        // We have to delete every reference base.
+        return referenceLength;
+    }
+    if(referenceLength == 0) {
+        // We have to insert every query base.
+        return queryLength;
+    }
+    
     if(((queryLength > referenceLength) &&
         (queryLength - referenceLength >= threshold)) ||
         ((referenceLength > queryLength) &&

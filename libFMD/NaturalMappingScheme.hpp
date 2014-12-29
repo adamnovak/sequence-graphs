@@ -271,8 +271,8 @@ protected:
     /**
      * Compute the edit distance between the specified region of the query and
      * the specified region of the reference. If the distance would be greater
-     * than the threshold, return th threshold value instead. Also returns the
-     * threshold value if the alignment that would need to be done is larger
+     * than the threshold, may return the threshold value instead. Also returns
+     * the threshold value if the alignment that would need to be done is larger
      * than maxAlignmentSize.
      */
     size_t countEdits(const std::string& query, size_t queryStart,
