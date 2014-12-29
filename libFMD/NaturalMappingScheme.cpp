@@ -592,11 +592,15 @@ void NaturalMappingScheme::identifyGoodMatchingRuns(
             // How much would it cost to connect these blocks?
             size_t cost;
             
-            if(queryGapLength < 0 && referenceGapLength >= 0) {
+            if(queryGapLength == 0 && referenceGapLength == 0) {
+                throw std::runtime_error(
+                    "Grave error: Can't have query and reference matchings "
+                    "both up against each other");
+            } else if(queryGapLength <= 0 && referenceGapLength >= 0) {
                 // They overlap in query and are separated in reference; charge
                 // the bases that were deleted.
                 cost = -queryGapLength + referenceGapLength;
-            } else if(queryGapLength >= 0 && referenceGapLength < 0) {
+            } else if(queryGapLength >= 0 && referenceGapLength <= 0) {
                 // They overlap in the reference and are separated in the query;
                 // charge the bases that were inserted.
                 cost = queryGapLength - referenceGapLength;
@@ -604,11 +608,6 @@ void NaturalMappingScheme::identifyGoodMatchingRuns(
                 // They overlap in both, but must be inconsistent. Charge the
                 // difference.
                 cost = std::abs(queryGapLength - referenceGapLength);
-            } else if(queryGapLength == 0 && referenceGapLength == 0) {
-            
-                throw std::runtime_error(
-                    "Grave error: Can't have query and reference matchings "
-                    "both up against each other");
             } else {
                 // They are separated by some distance in both.
                 
