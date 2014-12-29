@@ -222,11 +222,8 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             matching.start + matching.length << " (+" << matching.length <<
             ") @ " << matching.location << std::endl;
     
-        // For each maximal unique match (always nonoverlapping) from right to
-        // left...
-        
-        // See if this max matching is good enough to attach to the previous
-        // one, or if we need to make a new SyntenyBlock.
+        // For each maximal unique match from right to left, see how many
+        // minimal unique matchings it contains.
         
         while(minMatchings[minMatchingsUsed].start + 
             minMatchings[minMatchingsUsed].length > matching.start +
@@ -337,6 +334,11 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
                 
                 // If the distance in the query is too far, we can't connect at
                 // all, and nothing further away can either.
+                
+                Log::info() << matching << " can't come from " <<
+                    maxMatchings[prevMatching] <<
+                    " because it's too far upstream." << std::endl;
+                
                 break;
             }
 
@@ -352,6 +354,12 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
                 // direction to chain, and they are. We'll have to look at the
                 // bit between these two matchings.
                 matchingGraph[matchingNumber].push_back(prevMatching);
+                
+                Log::info() << matching << " can come from " << 
+                    maxMatchings[prevMatching] << std::endl;
+            } else {
+                Log::info() << matching << " can't come from " << 
+                    maxMatchings[prevMatching] << std::endl;
             }
             
         }
@@ -360,6 +368,9 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
         // later.
         minMatchingsUsed += matching.minMatchings;
     }
+    
+    Log::info() << maxMatchings.size() << " maximal matchings exist." <<
+        std::endl;
     
     // OK, now we have to do the DP, identify blocks that should create base to
     // base mappings, and make those.
@@ -491,9 +502,6 @@ void NaturalMappingScheme::identifyGoodMatchingRuns(
         for(size_t previous : matchingGraph[i]) {
             // Consider arriving at matching i from matching previous.
             
-            Log::info() << "Arriving at " << maxMatchings[i] << " from " <<
-                maxMatchings[previous] << std::endl;
-            
             // Where does the previous block start (inclusive). This is also the
             // exclusive end of the gap.
             size_t prevStart = maxMatchings[previous].start;
@@ -523,6 +531,9 @@ void NaturalMappingScheme::identifyGoodMatchingRuns(
                     gapLength, maxHammingDistance + 1);
             }
             
+            Log::info() << "Arriving at " << maxMatchings[i] << " from " <<
+                maxMatchings[previous]  << " costs " << cost << std::endl;
+            
             for(const Run& prevRun : runs[previous]) {
                 // For each run ending with this other matching
                 
@@ -541,15 +552,15 @@ void NaturalMappingScheme::identifyGoodMatchingRuns(
                 // And add the extension as a run for this matching
                 runs[i].push_back(newRun);
             }
-            
-            // We also need a Run that is just this match
-            Run startHere;
-            startHere.matchings.push_back(i);
-            startHere.totalCost = 0;
-            startHere.totalClearance = matching.nonOverlapping;
-            
-            runs[i].push_back(startHere);
         }
+        
+        // We also need a Run that is just this match
+        Run startHere;
+        startHere.matchings.push_back(i);
+        startHere.totalCost = 0;
+        startHere.totalClearance = matching.nonOverlapping;
+        
+        runs[i].push_back(startHere);
     }
     
     // Now we do a very inefficient thing: for each sufficiently good run, we
@@ -569,7 +580,9 @@ void NaturalMappingScheme::identifyGoodMatchingRuns(
             if(run.totalCost <= maxHammingDistance &&
                 run.totalClearance >= minHammingBound) {
                 
-                Log::info() << "Found acceptable run" << std::endl;
+                Log::info() << "Found acceptable run of +" <<
+                    run.totalClearance << ", -" << run.totalCost << ":" <<
+                    std::endl;
                 
                 // The run has enough Hamming clearance, and doesn't have too
                 // many mismatches/edits.
@@ -579,11 +592,17 @@ void NaturalMappingScheme::identifyGoodMatchingRuns(
                     maxMatchings[included].canMatch = true;
                     
                     Log::info() << "\tContains matching " <<
-                        maxMatchings[included].start << " - " <<
-                        maxMatchings[included].start +
-                        maxMatchings[included].length << std::endl;
+                        maxMatchings[included] << std::endl;
                 }
             
+            } else {
+                // Complain about insufficiently good runs.
+                Log::info() << "Unacceptable run of +" << run.totalClearance <<
+                    ", -" << run.totalCost << ":" << std::endl;
+                for(size_t included : run.matchings) {
+                    Log::info() << "\tContains matching " <<
+                        maxMatchings[included] << std::endl;
+                }
             }
         }
     }
