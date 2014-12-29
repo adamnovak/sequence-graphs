@@ -176,13 +176,6 @@ protected:
         std::deque<size_t> matchings;
         
         /**
-         * One shorter than the matchings vector. Holds the Hamming/edit distance
-         * cost for the gap after the corresponding entry in the matchings
-         * vector.
-         */
-        std::deque<size_t> costs;
-        
-        /**
          * Holds the total number of non-overlapping minimal unique matchings in
          * the run. TODO: Need to account for overlap in a run when maximal
          * unique matches in the same run overlap.
@@ -194,28 +187,6 @@ protected:
          * this run.
          */
         size_t totalCost;
-        
-        /**
-         * Equality comparison so we can put these in a set.
-         */
-        inline bool operator==(const Run& other) const {
-            return(matchings == other.matchings && costs == other.costs &&
-                totalClearance == other.tolalClearance &&
-                totalCost == other.totalCost);
-        }
-        
-        /**
-         * Ordering defined so we can put these in a set.
-         */
-        inline bool operator<(const Run& other) const {
-            return matchings < other.matchings ||
-                matchings == other.matchings && 
-                (costs < other.costs || 
-                costs == other.costs && 
-                (totalClearance < other.totalClearance || 
-                totalClearance == other.totalClearance && 
-                totalCost == other.totalCost));
-        }
         
     };
     
@@ -267,6 +238,17 @@ protected:
      * could eventually pass those thresholds on extension.
      */
     void scan(SyntenyBlock& block, const std::string& query) const;
+    
+    /**
+     * Go through the maximal unique matchings in the query, and see which of
+     * them are in Runs sufficiently good to be accepted, and which of them are
+     * in substandard runs but are still not trivially short, or are close
+     * enough to the edges that they could join better runs eventually and thus
+     * need to be blacklisted.
+     */
+    void identifyGoodMatchingRuns(const std::string& query,
+        std::vector<Matching>& maxMatchings,
+        const std::vector<std::vector<size_t>>& matchingGraph) const;
     
     /**
      * Count the mismatches between a query and a text in the index, in a range.

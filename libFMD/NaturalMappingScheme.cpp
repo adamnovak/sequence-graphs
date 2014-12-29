@@ -365,7 +365,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
     // base mappings, and make those.
     
     // Do the DP to find the good runs, and flag matchings in them.
-    identifyGoodMatchingRuns(maxMatchings, matchingGraph);
+    identifyGoodMatchingRuns(query, maxMatchings, matchingGraph);
     
     // Where will we keep unique matchings by base? We store them as sets of
     // TextPositions to which each base has been matched.
@@ -377,47 +377,31 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
     // (since it was maximal) until credit comes along.
     std::vector<bool> blacklist(query.size());
     
-    for(auto& entry : syntenyBlocks) { 
-        // Do the scan of each SyntenyBlock to figure out whether it matchings
-        // should count, and whether they should be blacklisted.
-        
-        Log::debug() << "Scanning frame " << entry.first.first << ", " <<
-            entry.first.second << std::endl;
-        
-        // Get a reference to the block, so we can update it in place.
-        SyntenyBlock& block = entry.second;
-        
-        // Scan the block and set the canMatch and blacklist flags on its
-        // matchings.
-        scan(block, query);
-        
-        for(Matching matching : block.maximalMatchings) {
-            // For each maximal matching in the block, we may need to make some
-            // mappings.
-        
-            if(matching.canMatch) {
-                // This mapping can produce matchings
-        
-                for(size_t i = matching.start;
-                    i < matching.start + matching.length; i++) {
-                    
-                    Log::trace() << "Matching " << i << " to " <<
-                        matching.location << std::endl;
-                    
-                    // For each position it covers, record the matching on that
-                    // position.
-                    matchings[i].insert(matching.location);
-                    
-                    // Bump the matching's location over by 1 for the next base.
-                    // We're working on the copy that the range for loop made
-                    // rather than the original.
-                    matching.location.addLocalOffset(1);
-                    
-                    if(matching.blacklist) {
-                        // We have to blacklist all these positions in the query
-                        // so they can't map.
-                        blacklist[i] = true;
-                    }
+    for(Matching& matching : maxMatchings) {
+        // For each maximal matching, we may need to make some mappings.
+    
+        if(matching.canMatch) {
+            // This mapping can produce matchings
+    
+            for(size_t i = matching.start;
+                i < matching.start + matching.length; i++) {
+                
+                Log::trace() << "Matching " << i << " to " <<
+                    matching.location << std::endl;
+                
+                // For each position it covers, record the matching on that
+                // position.
+                matchings[i].insert(matching.location);
+                
+                // Bump the matching's location over by 1 for the next base.
+                // We're working on the copy that the range for loop made
+                // rather than the original.
+                matching.location.addLocalOffset(1);
+                
+                if(matching.blacklist) {
+                    // We have to blacklist all these positions in the query
+                    // so they can't map.
+                    blacklist[i] = true;
                 }
             }
         }
@@ -492,12 +476,11 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
 
 void NaturalMappingScheme::identifyGoodMatchingRuns(
     const std::string& query, std::vector<Matching>& maxMatchings,
-    const std::vector<std::vector<size_t>>& matchingGraph) {
+    const std::vector<std::vector<size_t>>& matchingGraph) const {
 
     // This holds all the runs ending at a certain matching without getting too
     // many mismatches/edits.
-    // TODO: No set because no retraction
-    std::vector<std::set<Run>> runs;
+    std::vector<std::vector<Run>> runs(maxMatchings.size());
 
     for(size_t i = 0; i < maxMatchings.size(); i++) {
         // For each matching from right to left
@@ -549,13 +532,106 @@ void NaturalMappingScheme::identifyGoodMatchingRuns(
                 Run newRun = prevRun;
                 
                 newRun.matchings.push_back(i);
-                newRun.costs.push_back(cost);
                 newRun.totalCost += cost;
                 newRun.totalClearance += matching.nonOverlapping;
                 
                 // And add the extension as a run for this matching
-                runs[i].insert(newRun);
+                runs[i].push_back(newRun);
             }
+            
+            // We also need a Run that is just this match
+            Run startHere;
+            startHere.matchings.push_back(i);
+            startHere.totalCost = 0;
+            startHere.totalClearance = matching.nonOverlapping;
+            
+            runs[i].push_back(startHere);
+        }
+    }
+    
+    // Now we do a very inefficient thing: for each sufficiently good run, we
+    // flag all the involved matchings as able to match up bases. This means
+    // we'll possibly end up flagging the same matching repeatedly. TODO: make
+    // this more efficient by somehow linking matchings up with there eventual
+    // completed runs.
+    for(size_t i = 0; i < maxMatchings.size(); i++) {
+        // For each matching from right to left
+        
+        // Get a reference to this matcing we're on.
+        Matching& matching = maxMatchings[i];
+     
+        for(Run& run: runs[i]) {
+            // For each run that ends at this matching
+            
+            if(run.totalCost <= maxHammingDistance &&
+                run.totalClearance >= minHammingBound) {
+                
+                // The run has enough Hamming clearance, and doesn't have too
+                // many mismatches/edits.
+                
+                for(size_t included : run.matchings) {
+                    // For each matching in the run, flag it
+                    maxMatchings[included].canMatch = true;
+                }
+            
+            }
+        }
+    }
+    
+    // Now we have found all the possible good runs, and flagged all of their
+    // matchings as good. 
+    
+    if(conflictBelowThreshold) {
+    
+        // But there are some maximal matchings that we did not flag as good,
+        // but which we still want to cause conlict. So we blacklist those.
+        
+        for(Matching& matching : maxMatchings) {
+            // For each matching
+            if(!matching.canMatch && matching.length >= ignoreMatchesBelow) {
+                // We can't use it, but we can't just ignore it, so make it
+                // blacklisted.
+                matching.blacklist = true;
+                
+                // Which means we need to mark it as important for making base-
+                // to-base matchings.
+                matching.canMatch = true;
+            }
+        }
+    }
+    
+    // Now that we've flagged all the maximal unique matchings that can actually
+    // produce useful base-to-base matchings, we need to look for the ones that
+    // aren't flagged but might become flagged on extension, and which therefore
+    // need to have their bases blacklisted so they don't map anywhere else
+    // until that extension happens.
+    
+    // We're just going to blacklist any matchings that aren't flagged and that
+    // are within maxAlignmentSize of the ends
+        
+    for(size_t i = 0; i < maxMatchings.size(); i++) {
+        // For each matching coming in from the right
+        
+        // TODO: Only look at matchings near the ends somehow.
+        
+        if((maxMatchings[i].start < maxAlignmentSize || query.size() - 
+            (maxMatchings[i].start + maxMatchings[i].length) <= 
+            maxAlignmentSize) && !maxMatchings[i].canMatch && !unstable) {
+        
+            // We're too close to one end or the other, and aren't flagged as
+            // part of a good enough run. And we care about stability.
+            
+            // This one could be in a run extending off the end, and it didn't
+            // get flagged already.
+            
+            Log::debug() << "\t--- Blacklisting matching!" << std::endl;
+            
+            // This one needs to be blacklisted.
+            maxMatchings[i].blacklist = true;
+            // Which means we need to mark it as important for making base-to-
+            // base matchings.
+            maxMatchings[i].canMatch = true;
+        
         }
     }
 }
