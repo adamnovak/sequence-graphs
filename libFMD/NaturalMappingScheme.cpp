@@ -335,6 +335,8 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             // And where do they start on he left?
             size_t theirStart = maxMatchings[prevMatching].start;
             
+            int64_t queryGapLength = (int64_t) theirStart - (int64_t) ourEnd;
+            
             // TODO: These limits are asymetrical due to inclusive/exclusive
             // bounds.
             
@@ -602,7 +604,12 @@ void NaturalMappingScheme::identifyGoodMatchingRuns(
                 // They overlap in both, but must be inconsistent. Charge the
                 // difference.
                 cost = std::abs(queryGapLength - referenceGapLength);
-            } else if(queryGapLength > 0 && referenceGapLength > 0) {
+            } else if(queryGapLength == 0 && referenceGapLength == 0) {
+            
+                throw std::runtime_error(
+                    "Grave error: Can't have query and reference matchings "
+                    "both up against each other");
+            } else {
                 // They are separated by some distance in both.
                 
                 // Get a TextPosition to the first base in the gap
@@ -615,14 +622,11 @@ void NaturalMappingScheme::identifyGoodMatchingRuns(
                 cost = countEdits(query,
                     matching.start + matching.length, queryGapLength, afterMatching,
                     referenceGapLength, maxHammingDistance + 1);
-            } else {
-                throw std::runtime_error(
-                    "Grave error: Can't have query and reference matchings "
-                    "both up against each other");
-            }
+            } 
             
             Log::info() << "Arriving at " << maxMatchings[i] << " from " <<
-                maxMatchings[previous]  << " costs " << cost << std::endl;
+                maxMatchings[previous]  << " (" << queryGapLength << "|" <<
+                referenceGapLength << ") costs " << cost << std::endl;
             
             for(const Run& prevRun : runs[previous]) {
                 // For each run ending with this other matching
