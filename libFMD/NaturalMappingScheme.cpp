@@ -324,8 +324,8 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
         // matching. We need to see which previous matchings it could possibly
         // be in a run with.
         
-        for(size_t prevMatching = matchingNumber; prevMatching != (size_t) -1;
-            prevMatching--) {
+        for(size_t prevMatching = matchingNumber - 1; 
+            prevMatching != (size_t) -1; prevMatching--) {
             
             // For each previous matching
             
