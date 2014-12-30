@@ -670,12 +670,21 @@ void NaturalMappingScheme::identifyGoodMatchingRuns(
         for(Run& run: runs[i]) {
             // For each run that ends at this matching
             
-            if(run.totalCost <= maxHammingDistance &&
-                run.totalClearance >= minHammingBound) {
+            // Get the first and last matchings in the run
+            Matching& firstMatching = maxMatchings[run.matchings[0]];
+            Matching& lastMatching = maxMatchings[*(run.matchings.rbegin())];
                 
-                Log::debug() << "Found acceptable run of +" <<
-                    run.totalClearance << ", -" << run.totalCost << ":" <<
-                    std::endl;
+            // Work out the length of the run
+            size_t runLength = lastMatching.start + lastMatching.length -
+                firstMatching.start;
+            
+            if(run.totalCost <= maxHammingDistance &&
+                run.totalClearance >= minHammingBound &&
+                runLength >= minContext) {
+                
+                Log::debug() << "Found acceptable " << runLength << 
+                    "bp run of +" << run.totalClearance << ", -" << 
+                    run.totalCost << ":" << std::endl;
                 
                 // The run has enough Hamming clearance, and doesn't have too
                 // many mismatches/edits.
@@ -690,8 +699,9 @@ void NaturalMappingScheme::identifyGoodMatchingRuns(
             
             } else {
                 // Complain about insufficiently good runs.
-                Log::debug() << "Unacceptable run of +" << run.totalClearance <<
-                    ", -" << run.totalCost << ":" << std::endl;
+                Log::debug() << "Unacceptable " << runLength << "bp run of +" <<
+                     run.totalClearance << ", -" << run.totalCost << ":" <<
+                     std::endl;
                 for(size_t included : run.matchings) {
                     Log::debug() << "\tContains matching " <<
                         maxMatchings[included] << std::endl;

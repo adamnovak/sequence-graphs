@@ -23,7 +23,7 @@ mkdir -p "${OUTDIR}"
 truncate -s 0 ${TSV}
 
 # What scheme are we interested in?
-SCHEME="ICnaturalHam6Mis5"
+SCHEME="ICnaturalHam5Mis4"
 
 # Work out the total tandem count
 TANDEM_COUNT=$(sum.sh < tandem.${SCHEME}) 
