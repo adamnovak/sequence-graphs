@@ -219,7 +219,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             continue;
         }
         
-        Log::info() << "Max matching " << matching.start << " - " <<
+        Log::debug() << "Max matching " << matching.start << " - " <<
             matching.start + matching.length << " (+" << matching.length <<
             ") @ " << matching.location << std::endl;
     
@@ -343,7 +343,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             if(ourEnd > theirStart &&
                 ourEnd - theirStart > maxAlignmentSize) {
              
-                Log::info() << matching << " can't come from " <<
+                Log::debug() << matching << " can't come from " <<
                     maxMatchings[prevMatching] <<
                     " because it overlaps too much in query." << std::endl;
              
@@ -361,7 +361,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
                 // If the distance in the query is too far, we can't connect at
                 // all, and nothing further away can either.
                 
-                Log::info() << matching << " can't come from " <<
+                Log::debug() << matching << " can't come from " <<
                     maxMatchings[prevMatching] <<
                     " because it's too far upstream in query." << std::endl;
                 
@@ -393,7 +393,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
                 if(ourEnd > theirStart &&
                     ourEnd - theirStart > maxAlignmentSize) {
                  
-                    Log::info() << matching << " can't come from " <<
+                    Log::debug() << matching << " can't come from " <<
                         maxMatchings[prevMatching] <<
                         " because it overlaps too much in reference." <<
                         std::endl;
@@ -409,7 +409,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
                     // The distance between our right end and their left end is
                     // too great.
                     
-                    Log::info() << matching << " can't come from " <<
+                    Log::debug() << matching << " can't come from " <<
                         maxMatchings[prevMatching] <<
                         " because it's too far upstream in reference." <<
                         std::endl;
@@ -421,10 +421,10 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
                 // bit between these two matchings.
                 matchingGraph[matchingNumber].push_back(prevMatching);
                 
-                Log::info() << matching << " can come from " << 
+                Log::debug() << matching << " can come from " << 
                     maxMatchings[prevMatching] << std::endl;
             } else {
-                Log::info() << matching << " can't come from " << 
+                Log::debug() << matching << " can't come from " << 
                     maxMatchings[prevMatching] <<
                     " due to text/direction issue" << std::endl;
             }
@@ -623,7 +623,7 @@ void NaturalMappingScheme::identifyGoodMatchingRuns(
                     referenceGapLength, maxHammingDistance + 1);
             } 
             
-            Log::info() << "Arriving at " << maxMatchings[i] << " from " <<
+            Log::debug() << "Arriving at " << maxMatchings[i] << " from " <<
                 maxMatchings[previous]  << " (" << queryGapLength << "|" <<
                 referenceGapLength << ") costs " << cost << std::endl;
             
@@ -673,7 +673,7 @@ void NaturalMappingScheme::identifyGoodMatchingRuns(
             if(run.totalCost <= maxHammingDistance &&
                 run.totalClearance >= minHammingBound) {
                 
-                Log::info() << "Found acceptable run of +" <<
+                Log::debug() << "Found acceptable run of +" <<
                     run.totalClearance << ", -" << run.totalCost << ":" <<
                     std::endl;
                 
@@ -684,16 +684,16 @@ void NaturalMappingScheme::identifyGoodMatchingRuns(
                     // For each matching in the run, flag it
                     maxMatchings[included].canMatch = true;
                     
-                    Log::info() << "\tContains matching " <<
+                    Log::debug() << "\tContains matching " <<
                         maxMatchings[included] << std::endl;
                 }
             
             } else {
                 // Complain about insufficiently good runs.
-                Log::info() << "Unacceptable run of +" << run.totalClearance <<
+                Log::debug() << "Unacceptable run of +" << run.totalClearance <<
                     ", -" << run.totalCost << ":" << std::endl;
                 for(size_t included : run.matchings) {
-                    Log::info() << "\tContains matching " <<
+                    Log::debug() << "\tContains matching " <<
                         maxMatchings[included] << std::endl;
                 }
             }
