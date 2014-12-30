@@ -85,7 +85,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         plan = set()
         for credit, unstable in itertools.product([True, False], repeat=2):
         
-            plan += set([
+            plan |= set([
                 # Exact credit (tolerating 1 mismatch) with Hamming bound, but no
                 # mismatches.
                 (True, credit, unstable, None, None, None, None, 1, None, "natural"),

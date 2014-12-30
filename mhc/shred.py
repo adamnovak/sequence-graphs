@@ -5,7 +5,7 @@ shred.py: chop the sequences in a FASTA into fake reads.
 """
 
 import argparse, sys, os, os.path, random, subprocess, shutil, itertools
-import collections
+import collections, random
 
 from Bio import SeqIO
 from Bio.Seq import Seq
@@ -40,6 +40,18 @@ def parse_args(args):
         help="read length")
     parser.add_argument("--spacing", type=int, default=100,
         help="spacing between read start points")
+    parser.add_argument("--errors", action="store_true",
+        help="introduce errors into reads")
+    parser.add_argument("--mismatchRate", type=float, default=0.01,
+        help="frequency of mismatch errors per base")
+    # TODO: If you do indels, you can't look at where things actually map, 
+    # because the read coordinates no longer match the qurery sequence
+    # coordinates in a reasonable way.
+    # TODO: unimplemented.
+    parser.add_argument("--insertRate", type=float, default=0.001,
+        help="UNIMPLEMENTED frequency of insert errors per insert location")
+    parser.add_argument("--deleteRate", type=float, default=0.001,
+        help="UNIMPLEMENTED probability of deletion error per base")
     
     
     # The command line arguments start with the program name, which we don't
@@ -48,11 +60,13 @@ def parse_args(args):
         
     return parser.parse_args(args)
 
-def shred(records_in, size, spacing):
+def shred(records_in, size, spacing, mismatch_rate=0):
     """
     Given an iterator of SeqRecords, a read size, and a start position spacing,
     yield SeqRecords for the reads. Skips any reads containing Ns, or which are
     too short.
+    
+    Introduces mismatches at the given rate per base.
     """
     
     for input_record in records_in:
@@ -71,6 +85,20 @@ def shred(records_in, size, spacing):
             read.description = ""
             
             if("N" not in str(read.seq)):
+                # This read has no Ns, so we can use it.
+                
+                for i in xrange(len(read)):
+                    # For each base in the read
+                    if random.random() < mismatch_rate:
+                        # We're going to put an error here.
+                        
+                        # Pick from bases that aren't the one that was there.
+                        bases_allowed = set(["A", "C", "G", "T"])
+                        bases_allowed.remove(read[i])
+                        
+                        read[i] = random.choice(bases_allowed)
+                
+            
                 # Give out the read we've made
                 yield read
     
@@ -86,7 +114,8 @@ def main(args):
 
     # Stream records in, shred them, and stream the results out.
     SeqIO.write(shred(SeqIO.parse(options.fastaIn, "fasta"), options.size, 
-        options.spacing), options.fastaOut, "fasta")
+        options.spacing, options.mismatchRate if options.errors else 0),
+        options.fastaOut, "fasta")
             
     
             

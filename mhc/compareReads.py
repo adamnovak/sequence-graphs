@@ -448,10 +448,12 @@ class ShredTarget(jobTree.scriptTree.target.Target):
     
     """
     
-    def __init__(self, contig_fasta, read_fasta):
+    def __init__(self, contig_fasta, read_fasta, errors=False):
         """
         Make a target that shreds the contig_fasta into partly-overlapping reads
         with no Ns, producing the read_fasta.
+        
+        If errors is true, introduce some errors.
         
         """
         
@@ -461,6 +463,7 @@ class ShredTarget(jobTree.scriptTree.target.Target):
         # Save everything
         self.contig_fasta = contig_fasta
         self.read_fasta = read_fasta
+        self.erors = errors
         
         self.logToMaster("Creating ShredTarget")
         
@@ -479,6 +482,9 @@ class ShredTarget(jobTree.scriptTree.target.Target):
         # Put together the arguments
         args = ["./shred.py", "--fastaIn", self.contig_fasta, "--fastaOut",
             self.read_fasta]
+            
+        if self.errors:
+            args.append("--errors")
         
         # Run the shred script         
         check_call(self, args)
