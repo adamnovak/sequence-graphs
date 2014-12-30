@@ -70,25 +70,23 @@ truncate -s 0 ${TSV}
 # Define all the series we want
 
 series "${TSV}" "No Credit" \
-    INnaturalHam6Mis1 \
-    INnaturalHam6Mis2 \
-    INnaturalHam6Mis3 \
-    INnaturalHam6Mis4 \
-    INnaturalHam6Mis5
+    INnaturalHam5Mis1 \
+    INnaturalHam5Mis2 \
+    INnaturalHam5Mis3 \
+    INnaturalHam5Mis4
     
 series "${TSV}" "Credit" \
-    ICnaturalHam6Mis1 \
-    ICnaturalHam6Mis2 \
-    ICnaturalHam6Mis3 \
-    ICnaturalHam6Mis4 \
-    ICnaturalHam6Mis5
+    ICnaturalHam5Mis1 \
+    ICnaturalHam5Mis2 \
+    ICnaturalHam5Mis3 \
+    ICnaturalHam5Mis4
 
 # Make the actual plot
 scatter.py ${TSV} --tsv --no_sort \
     --colors 'r' 'k'  \
     --markers 'd' 'D'  \
     --x_label "Precision" --y_label "Recall" \
-    --title "$(printf 'Recall vs. Precision With and Without Credit\nHamming Clearance 6')" \
+    --title "$(printf 'Recall vs. Precision With and Without Credit\nSeparation 5')" \
     --max_x 1 --max_y 1 \
     --lines \
     --legend_overlay best \

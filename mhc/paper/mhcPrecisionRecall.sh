@@ -96,7 +96,7 @@ do
     done
     
     # Make a series for this Hamming clearance
-    series "${TSV}" "Hamming Clearance ${HAMMING_CLEARANCE}" ${POINTS[*]}
+    series "${TSV}" "Separation ${HAMMING_CLEARANCE}" ${POINTS[*]}
 done
 
 # Make the actual plot
