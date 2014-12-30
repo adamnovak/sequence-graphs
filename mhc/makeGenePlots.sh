@@ -8,6 +8,7 @@ shopt -s extglob
 rm -Rf counts/
 mkdir counts/
 rm -f coverage.tsv
+rm -f wrongness-fraction.tsv
 for FILE in `ls *.counts`
 do
     # Sort things out by category
@@ -18,6 +19,9 @@ do
     # We're going to count up how many mapped and unmapped bases it has.
     TOTAL_MAPPED=0
     TOTAL_UNMAPPED=0
+    
+    # And how many bases are in genes
+    TOTAL_GENE2=0
     
     while read LINE || [[ -n $LINE ]]
     do
@@ -32,6 +36,13 @@ do
         # Save the count and scheme name to the file for the category
         printf "${SCHEME}\t${COUNT}\n" >> counts/${CATEGORY}.tsv
         
+        if [[ ${CATEGORY} == gene2* ]]
+        then
+            # This one was supposed to be in a gene. Add it so we can see what
+            # fraction of gene bases are 2wrong later.
+            TOTAL_GENE2=$((${TOTAL_GENE2} + ${COUNT}))
+        fi
+        
         if [[ ${CATEGORY} == *2unmapped ]]
         then
             # This one was unmapped. Add it in.
@@ -45,6 +56,14 @@ do
             TOTAL_MAPPED=$((${TOTAL_MAPPED} + ${COUNT}))
         fi
         
+        if [[ ${CATEGORY} == "gene2wrong" ]]
+        then
+            # Save the count for when we get to gene2unmapped, the last category
+            # for the genome, so we can compute a 
+            # portion-of-gene-bases-wrongly-mapped value.
+            GENE2WRONG="${COUNT}"
+        fi
+        
         if [[ ${CATEGORY} == "gene2unmapped" ]]
         then
             # This is the last category from each genome. Save stats per genome.
@@ -56,9 +75,14 @@ do
             # Save coverage point
             printf "${SCHEME}\t${COVERAGE}\n" >> coverage.tsv
             
+            # And do the same for portion of gene bases wrongly mapped
+            WRONGNESS=$(echo "${GENE2WRONG} / ${TOTAL_GENE2}" | bc -l)
+            printf "${SCHEME}\t${WRONGNESS}\n" >> wrongness-fraction.tsv
+            
             # Restart for next scheme
             TOTAL_MAPPED=0
             TOTAL_UNMAPPED=0
+            TOTAL_GENE2=0
             
         fi
         
@@ -70,6 +94,9 @@ done
 
 # While we're at it we totaled up per scheme coverage, so plot that.
 boxplot.py coverage.tsv --x_label "Scheme" --x_sideways --y_label "Coverage" --max 1.01 --min 0 --title "Read Mapping Coverage" --save coverage.png
+
+# Also the gene2wrong/gene2* wrongness ratios
+boxplot.py wrongness-fraction.tsv --x_label "Scheme" --x_sideways --y_label "Fraction of Gene Bases Mapped to Wrong Gene" --max 1.01 --min 0 --title "Read Mapping Gene Wrongness" --save wrongness.png
 
 for FILE in `ls counts/*.tsv`
 do

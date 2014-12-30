@@ -412,6 +412,9 @@ def main(args):
     # observed any mappings.
     mapped_queries = set()
     
+    # We also want the total queries
+    total_queries = set()
+    
     for classification, gene_from, gene_to, mapping in classified:
         # For each classified mapping
         
@@ -425,6 +428,9 @@ def main(args):
         elif len(mapping) == 3:
             # We only have the query position
             contig2, base2, query_read = mapping
+            
+        # Record that this read existed
+        total_queries.add(query_read)
             
         # Record it in its class for its gene pair (which may be Nones)
         class_counts[classification][gene_from][gene_to] += 1
@@ -458,7 +464,10 @@ def main(args):
         options.classCounts.write("{}\t{}\n".format(classification, total))
         
     # Add in a fake class for total query contigs mapped
-    options.classCounts.write("!queriesMapped\t{}\n".format(len(mapped_queries)))
+    options.classCounts.write("!queriesMapped\t{}\n".format(len(
+        mapped_queries)))
+    # And in total
+    options.classCounts.write("!queriesTotal\t{}\n".format(len(total_queries)))
         
     for classification, gene_mappings in gene_sets.iteritems():
         # For each set of query genes with mappings in a class
