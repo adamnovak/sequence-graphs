@@ -158,25 +158,21 @@ class AlignerAssessmentTarget(jobTree.scriptTree.target.Target):
         # add_context, mult_context, ignore_below, hamming_bound, hamming_max,
         # map_type
         return set([
-            # Exact credit (tolerating 1 mismatch) with Hamming bound, but no
-            # mismatches.
-            (True, True, False, None, None, None, None, 1, None, "old"),
-            # Natural,  Hamming bound 6, 5 mismatches in gaps.
-            (True, True, False, None, None, None, None, 6, 5, "old"),
-            # Natural, Hamming bound 3, 2 mismatches.
-            (True, True, False, None, None, None, None, 3, 2, "old"), 
-            # Natural Hamming bound 1
-            (True, True, False, None, None, None, None, 1, None, "old"),
-            # Unstable versions
-            (True, True, True, None, None, None, None, 1, None, "old"),
-            (True, True, True, None, None, None, None, 6, 5, "old"),
-            (True, True, True, None, None, None, None, 3, 2, "old"),
-            (True, True, True, None, None, None, None, 1, None, "old"),
-            # Unstable new versions
+            # Exact credit (tolerating 1 mismatch) with Hamming bound 1 and no
+            # mismatches. Straw man.
             (True, True, True, None, None, None, None, 1, None, "natural"),
-            (True, True, True, None, None, None, None, 6, 5, "natural"),
+            # 3, 2
             (True, True, True, None, None, None, None, 3, 2, "natural"),
-            (True, True, True, None, None, None, None, 1, None, "natural")
+            # 5, 4
+            (True, True, True, None, None, None, None, 5, 4, "natural"),
+            # No credit versions
+            (True, False, True, None, None, None, None, 1, None, "natural"),
+            (True, False, True, None, None, None, None, 3, 2, "natural"),
+            (True, False, True, None, None, None, None, 5, 4, "natural"),
+            # Strongly stable versions
+            (True, True, False, None, None, None, None, 1, None, "natural"),
+            (True, True, False, None, None, None, None, 3, 2, "natural"),
+            (True, True, False, None, None, None, None, 5, 4, "natural"),
         ])
 
         
@@ -463,7 +459,7 @@ class ShredTarget(jobTree.scriptTree.target.Target):
         # Save everything
         self.contig_fasta = contig_fasta
         self.read_fasta = read_fasta
-        self.erors = errors
+        self.errors = errors
         
         self.logToMaster("Creating ShredTarget")
         
