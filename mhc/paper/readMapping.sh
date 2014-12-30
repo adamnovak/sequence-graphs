@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-# readCoverage.sh: Make the coverage plots for the paper. Execute from the
-# cluster run output directory. Takes an optional argument, which is the format
-# to generate graphs in.
+# readMapping.sh: Make the read mappability plots for the paper. Execute from
+# the cluster run output directory. Takes an optional argument, which is the
+# format to generate graphs in.
 
 # Die on errors
 set -e
@@ -12,9 +12,9 @@ OUTDIR="paper"
 # And save it in SVG unless someone tells us different.
 GRAPH_FORMAT=${1-svg}
 # We will make this data file (per-base coverage)
-TSV="${OUTDIR}/readCoverage.tsv"
+TSV="${OUTDIR}/readMapability.tsv"
 # And this plot image
-GRAPH="${OUTDIR}/readCoverage.${GRAPH_FORMAT}"
+GRAPH="${OUTDIR}/readMapability.${GRAPH_FORMAT}"
 
 # Make sure out directory exists.
 mkdir -p ${OUTDIR}
@@ -29,9 +29,9 @@ do
     # Grab the scheme
     SCHEME=${FILE%.*}
     
-    # We're going to count up how many mapped and unmapped bases it has.
-    TOTAL_MAPPED=0
-    TOTAL_UNMAPPED=0
+    # We're going to count up how many mapped and unmapped reads it has.
+    READS_MAPPED=0
+    READS_TOTAL=0
     
     while read LINE || [[ -n $LINE ]]
     do
@@ -43,35 +43,25 @@ do
         CATEGORY="${PARTS[0]}"
         COUNT="${PARTS[1]}"
         
-        if [[ ${CATEGORY} == *2unmapped ]]
+        if [[ ${CATEGORY} == '!queriesMapped' ]]
         then
-            # This one was unmapped. Add it in.
-            TOTAL_UNMAPPED=$((${TOTAL_UNMAPPED} + ${COUNT}))
-        elif [[ ${CATEGORY} == "!*" ]]
+            # These reads were mapped. Remember that.
+            READS_MAPPED="${COUNT}"
+        elif [[ ${CATEGORY} == '!queriesTotal' ]]
         then
-            # Skip this one
-            echo "Metadata category ${CATEGORY}"
-        else
-            # This one was mapped. Add it in.
-            TOTAL_MAPPED=$((${TOTAL_MAPPED} + ${COUNT}))
-        fi
-        
-        if [[ ${CATEGORY} == "gene2unmapped" ]]
-        then
-            # This is the last category from each genome. Save stats per genome.
-            # TODO: this is a hack.
+            # These reads were mapped. Remember that.
+            READS_TOTAL="${COUNT}"
             
-            # Calculate coverage
-            COVERAGE=$(echo "${TOTAL_MAPPED} / ( ${TOTAL_MAPPED} + ${TOTAL_UNMAPPED} )" | bc -l)
-    
-            # Save coverage point
-            printf "${SCHEME}\t${COVERAGE}\n" >> "${TSV}"
+            # Since these come in pairs, several to a file, and this is the
+            # second one, write an entry in the output file.
             
-            # Restart for next scheme
-            TOTAL_MAPPED=0
-            TOTAL_UNMAPPED=0
+            # Calculate mapability
+            MAPABILITY=$(echo "${READS_MAPPED} / ${READS_TOTAL}" | bc -l)
+            
+            # Save a line for this scheme and genome.
+            printf "${SCHEME}\t${MAPABILITY}\n" >> "${TSV}"
+            
         fi
-        
     done < ${FILE}
 done
 
@@ -126,10 +116,9 @@ LABEL_OPTS+=("--category_labels" \
     
 boxplot.py "${TSV}" \
     --x_label "Scheme Parameters" \
-    --y_label "Portion Aligned to Reference" \
-    --title "Read Coverage vs. Mapping Scheme" \
+    --y_label "Portion of Reads Mapped to Reference" \
+    --title "Read Mapability vs. Mapping Scheme" \
     "${GROUPING_OPTS[@]}" "${CATEGORY_OPTS[@]}" "${LABEL_OPTS[@]}" \
-    --legend_overlay 'lower left' \
     --grouping_colors 'k' 'b' 'g' 'r' \
     --x_sideways \
     --no_n \
