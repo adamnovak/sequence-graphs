@@ -248,7 +248,7 @@ echo "GRC average coverage: ${GRC_AVERAGE}"
 boxplot.py "${TSV}" \
     --x_label "Scheme Parameter (Min Length, Mismatches)" \
     --y_label "Portion Aligned to Reference" \
-    --title "Coverage vs. Merging Scheme" \
+    --title "Coverage vs. Mapping Scheme" \
     "${GROUPING_OPTS[@]}" "${CATEGORY_OPTS[@]}" "${LABEL_OPTS[@]}" \
     --grouping_colors 'b' 'g' 'r' 'c' 'm' 'y' 'k' \
     --legend_overlay 'lower right' --legend_columns 2 \

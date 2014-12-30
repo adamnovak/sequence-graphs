@@ -93,10 +93,10 @@ do
 done
 
 # While we're at it we totaled up per scheme coverage, so plot that.
-boxplot.py coverage.tsv --x_label "Scheme" --x_sideways --y_label "Coverage" --max 1.01 --min 0 --title "Read Mapping Coverage" --save coverage.png
+boxplot.py coverage.tsv --x_label "Scheme" --x_sideways --y_label "Coverage" --max 1.01 --title "Read Mapping Coverage" --save coverage.png
 
 # Also the gene2wrong/gene2* wrongness ratios
-boxplot.py wrongness-fraction.tsv --x_label "Scheme" --x_sideways --y_label "Fraction of Gene Bases Mapped to Wrong Gene" --max 1.01 --min 0 --title "Read Mapping Gene Wrongness" --save wrongness.png
+boxplot.py wrongness-fraction.tsv --x_label "Scheme" --x_sideways --y_label "Fraction of Gene Bases Mapped to Wrong Gene" --min 0 --title "Read Mapping Gene Wrongness" --save wrongness.png
 
 for FILE in `ls counts/*.tsv`
 do
