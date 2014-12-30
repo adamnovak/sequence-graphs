@@ -689,7 +689,8 @@ main(
             "Minimum Hamming distance lower bound on a maximum unique match")
         ("maxHammingDistance", boost::program_options::value<size_t>()
             ->default_value(0), 
-            "Maximum Hamming distance from reference location");
+            "Maximum Hamming distance from reference location")
+        ("unstable", "Allow unstable mapping for increased coverage");
         
     // And set up our positional arguments
     boost::program_options::positional_options_description positionals;
@@ -833,6 +834,7 @@ main(
                     "minHammingBound"].as<size_t>();
                 scheme->maxHammingDistance = options[
                     "maxHammingDistance"].as<size_t>();
+                scheme->unstable = options.count("unstable");
                 
                 return (MappingScheme*) scheme;
             } else if(options["mapType"].as<std::string>() == "old") {
@@ -850,6 +852,7 @@ main(
                     "minHammingBound"].as<size_t>();
                 scheme->maxHammingDistance = options[
                     "maxHammingDistance"].as<size_t>();
+                scheme->unstable = options.count("unstable");
                 
                 return (MappingScheme*) scheme;
             } else {
