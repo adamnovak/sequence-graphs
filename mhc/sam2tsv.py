@@ -81,7 +81,7 @@ def main(args):
             continue
         
         # Make sure we won't get tripped up by hard clipping or something.
-        assert(len(read.aligned_pairs) == read.infer_query_length())
+        assert(len(read.aligned_pairs) == read.inferred_length)
         
         for query_pos, ref_pos in read.aligned_pairs:
             # We can just iterate through this super simply.
