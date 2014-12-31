@@ -69,8 +69,8 @@ def main(args):
     # without parsing the somewhat incomprehensible MD tag.
     reference = SeqIO.to_dict(SeqIO.parse(options.reference, "fasta"))
     
-    for read in sam.fetch():
-        # For each read
+    for read in sam.fetch(until_eof=True):
+        # For each read (mapped or unmapped)
         
         if read.flag & 0x900 > 0:
             # This isn't a primary alignment according to the SAM spec at
@@ -79,6 +79,9 @@ def main(args):
             # is_secondary, but it doesn't expose the supplemental flag in the
             # same way.
             continue
+        
+        # Make sure we won't get tripped up by hard clipping or something.
+        assert(len(read.aligned_pairs) == read.infer_query_length())
         
         for query_pos, ref_pos in read.aligned_pairs:
             # We can just iterate through this super simply.
