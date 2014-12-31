@@ -173,13 +173,13 @@ LABEL_OPTS=()
 # Do just the min length one
 GROUPING_OPTS+=("--grouping" "Minimum Length")
 CATEGORY_OPTS+=("--categories" \
-    "ICnaturalMin20" \
-    "ICnaturalMin50" \
-    "ICnaturalMin100" \
-    "ICnaturalMin150" \
+    "ICnaturalMin250" \
     "ICnaturalMin200" \
-    "ICnaturalMin250")
-LABEL_OPTS+=("--category_labels" "250" "200" "150" "100" "50" "20")
+    "ICnaturalMin150" \
+    "ICnaturalMin100" \
+    "ICnaturalMin50" \
+    "ICnaturalMin20")
+LABEL_OPTS+=("--category_labels" '$l \geq 250$' '$l \geq 200$' '$l \geq 150$' '$l \geq 100$' '$l \geq 50$' '$l \geq 20$')
 
 # Do all the other series
 for HAMMING_CLEARANCE in {1..6}
@@ -187,13 +187,13 @@ do
     # For each minimum Hamming clearance we used...
     
     # Title the grouping
-    GROUPING_OPTS+=("--grouping" "Clearance ${HAMMING_CLEARANCE}")
+    GROUPING_OPTS+=("--grouping" "\$\\alpha=${HAMMING_CLEARANCE}\$")
     
     # Add category for 0 mismatches
     CATEGORY_OPTS+=("--categories" "ICnaturalHam${HAMMING_CLEARANCE}")
     
     # And label
-    LABEL_OPTS+=("--category_labels" "0")
+    LABEL_OPTS+=("--category_labels" "\$\\beta=0\$")
     
     for HAMMING_DISTANCE in $(seq 1 $((HAMMING_CLEARANCE - 1)))
     do
@@ -202,7 +202,7 @@ do
         
         # Add and label a category for this number of mismatches
         CATEGORY_OPTS+=("ICnaturalHam${HAMMING_CLEARANCE}Mis${HAMMING_DISTANCE}")
-        LABEL_OPTS+=("${HAMMING_DISTANCE}")
+        LABEL_OPTS+=("\$\\beta=${HAMMING_DISTANCE}\$")
     done
 done
     
@@ -246,7 +246,7 @@ GRC_AVERAGE=$(echo ${TOTAL_COVERAGE} / ${TOTAL_GENOMES} | bc -l)
 echo "GRC average coverage: ${GRC_AVERAGE}"
     
 boxplot.py "${TSV}" \
-    --x_label "Scheme Parameter (Min Length, Mismatches)" \
+    --x_label "Scheme Parameter (Min Length, \$\\beta\$)" \
     --y_label "Portion Aligned to Reference" \
     --title "Coverage vs. Mapping Scheme" \
     "${GROUPING_OPTS[@]}" "${CATEGORY_OPTS[@]}" "${LABEL_OPTS[@]}" \

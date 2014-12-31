@@ -93,42 +93,32 @@ CATEGORY_OPTS+=("--categories" "BWA")
 LABEL_OPTS+=("--category_labels" "BWA")
 
 # And the weakly stable ones
-GROUPING_OPTS+=("--grouping" "Weakly Stable, Credit")
+GROUPING_OPTS+=("--grouping" "Weakly Stable")
 CATEGORY_OPTS+=("--categories" \
     "ICnaturalHam1U" \
     "ICnaturalHam3Mis2U" \
     "ICnaturalHam5Mis4U")
 LABEL_OPTS+=("--category_labels" \
-    '$\alpha=1,\beta=0$' \
-    '$\alpha=3,\beta=2$'
-    '$\alpha=5,\beta=4$')
+    'Natural' \
+    '$\alpha=3, \beta=2$'
+    '$\alpha=5, \beta=4$')
     
-GROUPING_OPTS+=("--grouping" "Weakly Stable, No Credit")
-CATEGORY_OPTS+=("--categories" \
-    "INnaturalHam1U" \
-    "INnaturalHam3Mis2U" \
-    "INnaturalHam5Mis4U")
-LABEL_OPTS+=("--category_labels" \
-    '$\alpha=1,\beta=0$' \
-    '$\alpha=3,\beta=2$'
-    '$\alpha=5,\beta=4$')
-    
-    GROUPING_OPTS+=("--grouping" "Stable, Credit")
+GROUPING_OPTS+=("--grouping" "Stable")
 CATEGORY_OPTS+=("--categories" \
     "ICnaturalHam1" \
     "ICnaturalHam3Mis2" \
     "ICnaturalHam5Mis4")
 LABEL_OPTS+=("--category_labels" \
-    '$\alpha=1,\beta=0$' \
-    '$\alpha=3,\beta=2$'
-    '$\alpha=5,\beta=4$')
+    'Natural' \
+    '$\alpha=3, \beta=2$'
+    '$\alpha=5, \beta=4$')
     
 boxplot.py "${TSV}" \
     --x_label "Scheme Parameters" \
     --y_label "Portion of Gene Bases Aligned to Paralogs" \
     --title "Paralog Alignment vs. Mapping Scheme" \
     "${GROUPING_OPTS[@]}" "${CATEGORY_OPTS[@]}" "${LABEL_OPTS[@]}" \
-    --grouping_colors 'k' 'b' 'g' 'r' \
+    --grouping_colors 'k' 'b' 'r' \
     --x_sideways \
     --no_n \
     --save "${GRAPH}"

@@ -86,7 +86,7 @@ scatter.py ${TSV} --tsv --no_sort \
     --colors 'r' 'k'  \
     --markers 'd' 'D'  \
     --x_label "Precision" --y_label "Recall" \
-    --title "$(printf 'Recall vs. Precision With Strong and Weak Stability\nSeparation 5')" \
+    --title "$(printf 'Recall vs. Precision With Strong and Weak Stability\n$\\alpha = 5$')" \
     --max_x 1 --max_y 1 \
     --lines \
     --legend_overlay best \
