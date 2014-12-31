@@ -108,7 +108,7 @@ boxplot.py "${TSV}" \
     --y_label "Portion of Genes with Mappings to Paralogs" \
     --title "Paralog Mapping vs. Mapping Scheme" \
     "${GROUPING_OPTS[@]}" "${CATEGORY_OPTS[@]}" "${LABEL_OPTS[@]}" \
-    --legend_overlay 'upper right' \
+    --legend_overlay 'center left' \
     --grouping_colors 'k' 'b' 'g' 'r' \
     --x_sideways \
     --no_n \
