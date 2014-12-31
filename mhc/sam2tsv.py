@@ -117,8 +117,8 @@ def main(args):
                 # Write a line for it.
                 writer.line(ref_name, ref_pos, read.qname, query_pos, 
                     1 if read.is_reverse else 0)
-                    
-        for i in xrange(read.inferred_length):
+      
+        for i in xrange(read.query_length):
             # For each position in the read
             if i not in seen_positions:
                 # We found a position in the read that was hard-clipped or

@@ -58,6 +58,8 @@ do
             # Calculate mapability
             MAPABILITY=$(echo "${READS_MAPPED} / ${READS_TOTAL}" | bc -l)
             
+            echo "${READS_MAPPED} / ${READS_TOTAL} reads mapped in ${SCHEME}"
+            
             # Save a line for this scheme and genome.
             printf "${SCHEME}\t${MAPABILITY}\n" >> "${TSV}"
             
