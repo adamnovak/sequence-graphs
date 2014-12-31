@@ -80,8 +80,8 @@ def main(args):
             # same way.
             continue
         
-        # Make sure we won't get tripped up by hard clipping or something.
-        assert(len(read.aligned_pairs) == read.inferred_length)
+        # Keep track of what query positions were seen
+        seen_positions = set()
         
         for query_pos, ref_pos in read.aligned_pairs:
             # We can just iterate through this super simply.
@@ -89,6 +89,9 @@ def main(args):
             if query_pos is None:
                 # It's an insert in the reference
                 continue
+                
+            # Remember we saw his position oin the query
+            seen_positions.add(query_pos)
                 
             if ref_pos is None:
                 # It's an unaligned query base. Report it as unaligned.
@@ -114,6 +117,13 @@ def main(args):
                 # Write a line for it.
                 writer.line(ref_name, ref_pos, read.qname, query_pos, 
                     1 if read.is_reverse else 0)
+                    
+        for i in xrange(read.inferred_length):
+            # For each position in the read
+            if i not in seen_positions:
+                # We found a position in the read that was hard-clipped or
+                # something. Definitely not aligned. Report it as unaligned.
+                writer.line(read.qname, i)
 
 if __name__ == "__main__" :
     sys.exit(main(sys.argv))
