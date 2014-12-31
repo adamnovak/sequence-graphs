@@ -96,7 +96,7 @@ def shred(records_in, size, spacing, mismatch_rate=0):
                         bases_allowed = set(["A", "C", "G", "T"])
                         bases_allowed.remove(read[i])
                         
-                        read[i] = random.choice(bases_allowed)
+                        read[i] = random.choice(list(bases_allowed))
                 
             
                 # Give out the read we've made

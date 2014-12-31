@@ -444,7 +444,7 @@ class ShredTarget(jobTree.scriptTree.target.Target):
     
     """
     
-    def __init__(self, contig_fasta, read_fasta, errors=False):
+    def __init__(self, contig_fasta, read_fasta, errors=True):
         """
         Make a target that shreds the contig_fasta into partly-overlapping reads
         with no Ns, producing the read_fasta.
