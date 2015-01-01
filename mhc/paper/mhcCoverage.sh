@@ -251,7 +251,7 @@ boxplot.py "${TSV}" \
     --title "Coverage vs. Mapping Scheme" \
     "${GROUPING_OPTS[@]}" "${CATEGORY_OPTS[@]}" "${LABEL_OPTS[@]}" \
     --grouping_colors 'b' 'g' 'r' 'c' 'm' 'y' 'k' \
-    --legend_overlay 'lower right' --legend_columns 2 \
+    --no_legend \
     --x_sideways \
     --no_n \
     --hline ${GRC_AVERAGE} \

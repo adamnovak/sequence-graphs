@@ -111,8 +111,9 @@ boxplot.py "${TSV}" \
     --y_label "Portion of Reads Mapped to Reference" \
     --title "Read Mapability vs. Mapping Scheme" \
     "${GROUPING_OPTS[@]}" "${CATEGORY_OPTS[@]}" "${LABEL_OPTS[@]}" \
-    --grouping_colors 'k' 'b' 'g' 'r' \
+    --grouping_colors 'k' 'b' 'r' \
     --x_sideways \
+    --no_legend \
     --no_n \
     --max 1.01 \
     --save "${GRAPH}"

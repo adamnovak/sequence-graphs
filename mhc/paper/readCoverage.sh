@@ -119,8 +119,7 @@ boxplot.py "${TSV}" \
     --y_label "Portion Aligned to Reference" \
     --title "Read Coverage vs. Mapping Scheme" \
     "${GROUPING_OPTS[@]}" "${CATEGORY_OPTS[@]}" "${LABEL_OPTS[@]}" \
-    --legend_overlay 'best' \
-    --legend_columns 1 \
+    --no_legend \
     --grouping_colors 'k' 'b' 'r' \
     --x_sideways \
     --no_n \

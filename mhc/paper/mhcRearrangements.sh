@@ -31,7 +31,7 @@ TANDEM_COUNT=$(sum.sh < tandem.${SCHEME})
 # Plot the histogram indication the tandem dupes
 histogram.py "spectrum.${SCHEME}" \
     --logCounts \
-    --x_min 0 --x_max 25 --bins 25 \
+    --x_min 0 --x_max 35 --bins 35 \
     --y_max 1000000 \
     --x_label "Adjacency Component Size" --y_label "Occurrences" \
     --title "$(printf 'Adjacency Component Size Spectrum\n5 Clearance, 4 Mismatches')" \

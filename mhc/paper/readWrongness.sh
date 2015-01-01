@@ -120,6 +120,7 @@ boxplot.py "${TSV}" \
     "${GROUPING_OPTS[@]}" "${CATEGORY_OPTS[@]}" "${LABEL_OPTS[@]}" \
     --grouping_colors 'k' 'b' 'r' \
     --x_sideways \
+    --no_legend \
     --no_n \
     --save "${GRAPH}"
     
