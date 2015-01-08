@@ -367,8 +367,8 @@ main(
                     // For each subsequent matching until we run out or get
                     // enough, see if it overlaps the last one we grabbed.
                     
-                    Log::info() << "\tMatching " << minMatchings[i].start <<
-                        " + " << minMatchings[i].length << std::endl;
+                    Log::info() << "\tMatching " << minMatchings[j].start <<
+                        " + " << minMatchings[j].length << std::endl;
                     
                     if(minMatchings[j].start >= minMatchings[last].start +
                         minMatchings[last].length) {
@@ -509,6 +509,8 @@ main(
                 
             }
             
+            Log::output() << minContextLengths.size() << " lengths" << std::endl;
+            
             for(size_t contextLength : minContextLengths) {
                 // Output the final length at each base, one per line.
                 outputFile << contextLength << std::endl;
@@ -517,6 +519,7 @@ main(
         });
     }
     
+    outputFile.close();
     
     // Get rid of the index itself. Invalidates the index reference.
     delete indexPointer;
