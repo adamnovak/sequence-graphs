@@ -72,7 +72,7 @@ cactusMerge: $(CACTUSMERGE_OBJS) $(OBJS) $(DEPS)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(CACTUSMERGE_OBJS) $(OBJS) $(LDLIBS)
 	
 evaluateMapability: $(EVALUATEMAPABILITY_OBJS) $(OBJS) $(DEPS)
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(CACTUSMERGE_OBJS) $(OBJS) $(LDLIBS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(EVALUATEMAPABILITY_OBJS) $(OBJS) $(LDLIBS)
 	
 clean:
 	rm -Rf *.o createIndex
