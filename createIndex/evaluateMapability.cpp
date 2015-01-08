@@ -328,7 +328,7 @@ main(
             
             // For every piece of sequence between runs of 1 or more N...
             
-            Log::info() << "Contig: " << contig << std::endl;
+            Log::trace() << "Contig: " << contig << std::endl;
             
             // Find the minimum unique substrings between theis contig and the
             // whole reference.
@@ -352,7 +352,7 @@ main(
                 // For each match, find the right-minimal run of matches we need
                 // to get sufficient alpha.
                 
-                Log::info() << "Start at matching " << minMatchings[i].start <<
+                Log::debug() << "Start at matching " << minMatchings[i].start <<
                     " + " << minMatchings[i].length << std::endl;
                 
                 // How many of them have we found? We start with 1.
@@ -367,13 +367,13 @@ main(
                     // For each subsequent matching until we run out or get
                     // enough, see if it overlaps the last one we grabbed.
                     
-                    Log::info() << "\tMatching " << minMatchings[j].start <<
+                    Log::debug() << "\tMatching " << minMatchings[j].start <<
                         " + " << minMatchings[j].length << std::endl;
                     
                     if(minMatchings[j].start >= minMatchings[last].start +
                         minMatchings[last].length) {
                         
-                        Log::info() << "\t+++ Non-overlapping" << std::endl;
+                        Log::debug() << "\t+++ Non-overlapping" << std::endl;
                     
                         // We know it has to start after the last one starts,
                         // and we can see the last one also ends before it
@@ -390,7 +390,7 @@ main(
                         // And that we found another non-overlapping match.
                         nonOverlappingFound++;
                     } else {
-                        Log::info() << "\t--- Overlapping" << std::endl;
+                        Log::debug() << "\t--- Overlapping" << std::endl;
                     }
                 }
                 
@@ -465,7 +465,7 @@ main(
                 // the latest starting range left of us?
                 size_t contextLength = i - runs[latestStarting].first + 1;
                 
-                Log::info() << "Latest starting run before " << i << " is " <<
+                Log::debug() << "Latest starting run before " << i << " is " <<
                     runs[latestStarting].first << " - " <<
                     runs[latestStarting].second << " with context length " <<
                     contextLength << " vs. " << minContextLengths[i] <<
@@ -499,7 +499,7 @@ main(
                 // the earliest ending range right of us?
                 size_t contextLength = runs[earliestEnding].second - i;
                 
-                Log::info() << "Earliest ending run after " << i << " is " <<
+                Log::debug() << "Earliest ending run after " << i << " is " <<
                     runs[earliestEnding].first << " - " <<
                     runs[earliestEnding].second << " with context length " <<
                     contextLength << " vs. " << minContextLengths[i] <<
