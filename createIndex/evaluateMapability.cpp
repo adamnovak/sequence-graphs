@@ -218,7 +218,9 @@ main(
         ("indexDirectory", boost::program_options::value<std::string>(), 
             "Directory to make the index in; will be deleted and replaced!")
         ("reference", boost::program_options::value<std::string>(),
-            "FASTA contining a single N-free reference sequence to map to")
+            "FASTA contining a single reference sequence to map to")
+        ("outputFile", boost::program_options::value<std::string>(),
+            "File to save context lengths to, one per line")
         ("minHammingBound", boost::program_options::value<size_t>()
             ->default_value(0), 
             "Minimum Hamming distance lower bound on a maximum unique match");
@@ -230,6 +232,8 @@ main(
     positionals.add("indexDirectory", 1);
     // One reference
     positionals.add("reference", 1);
+    // One output file
+    positionals.add("outputFile", 1);
     
     // Add a variables map to hold option variables.
     boost::program_options::variables_map options;
