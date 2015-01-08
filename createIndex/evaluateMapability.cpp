@@ -339,8 +339,6 @@ main(
 
             const std::string& contig = *it;
 
-            Log::info() << contig << std::endl;
-            
             if(contig.size() == 0) {
                 // We got the bit between Ns.
                 
