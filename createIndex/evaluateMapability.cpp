@@ -81,7 +81,7 @@ struct Matching {
         start(start), location(location), length(length) {
     }
     
-}
+};
 
 /**
  * Find all of the minimal unique matchings between query string characters
@@ -91,7 +91,7 @@ std::vector<Matching>
 findMinMatchings(
     const FMDIndex& index,
     const std::string& query
-) const {
+) {
 
     // What matchings have we found?
     std::vector<Matching> toReturn;
@@ -322,12 +322,9 @@ main(
             // certain minimum number of nonoverlapping ones.
             
         
-        };
+        });
     }
     
-    
-    // Get rid of the mapping scheme now that everyone is done with it.
-    delete mappingScheme;
     
     // Get rid of the index itself. Invalidates the index reference.
     delete indexPointer;

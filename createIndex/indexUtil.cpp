@@ -1,3 +1,7 @@
+#include "indexUtil.hpp"
+
+#include <FMDIndexBuilder.hpp>
+
 FMDIndex*
 buildIndex(
     std::string indexDirectory,
