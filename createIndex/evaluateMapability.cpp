@@ -468,7 +468,8 @@ main(
                 Log::info() << "Latest starting run before " << i << " is " <<
                     runs[latestStarting].first << " - " <<
                     runs[latestStarting].second << " with context length " <<
-                    contextLength << std::endl;
+                    contextLength << " vs. " << minContextLengths[i] <<
+                    std::endl;
                 
                 // Adopt this context length if it is minimal.
                 minContextLengths[i] = std::min(minContextLengths[i],
@@ -499,9 +500,10 @@ main(
                 size_t contextLength = runs[earliestEnding].second - i;
                 
                 Log::info() << "Earliest ending run after " << i << " is " <<
-                    runs[latestStarting].first << " - " <<
-                    runs[latestStarting].second << " with context length " <<
-                    contextLength << std::endl;
+                    runs[earliestEnding].first << " - " <<
+                    runs[earliestEnding].second << " with context length " <<
+                    contextLength << " vs. " << minContextLengths[i] <<
+                    std::endl;
                 
                 // Adopt this context length if it is minimal.
                 minContextLengths[i] = std::min(minContextLengths[i],
