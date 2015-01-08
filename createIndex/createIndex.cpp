@@ -546,26 +546,7 @@ writeAdjacencyComponentSpectrum(
     
 }
 
-/**
- * Save a vector of numbers as a single-column TSV.
- */
-template<typename T>
-void
-writeColumn(
-    std::vector<T> numbers,
-    std::string filename
-) {
 
-    // Open up the file to write.
-    std::ofstream file(filename.c_str());
-    
-    for(auto number : numbers) {
-        // Write each number on its own line
-        file << number << std::endl;
-    }    
-    
-    file.close();
-}
 
 /**
  * createIndex: command-line tool to create a multi-level reference structure.

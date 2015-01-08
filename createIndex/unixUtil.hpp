@@ -1,6 +1,11 @@
 #ifndef UNIXUTIL_HPP
 #define UNIXUTIL_HPP
 
+#include <iostream>
+#include <vector>
+#include <string>
+#include <fstream>
+
 /**
  * unixUtil.hpp: utility functions for doing useful things with Unix.
  */
@@ -21,4 +26,27 @@ void exitOnSignal(int signalNumber);
  * <http://stackoverflow.com/a/77336/402891>
  */
 void stacktraceOnSignal(int signalNumber);
+
+/**
+ * Save a vector of numbers as a single-column TSV.
+ * TODO: Is this UNIX-y enough? Or do we need another util file just for this?
+ */
+template<typename T>
+void
+writeColumn(
+    std::vector<T> numbers,
+    std::string filename
+) {
+
+    // Open up the file to write.
+    std::ofstream file(filename.c_str());
+    
+    for(auto number : numbers) {
+        // Write each number on its own line
+        file << number << std::endl;
+    }    
+    
+    file.close();
+}
+
 #endif

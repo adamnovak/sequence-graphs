@@ -202,7 +202,7 @@ main(
 
     std::string appDescription = 
         std::string("Evaluate reference context lengths.\n") + 
-        "Usage: evaluateMapability <index directory> <reference>";
+        "Usage: evaluateMapability <index directory> <reference> <output file>";
 
     // Make an options description for our program's options.
     boost::program_options::options_description description("Options");
@@ -222,6 +222,7 @@ main(
         ("minHammingBound", boost::program_options::value<size_t>()
             ->default_value(0), 
             "Minimum Hamming distance lower bound on a maximum unique match");
+            
         
     // And set up our positional arguments
     boost::program_options::positional_options_description positionals;
@@ -254,7 +255,9 @@ main(
             return 0; 
         }
         
-        if(!options.count("indexDirectory") || !options.count("reference")) {
+        if(!options.count("indexDirectory") || !options.count("reference") ||
+            !options.count("outputFile")) {
+            
             // These are required.
             throw boost::program_options::error("Missing important arguments!");
         }
@@ -274,11 +277,19 @@ main(
     
     // If we get here, we have the right arguments. Parse them.
     
+    // How many min matches do we need in a run
+    size_t minHammingBound = options["minHammingBound"].as<size_t>();
+    
     // This holds the directory for the reference structure to build.
     std::string indexDirectory(options["indexDirectory"].as<std::string>());
     
     // This holds the reference
     std::string reference(options["reference"].as<std::string>());
+    
+    // This holds the filename to write to
+    std::string outputFilename = options["outputFile"].as<std::string>();
+    // Open that file for writing.
+    std::ofstream outputFile(outputFilename.c_str());
     
     // Read the reference contig. It must exist.
     std::pair<std::string, std::string> referenceRecord = 
@@ -313,42 +324,191 @@ main(
             
             // For every piece of sequence between runs of 1 or more N...
             
+            Log::info() << "Contig: " << contig << std::endl;
+            
             // Find the minimum unique substrings between theis contig and the
             // whole reference.
             std::vector<Matching> minMatchings = findMinMatchings(index,
                 contig);
                 
-            // Then we need to work out how far out we have to go to get a
-            // certain minimum number of nonoverlapping ones.
+            // Flip them around to be in ascending order by left endpoint.
+            std::reverse(minMatchings.begin(), minMatchings.end());
+
+            // We're going to fill in this vector of runs, which are [start,
+            // end) pairs, in ascending order by start position. All runs are
+            // right-minimal, and all left-minimal runs will be present.
+            std::vector<std::pair<size_t, size_t>> runs;
             
-            // For each run of n non-overlapping matches (which we can say is
-            // the run of n non-overlapping matches starting at this one)...
-            
-            // We know it's right minimal, since we went right as little as
-            // possible.
-            
-            // We know that the left-minimal one will be visited, since we try
-            // starting from each matching.
-            
-            // If there is a left-minimaler one covering a base, we will get it.
-            // If the only one covering a base is not left-minimal, we can have
-            // a problem.
-            
-            // TODO: What to do about the bases that are in contexts defined by
-            // MUMs in a chain that doesn't actually cross over the base?
-            
-            // I guess we could visit each base and add in the length you would
-            // need to cover the base and the match.
+            // We're going to do a pretty dumb approach where we fill in this
+            // vector repeatedly until it holds the right min context length for
+            // each base. Fill it with the biggest size_t.
+            std::vector<size_t> minContextLengths(contig.size(), (size_t) -1);
 
             for(size_t i = 0; i < minMatchings.size(); i++) {
-                // For each match, get the right number of non-overlapping
-                // matches going out rightwards.
-                size_t nonOverlappingFound = 0;
+                // For each match, find the right-minimal run of matches we need
+                // to get sufficient alpha.
+                
+                Log::info() << "Start at matching " << minMatchings[i].start <<
+                    " + " << minMatchings[i].length << std::endl;
+                
+                // How many of them have we found? We start with 1.
+                size_t nonOverlappingFound = 1;
+                
+                // The last non-overlapping thing we found was this first one.
+                size_t last = i;
+                
+                for(size_t j = i + 1; j < minMatchings.size() && 
+                    nonOverlappingFound < minHammingBound; j++) {
+                    
+                    // For each subsequent matching until we run out or get
+                    // enough, see if it overlaps the last one we grabbed.
+                    
+                    Log::info() << "\tMatching " << minMatchings[i].start <<
+                        " + " << minMatchings[i].length << std::endl;
+                    
+                    if(minMatchings[j].start >= minMatchings[last].start +
+                        minMatchings[last].length) {
+                        
+                        Log::info() << "\t+++ Non-overlapping" << std::endl;
+                    
+                        // We know it has to start after the last one starts,
+                        // and we can see the last one also ends before it
+                        // starts. So it's non-overlapping.
+                        
+                        // Since min matches can't contain each other, if this
+                        // is the first match that begins after our old match
+                        // ends, it necessarily ends before any other such
+                        // matches. So we can just take it and we automatically
+                        // have the greedy activity selection algorithm.
+                        
+                        // Say this is now our last match.
+                        last = j;
+                        // And that we found another non-overlapping match.
+                        nonOverlappingFound++;
+                    } else {
+                        Log::info() << "\t--- Overlapping" << std::endl;
+                    }
+                }
+                
+                if(nonOverlappingFound >= minHammingBound) {
+                    // We managed to find enough things for our run.
+                    
+                    // Where does it start and end, in bases? Start inclusive,
+                    // end exclusive.
+                    size_t runStart = minMatchings[i].start;
+                    size_t runEnd = minMatchings[last].start +
+                        minMatchings[last].length;
+                        
+                    Log::info() << "Successful run " << runStart << " - " <<
+                        runEnd << std::endl;
+                        
+                    // Save this run.
+                    runs.push_back(std::make_pair(runStart, runEnd));
+                }
             }
             
-            // If it is the shortest so far to include any of its bases, give
-            // those bases its length.
-            // Output the final length at each base.
+            if(runs.size() == 0) {
+                // Complain we found no runs.
+                throw std::runtime_error(
+                    "No valid runs found, so no bases can map at all");
+            }
+            
+            for(auto run: runs) {
+                // For each run, put its length if it is the shortest thing
+                // overlapping a base.
+                
+                // How long is the run?
+                size_t runLength = run.second - run.first;
+                
+                for(size_t i = run.first; i < run.second; i++) {
+                    // For each base in the run, put the run length if it hasn't
+                    // gotten anything smaller.
+                    minContextLengths[i] = std::min(minContextLengths[i],
+                        runLength);
+                }
+            }
+            
+            // Now we need to scan from side to side for things that are off the
+            // ends of runs.
+            
+            // We can guarantee that the endpoints of runs in runs do not move
+            // backwards. For them to move backwards, an earlier run would have
+            // to completely contain a later run. But the first matching of the
+            // first run would have chained to whatever the first matching of
+            // the later run chained to in order to finish sooner, so that can
+            // never happen.
+            
+            // What run starts last and finishes before this base?
+            size_t latestStarting = 0;
+            for(size_t i = runs[0].second; i < minContextLengths.size(); i++) {
+            
+                // For each base after the end of the first run...
+                
+                while(latestStarting + 1 < runs.size() &&
+                    // TODO: This one will always be true because runs don't
+                    // share left min matches and min matches can't share
+                    // endpoints.
+                    runs[latestStarting + 1].first >
+                    runs[latestStarting].first && 
+                    runs[latestStarting + 1].second <= i) {
+                    
+                    // We can advance to a later-starting run that still doesn't
+                    // cover this base. Do that.
+                    latestStarting++;
+                }
+                
+                // How long a string do we need to get out to the left end of
+                // the latest starting range left of us?
+                size_t contextLength = i - runs[latestStarting].first + 1;
+                
+                Log::info() << "Latest starting run before " << i << " is " <<
+                    runs[latestStarting].first << " - " <<
+                    runs[latestStarting].second << " with context length " <<
+                    contextLength << std::endl;
+                
+                // Adopt this context length if it is minimal.
+                minContextLengths[i] = std::min(minContextLengths[i],
+                        contextLength);
+            }
+            
+            // What run ends last and starts after this base?
+            size_t earliestEnding = runs.size() - 1;
+            for(size_t i = runs[runs.size() - 1].first - 1; i != (size_t) -1;
+                i--) {
+                
+                // For each base before the beginning of the last run...
+                
+                while(earliestEnding - 1 != (size_t) -1 &&
+                    // TODO: this one will always be true because run endpoints
+                    // are nondecreasing left to right.
+                    runs[earliestEnding - 1].second <=
+                    runs[earliestEnding].second &&
+                    runs[earliestEnding - 1].first > i) {
+                    
+                    // We can move to a lefter run while still not overlapping
+                    // base i. Do that.
+                    earliestEnding--;
+                }
+                
+                // How long a string do we need to get out to the right end of
+                // the earliest ending range right of us?
+                size_t contextLength = runs[earliestEnding].second - i;
+                
+                Log::info() << "Earliest ending run after " << i << " is " <<
+                    runs[latestStarting].first << " - " <<
+                    runs[latestStarting].second << " with context length " <<
+                    contextLength << std::endl;
+                
+                // Adopt this context length if it is minimal.
+                minContextLengths[i] = std::min(minContextLengths[i],
+                        contextLength);
+                
+            }
+            
+            for(size_t contextLength : minContextLengths) {
+                // Output the final length at each base, one per line.
+                outputFile << contextLength << std::endl;
+            }
         
         });
     }
