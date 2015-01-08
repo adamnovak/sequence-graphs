@@ -321,6 +321,34 @@ main(
             // Then we need to work out how far out we have to go to get a
             // certain minimum number of nonoverlapping ones.
             
+            // For each run of n non-overlapping matches (which we can say is
+            // the run of n non-overlapping matches starting at this one)...
+            
+            // We know it's right minimal, since we went right as little as
+            // possible.
+            
+            // We know that the left-minimal one will be visited, since we try
+            // starting from each matching.
+            
+            // If there is a left-minimaler one covering a base, we will get it.
+            // If the only one covering a base is not left-minimal, we can have
+            // a problem.
+            
+            // TODO: What to do about the bases that are in contexts defined by
+            // MUMs in a chain that doesn't actually cross over the base?
+            
+            // I guess we could visit each base and add in the length you would
+            // need to cover the base and the match.
+
+            for(size_t i = 0; i < minMatchings.size(); i++) {
+                // For each match, get the right number of non-overlapping
+                // matches going out rightwards.
+                size_t nonOverlappingFound = 0;
+            }
+            
+            // If it is the shortest so far to include any of its bases, give
+            // those bases its length.
+            // Output the final length at each base.
         
         });
     }
