@@ -1,7 +1,7 @@
 CXX=g++
 
 # What are our generic objects?
-OBJS=pinchGraphUtil.o unixUtil.o
+OBJS=pinchGraphUtil.o unixUtil.o indexUtil.o
     
 # What objects do we need for our createIndex binary?
 CREATEINDEX_OBJS=createIndex.o MergeApplier.o MergeScheme.o \
@@ -12,6 +12,9 @@ MAPREADS_OBJS=mapReads.o
 
 # And for our cactusMerge binary?
 CACTUSMERGE_OBJS=cactusMerge.o 
+
+# And for our evaluateMapability binary?
+EVALUATEMAPABILITY_OBJS=evaluateMapability.o
 
 # What projects do we depend on? We have rules for each of these.
 DEPS=pinchesAndCacti sonLib vflib libsuffixtools libfmd
@@ -36,7 +39,7 @@ CXXFLAGS += -std=c++11 -O3 -g -rdynamic -I../deps \
 # Re-do things every time
 .PHONY: clean $(DEPS)
 
-all: createIndex cactusMerge mapReads
+all: createIndex cactusMerge mapReads evaluateMapability
 
 # pinchesAndCacti dependency
 pinchesAndCacti: sonLib
@@ -66,6 +69,9 @@ mapReads: $(MAPREADS_OBJS) $(OBJS) $(DEPS)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(MAPREADS_OBJS) $(OBJS) $(LDLIBS)
 	
 cactusMerge: $(CACTUSMERGE_OBJS) $(OBJS) $(DEPS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(CACTUSMERGE_OBJS) $(OBJS) $(LDLIBS)
+	
+evaluateMapability: $(EVALUATEMAPABILITY_OBJS) $(OBJS) $(DEPS)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(CACTUSMERGE_OBJS) $(OBJS) $(LDLIBS)
 	
 clean:

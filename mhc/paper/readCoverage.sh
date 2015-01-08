@@ -96,21 +96,17 @@ LABEL_OPTS+=("--category_labels" "BWA")
 # And the weakly stable ones
 GROUPING_OPTS+=("--grouping" "Weakly Stable")
 CATEGORY_OPTS+=("--categories" \
-    "ICnaturalHam1U" \
     "ICnaturalHam3Mis2U" \
     "ICnaturalHam5Mis4U")
 LABEL_OPTS+=("--category_labels" \
-    'Natural' \
     '$\alpha=3, \beta=2$'
     '$\alpha=5, \beta=4$')
     
 GROUPING_OPTS+=("--grouping" "Stable")
 CATEGORY_OPTS+=("--categories" \
-    "ICnaturalHam1" \
     "ICnaturalHam3Mis2" \
     "ICnaturalHam5Mis4")
 LABEL_OPTS+=("--category_labels" \
-    'Natural' \
     '$\alpha=3, \beta=2$'
     '$\alpha=5, \beta=4$')
     
