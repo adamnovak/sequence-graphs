@@ -322,10 +322,31 @@ main(
         // Get records until we run out
         std::string scaffold = referenceReader.getNext();
             
-        std::for_each(std::sregex_token_iterator(scaffold.begin(),
-            scaffold.end(), std::regex("N+"), -1), std::sregex_token_iterator(),
-            [&](const std::string& contig) {
+        // Make a regex, which has to outlive the iterator. We would look for
+        // runs of Ns, but apparently the C++11 regex engine is not guaranteed
+        // to be able to match "N+" to an arbitrarily long string of Ns without
+        // stack overflowing.
+        std::regex pattern("N");
+        
+        // Make an end iterator
+        std::sregex_token_iterator end;
+        
+        // And a start one
+        std::sregex_token_iterator start(scaffold.begin(),
+            scaffold.end(), pattern, -1);
             
+        for(std::sregex_token_iterator it = start; it != end; ++it) {
+
+            const std::string& contig = *it;
+
+            Log::info() << contig << std::endl;
+            
+            if(contig.size() == 0) {
+                // We got the bit between Ns.
+                
+                continue;
+            }
+
             // For every piece of sequence between runs of 1 or more N...
             
             Log::trace() << "Contig: " << contig << std::endl;
@@ -518,7 +539,7 @@ main(
                 outputFile << contextLength << std::endl;
             }
         
-        });
+        }
     }
     
     outputFile.close();
