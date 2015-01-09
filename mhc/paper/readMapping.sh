@@ -83,7 +83,7 @@ LABEL_OPTS=()
 # Do BWA as a group
 GROUPING_OPTS+=("--grouping" "BWA" "--grouping" "BWAStrict")
 CATEGORY_OPTS+=("--categories" "BWA" "--categories" "BWAStrict")
-LABEL_OPTS+=("--category_labels" "BWA" "--category_labels" 'BWA $Q \geq 60$')
+LABEL_OPTS+=("--category_labels" "BWA" "--category_labels" "$(printf 'BWA\n$Q \\geq 60$')")
 
 # And the weakly stable ones
 GROUPING_OPTS+=("--grouping" "Weakly Stable")
@@ -91,27 +91,28 @@ CATEGORY_OPTS+=("--categories" \
     "ICnaturalHam3Mis2U" \
     "ICnaturalHam5Mis4U")
 LABEL_OPTS+=("--category_labels" \
-    '$\alpha=3, \beta=2$'
-    '$\alpha=5, \beta=4$')
+    "$(printf 'Weak\n$\\alpha^\\prime=3, \\beta^\\prime=2$')"
+    "$(printf 'Weak\n$\\alpha^\\prime=5, \\beta^\\prime=4$')")
     
 GROUPING_OPTS+=("--grouping" "Stable")
 CATEGORY_OPTS+=("--categories" \
     "ICnaturalHam3Mis2" \
     "ICnaturalHam5Mis4")
 LABEL_OPTS+=("--category_labels" \
-    '$\alpha=3, \beta=2$'
-    '$\alpha=5, \beta=4$')
+    '$\alpha^\prime=3, \beta^\prime=2$'
+    '$\alpha^\prime=5, \beta^\prime=4$')
     
 boxplot.py "${TSV}" \
     --x_label "Scheme Parameters" \
-    --y_label "Portion of Reads Mapped to Reference" \
-    --title "Read Mapability vs. Mapping Scheme" \
+    --y_label "$(printf 'Portion of Reads\nMapped to Reference')" \
+    --title "$(printf 'Read Mapability vs.\nMapping Scheme')" \
     "${GROUPING_OPTS[@]}" "${CATEGORY_OPTS[@]}" "${LABEL_OPTS[@]}" \
     --grouping_colors 'k' 'y' 'b' 'r' \
     --x_sideways \
     --no_legend \
     --no_n \
     --max 1.01 \
+    --width 4 --height 4 \
     --save "${GRAPH}"
     
 # We put the arrays in quotes and use @ above because that uses the array
