@@ -41,6 +41,8 @@ def parse_args(args):
     parser.add_argument("--tsvOut", type=argparse.FileType("w"),
         default=sys.stdout,
         help="TSV of mappings to write")
+    parser.add_argument("--minQuality", type=int,
+        help="minimum mapping quality to accept a mapping")
     
     
     # The command line arguments start with the program name, which we don't
@@ -78,6 +80,12 @@ def main(args):
             # must be either secondary or supplemental. TODO: pysam exposes
             # is_secondary, but it doesn't expose the supplemental flag in the
             # same way.
+            continue
+            
+        if (options.minQuality is not None and
+            read.mapping_quality < options.minQuality):
+            
+            # This read is too low quality. Skip it.
             continue
         
         # Keep track of what query positions were seen

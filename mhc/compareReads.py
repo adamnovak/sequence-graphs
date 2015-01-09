@@ -368,6 +368,61 @@ class AlignerAssessmentTarget(jobTree.scriptTree.target.Target):
         # End the subtask of the serial steps for the BWA scheme
         queuer.end_subtask()
         
+        # And we need a serial subtask for the strict version ofn BWA respecting
+        # mapping quality: do all the mappings, then merge them.
+        queuer.subtask_serial("mapConcatBWAStrict")
+        
+        # Do all the mappings and check all the genes.
+        queuer.subtask_parallel("mapAllGenomes")
+            
+        # This holds the checkGenes class counts files from each genome mapped
+        class_count_files = []
+        
+        # This holds the gene set files
+        gene_set_files = []
+            
+        for reads in read_files:
+            # Make a file to save the BWA mappings from this set of reads in
+            bwa_mappings = queuer.tempfile()
+                
+            # We need to BWA map and check genes in serial.
+            queuer.subtask_serial("mapThenCheck")
+                
+            # Make a target to do the mapping, enforcing a quality bound.
+            queuer.append(BWATarget(self.fasta_list[0], reads, bwa_mappings,
+                min_quality=60))
+            
+            # Make a file to put the class counts in
+            class_count_file = queuer.tempfile()
+            class_count_files.append(class_count_file)
+            
+            # Make a file to put the gene sets in
+            gene_set_file = queuer.tempfile()
+            gene_set_files.append(gene_set_file)
+            
+            # And one to do the gene checking
+            queuer.append(TsvGeneCheckerTarget(bwa_mappings, self.gene_beds, 
+                class_count_file, gene_set_file))
+                
+            queuer.end_subtask()
+            
+        # We finished all the mapping and gene checking
+        queuer.end_subtask()
+        
+        # Now we need to merge the checkGenes output TSVs
+        queuer.subtask_parallel("concat")
+        # Concatenate the class counts
+        queuer.append(ConcatenateTarget(class_count_files, 
+            self.out_dir + "/BWAStrict.counts"))
+        # And the gene set files
+        queuer.append(ConcatenateTarget(gene_set_files, 
+            self.out_dir + "/BWAStrict.genes"))
+        # Output TSVs are merged
+        queuer.end_subtask()
+            
+        # End the subtask of the serial steps for the BWAStrict scheme
+        queuer.end_subtask()
+        
         for scheme_name, extra_args in self.generateSchemes():
             # Now we need to do all the other schemes. Each will have a mapping
             # step and a concatenate step in order.
@@ -544,10 +599,11 @@ class BWATarget(jobTree.scriptTree.target.Target):
     
     """
     
-    def __init__(self, reference, query, mappings_out):
+    def __init__(self, reference, query, mappings_out, min_quality=None):
         """
         Make a target that maps the query to the reference, using BWA. Saves a
-        TSV of mappings in mappings_out.
+        TSV of mappings in mappings_out. Can optionally enforce a minimum
+        mapping quality.
         
         """
         
@@ -558,6 +614,7 @@ class BWATarget(jobTree.scriptTree.target.Target):
         self.reference = reference
         self.query = query
         self.mappings_out = mappings_out
+        self.min_quality = min_quality
         
         self.logToMaster("Creating BWATarget")
         
@@ -592,8 +649,15 @@ class BWATarget(jobTree.scriptTree.target.Target):
                 process.returncode))
                 
         # Now we need to make the TSV output our parent expects.
-        check_call(self, ["./sam2tsv.py", "--samIn", sam_file, "--tsvOut", 
-            self.mappings_out, "--reference", self.reference])
+        args = ["./sam2tsv.py", "--samIn", sam_file, "--tsvOut", 
+            self.mappings_out, "--reference", self.reference]
+            
+        if self.min_quality:
+            # Send the min mapping quality along
+            args.append("--minQuality")
+            args.append(min_quality)
+            
+        check_call(self, args)
             
         self.logToMaster("BWATarget Finished")
         
