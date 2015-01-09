@@ -655,7 +655,7 @@ class BWATarget(jobTree.scriptTree.target.Target):
         if self.min_quality:
             # Send the min mapping quality along
             args.append("--minQuality")
-            args.append(min_quality)
+            args.append(self.min_quality)
             
         check_call(self, args)
             
