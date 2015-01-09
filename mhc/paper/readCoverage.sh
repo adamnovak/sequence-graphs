@@ -61,6 +61,10 @@ do
             # This is the last category from each genome. Save stats per genome.
             # TODO: this is a hack.
             
+            TOTAL_BASES=$((${TOTAL_MAPPED} + ${TOTAL_UNMAPPED}))
+            
+            echo "${SCHEME} mapped ${TOTAL_MAPPED}/${TOTAL_BASES}"
+            
             # Calculate coverage
             COVERAGE=$(echo "${TOTAL_MAPPED} / ( ${TOTAL_MAPPED} + ${TOTAL_UNMAPPED} )" | bc -l)
     
@@ -89,9 +93,9 @@ CATEGORY_OPTS=()
 LABEL_OPTS=()
 
 # Do BWA as a group
-GROUPING_OPTS+=("--grouping" "BWA")
-CATEGORY_OPTS+=("--categories" "BWA")
-LABEL_OPTS+=("--category_labels" "BWA")
+GROUPING_OPTS+=("--grouping" "BWA" "--grouping" "BWAStrict")
+CATEGORY_OPTS+=("--categories" "BWA" "--categories" "BWAStrict")
+LABEL_OPTS+=("--category_labels" "BWA" "--category_labels" 'BWA $Q \geq 60$')
 
 # And the weakly stable ones
 GROUPING_OPTS+=("--grouping" "Weakly Stable")
@@ -116,7 +120,7 @@ boxplot.py "${TSV}" \
     --title "Read Coverage vs. Mapping Scheme" \
     "${GROUPING_OPTS[@]}" "${CATEGORY_OPTS[@]}" "${LABEL_OPTS[@]}" \
     --no_legend \
-    --grouping_colors 'k' 'b' 'r' \
+    --grouping_colors 'k' 'y' 'b' 'r' \
     --x_sideways \
     --no_n \
     --max 1.01 \

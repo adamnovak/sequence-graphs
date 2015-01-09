@@ -81,9 +81,9 @@ CATEGORY_OPTS=()
 LABEL_OPTS=()
 
 # Do BWA as a group
-GROUPING_OPTS+=("--grouping" "BWA")
-CATEGORY_OPTS+=("--categories" "BWA")
-LABEL_OPTS+=("--category_labels" "BWA")
+GROUPING_OPTS+=("--grouping" "BWA" "--grouping" "BWAStrict")
+CATEGORY_OPTS+=("--categories" "BWA" "--categories" "BWAStrict")
+LABEL_OPTS+=("--category_labels" "BWA" "--category_labels" 'BWA $Q \geq 60$')
 
 # And the weakly stable ones
 GROUPING_OPTS+=("--grouping" "Weakly Stable")
@@ -107,7 +107,7 @@ boxplot.py "${TSV}" \
     --y_label "Portion of Reads Mapped to Reference" \
     --title "Read Mapability vs. Mapping Scheme" \
     "${GROUPING_OPTS[@]}" "${CATEGORY_OPTS[@]}" "${LABEL_OPTS[@]}" \
-    --grouping_colors 'k' 'b' 'r' \
+    --grouping_colors 'k' 'y' 'b' 'r' \
     --x_sideways \
     --no_legend \
     --no_n \

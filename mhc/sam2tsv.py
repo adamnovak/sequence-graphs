@@ -82,49 +82,50 @@ def main(args):
             # same way.
             continue
             
-        if (options.minQuality is not None and
-            read.mapping_quality < options.minQuality):
-            
-            # This read is too low quality. Skip it.
-            continue
-        
         # Keep track of what query positions were seen
         seen_positions = set()
         
-        for query_pos, ref_pos in read.aligned_pairs:
-            # We can just iterate through this super simply.
+        if (options.minQuality is None or
+            read.mapping_quality >= options.minQuality):
             
-            if query_pos is None:
-                # It's an insert in the reference
-                continue
+            # This read is sufficiently good quality to use any of its mappings.
+        
+            for query_pos, ref_pos in read.aligned_pairs:
+                # We can just iterate through this super simply.
                 
-            # Remember we saw his position oin the query
-            seen_positions.add(query_pos)
+                if query_pos is None:
+                    # It's an insert in the reference
+                    continue
+                    
+                # Remember we saw his position oin the query
+                seen_positions.add(query_pos)
+                    
+                if ref_pos is None:
+                    # It's an unaligned query base. Report it as unaligned.
+                    writer.line(read.qname, query_pos)
+                    continue
                 
-            if ref_pos is None:
-                # It's an unaligned query base. Report it as unaligned.
-                writer.line(read.qname, query_pos)
-                continue
-            
-            # Look up the reference sequence name
-            ref_name = sam.getrname(read.tid)
+                # Look up the reference sequence name
+                ref_name = sam.getrname(read.tid)
+                    
+                if query_pos >= len(read.seq):
+                    print(read.seq)
+                    print(read)
+                    raise Exception("Query {} out of bounds!".format(
+                        query_pos))
+                    
+                if ref_pos >= len(reference[ref_name]):
+                    print(reference[ref_name])
+                    print(read)
+                    raise Exception("Reference {} out of bounds!".format(
+                        ref_pos))
+                    
                 
-            if query_pos >= len(read.seq):
-                print(read.seq)
-                print read
-                raise Exception("Query {} out of bounds!".format(query_pos))
-                
-            if ref_pos >= len(reference[ref_name]):
-                print(reference[ref_name])
-                print read
-                raise Exception("Reference {} out of bounds!".format(ref_pos))
-                
-            
-            if read.seq[query_pos] == reference[ref_name][ref_pos]:
-                # This is a match, and not a mismatch.
-                # Write a line for it.
-                writer.line(ref_name, ref_pos, read.qname, query_pos, 
-                    1 if read.is_reverse else 0)
+                if read.seq[query_pos] == reference[ref_name][ref_pos]:
+                    # This is a match, and not a mismatch.
+                    # Write a line for it.
+                    writer.line(ref_name, ref_pos, read.qname, query_pos, 
+                        1 if read.is_reverse else 0)
       
         for i in xrange(max(read.query_length, read.infer_query_length(
             always=True))):
