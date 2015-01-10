@@ -38,4 +38,6 @@ histogram.py "spectrum.${SCHEME}" \
     --label \
     --redWeight 0 --redWeight 0 --redWeight 0 --redWeight 0 --redWeight "${TANDEM_COUNT}" \
     --no_n \
+    --width 4 --height 4 \
+    --label_size 6 \
     --save "${GRAPH}"
