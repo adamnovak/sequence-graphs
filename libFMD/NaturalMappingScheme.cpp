@@ -181,6 +181,9 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
     
     // Then we can apply credit in another function.
     
+    // How many bases are unmapped due to conflict?
+    size_t unmappedByConflict = 0;
+    
     // Get the min and max matchings.
     std::vector<Matching> minMatchings = findMinMatchings(query);
     std::vector<Matching> maxMatchings = findMaxMatchings(query);
@@ -545,8 +548,12 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
         } else if(matchings[i].size() > 1) {
             Log::debug() << "Conflict: " << matchings[i].size() <<
                 " matchings for base " << i << std::endl;
+            unmappedByConflict++;
         }
     }
+    
+    // Record the bases unmapped by conflict.
+    stats.add("conflicted", unmappedByConflict);
     
     // Now we've made all the mappings we need.
     return mappings;
@@ -1129,7 +1136,6 @@ void NaturalMappingScheme::map(const std::string& query,
         
     // How many bases have we mapped or not mapped (credit or not).
     size_t mappedBases = 0;
-    size_t unmappedBases = 0;
     
     // How many bases are mapped on credit?
     size_t creditBases = 0;
@@ -1328,6 +1334,12 @@ void NaturalMappingScheme::map(const std::string& query,
             
         }
     }
+    
+    // Track stats
+    stats.add("mapped", mappedBases);
+    stats.add("unmapped", query.size() - mappedBases);
+    stats.add("credit", creditBases); // Mapped on credit
+    stats.add("conflictedCredit", conflictedCredit); // Conflicted on credit
     
     Log::output() << "Mapped " << mappedBases << " bases, " << 
         creditBases << " on credit, " << conflictedCredit << 

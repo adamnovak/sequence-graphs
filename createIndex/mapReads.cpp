@@ -325,7 +325,9 @@ main(
         ("maxHammingDistance", boost::program_options::value<size_t>()
             ->default_value(0), 
             "Maximum Hamming distance from reference location")
-        ("unstable", "Allow unstable mapping for increased coverage");
+        ("unstable", "Allow unstable mapping for increased coverage")
+        ("stats", boost::program_options::value<std::string>(),
+            "TSV file to save statistics to");
         
     // And set up our positional arguments
     boost::program_options::positional_options_description positionals;
@@ -507,6 +509,12 @@ main(
         thread.join();
     }
     
+    if(options.count("stats")) {
+        // Save statistics report to the specified file
+        Log::info() << "Saving statistics to " <<
+            options["stats"].as<std::string>() << std::endl;
+        mappingScheme->stats.save(options["stats"].as<std::string>());
+    }
     
     // Get rid of the mapping scheme now that everyone is done with it.
     delete mappingScheme;

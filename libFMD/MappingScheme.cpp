@@ -5,4 +5,7 @@ MappingScheme::MappingScheme(const FMDIndex& index,
     ranges(ranges), mask(mask) {
     
     // Nothing to do!
-} 
+}
+StatTracker MappingScheme::getStats() const {
+    return stats;
+}

@@ -4,6 +4,7 @@
 #include "GenericBitVector.hpp"
 #include "FMDIndex.hpp"
 #include "TextPosition.hpp"
+#include "StatTracker.hpp"
 
 #include <string>
 #include <functional>
@@ -47,9 +48,17 @@ public:
      * Must be defined by all implementations.
      *
      * Must be thread-safe.
+     *
+     * Should update the "mapped" and "unmapped" stats in the MappingScheme's
+     * StatTracker, as well as any other applicable stats.
      */
     virtual void map(const std::string& query,
         std::function<void(size_t, TextPosition)> callback) const = 0;
+    
+    /**
+     * Get a snapshot of the stats for this mapping scheme.
+     */
+    StatTracker getStats() const;
     
 protected:
     // These configuration parameters are ones that every MappingScheme that
@@ -69,6 +78,12 @@ protected:
      * The mask with which we are mapping.
      */
     const GenericBitVector* mask;
+    
+    /**
+     * We keep a StatTracker around for tracking stats. It is mutable so that
+     * the map method can update it, and it is guaranteed to be thread-safe.
+     */
+    mutable StatTracker stats;
 };
  
 
