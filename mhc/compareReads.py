@@ -602,7 +602,7 @@ class MapReadsTarget(jobTree.scriptTree.target.Target):
         if self.stats is not None:
             # Save mapping stats to a file
             args.append("--stats")
-            args.append(self.sats)
+            args.append(self.stats)
             
         # Invoke the mapper
         check_call(self, args)
