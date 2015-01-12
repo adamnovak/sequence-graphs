@@ -69,7 +69,7 @@ truncate -s 0 ${TSV}
 
 # Define all the series we want
 
-series "${TSV}" "Weakly Stable" \
+series "${TSV}" "Weak" \
     ICnaturalHam5Mis1U \
     ICnaturalHam5Mis2U \
     ICnaturalHam5Mis3U \
@@ -86,9 +86,10 @@ scatter.py ${TSV} --tsv --no_sort \
     --colors 'r' 'k'  \
     --markers 'd' 'D'  \
     --x_label "Precision" --y_label "Recall" \
-    --title "$(printf 'Recall vs. Precision With Strong and Weak Stability\n$\\alpha = 5$')" \
-    --max_x 1 --max_y 1 \
+    --title "$(printf 'Recall vs. Precision\nWeak vs. Normal Stability\n$\\alpha^\\prime = 5$')" \
     --lines \
     --legend_overlay best \
     --no_n \
+    --width 4 --height 4 \
+    --sparse_ticks \
     --save ${GRAPH}

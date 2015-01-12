@@ -96,7 +96,7 @@ do
     done
     
     # Make a series for this Hamming clearance
-    series "${TSV}" "\$\\\\alpha = ${HAMMING_CLEARANCE}\$" ${POINTS[*]}
+    series "${TSV}" "\$\\\\alpha^\\\\prime = ${HAMMING_CLEARANCE}\$" ${POINTS[*]}
 done
 
 # Make the actual plot

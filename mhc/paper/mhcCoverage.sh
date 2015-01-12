@@ -117,7 +117,7 @@ do
     done
     
     # Make a series for this Hamming clearance
-    series "${TSV}" "Hamming Clearance ${HAMMING_CLEARANCE}" ${POINTS[*]}
+    series "${TSV}" "\$\\\\alpha^\\\\prime = ${HAMMING_CLEARANCE}\$" ${POINTS[*]}
 done
 
 # Make the actual plot
@@ -187,13 +187,13 @@ do
     # For each minimum Hamming clearance we used...
     
     # Title the grouping
-    GROUPING_OPTS+=("--grouping" "\$\\alpha=${HAMMING_CLEARANCE}\$")
+    GROUPING_OPTS+=("--grouping" "\$\\alpha^\\prime=${HAMMING_CLEARANCE}\$")
     
     # Add category for 0 mismatches
     CATEGORY_OPTS+=("--categories" "ICnaturalHam${HAMMING_CLEARANCE}")
     
     # And label
-    LABEL_OPTS+=("--category_labels" "\$\\beta=0\$")
+    LABEL_OPTS+=("--category_labels" "\$\\beta^\\prime=0\$")
     
     for HAMMING_DISTANCE in $(seq 1 $((HAMMING_CLEARANCE - 1)))
     do
@@ -202,7 +202,7 @@ do
         
         # Add and label a category for this number of mismatches
         CATEGORY_OPTS+=("ICnaturalHam${HAMMING_CLEARANCE}Mis${HAMMING_DISTANCE}")
-        LABEL_OPTS+=("\$\\beta=${HAMMING_DISTANCE}\$")
+        LABEL_OPTS+=("\$\\beta^\\prime=${HAMMING_DISTANCE}\$")
     done
 done
     
@@ -246,7 +246,7 @@ GRC_AVERAGE=$(echo ${TOTAL_COVERAGE} / ${TOTAL_GENOMES} | bc -l)
 echo "GRC average coverage: ${GRC_AVERAGE}"
     
 boxplot.py "${TSV}" \
-    --x_label "Scheme Parameter (Min Length, \$\\beta\$)" \
+    --x_label "Scheme Parameter (Min Length, \$\\beta^\\prime\$)" \
     --y_label "Portion Aligned to Reference" \
     --title "Coverage vs. Mapping Scheme" \
     "${GROUPING_OPTS[@]}" "${CATEGORY_OPTS[@]}" "${LABEL_OPTS[@]}" \
