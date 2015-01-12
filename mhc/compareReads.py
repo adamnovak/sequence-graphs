@@ -437,6 +437,9 @@ class AlignerAssessmentTarget(jobTree.scriptTree.target.Target):
             
             # This holds the gene set files
             gene_set_files = []
+            
+            # This holds mapping stat files
+            mapping_stat_files = []
                 
             for reads in read_files:
                 # Make a file to save the mapReads mappings from this set of
@@ -445,10 +448,14 @@ class AlignerAssessmentTarget(jobTree.scriptTree.target.Target):
                     
                 # We need to map and check genes in serial for each genome.
                 queuer.subtask_serial("mapThenCheck")
+                
+                # Make a file to put the mapping stats in
+                mapping_stat_file = queuer.tempfile()
+                mapping_stat_files.append(mapping_stat_file)
                     
                 # Make a target to do the mapping
                 queuer.append(MapReadsTarget(self.fasta_list[0], reads,
-                    mappings, extra_args=extra_args))
+                    mappings, stats=mapping_stat_file, extra_args=extra_args))
                 
                 # Make a file to put the class counts in
                 class_count_file = queuer.tempfile()
@@ -475,6 +482,9 @@ class AlignerAssessmentTarget(jobTree.scriptTree.target.Target):
             # And the gene set files
             queuer.append(ConcatenateTarget(gene_set_files, 
                 self.out_dir + "/" + scheme_name + ".genes"))
+            # And the stats files
+            queuer.append(ConcatenateTarget(mapping_stat_files, 
+                self.out_dir + "/" + scheme_name + ".mapstats"))
             # Output TSVs are merged
             queuer.end_subtask()
             
@@ -548,11 +558,13 @@ class MapReadsTarget(jobTree.scriptTree.target.Target):
     
     """
     
-    def __init__(self, reference, query, mappings_out, extra_args=[]):
+    def __init__(self, reference, query, mappings_out, stats=None,
+        extra_args=[]):
         """
         Make a target that maps the query to the reference, using mapReads.
-        Saves a TSV of mappings in mappings_out. Passes the optional extra_args
-        to mapReads.
+        Saves a TSV of mappings in mappings_out. If stats is specified, saves
+        mapping statistics to that file. Passes the optional extra_args to
+        mapReads.
         
         """
         
@@ -564,6 +576,7 @@ class MapReadsTarget(jobTree.scriptTree.target.Target):
         self.reference = reference
         self.query = query
         self.mappings_out = mappings_out
+        self.stats = stats
         self.extra_args = extra_args
         
         self.logToMaster("Creating MapReadsTarget")
@@ -585,6 +598,11 @@ class MapReadsTarget(jobTree.scriptTree.target.Target):
         args = (["../createIndex/mapReads", index_dir, self.reference, 
             self.query, "--alignment", self.mappings_out, "--threads", "32"] +
             self.extra_args)
+            
+        if self.stats is not None:
+            # Save mapping stats to a file
+            args.append("--stats")
+            args.append(self.sats)
             
         # Invoke the mapper
         check_call(self, args)

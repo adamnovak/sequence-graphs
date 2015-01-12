@@ -513,7 +513,7 @@ main(
         // Save statistics report to the specified file
         Log::info() << "Saving statistics to " <<
             options["stats"].as<std::string>() << std::endl;
-        mappingScheme->stats.save(options["stats"].as<std::string>());
+        mappingScheme->getStats().save(options["stats"].as<std::string>());
     }
     
     // Get rid of the mapping scheme now that everyone is done with it.
