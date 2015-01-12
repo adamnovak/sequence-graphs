@@ -77,7 +77,7 @@ void StatTracker::save(const std::string& filename) const {
     statsMutex.lock();
     for(auto& pair : stats) {
         // For each stat, save the name and value
-        file << pair.first << "\t" << pair.second;
+        file << pair.first << "\t" << pair.second << std::endl;
     }
     // Unlock the stats in case someone wants them later.
     statsMutex.unlock();
