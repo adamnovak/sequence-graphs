@@ -18,20 +18,36 @@ int main(int argc, char** argv) {
         std::cout << argv[i] << " ";
     }
     std::cout << std::endl;
-    std::cout << "Running unit tests..." << std::endl;
-
+    
     // Get the top level suite from the registry
     CppUnit::Test *suite = 
         CppUnit::TestFactoryRegistry::getRegistry().makeTest();
 
     // Adds the test to the list of test to run
     CppUnit::TextUi::TestRunner runner;
-    runner.addTest( suite );
+    runner.addTest(suite);
+    
+    // Have all the tests succeeded so far?
+    bool wasSucessful = true;
+    
+    if(argc > 1) {
+        // Say the rest of the arguments are test names and we should run them.
+        
+        for(size_t i = 1; i < argc; i++) {
+            // Run each test in turn.
+            std::cout << "Running test " << argv[i] << "..." << std::endl;
+            wasSucessful &= runner.run(std::string(argv[i]));
+        }
+        
+    } else {
+        // Run all the tests
+        std::cout << "Running unit tests..." << std::endl;
 
-    // Run the tests.
-    bool wasSucessful = runner.run();
-
-    // Return error code 1 if the one of test failed.
+        // Run the tests.
+        wasSucessful &= runner.run();
+    }
+    
+    // Return error code 1 if the one of the tests failed.
     return wasSucessful ? 0 : 1;
 }
 
