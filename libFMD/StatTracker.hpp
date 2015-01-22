@@ -22,7 +22,7 @@ public:
     /**
      * Default default constructor should exist.
      */
-    StatTracker() = default;
+    StatTracker();
     
     /**
      * Copy constructor needs to lock the source before copying.

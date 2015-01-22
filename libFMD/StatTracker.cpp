@@ -2,6 +2,10 @@
 
 #include <fstream>
 
+StatTracker::StatTracker(): stats(), statsMutex() {
+    // Nothing to do
+}
+
 StatTracker& StatTracker::operator+=(const StatTracker& other){
     std::lock(statsMutex, other.statsMutex);
     for(auto& pair : other.stats) {

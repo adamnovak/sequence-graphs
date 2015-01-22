@@ -50,6 +50,28 @@ public:
     GenericBitVector();
     
     /**
+     * Create a bitvector by scanning the other one and marking all its 1
+     * postions. O(n) in the number of bits.
+     *
+     * Note that the source GenericBitVector must have had finish() called on
+     * it.
+     */
+    inline explicit GenericBitVector(const GenericBitVector& other):
+        GenericBitVector() {
+        
+        for(size_t i = 0; i < other.getSize(); i++) {
+            // Check each bit of the source
+            if(other.isSet(i)) {
+                // And add the 1s in ourselves.
+                addBit(i);
+            }
+        }
+        
+        // Finish ourselves to the correct size.
+        finish(other.getSize());
+    }
+    
+    /**
      * Destroy a generic bitvector.
      */
     ~GenericBitVector();
@@ -128,8 +150,8 @@ public:
     
     /**
      * Must be called on a bitvector not loaded from a file before using rank
-     * and select, or saving to a file. Takes the total length of the bitvector
-     * inclusing all trailing zeros.
+     * and select, copying it, or saving to a file. Takes the total length of
+     * the bitvector inclusing all trailing zeros.
      */
     void finish(size_t length);
     
@@ -302,9 +324,6 @@ public:
     GenericBitVector& operator=(GenericBitVector&& other) = default; 
     
 private:
-    
-    // No copy
-    GenericBitVector(const GenericBitVector& other) = delete;
     
     // No assignment
     GenericBitVector& operator=(const GenericBitVector& other) = delete;
