@@ -34,7 +34,7 @@ histogram.py "spectrum.${SCHEME}" \
     --x_min 0 --x_max 35 --bins 35 \
     --y_max 1000000 \
     --x_label "Adjacency Component Size" --y_label "Occurrences" \
-    --title "$(printf 'Adjacency Component Size Spectrum\n5 Clearance, 4 Mismatches')" \
+    --title "$(printf 'Adjacency Component Size Spectrum\n$\\alpha^\\prime = 5$, $\\beta^\\prime = 4$')" \
     --label \
     --redWeight 0 --redWeight 0 --redWeight 0 --redWeight 0 --redWeight "${TANDEM_COUNT}" \
     --no_n \

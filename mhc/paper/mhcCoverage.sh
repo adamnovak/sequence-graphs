@@ -246,7 +246,7 @@ GRC_AVERAGE=$(echo ${TOTAL_COVERAGE} / ${TOTAL_GENOMES} | bc -l)
 echo "GRC average coverage: ${GRC_AVERAGE}"
     
 boxplot.py "${TSV}" \
-    --x_label "Scheme Parameter (Min Length, \$\\beta^\\prime\$)" \
+    --x_label "Scheme Parameter (Min Length/Tolerance)" \
     --y_label "Portion Aligned to Reference" \
     --title "Coverage vs. Mapping Scheme" \
     "${GROUPING_OPTS[@]}" "${CATEGORY_OPTS[@]}" "${LABEL_OPTS[@]}" \

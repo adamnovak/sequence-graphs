@@ -116,7 +116,7 @@ LABEL_OPTS+=("--category_labels" \
     
 boxplot.py "${TSV}" \
     --x_label "Scheme Parameters" \
-    --y_label "Portion Aligned to Reference" \
+    --y_label "$(printf 'Portion of Bases\\Mapped to Reference')" \
     --title "$(printf 'Read Coverage vs.\nMapping Scheme')" \
     "${GROUPING_OPTS[@]}" "${CATEGORY_OPTS[@]}" "${LABEL_OPTS[@]}" \
     --no_legend \

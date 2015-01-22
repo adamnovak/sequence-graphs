@@ -12,9 +12,9 @@ OUTDIR="paper"
 # And save it in SVG unless someone tells us different.
 GRAPH_FORMAT=${1-svg}
 # We will make this data file (per-base coverage)
-TSV="${OUTDIR}/readMapability.tsv"
+TSV="${OUTDIR}/readMappability.tsv"
 # And this plot image
-GRAPH="${OUTDIR}/readMapability.${GRAPH_FORMAT}"
+GRAPH="${OUTDIR}/readMappability.${GRAPH_FORMAT}"
 
 # Make sure out directory exists.
 mkdir -p ${OUTDIR}
@@ -105,7 +105,7 @@ LABEL_OPTS+=("--category_labels" \
 boxplot.py "${TSV}" \
     --x_label "Scheme Parameters" \
     --y_label "$(printf 'Portion of Reads\nMapped to Reference')" \
-    --title "$(printf 'Read Mapability vs.\nMapping Scheme')" \
+    --title "$(printf 'Read Mappability vs.\nMapping Scheme')" \
     "${GROUPING_OPTS[@]}" "${CATEGORY_OPTS[@]}" "${LABEL_OPTS[@]}" \
     --grouping_colors 'k' 'y' 'b' 'r' \
     --x_sideways \
