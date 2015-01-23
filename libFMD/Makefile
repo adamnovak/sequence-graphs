@@ -95,9 +95,12 @@ testRunner: $(TEST_OBJS) $(OBJS) $(DEPS) Makefile
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(TEST_OBJS) $(OBJS) $(LDLIBS) \
 	$(TEST_LIBS)
 	
-# We can automagically get header dependencies.
-dependencies.mk: *.cpp Test/*.cpp CSA/*.cpp *.hpp Test/*.hpp CSA/*.hpp
-	g++ $(CXXFLAGS) -MM *.cpp Test/*.cpp CSA/*.cpp > dependencies.mk
+# We can automagically get header dependencies. We need to hack the output of
+# g++ -MM because it writes rules ignoring the relative path to the source file.
+dependencies.mk: Makefile *.cpp Test/*.cpp CSA/*.cpp *.hpp Test/*.hpp CSA/*.hpp
+	g++ $(CXXFLAGS) -MM *.cpp > dependencies.mk
+	g++ $(CXXFLAGS) -MM CSA/*.cpp | sed 's/\(^[^:]*:\)/CSA\/\1/' >> dependencies.mk
+	g++ $(CXXFLAGS) -MM Test/*.cpp | sed 's/\(^[^:]*:\)/Test\/\1/' >> dependencies.mk
 	
 # Include auto-generated dependencies.
 include dependencies.mk
