@@ -107,7 +107,9 @@ clean:
 	
 # We can automagically get header dependencies.
 dependencies.mk: *.cpp *.h Thirdparty/*.C Thirdparty/*.c Thirdparty/*.h Test/*.cpp Test/*.h
-	g++ $(CXXFLAGS) -MM *.cpp Thirdparty/*.C Thirdparty/*.c Test/*.cpp > dependencies.mk
+	g++ $(CXXFLAGS) -MM *.cpp > dependencies.mk
+	g++ $(CXXFLAGS) -MM Thirdparty/*.C Thirdparty/*.c | sed 's/\(^[^:]*:\)/Thirdparty\/\1/' >> dependencies.mk
+	g++ $(CXXFLAGS) -MM Test/*.cpp | sed 's/\(^[^:]*:\)/Test\/\1/' >> dependencies.mk
 	
 # Include auto-generated dependencies.
 include dependencies.mk
