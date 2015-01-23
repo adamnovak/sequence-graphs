@@ -21,7 +21,12 @@ CPPUNIT_TEST_SUITE_REGISTRATION( CreditFilterTests );
 const std::string CreditFilterTests::filename = "Test/haplotypes.fa";
 
 CreditFilterTests::CreditFilterTests() {
+}
 
+CreditFilterTests::~CreditFilterTests() {
+}
+
+void CreditFilterTests::setUp() {
     // We need a built index as a fixture, and we don't want to rebuild it for
     // every test.
 
@@ -43,21 +48,12 @@ CreditFilterTests::CreditFilterTests() {
     // Save a pointer to a new index that we just load (so we don't have the
     // full SA).
     index = new FMDIndex(tempDir + "/index.basename");
-    
-}
-
-CreditFilterTests::~CreditFilterTests() {
-    // Get rid of the temporary index directory
-    boost::filesystem::remove_all(tempDir);
-}
-
-void CreditFilterTests::setUp() {
-    
 }
 
 
 void CreditFilterTests::tearDown() {
-    
+    // Get rid of the temporary index directory
+    boost::filesystem::remove_all(tempDir);
 }
 
 /**

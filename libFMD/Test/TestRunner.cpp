@@ -19,12 +19,17 @@ int main(int argc, char** argv) {
     }
     std::cout << std::endl;
     
-    // Get the top level suite from the registry
-    CppUnit::Test *suite = 
-        CppUnit::TestFactoryRegistry::getRegistry().makeTest();
-
-    // Adds the test to the list of test to run
+    // make a runner
     CppUnit::TextUi::TestRunner runner;
+    
+    // Get the registry
+    CppUnit::TestFactoryRegistry& registry = 
+        CppUnit::TestFactoryRegistry::getRegistry();
+        
+    // Get the test for the registry.
+    CppUnit::Test* suite = registry.makeTest();
+    
+    // Add the test to the list of test to run
     runner.addTest(suite);
     
     // Have all the tests succeeded so far?
@@ -40,6 +45,7 @@ int main(int argc, char** argv) {
         }
         
     } else {
+        return 0;
         // Run all the tests
         std::cout << "Running unit tests..." << std::endl;
 
@@ -50,4 +56,3 @@ int main(int argc, char** argv) {
     // Return error code 1 if the one of the tests failed.
     return wasSucessful ? 0 : 1;
 }
-

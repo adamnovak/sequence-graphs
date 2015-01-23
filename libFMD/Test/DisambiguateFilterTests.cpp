@@ -21,7 +21,12 @@ CPPUNIT_TEST_SUITE_REGISTRATION( DisambiguateFilterTests );
 const std::string DisambiguateFilterTests::filename = "Test/haplotypes.fa";
 
 DisambiguateFilterTests::DisambiguateFilterTests() {
+}
 
+DisambiguateFilterTests::~DisambiguateFilterTests() {
+}
+
+void DisambiguateFilterTests::setUp() {
     // We need a built index as a fixture, and we don't want to rebuild it for
     // every test.
 
@@ -43,21 +48,12 @@ DisambiguateFilterTests::DisambiguateFilterTests() {
     // Save a pointer to a new index that we just load (so we don't have the
     // full SA).
     index = new FMDIndex(tempDir + "/index.basename");
-    
-}
-
-DisambiguateFilterTests::~DisambiguateFilterTests() {
-    // Get rid of the temporary index directory
-    boost::filesystem::remove_all(tempDir);
-}
-
-void DisambiguateFilterTests::setUp() {
-    
 }
 
 
 void DisambiguateFilterTests::tearDown() {
-    
+    // Get rid of the temporary index directory
+    boost::filesystem::remove_all(tempDir);
 }
 
 /**

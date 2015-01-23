@@ -21,9 +21,14 @@ CPPUNIT_TEST_SUITE_REGISTRATION( FMDIndexTests );
 const std::string FMDIndexTests::filename = "Test/haplotypes.fa";
 
 FMDIndexTests::FMDIndexTests() {
+}
 
-    // We need a built index as a fixture, and we don't want to rebuild it for
-    // every test.
+FMDIndexTests::~FMDIndexTests() {
+}
+
+void FMDIndexTests::setUp() {
+
+    // We need a built index as a fixture. It has to get built for every test.
 
     // Set up a temporary directory to put the index in.
     tempDir = make_tempdir();
@@ -46,18 +51,10 @@ FMDIndexTests::FMDIndexTests() {
     
 }
 
-FMDIndexTests::~FMDIndexTests() {
-    // Get rid of the temporary index directory
-    boost::filesystem::remove_all(tempDir);
-}
-
-void FMDIndexTests::setUp() {
-    
-}
-
 
 void FMDIndexTests::tearDown() {
-    
+    // Get rid of the temporary index directory
+    boost::filesystem::remove_all(tempDir);
 }
 
 /**

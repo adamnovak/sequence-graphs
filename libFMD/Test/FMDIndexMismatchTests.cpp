@@ -22,9 +22,13 @@ CPPUNIT_TEST_SUITE_REGISTRATION( FMDIndexMismatchTests );
 const std::string FMDIndexMismatchTests::filename = "Test/haplotypes2.fa";
 
 FMDIndexMismatchTests::FMDIndexMismatchTests() {
+}
 
-    // We need a built index as a fixture, and we don't want to rebuild it for
-    // every test.
+FMDIndexMismatchTests::~FMDIndexMismatchTests() {
+}
+
+void FMDIndexMismatchTests::setUp() {
+    // We need a built index as a fixture. It has to get built for every test.
 
     // Set up a temporary directory to put the index in.
     tempDir = make_tempdir();
@@ -44,21 +48,12 @@ FMDIndexMismatchTests::FMDIndexMismatchTests() {
     // Save a pointer to a new index that we just load (so we don't have the
     // full SA).
     index = new FMDIndex(tempDir + "/index.basename");
-    
-}
-
-FMDIndexMismatchTests::~FMDIndexMismatchTests() {
-    // Get rid of the temporary index directory
-    boost::filesystem::remove_all(tempDir);
-}
-
-void FMDIndexMismatchTests::setUp() {
-    
 }
 
 
 void FMDIndexMismatchTests::tearDown() {
-    
+    // Get rid of the temporary index directory
+    boost::filesystem::remove_all(tempDir);
 }
 
 

@@ -22,7 +22,12 @@ CPPUNIT_TEST_SUITE_REGISTRATION( LRMappingSchemeTests2 );
 const std::string LRMappingSchemeTests2::filename = "Test/haplotypes2.fa";
 
 LRMappingSchemeTests2::LRMappingSchemeTests2() {
+}
 
+LRMappingSchemeTests2::~LRMappingSchemeTests2() {
+}
+
+void LRMappingSchemeTests2::setUp() {
     // We need a built index as a fixture, and we don't want to rebuild it for
     // every test.
 
@@ -51,20 +56,7 @@ LRMappingSchemeTests2::LRMappingSchemeTests2() {
         ranges->addBit(i);
     }
     ranges->finish(index->getBWTLength());
-}
 
-LRMappingSchemeTests2::~LRMappingSchemeTests2() {
-    // Get rid of the temporary index directory
-    boost::filesystem::remove_all(tempDir);
-    
-    // Delete the index
-    delete index;
-    
-    // And the ranges bit vector
-    delete ranges;
-}
-
-void LRMappingSchemeTests2::setUp() {
     // Make the mapping scheme
     scheme = new LRMappingScheme(*index, *ranges);
 }
@@ -73,6 +65,15 @@ void LRMappingSchemeTests2::setUp() {
 void LRMappingSchemeTests2::tearDown() {
     // Clean up the mapping scheme
     delete scheme;
+    
+    // Get rid of the temporary index directory
+    boost::filesystem::remove_all(tempDir);
+    
+    // Delete the index
+    delete index;
+    
+    // And the ranges bit vector
+    delete ranges;
 }
 
 
