@@ -2,6 +2,7 @@
 #define INTERVALINDEX_HPP
 
 #include "GenericBitVector.hpp"
+#include "Log.hpp"
 
 #include <vector>
 #include <algorithm>
@@ -44,12 +45,18 @@ public:
     /**
      * Create a new interval index given the possibly unsorted vector of
      * intervals and their associated values.
+     *
+     * Takes O(n) time if intervals are already sorted by both start and end
+     * coordinates, and O(n log n) time otherwise.
      */
     IntervalIndex(const std::vector<value_type, Allocator>& intervals): 
         records(intervals) {
     
-        // Sort records by start, length (and then value)
-        std::sort(records.begin(), records.end());
+        if(!std::is_sorted(records.begin(), records.end())) {
+            // If not already sorted (check is O(n), sort is O(n log n))...
+            // Sort records by start, length (and then value)
+            std::sort(records.begin(), records.end());
+        }
         
         // What's the past-the-end position for the last interval?
         size_t totalLength = 0;
@@ -76,6 +83,7 @@ public:
             // Note that this is an interval starting at this position.
             startBits->addBit(records[i].first.first);
             startRecords.push_back(i);
+            Log::info() << "Start bit at " << records[i].first.first << std::endl;
         }
         
         // We're done marking start positions.
@@ -92,8 +100,11 @@ public:
                 records[i].first.first + records[i].first.second - 1, i));
         }
         
-        // Sort the interval indices by end position
-        std::sort(ends.begin(), ends.end());
+        if(!std::is_sorted(ends.begin(), ends.end())) {
+            // Sort the interval indices by end position, if they aren't in
+            // order already.
+            std::sort(ends.begin(), ends.end());
+        }
         
         // We keep them in ascending order because it's not all that hard to get
         // the rank in either direction.
@@ -113,11 +124,16 @@ public:
             // Note that this points to an interval ending at this position.
             endBits->addBit(ends[i].first);
             endRecords.push_back(ends[i].second);
+            Log::info() << "End bit at " << ends[i].first << std::endl;
         }
         
         // Finish off the bit vector with the total length of the region we care
         // about.
         endBits->finish(totalLength);
+        
+        for(size_t i = 0; i < startBits->getSize(); i++) {
+            Log::info() << i << ": " << startBits->rank(i, true) << ", " << startBits->rank(i) << std::endl;
+        }
     }
     
     /**
@@ -163,7 +179,12 @@ public:
      * position, and false otherwise.
      */
     bool hasStartingBefore(size_t index) {
-        return startBits->rank(index, true);
+        if(index > startBits->getSize()) {
+            // Going too far off the end.
+            return hasStartingBefore(startBits->getSize());
+        } else {
+            return startBits->rank(index, false);
+        }
     }
     
     /**
@@ -171,6 +192,11 @@ public:
      * index, and its associated data value.
      */
     value_type getStartingBefore(size_t index) const {
+    
+        if(index > startBits->getSize()) {
+            // Going too far off the end.
+            return getStartingBefore(startBits->getSize());
+        }
     
         // How many positions where intervals start are before or at that
         // position?
@@ -200,7 +226,7 @@ public:
      * Get the earliest ending interval that ends at or after the given index,
      * and its associated data value.
      */
-    bool getEndingAfter(size_t index) {
+    value_type getEndingAfter(size_t index) {
         // How many interval ending positions are before this index? If this is
         // 0, the soonest-ending interval ending here or later will be the
         // first-ending interval, and we count up from there.
