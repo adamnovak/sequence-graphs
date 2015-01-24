@@ -131,13 +131,6 @@ public:
         // about.
         endBits->finish(totalLength);
         
-        for(size_t i = 0; i < startBits->getSize(); i++) {
-            Log::info() << "F" << i << ": " << startBits->rank(i, true) << ", " << startBits->rank(i) << ", " << startBits->isSet(i) << std::endl;
-        }
-        
-        for(size_t i = 0; i < endBits->getSize(); i++) {
-            Log::info() << "R" << i << ": " << endBits->rank(i, true) << ", " << endBits->rank(i) << ", " << endBits->isSet(i) << std::endl;
-        }
     }
     
     /**
