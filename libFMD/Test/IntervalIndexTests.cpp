@@ -92,9 +92,8 @@ void IntervalIndexTests::testLookupAfter() {
     // Make sure the last end point exists properly
     CPPUNIT_ASSERT(index.hasEndingAfter(0));
     CPPUNIT_ASSERT(index.hasEndingAfter(10));
-    CPPUNIT_ASSERT(index.hasEndingAfter(11));
+    CPPUNIT_ASSERT(!index.hasEndingAfter(11));
     CPPUNIT_ASSERT(!index.hasEndingAfter(12));
-    
     
     // And we can go off the end
     CPPUNIT_ASSERT(!index.hasEndingAfter(100));
@@ -109,7 +108,6 @@ void IntervalIndexTests::testLookupAfter() {
     CPPUNIT_ASSERT_EQUAL("Bret"_s, index.getEndingAfter(8).second);
     CPPUNIT_ASSERT_EQUAL("Bret"_s, index.getEndingAfter(9).second);
     CPPUNIT_ASSERT_EQUAL("Corey"_s, index.getEndingAfter(10).second);
-    CPPUNIT_ASSERT_EQUAL("Corey"_s, index.getEndingAfter(11).second);
     
     // Can't go off the end because we can't look up results we don't have.
 }

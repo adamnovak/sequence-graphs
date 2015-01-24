@@ -132,7 +132,11 @@ public:
         endBits->finish(totalLength);
         
         for(size_t i = 0; i < startBits->getSize(); i++) {
-            Log::info() << i << ": " << startBits->rank(i, true) << ", " << startBits->rank(i) << std::endl;
+            Log::info() << "F" << i << ": " << startBits->rank(i, true) << ", " << startBits->rank(i) << ", " << startBits->isSet(i) << std::endl;
+        }
+        
+        for(size_t i = 0; i < endBits->getSize(); i++) {
+            Log::info() << "R" << i << ": " << endBits->rank(i, true) << ", " << endBits->rank(i) << ", " << endBits->isSet(i) << std::endl;
         }
     }
     
@@ -179,9 +183,9 @@ public:
      * position, and false otherwise.
      */
     bool hasStartingBefore(size_t index) {
-        if(index > startBits->getSize()) {
+        if(index >= startBits->getSize()) {
             // Going too far off the end.
-            return hasStartingBefore(startBits->getSize());
+            return hasStartingBefore(startBits->getSize() - 1);
         } else {
             return startBits->rank(index, false);
         }
@@ -193,14 +197,14 @@ public:
      */
     value_type getStartingBefore(size_t index) const {
     
-        if(index > startBits->getSize()) {
+        if(index >= startBits->getSize()) {
             // Going too far off the end.
-            return getStartingBefore(startBits->getSize());
+            return getStartingBefore(startBits->getSize() - 1);
         }
     
         // How many positions where intervals start are before or at that
         // position?
-        size_t rank = startBits->rank(index, true);
+        size_t rank = startBits->rank(index, false);
         
         if(rank == 0) {
             // No interval starts before or at the given position.
@@ -219,7 +223,13 @@ public:
     bool hasEndingAfter(size_t index) {
         // There is an interval ending at or after the given index if all of the
         // interval endpoints aren't already before the position.
-        return endBits->rank(index) < endRecords.size();
+        if(index >= endBits->getSize()) {
+            // Nothing ends at or after the past-the-end position.
+            return false;
+        } else {
+            
+            return endBits->rank(index, true) - 1 < endRecords.size();
+        }
     }
     
     /**
@@ -230,7 +240,7 @@ public:
         // How many interval ending positions are before this index? If this is
         // 0, the soonest-ending interval ending here or later will be the
         // first-ending interval, and we count up from there.
-        size_t rank = endBits->rank(index);
+        size_t rank = endBits->rank(index, true) - 1;
         
         // Go get and return that interval.
         return records[endRecords[rank]];
