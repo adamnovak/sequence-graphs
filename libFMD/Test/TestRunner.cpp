@@ -45,7 +45,6 @@ int main(int argc, char** argv) {
         }
         
     } else {
-        return 0;
         // Run all the tests
         std::cout << "Running unit tests..." << std::endl;
 

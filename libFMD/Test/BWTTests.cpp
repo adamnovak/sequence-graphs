@@ -23,8 +23,6 @@ void BWTTests::tearDown() {
  */
 void BWTTests::testBWT() {
     
-    throw std::runtime_error("Should not be running!");
-    
     // Make a read table from the headers in the file
 	ReadTable* readTable = new ReadTable(filename);
     CPPUNIT_ASSERT(readTable != NULL);
