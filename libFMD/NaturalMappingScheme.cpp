@@ -162,6 +162,149 @@ std::vector<NaturalMappingScheme::Matching>
     return toReturn;
 }
 
+std::map<NaturalMappingScheme::Matching,
+    std::vector<std::pair<NaturalMappingScheme::Matching, size_t>>>
+    NaturalMappingScheme::generateMaxMatchingGraph(
+    std::vector<Matching> maxMatchings, const std::string& query) {
+    
+    // Bucket the matchings by text and diagonal.
+    std::map<std::pair<size_t, int64_t>, std::vector<Matching>> buckets;
+    
+    for(const Matching& matching : maxMatchings) {
+        // Claculate the diagonal: offset between the query and the reference
+        int64_t diagonal = (int64_t) matching.start - 
+            (int64_t) matching.location.getOffset();
+            
+        // Look up the vector for that text and that diagonal, and append this
+        // Matching to it. Matchings will stay in query order.
+        buckets[{matching.location.getText(), diagonal}].push_back(matching);
+            
+        // TODO: maybe make the buckets maps on start, end pairs to save some
+        // copying around?
+    }
+    
+    // Index each bucket for preceeding-range queries
+    std::map<std::pair<size_t, int64_t>, IntervalIndex<Matching>> indices;
+    
+    for(const auto& kv : buckets) {
+        // For each bucket...
+    
+        // Make start, end keys for all the Matchings
+        std::vector<std::pair<std::pair<size_t, size_t>, Matching>> withKeys;
+        
+        for(const Matching& matching : kv.second) {
+            // For each matching, put it in the vector with its start, end
+            // range.
+            withKeys.push_back({{matching.start,
+                matching.start + matching.length - 1}, matching});
+        }
+    
+        // Make in IntervalIndex from the vector of mappings and keys. This
+        // should be pre-sorted. Store it under the same text and diagonal as
+        // the bucket.
+        indices[kv.first] = IntervalIndex<Matching>(withKeys);
+    }
+    
+    // Now we have our index built. We need to turn this into a graph with
+    // costs.
+    std::map<Matching, std::vector<std::pair<Matching, size_t>>> graph;
+    
+    for(const Matching& matching : maxMatchings) {
+        // For each matching
+    
+        // What are the text and diagonal?
+        size_t text = matching.location.getText();
+        int64_t diagonal = (int64_t) matching.start - 
+            (int64_t) matching.location.getOffset();
+    
+        for(int64_t offset = -maxHammingDistance; offset >= maxHammingDistance;
+            offset++) {
+            // Scan the diagonals up and down by maxHammingDistance
+            int64_t otherDiagonal = diagonal + offset;
+
+            if(!indices.count({text, otherDiagonal})) {
+                // Nothing else is on this diagonal.
+                continue;
+            }
+            
+            if(!indices[{text, otherDiagonal}].hasStartingBefore(
+                matching.start - 1)) {
+                
+                // There is no matching on this diagonal starting strictly
+                // before the matching we are interested in. We have to be
+                // strict or we would find this matching before itself on its
+                // own diagonal. TODO: Should we make this a strictly before
+                // method and drop the -1?
+                continue;
+            }
+            
+            // Get the last matching starting before this one starts, in the
+            // other diagonal.
+            const Matching& previous = indices[{text, 
+                otherDiagonal}].getStartingBefore(matching.start - 1).second;
+            
+            // How much are they separated in the query?            
+            int64_t queryGapLength = (int64_t) matching.start -
+                (int64_t) (previous.start + previous.length);
+            
+            // And in the reference (we know they are on the same text)? We can
+            // just infer this from the diagonal offset and the query
+            // separation.
+            int64_t referenceGapLength = queryGapLength - offset;
+            
+            // How much should this gap cost?
+            size_t gapCost;
+
+            // We have 4 cases for the signs of these things.
+            // +/+: do an alignment
+            // +/-: Charge for indels to make up the length difference.
+            // -/+: Charge for indels to make up the length difference.
+            // -/-: Charge for indels to make up the length difference.
+            
+            // TODO: check overlaps against max alignment size.
+            
+            if(queryGapLength > 0 && referenceGapLength > 0) {
+                // They are separated by some distance in both.
+                
+                // Get a TextPosition to the first base in the gap
+                TextPosition afterPrevious = previous.location;
+                afterPrevious.addLocalOffset(previous.length);
+            
+                // The cost is the number of edits from there to the start of
+                // the current Matching. There can't be maxHammingDistance + 1
+                // or more, so fail fast if that looks like the case.
+                gapCost = countEdits(query, previous.start + previous.length, 
+                    queryGapLength, afterPrevious, referenceGapLength,
+                    maxHammingDistance + 1);
+                
+            } else {
+                // Charge for indels to make up the difference.
+                gapCost = std::abs(queryGapLength - referenceGapLength);
+                
+                if(gapCost == 0) {
+                    // This should never be 0, because there is overlap or a
+                    // length difference.
+                    throw std::runtime_error(
+                        "Gap cost of 0 with no actual gap");
+                }
+            }
+            
+            if(gapCost <= maxHammingDistance) {
+                // If the gap cost is low enough...
+            
+                // Record an edge from this matching to the previous one with
+                // its cost.
+                graph[matching].push_back({previous, gapCost});
+                
+            }
+            
+        }
+    }
+    
+    // Give back the graph we have made.
+    return graph;
+}
+
 std::vector<Mapping> NaturalMappingScheme::naturalMap(
     const std::string& query) const {
     

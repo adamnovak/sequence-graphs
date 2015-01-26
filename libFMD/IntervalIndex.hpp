@@ -43,6 +43,13 @@ public:
     
     
     /**
+     * Create a new empty IntervalIndex.
+     */
+    IntervalIndex(): IntervalIndex(std::vector<value_type, Allocator>()) {
+        // Nothing to do!
+    }
+    
+    /**
      * Create a new interval index given the possibly unsorted vector of
      * intervals and their associated values.
      *

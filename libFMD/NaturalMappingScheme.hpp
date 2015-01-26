@@ -3,6 +3,7 @@
 
 #include "MappingScheme.hpp"
 #include "Mapping.hpp"
+#include "IntervalIndex.hpp"
 #include "Log.hpp"
 
 /**
@@ -106,7 +107,8 @@ protected:
     
     /**
      * Keep track of an occurrence of a unique string which matches a query
-     * position to a reference position.
+     * position to a reference position. Since we work only on a single query at
+     * a time, a Matching is defined by a start and a length.
      */
     struct Matching {
         /**
@@ -121,6 +123,16 @@ protected:
          * How long is it?
          */
         size_t length;
+        
+        /**
+         * Is this Matching less than that one of the same type on the same
+         * query? TODO: account for all the fields?
+         */
+        inline bool operator<(const Matching& other) const {
+            // Order by start, then by length.
+            return (start < other.start) ||
+                (start == other.start && length < other.length);
+        }
         
         /**
          * Make a new Matching.
@@ -235,6 +247,16 @@ protected:
      * and the reference, in descending order by left endpoint.
      */
     std::vector<Matching> findMinMatchings(const std::string& query) const;
+    
+    /**
+     * Produce a graph from each MUM to the MUMs it connects to, with the
+     * mismatch gap cost of the connection. Input matchings must not contain
+     * each other and must be in ascending order of start position. Note that
+     * this is the reverse order of the mindMaxMatchings method!
+     */
+    std::map<Matching, std::vector<std::pair<Matching, size_t>>>
+        generateMaxMatchingGraph(std::vector<Matching> maxMatchings,
+        const std::string& query);
     
     /**
      * Scan through the given SyntenyBlock and do the inchworm algorithm to flag
