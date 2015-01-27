@@ -1,5 +1,5 @@
-#ifndef LRMAPPINGSCHEMETESTS_HPP
-#define LRMAPPINGSCHEMETESTS_HPP
+#ifndef LRMAPPINGSCHEMETESTS2_HPP
+#define LRMAPPINGSCHEMETESTS2_HPP
 
 #include <cppunit/extensions/HelperMacros.h>
 #include "../LRMappingScheme.hpp"
