@@ -589,265 +589,25 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
     std::vector<Matching> minMatchings = findMinMatchings(query);
     std::vector<Matching> maxMatchings = findMaxMatchings(query);
     
+    // Flip them around to ascending order
+    std::reverse(minMatchings.begin(), minMatchings.end());
+    std::reverse(maxMatchings.begin(), maxMatchings.end());
+    
     for(Matching m : minMatchings) { 
         Log::trace() << "Min matching: " << m.start << " - " <<
             m.start + m.length << " (+" << m.length << ")" << std::endl;
     }
     
-    // We keep a map of SyntenyBlocks by (text, query offset) pairs.
-    std::map<std::pair<size_t, int64_t>, SyntenyBlock> syntenyBlocks;
-    
-    // We need to build a graph from maximal Matchings to the previous maximal
-    // Matchings they might be in runs with.
-    std::vector<std::vector<size_t>> matchingGraph(maxMatchings.size());
-    
-    // We need to work out which min matchings belong to each max matching. This
-    // holds how many min matchings have been used up and were contained in
-    // previous (i.e. further right) max matchings. Every min matching is
-    // contained within exactly one max matching (but may overlap others).
-    size_t minMatchingsUsed = 0;
-    
-    for(size_t matchingNumber = 0; matchingNumber < maxMatchings.size();
-        matchingNumber++) {
-        
-        // Go through all max matchings, and reference each.
-        Matching& matching = maxMatchings[matchingNumber];
-    
-        if(matchingNumber != 0 && matchingNumber != maxMatchings.size() - 1 && 
-            matching.length < ignoreMatchesBelow) {
-            // This matching is not the first or the last, and it is too short
-            // even to prevent mapping on bases it overlaps. Skip it entirely.
-            // Pretend it isn't even there.
-            Log::debug() << "\tSkipping matching entirely due to length " <<
-                matching.length << " < " << ignoreMatchesBelow << std::endl;
-            continue;
-        }
-        
-        Log::debug() << "Max matching " << matching.start << " - " <<
-            matching.start + matching.length << " (+" << matching.length <<
-            ") @ " << matching.location << std::endl;
-    
-        // For each maximal unique match from right to left, see how many
-        // minimal unique matchings it contains.
-        
-        while(minMatchings[minMatchingsUsed].start + 
-            minMatchings[minMatchingsUsed].length > matching.start +
-            matching.length) {
-            
-            Log::trace() << "\tDiscard min matching " << minMatchingsUsed <<
-                ": " << minMatchings[minMatchingsUsed].start << " - " <<
-                minMatchings[minMatchingsUsed].start +
-                minMatchings[minMatchingsUsed].length << " (+ " <<
-                minMatchings[minMatchingsUsed].length << ") @ " <<
-                minMatchings[minMatchingsUsed].location << std::endl;
-            
-            // Throw away min matchings while they end further right than our
-            // end.
-            minMatchingsUsed++;
-        }
-        
-        // How many min matchings have we grabbed that are contained in this max
-        // matching? There will be at least one.
-        size_t minMatchingsTaken = 0;
-        
-        // How many of those are non-overlapping? We know this maximal unique
-        // match is at least this Hamming distance away from any other places in
-        // the reference.
-        size_t nonOverlapping = 0;
-        
-        // What was the left endpoint of the last non-overlapping minimal unique
-        // matching we counted? We need this in order to implement the optimal
-        // greedy algorithm for the "Activity Selection Problem"
-        // <http://en.wikipedia.org/wiki/Activity_selection_problem>. Basically,
-        // when reading from right to left, we can get the maximum number of
-        // non-overlapping intervals by taking the non-overlapping interval with
-        // the largest left endpoint (which, conveniently, we will encounter
-        // first).
-        size_t previousLeftEndpoint = query.size();
-        
-        while(minMatchingsUsed + matching.minMatchings < minMatchings.size() && 
-            minMatchings[minMatchingsUsed + matching.minMatchings].start >=
-            matching.start) {
-            
-            // What's the next min matching?
-            const Matching& minMatching = minMatchings[minMatchingsUsed +
-                matching.minMatchings];
-            
-            Log::trace() << "\tContains min matching " << 
-                minMatchingsUsed + matching.minMatchings << ": " <<
-                minMatching.start << " - " <<
-                minMatching.start + minMatching.length << " @ " <<
-                minMatching.location << std::endl;
-            
-            if(minMatching.start + minMatching.length <= previousLeftEndpoint) {
-                // This min matching does not overlap the last non-overlapping
-                // matching we collected. (Remember, it's start and length, so
-                // start is inclusive and start+length is exclusive.) Since
-                // we're taking min matchings in order of descending left
-                // endpoint, it also must have the greatest left endpoint. So we
-                // need to count it as non- overlapping and look only to the
-                // left of it.
-                matching.nonOverlapping++;
-                previousLeftEndpoint = minMatching.start;
-                
-                Log::trace() <<
-                    "\t\tMatching is on maximal non-overlapping path" <<
-                    std::endl;
-            }
-            
-            // Take matchings while they start further right than our start,
-            // until we run out.
-            matching.minMatchings++;
-            
-            // Make sure to count their length
-            matching.minMatchingLength += minMatching.length;
-        }
-        
-        // matching contains minMatchings[minMatchingsUsed] to
-        // minMatchings[minMatchings + matching.minMatchings], inclusive on the
-        // low end.
-        
-        Log::debug() << "\tTook " << matching.minMatchings <<
-            " min matches (" << matching.minMatchingLength << "bp), " <<
-            matching.nonOverlapping << " non-overlapping" << std::endl;
-        
-        if(matching.minMatchings == 0) {
-            Log::critical() << "\tDoes not contain min matching " << 
-                minMatchingsUsed + matching.minMatchings << ": " <<
-                minMatchings[minMatchingsUsed].start << " - " <<
-                minMatchings[minMatchingsUsed].start +
-                minMatchings[minMatchingsUsed].length << " @ " <<
-                minMatchings[minMatchingsUsed].location << std::endl;
-                
-            // There is clearly a problem if we find no contained minimal
-            // matching.
-            throw std::runtime_error(
-                "Maximal matching contains no minimal matchings!");
-        }
-        
-        // OK, now we know everything we need to know about this maximal unique
-        // matching. We need to see which previous matchings it could possibly
-        // be in a run with.
-        
-        for(size_t prevMatching = matchingNumber - 1; 
-            prevMatching != (size_t) -1; prevMatching--) {
-            
-            // For each previous matching
-            
-            // Where do we end on the right?
-            size_t ourEnd = matching.start + matching.length;
-            // And where do they start on he left?
-            size_t theirStart = maxMatchings[prevMatching].start;
-            
-            int64_t queryGapLength = (int64_t) theirStart - (int64_t) ourEnd;
-            
-            // TODO: These limits are asymetrical due to inclusive/exclusive
-            // bounds.
-            
-            if(ourEnd > theirStart &&
-                ourEnd - theirStart > maxAlignmentSize) {
-             
-                Log::debug() << matching << " can't come from " <<
-                    maxMatchings[prevMatching] <<
-                    " because it overlaps too much in query." << std::endl;
-             
-                // They overlap too far into us.
-                continue;   
-            }
-            
-            if(ourEnd <= theirStart &&
-                theirStart - ourEnd > maxAlignmentSize) {
-                
-            
-                // The distance between our right end and their left end is too
-                // great.
-                
-                // If the distance in the query is too far, we can't connect at
-                // all, and nothing further away can either.
-                
-                Log::debug() << matching << " can't come from " <<
-                    maxMatchings[prevMatching] <<
-                    " because it's too far upstream in query." << std::endl;
-                
-                break;
-            }
-
-            // We need to compare these two reference positions to see if these
-            // could make any sense in the same run.
-            TextPosition& curPos = matching.location;
-            TextPosition& prevPos = maxMatchings[prevMatching].location;
-            
-            if(curPos.getText() == prevPos.getText() &&
-                curPos.getOffset() < prevPos.getOffset()) {
-            
-                // They have to be on the same text and going in the correct
-                // direction to chain, and they are.
-                
-                // Now we need to check to make sure the requested alignment
-                // won't be too big on the referece side.
-                TextPosition curEnd = curPos;
-                curEnd.addLocalOffset(matching.length);
-                
-                // Pull out the reference offsets, which we can treat just lke
-                // query ofsets for distance finding. Works because these
-                // offsets are always on the stran (text) we are mapping to.
-                ourEnd = curEnd.getOffset();
-                theirStart = prevPos.getOffset();
-                
-                if(ourEnd > theirStart &&
-                    ourEnd - theirStart > maxAlignmentSize) {
-                 
-                    Log::debug() << matching << " can't come from " <<
-                        maxMatchings[prevMatching] <<
-                        " because it overlaps too much in reference." <<
-                        std::endl;
-                 
-                    // They overlap too far into us.
-                    continue;   
-                }
-                
-                if(ourEnd <= theirStart &&
-                    theirStart - ourEnd > maxAlignmentSize) {
-                    
-                
-                    // The distance between our right end and their left end is
-                    // too great.
-                    
-                    Log::debug() << matching << " can't come from " <<
-                        maxMatchings[prevMatching] <<
-                        " because it's too far upstream in reference." <<
-                        std::endl;
-                    
-                    continue;
-                }
-                
-                // We'll have to look at the
-                // bit between these two matchings.
-                matchingGraph[matchingNumber].push_back(prevMatching);
-                
-                Log::debug() << matching << " can come from " << 
-                    maxMatchings[prevMatching] << std::endl;
-            } else {
-                Log::debug() << matching << " can't come from " << 
-                    maxMatchings[prevMatching] <<
-                    " due to text/direction issue" << std::endl;
-            }
-            
-        }
-        
-        // The next maximal matching has to use the minimal matchings that come
-        // later.
-        minMatchingsUsed += matching.minMatchings;
-    }
-    
     Log::info() << maxMatchings.size() << " maximal matchings exist." <<
         std::endl;
     
-    // OK, now we have to do the DP, identify blocks that should create base to
+    // OK, now we have to do the DP, identify runs that should create base to
     // base mappings, and make those.
     
-    // Do the DP to find the good runs, and flag matchings in them.
-    identifyGoodMatchingRuns(query, maxMatchings, matchingGraph);
+    // Which maximal matchings contain minimal matchings involved in
+    // sufficiently good synteny runs?
+    std::set<Matching> goodMaxMatchings = maxMatchingsInSyntenyRuns(
+        maxMatchings, minMatchings, query);
     
     // Where will we keep unique matchings by base? We store them as sets of
     // TextPositions to which each base has been matched.
@@ -859,31 +619,82 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
     // (since it was maximal) until credit comes along.
     std::vector<bool> blacklist(query.size());
     
-    for(Matching& matching : maxMatchings) {
-        // For each maximal matching, we may need to make some mappings.
+    for(const Matching& matching : goodMaxMatchings) {
+        // For each maximal matching in a sufficiently good block, make some
+        // mappings.
     
-        if(matching.canMatch) {
-            // This mapping can produce matchings
+        // Get a non-const TextPosition we can slide through the matching.
+        TextPosition location = matching.location;
     
-            for(size_t i = matching.start;
-                i < matching.start + matching.length; i++) {
+        for(size_t i = matching.start;
+            i < matching.start + matching.length; i++) {
+            
+            Log::trace() << "Matching " << i << " to " << location << std::endl;
+            
+            // For each position it covers, record the matching on that
+            // position.
+            matchings[i].insert(location);
+            
+            // Bump the location over by 1 for the next base.
+            location.addLocalOffset(1);
+        }
+    }
+    
+    if(conflictBelowThreshold) {
+        // There may be some maximal matchings that we did not flag as good, and
+        // we want them to cause conlict. So we blacklist their bases.
+        
+        for(const Matching& matching : maxMatchings) {
+            // For each matching
+            if(!goodMaxMatchings.count(matching) &&
+                matching.length >= ignoreMatchesBelow) {
                 
-                Log::trace() << "Matching " << i << " to " <<
-                    matching.location << std::endl;
+                // We can't use it, but we can't just ignore it, so make it
+                // blacklisted.
                 
-                // For each position it covers, record the matching on that
-                // position.
-                matchings[i].insert(matching.location);
-                
-                // Bump the matching's location over by 1 for the next base.
-                // We're working on the copy that the range for loop made
-                // rather than the original.
-                matching.location.addLocalOffset(1);
-                
-                if(matching.blacklist) {
-                    // We have to blacklist all these positions in the query
-                    // so they can't map.
+                for(size_t i = matching.start;
+                    i < matching.start + matching.length; i++) {
+                    
+                    // Blacklist every query position in the matching.
                     blacklist[i] = true;
+                    
+                    // TODO: Make this count as conflict if it stops any bases
+                    // from mapping.
+                    
+                }
+                
+            }
+        }
+    }
+    
+    if(!unstable) {
+        // We need to find max matchings that don't have min matchings in good
+        // enough synteny runs, but which might acquire them on extension. We
+        // need to blacklist bases in those max matchings.
+    
+        for(const Matching& matching : maxMatchings) {
+            // For each matching that might be able to get out the end...
+            
+            // TODO: Only look at matchings near the ends somehow.
+            
+            if(!goodMaxMatchings.count(matching) && 
+                (matching.start < maxAlignmentSize || query.size() - 
+                (matching.start + matching.length) <= maxAlignmentSize)) {
+            
+                // We're too close to one end or the other, and don't already
+                // have a good enough run.
+                
+                // TODO: How close is too close? What if a new max matching
+                // shows up with its end not exactly at the end of the query but
+                // a bit inside? Do we have to ban the first/last matching in
+                // every diagonal?
+                
+                for(size_t i = matching.start;
+                    i < matching.start + matching.length; i++) {
+                    
+                    // Blacklist every query position in the matching.
+                    blacklist[i] = true;
+                    
                 }
             }
         }
