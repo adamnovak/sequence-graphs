@@ -94,8 +94,10 @@ void NaturalMappingSchemeTests::testMap() {
         mappedBases++;
     });
     
-    // All bases should map.
-    CPPUNIT_ASSERT_EQUAL(query.size(), mappedBases);
+    // All the bases inside the protection of the outermost min matchings should
+    // map. The first mappable position is 4, and the last is 30, giving 27
+    // mappable positions.
+    CPPUNIT_ASSERT_EQUAL(query.size() - 4 - 4, mappedBases);
     
     // Grab all of the first contig's reverse strand.
     std::string query2 = "AGAGTCGCAGATGAGCGTCGAATCGCCGAAGCATG";
@@ -111,8 +113,9 @@ void NaturalMappingSchemeTests::testMap() {
         mappedBases++;
     });
     
-    // All bases should map.
-    CPPUNIT_ASSERT_EQUAL(query2.size(), mappedBases);
+    // All mappable bases should map; the uniqueness structure is the same as
+    // the forward strand.
+    CPPUNIT_ASSERT_EQUAL(query2.size() - 4 - 4, mappedBases);
     
     // Concatenate them together
     std::string query3 = ("CATGCTTCGGCGATTCGACGCTCATCTGCGACTCTAGAGTCGCAGATGAGCG"
@@ -139,8 +142,9 @@ void NaturalMappingSchemeTests::testMap() {
         mappedBases++;
     });
     
-    // All the bases not in that gap should have reported in.
-    CPPUNIT_ASSERT_EQUAL(query3.size() - (37 - 33), mappedBases);
+    // All the bases not in that gap and not too close to the ends should have
+    // reported in.
+    CPPUNIT_ASSERT_EQUAL(query3.size() - (37 - 33) - 4 - 4, mappedBases);
 }
 
 void NaturalMappingSchemeTests::testMapWithMask() {
@@ -161,8 +165,9 @@ void NaturalMappingSchemeTests::testMapWithMask() {
         mappedBases++;
     });
     
-    // All bases should map.
-    CPPUNIT_ASSERT_EQUAL(query.size(), mappedBases);    
+    // Same number of bases as in previous test should map since there is just
+    // the one genome.
+    CPPUNIT_ASSERT_EQUAL(query.size() - 4 - 4, mappedBases);    
 }
 
 

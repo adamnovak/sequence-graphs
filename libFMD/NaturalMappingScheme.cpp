@@ -606,6 +606,11 @@ std::set<NaturalMappingScheme::Matching>
         }
     }
     
+    for(const auto& goodMatch : toReturn) {
+        Log::debug() << goodMatch << " has a good enough synteny chain" <<
+            std::endl;
+    }
+    
     // Give back the set of max matchings that have a min matching in a good
     // enough chain.
     return toReturn;
@@ -767,13 +772,13 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
     // not mapping the ends outside the inner edges of the outermost minimum
     // unique matchings.
     
-    // What is the leftmost min unique matching? They are in order from right to
-    // left.
-    Matching leftmostMinMatching = minMatchings[minMatchings.size() - 1];
+    // What is the leftmost min unique matching? They are in order from left to
+    // right.
+    Matching leftmostMinMatching = minMatchings[0];
     
-    // What is the rightmost min unique matching? They are in order from right
-    // to left.
-    Matching rightmostMinMatching = minMatchings[0];
+    // What is the rightmost min unique matching? They are in order from left to
+    // right.
+    Matching rightmostMinMatching = minMatchings[minMatchings.size() - 1];
     
     // What is the leftmost position that can't get a non-unique context over
     // the left edge?
