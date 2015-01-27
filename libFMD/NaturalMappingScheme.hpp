@@ -253,10 +253,36 @@ protected:
      * mismatch gap cost of the connection. Input matchings must not contain
      * each other and must be in ascending order of start position. Note that
      * this is the reverse order of the mindMaxMatchings method!
+     * TODO: Typedef this return type.
      */
     std::map<Matching, std::vector<std::pair<Matching, size_t>>>
         generateMaxMatchingGraph(std::vector<Matching> maxMatchings,
-        const std::string& query);
+        const std::string& query) const;
+        
+    /**
+     * TODO
+     * Look up the max matching that contains a given min matching.
+     */
+    const Matching& getMaxMatching(const IntervalIndex<Matching>& maxMatchings,
+        const Matching& minMatching) const;
+    
+    /**
+     * Given an index of max matchings, and a vector of min matchings in
+     * ascending order (opposite of findMinMatchings), produce a map from max
+     * matchings to the min matchings they contain, in ascending order.
+     */
+    std::map<Matching, std::vector<Matching>> assignMinMatchings(
+        const IntervalIndex<Matching>& maxMatchings,
+        const std::vector<Matching>& minMatchings) const;
+        
+    /**
+     * TODO For each min matching, and for each cost value <= maxHammingDistace,
+     * calculate the number of nonoverlapping minimal unique matchings that can
+     * be chained together, going in a certain direction (forward or reverse).
+     */
+    std::map<Matching, std::vector<size_t>> getMinMatchingChains(
+        const std::map<Matching, std::vector<std::pair<Matching, size_t>>>&
+        maxMatchingGraph, bool isForward) const;
     
     /**
      * Scan through the given SyntenyBlock and do the inchworm algorithm to flag

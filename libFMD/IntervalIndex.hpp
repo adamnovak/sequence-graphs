@@ -182,7 +182,7 @@ public:
      * Return true if an interval exists starting at or before the given
      * position, and false otherwise.
      */
-    bool hasStartingBefore(size_t index) {
+    bool hasStartingBefore(size_t index) const {
         if(index >= startBits->getSize()) {
             // Going too far off the end.
             return hasStartingBefore(startBits->getSize() - 1);
@@ -220,7 +220,7 @@ public:
      * Returns true if an interval exists ending at or after the given position,
      * and false otherwise.
      */
-    bool hasEndingAfter(size_t index) {
+    bool hasEndingAfter(size_t index) const {
         // There is an interval ending at or after the given index if all of the
         // interval endpoints aren't already before the position.
         if(index >= endBits->getSize()) {
@@ -236,7 +236,7 @@ public:
      * Get the earliest ending interval that ends at or after the given index,
      * and its associated data value.
      */
-    value_type getEndingAfter(size_t index) {
+    value_type getEndingAfter(size_t index) const {
         // How many interval ending positions are before this index? If this is
         // 0, the soonest-ending interval ending here or later will be the
         // first-ending interval, and we count up from there.

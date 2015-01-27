@@ -165,7 +165,7 @@ std::vector<NaturalMappingScheme::Matching>
 std::map<NaturalMappingScheme::Matching,
     std::vector<std::pair<NaturalMappingScheme::Matching, size_t>>>
     NaturalMappingScheme::generateMaxMatchingGraph(
-    std::vector<Matching> maxMatchings, const std::string& query) {
+    std::vector<Matching> maxMatchings, const std::string& query) const {
     
     // Bucket the matchings by text and diagonal.
     std::map<std::pair<size_t, int64_t>, std::vector<Matching>> buckets;
@@ -264,7 +264,8 @@ std::map<NaturalMappingScheme::Matching,
             // TODO: check overlaps against max alignment size.
             
             if(queryGapLength > 0 && referenceGapLength > 0) {
-                // They are separated by some distance in both.
+                // They are separated by some distance in both. They are on the
+                // same text, so they must be syntenic.
                 
                 // Get a TextPosition to the first base in the gap
                 TextPosition afterPrevious = previous.location;
@@ -278,6 +279,10 @@ std::map<NaturalMappingScheme::Matching,
                     maxHammingDistance + 1);
                 
             } else {
+                // There is some overlap somewhere. They are still on the same
+                // text and the previous one is before this one, so they are
+                // still syntenic.
+            
                 // Charge for indels to make up the difference.
                 gapCost = std::abs(queryGapLength - referenceGapLength);
                 
@@ -303,6 +308,36 @@ std::map<NaturalMappingScheme::Matching,
     
     // Give back the graph we have made.
     return graph;
+}
+
+const NaturalMappingScheme::Matching& NaturalMappingScheme::getMaxMatching(
+    const IntervalIndex<NaturalMappingScheme::Matching>& maxMatchings,
+    const NaturalMappingScheme::Matching& minMatching) const {
+    
+    // What max matching contains this min matching? It should be the last one
+    // starting before it.
+    
+    if(!maxMatchings.hasStartingBefore(minMatching.start)) {
+        // Somehow we have an orphan min matching.
+        throw std::runtime_error(
+            "Min matching not contained in a max matching");
+    }
+
+    // Find the matching it has to be    
+    const Matching& maxMatching = maxMatchings.getStartingBefore(
+        minMatching.start).second;
+        
+    if(maxMatching.start + maxMatching.length < 
+        minMatching.start + minMatching.length) {
+        
+        // The max matching stops too early.
+        throw std::runtime_error(
+            "Min matching not contained in a max matching");
+    }
+    
+    // Return the matching we found.
+    return maxMatching;
+    
 }
 
 std::vector<Mapping> NaturalMappingScheme::naturalMap(
