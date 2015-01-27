@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <cstdlib>
 
+#include <boost/range/adaptor/reversed.hpp>
+
 std::vector<NaturalMappingScheme::Matching>
     NaturalMappingScheme::findMaxMatchings(const std::string& query) const {
  
@@ -303,11 +305,34 @@ std::map<NaturalMappingScheme::Matching,
                 
             }
             
+            // Make sure to have a self edge at cost 0
+            graph[matching].push_back({matching, 0});
+            
         }
     }
     
     // Give back the graph we have made.
     return graph;
+}
+
+std::map<NaturalMappingScheme::Matching,
+    std::vector<std::pair<NaturalMappingScheme::Matching, size_t>>>
+    NaturalMappingScheme::invertGraph(const std::map<
+    NaturalMappingScheme::Matching, std::vector<std::pair<
+    NaturalMappingScheme::Matching, size_t>>>& graph) const {
+    
+    // We need to invert the graph, so we need a new graph.
+    std::map<Matching, std::vector<std::pair<Matching, size_t>>> inverted;
+    
+    for(const auto& kv : graph) {
+        // For each source node and its edges
+        for(const auto& edge : kv.second) {
+            // For each {dest, cost} pair, add in the reverse edge
+            inverted[edge.first].push_back({kv.first, edge.second});
+        }
+    }
+    
+    return inverted;
 }
 
 const NaturalMappingScheme::Matching& NaturalMappingScheme::getMaxMatching(
@@ -338,6 +363,204 @@ const NaturalMappingScheme::Matching& NaturalMappingScheme::getMaxMatching(
     // Return the matching we found.
     return maxMatching;
     
+}
+
+std::map<NaturalMappingScheme::Matching,
+    std::vector<NaturalMappingScheme::Matching>>
+    NaturalMappingScheme::assignMinMatchings(
+    const IntervalIndex<NaturalMappingScheme::Matching>& maxMatchings,
+    const std::vector<NaturalMappingScheme::Matching>& minMatchings) const {
+
+    // We need to assign the min matchings to max matchings.
+    
+    // We keep a map from max matching to vector of min matchings, in ascending
+    // order.
+    std::map<Matching, std::vector<Matching>> minsForMax;
+    
+    for(const auto& minMatching : minMatchings) {
+        // For each min matching, find the max matching it belongs to and put it
+        // in that list. They come in in ascending order, so they also go out in
+        // ascending order.
+        minsForMax[getMaxMatching(maxMatchings, minMatching)].push_back(
+            minMatching);
+    }
+    
+    // Give back the assignments.
+    return minsForMax;
+}
+
+std::map<NaturalMappingScheme::Matching, std::vector<size_t>>
+    NaturalMappingScheme::getMinMatchingChains(const std::map<
+    NaturalMappingScheme::Matching, std::vector<std::pair<
+    NaturalMappingScheme::Matching, size_t>>>& maxMatchingGraph, const std::map<
+    NaturalMappingScheme::Matching, std::vector<
+    NaturalMappingScheme::Matching>>& minsForMax, const std::vector<
+    NaturalMappingScheme::Matching>& maxMatchings, bool isForward) const {
+ 
+    // We have the max matching connectivity graph, the min matching
+    // assignments, and the list of max matchings in order.
+    
+    // TODO: If we are going backwards, turn the graph around so we can come
+    // from max matchings on the right instead.
+    const auto& graph = isForward ? maxMatchingGraph : 
+        invertGraph(maxMatchingGraph);
+        
+    // Make a DP table, storing achievable numbers of non-overlapping min
+    // matchings in a chain by min matching and then by mismatch cost (<=
+    // maxHammingDistance).
+    std::map<Matching, std::vector<size_t>> table;
+    
+    for(size_t i = isForward ? 0 : maxMatchings.size() - 1;
+        isForward ? i < maxMatchings.size() : i != (size_t) -1;
+        isForward ? i++ : i--) {
+        // For each max matching in the order we decided to go in (which would
+        // be a whole lot easier to write if it were possible to decide between
+        // std::vector::begin() and std::vector::rbegin() at runtime, I'll have
+        // you know...)
+
+        // Grab the matching
+        const auto& maxMatching = maxMatchings[i];
+
+        for(const Matching& minMatching : minsForMax.at(maxMatching)) {
+            // For each min matching in it (at least 1 must exist)
+            
+            // Fill its DP table with 1 non-overlapping min match at any cost.
+            table[minMatching] = std::vector<size_t>(maxHammingDistance + 1, 1);
+            
+            for(const auto& edge : maxMatchingGraph.at(maxMatching)) {
+                // For each max matching we can pull from, and the cost to get
+                // there (at least the self edge must exist)
+                const Matching& prevMax = edge.first;
+                size_t edgeCost = edge.second;
+            
+                for(const Matching& prevMin : minsForMax.at(prevMax)) {
+                    // For each min matching in there (at least 1 must exist)
+                    
+                    if(prevMin.start + prevMin.length > minMatching.start &&
+                        minMatching.start + minMatching.length > 
+                        prevMin.start) {
+                        // If it overlaps this one, skip it
+                        continue;
+                    }
+                    
+                    if((isForward && prevMin.start >= minMatching.start) ||
+                        (!isForward && prevMin.start <= minMatching.start)) {
+                        // This previous min matching comes after (in the
+                        // applicable direction) the one we are trying to do the
+                        // DP for. We can't pull from it.
+                        continue;
+                    }
+                        
+                    for(size_t j = edgeCost; j <= maxHammingDistance; j++) {
+                        
+                        // Scan the range of our table that we can potentially
+                        // fill in from the other table.
+                        
+                        // How long a run would we get if we incured total cost
+                        // i and came from the corresponding place in the
+                        // previous min match's table?
+                        size_t newRunLength = table[prevMin][j - edgeCost] + 1;
+                        
+                        // If the new run is longer, use it.
+                        table[minMatching][j] = std::max(table[minMatching][j],
+                            newRunLength);
+                            
+                        // We will still need to fill in higher-cost entries
+                        // later if we don't find anything better at the higher
+                        // costs.
+                    }
+                }
+            }
+            
+            // What's the longest run encountered so far scanning up through the
+            // cost table?
+            size_t longestRun = 0;
+            for(size_t j = 0; j <= maxHammingDistance; j++) {
+                // For each loaction in the cost table, see if we could instead
+                // get a better run at a lower cost.
+                
+                // The table should have what's in it here if the longest run at
+                // a lower cost, whichever is greater. And the longest run will
+                // the what it was before or what we find here, whichever is
+                // greater.
+                longestRun = table[minMatching][j] = std::max(
+                    table[minMatching][j], longestRun);
+            }
+        }
+    }
+    
+    // Give back the filled DP table.
+    return table;
+}
+
+std::set<NaturalMappingScheme::Matching>
+    NaturalMappingScheme::maxMatchingsInSyntenyRuns(
+    const std::vector<NaturalMappingScheme::Matching>& maxMatchings,
+    const std::vector<NaturalMappingScheme::Matching>& minMatchings,
+    const std::string& query) const {
+
+    // We need to make the connectivity graph, call the two directions of DP,
+    // scan through the min matches, integrate the two directions, and flag the
+    // corresponding max matchings. Then we need to make the set of max
+    // matchings that pass.
+    
+    // Make the max matching cost graph
+    auto graph = generateMaxMatchingGraph(maxMatchings, query);
+    
+    // Make a vector of max matchings with their occupied intervals.
+    std::vector<std::pair<std::pair<size_t, size_t>, Matching>> toIndex;
+    for(const Matching& maxMatching : maxMatchings) {
+        // Populate it with the inclusive start, end interval for each max
+        // matching.
+        toIndex.push_back({{maxMatching.start,
+            maxMatching.start + maxMatching.length - 1}, maxMatching});
+    }
+    // Index the max matchings by interval
+    IntervalIndex<Matching> index(toIndex);
+    
+    // Assign all the min matchings to their max matchings, using the index we
+    // just made.
+    auto minsForMax = assignMinMatchings(index, minMatchings);
+    
+    // Do the DP looking left
+    auto forwardChains = getMinMatchingChains(graph, minsForMax, maxMatchings,
+        true);
+        
+    // And looking right
+    auto reverseChains = getMinMatchingChains(graph, minsForMax, maxMatchings,
+        false);
+        
+    // Make the set to return.
+    std::set<Matching> toReturn;
+    
+    for(const Matching& minMatching : minMatchings) {
+        // For each min matching
+        
+        for(size_t forwardCost = 0; forwardCost <= maxHammingDistance;
+            forwardCost++) {
+            
+            // For each way to apportion the mismatch cost between forward and
+            // reverse directions...
+            size_t reverseCost = maxHammingDistance - forwardCost;
+            
+            // How long a run can we get on that budget in each direction?
+            // Subtract 1 so we don't double-count this min match.
+            size_t runLength = forwardChains[minMatching][forwardCost] +
+                reverseChains[minMatching][reverseCost] - 1;
+                
+            if(runLength >= minHammingBound) {
+                // This run is sufficiently good. Mark the max matching as good
+                // too.
+                toReturn.insert(getMaxMatching(index, minMatching));
+            }
+            
+        }
+    }
+    
+    // Give back the set of max matchings that have a min matching in a good
+    // enough chain.
+    return toReturn;
+
 }
 
 std::vector<Mapping> NaturalMappingScheme::naturalMap(

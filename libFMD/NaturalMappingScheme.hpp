@@ -250,17 +250,25 @@ protected:
     
     /**
      * Produce a graph from each MUM to the MUMs it connects to, with the
-     * mismatch gap cost of the connection. Input matchings must not contain
-     * each other and must be in ascending order of start position. Note that
-     * this is the reverse order of the mindMaxMatchings method!
-     * TODO: Typedef this return type.
+     * mismatch gap cost of the connection. Includes self edges at cost 0. Input
+     * matchings must not contain each other and must be in ascending order of
+     * start position. Note that this is the reverse order of the
+     * mindMaxMatchings method! TODO: Typedef this return type.
      */
     std::map<Matching, std::vector<std::pair<Matching, size_t>>>
         generateMaxMatchingGraph(std::vector<Matching> maxMatchings,
         const std::string& query) const;
         
     /**
-     * TODO
+     * Given a graph from each MUM to the MUMs it connects to, this the mismatch
+     * gap cost of the connection, invert all the directed edges in the graph,
+     * creating a new graph. Edges from a node may be in any order.
+     */
+    std::map<Matching, std::vector<std::pair<Matching, size_t>>>
+        invertGraph(const std::map<Matching, std::vector<std::pair<Matching,
+        size_t>>>& graph) const;
+        
+    /**
      * Look up the max matching that contains a given min matching.
      */
     const Matching& getMaxMatching(const IntervalIndex<Matching>& maxMatchings,
@@ -276,13 +284,29 @@ protected:
         const std::vector<Matching>& minMatchings) const;
         
     /**
-     * TODO For each min matching, and for each cost value <= maxHammingDistace,
+     * For each min matching, and for each cost value <= maxHammingDistace,
      * calculate the number of nonoverlapping minimal unique matchings that can
      * be chained together, going in a certain direction (forward or reverse).
+     *
+     * Depends on the graph of max matching connectivity (with edges in any
+     * order), the assignments of min matchings to max matchings (in ascending
+     * order), and the list of max matchings (in ascending order). The graph
+     * should contain self edges at cost 0.
      */
     std::map<Matching, std::vector<size_t>> getMinMatchingChains(
         const std::map<Matching, std::vector<std::pair<Matching, size_t>>>&
-        maxMatchingGraph, bool isForward) const;
+        maxMatchingGraph, const std::map<Matching, std::vector<Matching>>&
+        minsForMax, const std::vector<Matching>& maxMatchings,
+        bool isForward) const;
+        
+    /**
+     * Given vectors of max and min matchings in ascending order as well as the
+     * query, produce a vector of only max matchings that have min matchings in
+     * sufficiently good (>= minHammingBound) synteny runs.
+     */
+    std::set<Matching> maxMatchingsInSyntenyRuns(const std::vector<Matching>&
+        maxMatchings, const std::vector<Matching>& minMatchings,
+        const std::string& query) const;
     
     /**
      * Scan through the given SyntenyBlock and do the inchworm algorithm to flag
