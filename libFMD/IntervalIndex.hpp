@@ -195,7 +195,7 @@ public:
      * Get the latest starting interval that starts at or before the given
      * index, and its associated data value.
      */
-    value_type getStartingBefore(size_t index) const {
+    const value_type& getStartingBefore(size_t index) const {
     
         if(index >= startBits->getSize()) {
             // Going too far off the end.
@@ -236,7 +236,7 @@ public:
      * Get the earliest ending interval that ends at or after the given index,
      * and its associated data value.
      */
-    value_type getEndingAfter(size_t index) const {
+    const value_type& getEndingAfter(size_t index) const {
         // How many interval ending positions are before this index? If this is
         // 0, the soonest-ending interval ending here or later will be the
         // first-ending interval, and we count up from there.
