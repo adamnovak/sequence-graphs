@@ -11,6 +11,9 @@ class NaturalMappingSchemeTests : public CppUnit::TestFixture {
     CPPUNIT_TEST_SUITE(NaturalMappingSchemeTests);
     CPPUNIT_TEST(testMap);
     CPPUNIT_TEST(testMapWithMask);
+    CPPUNIT_TEST(testSkipMismatches);
+    CPPUNIT_TEST(testSkipInserts);
+    CPPUNIT_TEST(testSkipDeletes);
     CPPUNIT_TEST_SUITE_END();
     
     // Keep a string saying where to get the haplotypes to test with.
@@ -38,6 +41,9 @@ public:
 
     void testMap();
     void testMapWithMask();
+    void testSkipMismatches();
+    void testSkipInserts();
+    void testSkipDeletes();
     
 };
 

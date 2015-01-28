@@ -683,7 +683,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
         for(size_t i = matching.start;
             i < matching.start + matching.length; i++) {
             
-            Log::trace() << "Matching " << i << " to " << location << std::endl;
+            Log::debug() << "Matching " << i << " to " << location << std::endl;
             
             // For each position it covers, record the matching on that
             // position.
@@ -711,6 +711,10 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
                     
                     // Blacklist every query position in the matching.
                     blacklist[i] = true;
+                    
+                    Log::debug() << "Blacklisting base " << i << 
+                        " for participation in max matching" << matching <<
+                        " with conflictBelowThreshold" << std::endl;
                     
                     // TODO: Make this count as conflict if it stops any bases
                     // from mapping.
@@ -743,11 +747,19 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
                 // a bit inside? Do we have to ban the first/last matching in
                 // every diagonal?
                 
+                // Can we somehow see what things can afford to make it to the
+                // ends and what can't?
+                
                 for(size_t i = matching.start;
                     i < matching.start + matching.length; i++) {
                     
                     // Blacklist every query position in the matching.
                     blacklist[i] = true;
+                    
+                    Log::debug() << "Blacklisting base " << i <<
+                        " for participation in max matching " << matching <<
+                        " which may become sufficiently good" <<
+                        std::endl;
                     
                 }
             }

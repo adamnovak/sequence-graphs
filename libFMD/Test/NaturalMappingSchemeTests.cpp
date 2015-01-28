@@ -147,6 +147,9 @@ void NaturalMappingSchemeTests::testMap() {
     CPPUNIT_ASSERT_EQUAL(query3.size() - (37 - 33) - 4 - 4, mappedBases);
 }
 
+/**
+ * Make sure mapping works with a (trivial) mask on.
+ */
 void NaturalMappingSchemeTests::testMapWithMask() {
 
     // Grab all of the first contig.
@@ -170,7 +173,85 @@ void NaturalMappingSchemeTests::testMapWithMask() {
     CPPUNIT_ASSERT_EQUAL(query.size() - 4 - 4, mappedBases);    
 }
 
+/**
+ * Make sure synteny chaining can cross a mismatch.
+ */
+void NaturalMappingSchemeTests::testSkipMismatches() {
+    // Grab all of the first contig, with an error in the middle.
+    //                                     v Here
+    std::string query = "CATGCTTCGGCGATTCGAGGCTCATCTGCGACTCT";
+    
+    // Configure the scheme to be slightly more tolerant.
+    scheme->minHammingBound = 2;
+    scheme->maxHammingDistance = 1;
+    
+    // Map the query and see how much maps.
+    size_t mappedBases = 0;
+    scheme->map(query, [&](size_t i, TextPosition mappedTo) {
+        // Make sure each base maps in order still.
+        CPPUNIT_ASSERT_EQUAL((size_t) 0, mappedTo.getText());
+        CPPUNIT_ASSERT_EQUAL(i, mappedTo.getOffset());
+        mappedBases++;
+    });
+    
+    // We should not map that changed base, but the rest should map as before.
+    CPPUNIT_ASSERT_EQUAL(query.size() - 4 - 4 - 1, mappedBases);   
+}
 
+/**
+ * Make sure synteny chaining can cross an insertion.
+ */
+void NaturalMappingSchemeTests::testSkipInserts() {
+    // Grab all of the first contig, with an insertion in the middle.
+    //                               v Here      
+    std::string query = "CATGCTTCGGCGTATTCGACGCTCATCTGCGACTCT";
+    
+    // Configure the scheme to be slightly more tolerant.
+    scheme->minHammingBound = 2;
+    scheme->maxHammingDistance = 1;
+    
+    // Map the query and see how much maps.
+    size_t mappedBases = 0;
+    scheme->map(query, [&](size_t i, TextPosition mappedTo) {
+        // Make sure each base maps on the right text
+        CPPUNIT_ASSERT_EQUAL((size_t) 0, mappedTo.getText());
+        // TODO: check the offsets.
+        mappedBases++;
+        
+        Log::info() << i << ": " << query[i] << " mapped to " << mappedTo <<
+        std::endl;
+        
+    });
+    
+    // We should not map that inserted base, but the rest should map as before.
+    CPPUNIT_ASSERT_EQUAL(query.size() - 4 - 4 - 1, mappedBases);   
+}
+
+/**
+ * Make sure synteny chaining can cross a deletion.
+ */
+void NaturalMappingSchemeTests::testSkipDeletes() {
+    // Grab all of the first contig, with a deletion in the middle.
+    //                                 v Was here  
+    std::string query = "CATGCTTCGGCGATCGACGCTCATCTGCGACTCT";
+    
+    // Configure the scheme to be slightly more tolerant.
+    scheme->minHammingBound = 2;
+    scheme->maxHammingDistance = 1;
+    
+    // Map the query and see how much maps.
+    size_t mappedBases = 0;
+    scheme->map(query, [&](size_t i, TextPosition mappedTo) {
+        // Make sure each base maps on the right text
+        CPPUNIT_ASSERT_EQUAL((size_t) 0, mappedTo.getText());
+        // TODO: check the offsets.
+        mappedBases++;
+    });
+    
+    // We should not map the one remaining T of the double T, but the rest
+    // should map as before.
+    CPPUNIT_ASSERT_EQUAL(query.size() - 4 - 4 - 1, mappedBases);   
+}
 
 
 
