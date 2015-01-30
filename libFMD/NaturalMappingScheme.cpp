@@ -1349,7 +1349,8 @@ size_t NaturalMappingScheme::countMismatches(const std::string& query,
 
 size_t NaturalMappingScheme::countEdits(const std::string& query,
     size_t queryStart, size_t queryLength, TextPosition referenceStart,
-    size_t referenceLength, int64_t threshold) const {
+    size_t referenceLength, int64_t threshold, bool leftJustify,
+    bool rightJustify) const {
     
     // We can get more accurate costs for these for free, and keep 0s out of our
     // DP problem
@@ -1392,16 +1393,36 @@ size_t NaturalMappingScheme::countEdits(const std::string& query,
         }
     } 
     
+    // Initialize the first row and column of the matrix with the costs for
+    // reference and query gaps on the left edge.
+    for(size_t i = 0; i < queryLength; i++) {
+        // How much is a gap in the reference at the left (unbused query bases)?
+        // Always 1.
+        matrix[i][0] = i;
+    }
+    for(size_t j = 0; j < referenceLength; j++) {
+        // How much is a gap in the query at the left (unused reference bases)?
+        // Depends on if we're left-justifying or not.
+        matrix[0][j] = leftJustify * j;
+    }
+    
     for(size_t i = 1; i < queryLength + 1; i++) {
         for(size_t j = 1; j < referenceLength + 1; j++) {
         
             // For each interior position, see if you should have a gap in one,
             // a gap in the other, or a match/mismatch
             
-            // Don't advance in the query, and pay 1 for a gap.
-            int queryGapCost = matrix[i - 1][j] + 1;
             // Don't advance in the reference, and pay 1 for a gap.
-            int referenceGapCost = matrix[i][j - 1] + 1;
+            int referenceGapCost = matrix[i - 1][j] + 1;
+            
+            // Don't advance in the query, and pay 1 for a gap.
+            int queryGapCost = matrix[i][j - 1] + 1;
+            
+            if(!rightJustify && i == queryLength) {
+                // Don't charge for gaps in the query (unused reference bases)
+                // on the right end.
+                queryGapCost = 0;
+            }
             
             // Advance in both, and pay 1 if this isn't a match.
             TextPosition referencePosition = referenceStart;
