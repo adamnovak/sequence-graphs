@@ -369,24 +369,40 @@ const NaturalMappingScheme::Matching& NaturalMappingScheme::getMaxMatching(
 }
 
 std::map<NaturalMappingScheme::Matching,
-    std::vector<NaturalMappingScheme::Matching>>
+    IntervalIndex<NaturalMappingScheme::Matching>>
     NaturalMappingScheme::assignMinMatchings(
     const IntervalIndex<NaturalMappingScheme::Matching>& maxMatchings,
     const std::vector<NaturalMappingScheme::Matching>& minMatchings) const {
 
     // We need to assign the min matchings to max matchings.
     
-    // We keep a map from max matching to vector of min matchings, in ascending
-    // order.
-    std::map<Matching, std::vector<Matching>> minsForMax;
+    // We keep a map from max matching to vector of min matchings with their
+    // ranges, in ascending order.
+    std::map<Matching, std::vector<std::pair<std::pair<size_t, size_t>,
+        Matching>>> vectorForMax;
     
     for(const auto& minMatching : minMatchings) {
         // For each min matching, find the max matching it belongs to and put it
         // in that list. They come in in ascending order, so they also go out in
         // ascending order.
         
+        // Find the max matching
         const Matching& maxMatching = getMaxMatching(maxMatchings, minMatching);
-        minsForMax[maxMatching].push_back(minMatching);
+        // Give this min matching to it. TODO: have a helper function to
+        // annotate matchings with their ranges like this, sicne we do it in
+        // several places.
+        vectorForMax[maxMatching].push_back({{minMatching.start,
+            minMatching.start + minMatching.length - 1}, minMatching});
+    }
+    
+    // But we really need this map from max matching to IntervalIndex of min
+    // matchings, instead of a map from max matching to vector of min matchings.
+    std::map<Matching, IntervalIndex<Matching>> minsForMax;
+    
+    // Now we index the mins in each max.
+    for(const auto& kv : vectorForMax) {
+        // Just (implicitly) make an IntervalIndex of each vector.
+        minsForMax[kv.first] = kv.second;
     }
     
     // Give back the assignments.
@@ -397,7 +413,7 @@ std::map<NaturalMappingScheme::Matching, std::vector<size_t>>
     NaturalMappingScheme::getMinMatchingChains(const std::map<
     NaturalMappingScheme::Matching, std::vector<std::pair<
     NaturalMappingScheme::Matching, size_t>>>& maxMatchingGraph, const std::map<
-    NaturalMappingScheme::Matching, std::vector<
+    NaturalMappingScheme::Matching, IntervalIndex<
     NaturalMappingScheme::Matching>>& minsForMax, const std::vector<
     NaturalMappingScheme::Matching>& maxMatchings, bool isForward) const {
  
@@ -407,8 +423,8 @@ std::map<NaturalMappingScheme::Matching, std::vector<size_t>>
     for(const auto& kv : minsForMax) {
         Log::debug() << "Max " << kv.first << " has mins:" << std::endl;
         
-        for(const auto& min : kv.second) {
-            Log::debug() << "\tMin: " << min << std::endl;
+        for(const auto& kv2 : kv.second) {
+            Log::debug() << "\tMin: " << kv2.second << std::endl;
         }
     }
  
@@ -438,14 +454,14 @@ std::map<NaturalMappingScheme::Matching, std::vector<size_t>>
 
         // Get the vector of all the min matchings in the current max matching,
         // in ascending order.
-        const std::vector<Matching>& mins = minsForMax.at(maxMatching);
+        const IntervalIndex<Matching>& mins = minsForMax.at(maxMatching);
 
         for(size_t j = isForward ? 0 : mins.size() - 1;
             isForward ? j < mins.size() : j != (size_t) -1;
             isForward ? j++ : j--) {
             // For each min matching in it, in the appropriate direction (at
             // least 1 must exist)
-            const Matching& minMatching = mins[j];
+            const Matching& minMatching = mins[j].second;
             
             
             // Fill its DP table with 1 non-overlapping min match at any cost.
@@ -462,7 +478,8 @@ std::map<NaturalMappingScheme::Matching, std::vector<size_t>>
             
                 // Get the vector of all the min matchings in the previous max
                 // matching, in ascending order.
-                const std::vector<Matching>& prevMins = minsForMax.at(prevMax);
+                const IntervalIndex<Matching>& prevMins = minsForMax.at(
+                    prevMax);
             
                 for(size_t k = isForward ? 0 : prevMins.size() - 1;
                     isForward ? k < prevMins.size() : k != (size_t) -1;
@@ -473,7 +490,7 @@ std::map<NaturalMappingScheme::Matching, std::vector<size_t>>
                     
                     // Grab the min matching we want to come from. We will have
                     // already completed the DP for it.
-                    const Matching& prevMin = prevMins[k];
+                    const Matching& prevMin = prevMins[k].second;
                     
                     if(prevMin.start + prevMin.length > minMatching.start &&
                         minMatching.start + minMatching.length > 

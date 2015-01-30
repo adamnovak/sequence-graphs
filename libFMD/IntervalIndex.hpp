@@ -41,6 +41,11 @@ public:
      */
     typedef std::pair<key_type, mapped_type> value_type;
     
+    /**
+     * Type of the const iterator over the contained mapping pairs.
+     */
+    typedef typename std::vector<value_type>::const_iterator const_iterator;
+    
     
     /**
      * Create a new empty IntervalIndex.
@@ -176,6 +181,37 @@ public:
         startRecords = other.startRecords;
         endBits = new GenericBitVector(*(other.endBits)); 
         endRecords = other.endRecords;
+    }
+    
+    /**
+     * How many intervals are in this IntervalIndex?
+     */
+    size_t size() const {
+        return records.size();
+    }
+    
+    /**
+     * Get the index'th interval in the index. Index must be less than size().
+     * TODO: overload for key_type.
+     */
+    const value_type& operator[](size_t index) const {
+        return records[index];
+    }
+    
+    /**
+     * Provide a begin iterator to iterate through the key, value pairs in this
+     * IntervalIndex.
+     */
+    const_iterator begin() const {
+        return records.begin();
+    }
+    
+    /**
+     * Provide an end iterator to iterate through the key, value pairs in this
+     * IntervalIndex.
+     */
+    const_iterator end() const {
+        return records.begin();
     }
     
     /**

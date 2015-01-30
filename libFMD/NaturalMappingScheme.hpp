@@ -277,9 +277,9 @@ protected:
     /**
      * Given an index of max matchings, and a vector of min matchings in
      * ascending order (opposite of findMinMatchings), produce a map from max
-     * matchings to the min matchings they contain, in ascending order.
+     * matchings to the indexed min matchings they contain, in ascending order.
      */
-    std::map<Matching, std::vector<Matching>> assignMinMatchings(
+    std::map<Matching, IntervalIndex<Matching>> assignMinMatchings(
         const IntervalIndex<Matching>& maxMatchings,
         const std::vector<Matching>& minMatchings) const;
         
@@ -295,7 +295,7 @@ protected:
      */
     std::map<Matching, std::vector<size_t>> getMinMatchingChains(
         const std::map<Matching, std::vector<std::pair<Matching, size_t>>>&
-        maxMatchingGraph, const std::map<Matching, std::vector<Matching>>&
+        maxMatchingGraph, const std::map<Matching, IntervalIndex<Matching>>&
         minsForMax, const std::vector<Matching>& maxMatchings,
         bool isForward) const;
         
