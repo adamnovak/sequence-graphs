@@ -39,9 +39,9 @@ void IntervalIndexTests::testCreate() {
 }
 
 /**
- * Test looking up intervals by their left ends.
+ * Test looking up intervals by their left ends, from the right.
  */
-void IntervalIndexTests::testLookupBefore() {
+void IntervalIndexTests::testLookupStartingBefore() {
     // First we need to define the intervals: (start, length) and a value
     std::vector<std::pair<std::pair<size_t, size_t>, std::string>> data = {
         {{2, 3}, "Ash"},
@@ -76,9 +76,44 @@ void IntervalIndexTests::testLookupBefore() {
 }
 
 /**
- * Test looking up intervals by their right ends.
+ * Test looking up intervals by their left ends, from the left.
  */
-void IntervalIndexTests::testLookupAfter() {
+void IntervalIndexTests::testLookupStartingAfter() {
+    // First we need to define the intervals: (start, length) and a value
+    std::vector<std::pair<std::pair<size_t, size_t>, std::string>> data = {
+        {{2, 3}, "Ash"},
+        {{3, 7}, "Bret"},
+        {{10, 1}, "Corey"} 
+    };
+    
+    // Then we make in IntervalIndex
+    IntervalIndex<std::string> index(data);
+    
+    // Make sure the last start point exists properly
+    CPPUNIT_ASSERT(index.hasStartingAfter(0));
+    CPPUNIT_ASSERT(index.hasStartingAfter(1));
+    CPPUNIT_ASSERT(index.hasStartingAfter(2));
+    CPPUNIT_ASSERT(index.hasStartingAfter(10));
+    CPPUNIT_ASSERT(!index.hasStartingAfter(11));
+    
+    // And we can go off the end
+    CPPUNIT_ASSERT(!index.hasStartingAfter(100));
+    
+    // Make sure we transition between intervals where we ought to
+    CPPUNIT_ASSERT_EQUAL("Ash"_s, index.getStartingAfter(0).second);
+    CPPUNIT_ASSERT_EQUAL("Ash"_s, index.getStartingAfter(1).second);
+    CPPUNIT_ASSERT_EQUAL("Ash"_s, index.getStartingAfter(2).second);
+    CPPUNIT_ASSERT_EQUAL("Bret"_s, index.getStartingAfter(3).second);
+    CPPUNIT_ASSERT_EQUAL("Corey"_s, index.getStartingAfter(4).second);
+    CPPUNIT_ASSERT_EQUAL("Corey"_s, index.getStartingAfter(5).second);
+    CPPUNIT_ASSERT_EQUAL("Corey"_s, index.getStartingAfter(9).second);
+    CPPUNIT_ASSERT_EQUAL("Corey"_s, index.getStartingAfter(10).second);
+}
+
+/**
+ * Test looking up intervals by their right ends, from the left.
+ */
+void IntervalIndexTests::testLookupEndingAfter() {
     // First we need to define the intervals: (start, length) and a value
     std::vector<std::pair<std::pair<size_t, size_t>, std::string>> data = {
         {{2, 3}, "Ash"},
@@ -110,4 +145,38 @@ void IntervalIndexTests::testLookupAfter() {
     CPPUNIT_ASSERT_EQUAL("Corey"_s, index.getEndingAfter(10).second);
     
     // Can't go off the end because we can't look up results we don't have.
+}
+
+/**
+ * Test looking up intervals by their right ends, from the right.
+ */
+void IntervalIndexTests::testLookupEndingBefore() {
+    // First we need to define the intervals: (start, length) and a value
+    std::vector<std::pair<std::pair<size_t, size_t>, std::string>> data = {
+        {{2, 3}, "Ash"},
+        {{3, 7}, "Bret"},
+        {{10, 1}, "Corey"} 
+    };
+    
+    // Then we make in IntervalIndex
+    IntervalIndex<std::string> index(data);
+    
+    // Make sure the last end point exists properly
+    CPPUNIT_ASSERT(!index.hasEndingBefore(0));
+    CPPUNIT_ASSERT(!index.hasEndingBefore(3));
+    CPPUNIT_ASSERT(index.hasEndingBefore(4));
+    CPPUNIT_ASSERT(index.hasEndingBefore(5));
+    
+    // And we can go off the end
+    CPPUNIT_ASSERT(index.hasEndingBefore(100));
+    
+    // Make sure we transition between intervals where we ought to
+    CPPUNIT_ASSERT_EQUAL("Ash"_s, index.getEndingBefore(4).second);
+    CPPUNIT_ASSERT_EQUAL("Ash"_s, index.getEndingBefore(5).second);
+    CPPUNIT_ASSERT_EQUAL("Ash"_s, index.getEndingBefore(8).second);
+    CPPUNIT_ASSERT_EQUAL("Bret"_s, index.getEndingBefore(9).second);
+    CPPUNIT_ASSERT_EQUAL("Corey"_s, index.getEndingBefore(10).second);
+    
+    // And we can go off the end
+    CPPUNIT_ASSERT_EQUAL("Corey"_s, index.getEndingBefore(100).second);
 }

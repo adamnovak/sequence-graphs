@@ -11,8 +11,10 @@
 class IntervalIndexTests : public CppUnit::TestFixture {
     CPPUNIT_TEST_SUITE(IntervalIndexTests);
     CPPUNIT_TEST(testCreate);
-    CPPUNIT_TEST(testLookupBefore);
-    CPPUNIT_TEST(testLookupAfter);
+    CPPUNIT_TEST(testLookupStartingBefore);
+    CPPUNIT_TEST(testLookupStartingAfter);
+    CPPUNIT_TEST(testLookupEndingAfter);
+    CPPUNIT_TEST(testLookupEndingBefore);
     CPPUNIT_TEST_SUITE_END();
     
 public:
@@ -20,8 +22,10 @@ public:
     void tearDown();
 
     void testCreate();
-    void testLookupBefore();
-    void testLookupAfter();
+    void testLookupStartingBefore();
+    void testLookupStartingAfter();
+    void testLookupEndingAfter();
+    void testLookupEndingBefore();
 };
 
 #endif

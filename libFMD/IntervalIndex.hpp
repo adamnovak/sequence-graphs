@@ -217,6 +217,44 @@ public:
     }
     
     /**
+     * Return true if an interval exists ending at or before the given position,
+     * and false otherwise.
+     */
+    bool hasEndingBefore(size_t index) const {
+        if(index >= endBits->getSize()) {
+            // Going too far off the end.
+            return hasEndingBefore(endBits->getSize() - 1);
+        } else {
+            return endBits->rank(index, false);
+        }
+    }
+    
+    /**
+     * Get the latest ending interval that ends at or before the given index,
+     * and its associated data value.
+     */
+    const value_type& getEndingBefore(size_t index) const {
+    
+        if(index >= endBits->getSize()) {
+            // Going too far off the end.
+            return getEndingBefore(endBits->getSize() - 1);
+        }
+    
+        // How many positions where intervals end are before or at that
+        // position?
+        size_t rank = endBits->rank(index, false);
+        
+        if(rank == 0) {
+            // No interval ends before or at the given position.
+            throw std::runtime_error("No interval ending at or before " +
+                std::to_string(index));
+        }
+        
+        // We know we have a result, so get the record for that rank.
+        return records[endRecords[rank - 1]];
+    }
+    
+    /**
      * Returns true if an interval exists ending at or after the given position,
      * and false otherwise.
      */
@@ -245,6 +283,37 @@ public:
         // Go get and return that interval.
         return records[endRecords[rank]];
     }
+    
+    /**
+     * Returns true if an interval exists starting at or after the given
+     * position, and false otherwise.
+     */
+    bool hasStartingAfter(size_t index) const {
+        // There is an interval starting at or after the given index if all of
+        // the interval start points aren't already before the position.
+        if(index >= startBits->getSize()) {
+            // Nothing starts at or after the past-the-end position.
+            return false;
+        } else {
+            
+            return startBits->rank(index, true) - 1 < startRecords.size();
+        }
+    }
+    
+    /**
+     * Get the earliest starting interval that starts at or after the given
+     * index, and its associated data value.
+     */
+    const value_type& getStartingAfter(size_t index) const {
+        // How many interval starting positions are before this index? If this
+        // is 0, the soonest-starting interval starting here or later will be
+        // the first-starting interval, and we count up from there.
+        size_t rank = startBits->rank(index, true) - 1;
+        
+        // Go get and return that interval.
+        return records[startRecords[rank]];
+    }
+     
      
         
 
