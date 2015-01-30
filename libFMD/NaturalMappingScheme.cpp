@@ -476,61 +476,61 @@ std::map<NaturalMappingScheme::Matching, std::vector<size_t>>
                 const Matching& prevMax = edge.first;
                 size_t edgeCost = edge.second;
             
-                // Get the vector of all the min matchings in the previous max
+                // Get the index of all the min matchings in the previous max
                 // matching, in ascending order.
                 const IntervalIndex<Matching>& prevMins = minsForMax.at(
                     prevMax);
             
-                for(size_t k = isForward ? 0 : prevMins.size() - 1;
-                    isForward ? k < prevMins.size() : k != (size_t) -1;
-                    isForward ? k++ : k--) {
+                // There is only one min matching we need to consider coming
+                // from: the last non-overlapping min matching in that max
+                // matching (if we are going forward), or the first one (if we
+                // are going backwards).
                 
-                    // For each min matching in there (at least 1 must exist),
-                    // going in the direction we decided to go in...
+                // TODO: make hasEndingBefore and friends use open intervals.
+                if(isForward ? (minMatching.start == 0 ||
+                    !prevMins.hasEndingBefore(minMatching.start - 1)) : 
+                    !prevMins.hasStartingAfter(minMatching.start + 
+                    minMatching.length)) {
+                
+                    // The previous max match has no min matches with their DP
+                    // tables filled in that don't overlap this one. This is
+                    // probably because we are looking at the self edge to the
+                    // current max matching and we are the first min matching in
+                    // it.
                     
-                    // Grab the min matching we want to come from. We will have
-                    // already completed the DP for it.
-                    const Matching& prevMin = prevMins[k].second;
+                    Log::debug() << "Nothing in " << prevMax <<
+                        " we can use from " << minMatching << std::endl;
                     
-                    if(prevMin.start + prevMin.length > minMatching.start &&
-                        minMatching.start + minMatching.length > 
-                        prevMin.start) {
-                        // If it overlaps this one, skip it
-                        continue;
-                    }
+                    // Skip on to the next graph edge.
+                    continue;
+                }
+                
+                // Get the min matching that we need to consider coming from.
+                const Matching& prevMin = (isForward ? 
+                    prevMins.getEndingBefore(minMatching.start - 1) : 
+                    prevMins.getStartingAfter(minMatching.start + 
+                    minMatching.length)).second;
+            
+                Log::debug() << "Could come to " << minMatching <<
+                    " from " << prevMin << " with cost " << edgeCost <<
+                    std::endl;
+                        
+                for(size_t k = edgeCost; k <= maxHammingDistance; k++) {
+                    // Scan the range of our table that we can potentially
+                    // fill in from the other table.
                     
-                    if((isForward && prevMin.start >= minMatching.start) ||
-                        (!isForward && prevMin.start <= minMatching.start)) {
-                        // This previous min matching comes after (in the
-                        // applicable direction) the one we are trying to do the
-                        // DP for. We can't pull from it.
-                        continue;
-                    }
+                    // How long a run would we get if we incured total cost
+                    // i and came from the corresponding place in the
+                    // previous min match's table?
+                    size_t newRunLength = table[prevMin][k - edgeCost] + 1;
+                    
+                    // If the new run is longer, use it.
+                    table[minMatching][k] = std::max(table[minMatching][k],
+                        newRunLength);
                         
-                    Log::debug() << "Could come to " << minMatching <<
-                        " from " << prevMin << " with cost " << edgeCost <<
-                        std::endl;
-                        
-                    for(size_t l = edgeCost; l <= maxHammingDistance; l++) {
-                        // Scan the range of our table that we can potentially
-                        // fill in from the other table. TODO: we used up i, j,
-                        // k, and l. Can we shadow some loop variables? Or give
-                        // them more descriptive names? Or split this function
-                        // up?
-                        
-                        // How long a run would we get if we incured total cost
-                        // i and came from the corresponding place in the
-                        // previous min match's table?
-                        size_t newRunLength = table[prevMin][l - edgeCost] + 1;
-                        
-                        // If the new run is longer, use it.
-                        table[minMatching][l] = std::max(table[minMatching][l],
-                            newRunLength);
-                            
-                        // We will still need to fill in higher-cost entries
-                        // later if we don't find anything better at the higher
-                        // costs.
-                    }
+                    // We will still need to fill in higher-cost entries
+                    // later if we don't find anything better at the higher
+                    // costs.
                 }
             }
             
