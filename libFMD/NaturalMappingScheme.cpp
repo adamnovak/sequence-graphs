@@ -431,8 +431,8 @@ std::map<NaturalMappingScheme::Matching, std::vector<size_t>>
     // We have the max matching connectivity graph, the min matching
     // assignments, and the list of max matchings in order.
     
-    // TODO: If we are going backwards, turn the graph around so we can come
-    // from max matchings on the right instead.
+    // If we are going backwards, turn the graph around so we can come from max
+    // matchings on the right instead.
     const auto& graph = isForward ? maxMatchingGraph : 
         invertGraph(maxMatchingGraph);
         
@@ -711,18 +711,63 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
         }
     }
     
-    if(conflictBelowThreshold) {
-        // There may be some maximal matchings that we did not flag as good, and
-        // we want them to cause conlict. So we blacklist their bases.
-        
-        for(const Matching& matching : maxMatchings) {
-            // For each matching
-            if(!goodMaxMatchings.count(matching) &&
-                matching.length >= ignoreMatchesBelow) {
+    for(const Matching& matching : maxMatchings) {
+        // For each matching...
+        if(!goodMaxMatchings.count(matching) &&
+            matching.length >= ignoreMatchesBelow) {
+            
+            // We can't use it, because it doesn't have a MUS in a good enough
+            // synteny run, but we can't just ignore it.
+            
+            // We need to check if it can reach the ends of the query
+            // wothout too many mismatches, in which case we would need to
+            // blacklist it to preserve stability.
+            
+            // How many bases on the left of this MUM in the query do we care
+            // about? We'll look up to the max alignment size.
+            size_t leftQueryLength = std::min(matching.start, maxAlignmentSize);
+            
+            // Where do I have to start from in the reference for the end of the
+            // query?
+            TextPosition leftReferenceStart = matching.location;
+            
+            // And how many do we care about in the reference? We need 2x the
+            // number in the query, or however many remain on the reference
+            // text, whichever is smaller. TODO: how will this ever work for
+            // graphs???
+            size_t leftReferenceLength = std::min(2 * leftQueryLength,
+                leftReferenceStart.getOffset());
+            
+            // Budge the reference start position over that much.
+            leftReferenceStart.addLocalOffset(-leftReferenceLength);
+            
+            Log::debug() << "Doing alignment 0-" << leftQueryLength <<
+                " against " << leftReferenceStart << " - " <<
+                leftReferenceLength << std::endl;
+            
+            // What's the cost to reach out to the left end of the query? We
+            // right justify the alignment, and we don't care about the exact
+            // value if it's more than ourmaxHammingDistance.
+            size_t leftEndCost = countEdits(query, 0,  leftQueryLength,
+            leftReferenceStart, leftReferenceLength, maxHammingDistance + 1, 
+            false, true);
+            
+            Log::debug() << "Would take " << leftEndCost <<
+                " to get off the left end from " << matching << std::endl;
+            
+            // TODO: what if there are plenty of differences, but not in the
+            // near 500bp? Should we check over at the far ends instead or
+            // something?
+            
+            if((!unstable && leftEndCost <= maxHammingDistance) ||
+                conflictBelowThreshold) {
                 
-                // We can't use it, but we can't just ignore it, so make it
-                // blacklisted.
+                // There aren't enough mismatches between here and the ends of
+                // the query, or we've opted to blacklist every little MUM that
+                // doesn't pass.
                 
+                // TODO: implement right looking mismatch count.
+            
                 for(size_t i = matching.start;
                     i < matching.start + matching.length; i++) {
                     
@@ -731,55 +776,14 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
                     
                     Log::debug() << "Blacklisting base " << i << 
                         " for participation in max matching" << matching <<
-                        " with conflictBelowThreshold" << std::endl;
+                        std::endl;
                     
                     // TODO: Make this count as conflict if it stops any bases
                     // from mapping.
                     
                 }
-                
             }
-        }
-    }
-    
-    if(!unstable) {
-        // We need to find max matchings that don't have min matchings in good
-        // enough synteny runs, but which might acquire them on extension. We
-        // need to blacklist bases in those max matchings.
-    
-        for(const Matching& matching : maxMatchings) {
-            // For each matching that might be able to get out the end...
             
-            // TODO: Only look at matchings near the ends somehow.
-            
-            if(!goodMaxMatchings.count(matching) && 
-                (matching.start < maxAlignmentSize || query.size() - 
-                (matching.start + matching.length) <= maxAlignmentSize)) {
-            
-                // We're too close to one end or the other, and don't already
-                // have a good enough run.
-                
-                // TODO: How close is too close? What if a new max matching
-                // shows up with its end not exactly at the end of the query but
-                // a bit inside? Do we have to ban the first/last matching in
-                // every diagonal?
-                
-                // Can we somehow see what things can afford to make it to the
-                // ends and what can't?
-                
-                for(size_t i = matching.start;
-                    i < matching.start + matching.length; i++) {
-                    
-                    // Blacklist every query position in the matching.
-                    blacklist[i] = true;
-                    
-                    Log::debug() << "Blacklisting base " << i <<
-                        " for participation in max matching " << matching <<
-                        " which may become sufficiently good" <<
-                        std::endl;
-                    
-                }
-            }
         }
     }
     

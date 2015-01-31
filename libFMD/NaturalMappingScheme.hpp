@@ -300,22 +300,6 @@ protected:
         bool isForward) const;
         
     /**
-     * For each min matching, determine whether it could participate in a
-     * synteny run with a newly added MUM on the left (for a forward pass) or
-     * right (for a backward pass) end of the query.
-     *
-     * A heuristic algorithm is used which will identify all true positives at
-     * the cost of some false positives. A MUS is held to be able to reach an
-     * end of the query with a cost greater than or equal to the number of
-     * nonsyntenic, mutually nonoverlapping MUSes between it and the end.
-     */
-    std::map<Matching, bool> getMinMatchingEndAccessibility(
-        const std::map<Matching, std::vector<std::pair<Matching, size_t>>>&
-        maxMatchingGraph, const std::map<Matching, IntervalIndex<Matching>>&
-        minsForMax, const std::vector<Matching>& maxMatchings,
-        bool isForward) const;
-        
-    /**
      * Given vectors of max and min matchings in ascending order as well as the
      * query, produce a vector of only max matchings that have min matchings in
      * sufficiently good (>= minHammingBound) synteny runs.
