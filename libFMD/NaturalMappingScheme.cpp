@@ -720,12 +720,16 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             // synteny run, but we can't just ignore it.
             
             // We need to check if it can reach the ends of the query
-            // wothout too many mismatches, in which case we would need to
+            // without too many mismatches, in which case we would need to
             // blacklist it to preserve stability.
             
+            // TODO: Split this out into a function?
+            
             // How many bases on the left of this MUM in the query do we care
-            // about? We'll look up to the max alignment size.
-            size_t leftQueryLength = std::min(matching.start, maxAlignmentSize);
+            // about? We'll look up to half the max alignment size, since the
+            // other aligned sequence has to be double this length.
+            size_t leftQueryLength = std::min(matching.start,
+                maxAlignmentSize/2);
             
             // Where do I have to start from in the reference for the end of the
             // query?
@@ -733,8 +737,9 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             
             // And how many do we care about in the reference? We need 2x the
             // number in the query, or however many remain on the reference
-            // text, whichever is smaller. TODO: how will this ever work for
-            // graphs???
+            // text, whichever is smaller, in order to be sure of getting the
+            // lowest-possible-cost one-side-justified alignment. TODO: how will
+            // this ever work for graphs???
             size_t leftReferenceLength = std::min(2 * leftQueryLength,
                 leftReferenceStart.getOffset());
             
@@ -747,27 +752,61 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             
             // What's the cost to reach out to the left end of the query? We
             // right justify the alignment, and we don't care about the exact
-            // value if it's more than ourmaxHammingDistance.
+            // value if it's more than our maxHammingDistance.
             size_t leftEndCost = countEdits(query, 0,  leftQueryLength,
             leftReferenceStart, leftReferenceLength, maxHammingDistance + 1, 
             false, true);
             
-            Log::debug() << "Would take " << leftEndCost <<
-                " to get off the left end from " << matching << std::endl;
+            // TODO: We repeat most of this stuff in the opposite polarity for
+            // the right side. Unify somehow?
             
-            // TODO: what if there are plenty of differences, but not in the
-            // near 500bp? Should we check over at the far ends instead or
-            // something?
+            // Where does the bit after the MUM in the query start?
+            size_t rightQueryStart = matching.start + matching.length;
             
-            if((!unstable && leftEndCost <= maxHammingDistance) ||
+            // How many bases on the right of this MUM in the query do we care
+            // about? Again, we need to use double this from the reference, so
+            // we go up to half the max size.
+            size_t rightQueryLength = std::min(query.size() - rightQueryStart,
+                maxAlignmentSize/2);
+                
+            // Where do I have to start from in the reference for the start of the
+            // query?
+            TextPosition rightReferenceStart = matching.location;
+            rightReferenceStart.addLocalOffset(matching.length);
+                
+            // On the right side, we need again either twice the query length,
+            // or however much is available.
+            size_t rightReferenceLength = std::min(2 * rightQueryLength, 
+                index.getContigLength(rightReferenceStart.getContigNumber()) -
+                rightReferenceStart.getOffset());
+            
+            // What's the cost to reach out to the right end of the query? We
+            // left justify the alignment, and we don't care about the exact
+            // value if it's more than our maxHammingDistance.
+            size_t rightEndCost = countEdits(query, rightQueryStart, 
+            rightQueryLength, rightReferenceStart, rightReferenceLength,
+            maxHammingDistance + 1, true, false);
+            
+            Log::debug() << matching << " has end costs " << leftEndCost <<
+                " in " << leftQueryLength << "|" << leftReferenceLength <<
+                " bases on the left and " << rightEndCost << " in " <<
+                rightQueryLength << "|" << rightReferenceLength <<
+                " bases on the right" << std::endl;
+            
+            // TODO: what if there are plenty of differences, but not in range
+            // given the sizer of the alignment we are willing to do? Should we
+            // check over at the far ends instead or something?
+            
+            if((!unstable && (leftEndCost <= maxHammingDistance ||
+                rightEndCost <= maxHammingDistance)) ||
                 conflictBelowThreshold) {
                 
                 // There aren't enough mismatches between here and the ends of
                 // the query, or we've opted to blacklist every little MUM that
                 // doesn't pass.
                 
-                // TODO: implement right looking mismatch count.
-            
+                
+                
                 for(size_t i = matching.start;
                     i < matching.start + matching.length; i++) {
                     
@@ -1360,20 +1399,30 @@ size_t NaturalMappingScheme::countEdits(const std::string& query,
     // DP problem
     if(queryLength == 0) {
         // We have to delete every reference base.
-        return referenceLength;
+        Log::debug() << "Alignment is just to delete the reference" <<
+            std::endl; 
+        // This costs 1 per reference base, if we're justifying the query to
+        // both ends. If we let the query not make it to one end of the
+        // reference, then this is free.
+        return (leftJustify && rightJustify) ? referenceLength : 0;
     }
     if(referenceLength == 0) {
         // We have to insert every query base.
+        Log::debug() << "Alignment is just to insert the query" << std::endl; 
         return queryLength;
     }
     
-    if(((queryLength > referenceLength) &&
+    if((leftJustify && rightJustify) && (((queryLength > referenceLength) &&
         (queryLength - referenceLength >= threshold)) ||
         ((referenceLength > queryLength) &&
-        (referenceLength - queryLength >= threshold))) {
+        (referenceLength - queryLength >= threshold)))) {
     
-        // We know the difference in lengths is at least the threshold. In that
-        // case, there must be at least threshold edits.
+        // We are justifying on both ends, and we know the difference in lengths
+        // is at least the threshold. In that case, there must be at least
+        // threshold edits.
+        Log::debug() << 
+            "Alignment length difference so great we don't have to do it" << 
+            std::endl;
         return threshold;
         
     }
@@ -1399,18 +1448,42 @@ size_t NaturalMappingScheme::countEdits(const std::string& query,
     
     // Initialize the first row and column of the matrix with the costs for
     // reference and query gaps on the left edge.
-    for(size_t i = 0; i < queryLength; i++) {
+    for(size_t i = 0; i < queryLength + 1; i++) {
         // How much is a gap in the reference at the left (unbused query bases)?
         // Always 1.
         matrix[i][0] = i;
     }
-    for(size_t j = 0; j < referenceLength; j++) {
+    for(size_t j = 0; j < referenceLength + 1; j++) {
         // How much is a gap in the query at the left (unused reference bases)?
         // Depends on if we're left-justifying or not.
         matrix[0][j] = leftJustify * j;
     }
     
+    // Now we computew and dump our DP matrix.
+    Log::info() << "Actually doing alignment" << std::endl;
+    
+    auto& headerLine = Log::debug() << std::setw(3) << "#" << std::setw(3) <<
+        "#";
+    for(size_t j = 1; j < referenceLength + 1; j++) {
+        // Dump all the reference characters as a line
+        TextPosition referencePosition = referenceStart;
+        referencePosition.addLocalOffset(j - 1);
+        headerLine << std::setw(3) << index.displayCached(referencePosition);
+    }
+    headerLine << std::endl;
+    
+    auto& firstRow = Log::debug() << std::setw(3) << "#";
+    for(size_t j = 0; j < referenceLength + 1; j++) {
+        // Dump the first row of the matrix.
+        firstRow << std::setw(3) << matrix[0][j];
+    }
+    firstRow << std::endl;
+    
     for(size_t i = 1; i < queryLength + 1; i++) {
+    
+        auto& matrixLine = Log::debug() << std::setw(3) <<
+            query[queryStart + i - 1] << std::setw(3) << matrix[i][0];  
+        
         for(size_t j = 1; j < referenceLength + 1; j++) {
         
             // For each interior position, see if you should have a gap in one,
@@ -1423,9 +1496,9 @@ size_t NaturalMappingScheme::countEdits(const std::string& query,
             int queryGapCost = matrix[i][j - 1] + 1;
             
             if(!rightJustify && i == queryLength) {
-                // Don't charge for gaps in the query (unused reference bases)
-                // on the right end.
-                queryGapCost = 0;
+                // Don't charge the +1 for gaps in the query (unused reference
+                // bases) on the right end.
+                queryGapCost = matrix[i][j - 1];
             }
             
             // Advance in both, and pay 1 if this isn't a match.
@@ -1438,8 +1511,13 @@ size_t NaturalMappingScheme::countEdits(const std::string& query,
             // Adopt the cost of whatever the best choice was.
             matrix[i][j] = std::min(std::min(queryGapCost, referenceGapCost),
                 matchMismatchCost);
+                
+            matrixLine << std::setw(3) << matrix[i][j];
         }
+        matrixLine << std::endl;
     }
+    
+    Log::info() << "Alignment done!" << std::endl;
     
     // Read off the cost in the lower right
     return matrix[queryLength][referenceLength];
