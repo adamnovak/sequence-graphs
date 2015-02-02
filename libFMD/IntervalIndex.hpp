@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <utility>
 #include <memory>
+#include <iostream>
 
 /**
  * Represents a container for (start, length) intervals of size_ts, with an
@@ -211,7 +212,7 @@ public:
      * IntervalIndex.
      */
     const_iterator end() const {
-        return records.begin();
+        return records.end();
     }
     
     /**
@@ -382,7 +383,54 @@ private:
      * position's bit rank in endBits.
      */
     std::vector<size_t> endRecords;
+   
+// Make friends with the output operator.
+template<typename FAnnotation, typename FAllocator>
+friend std::ostream& operator<<(std::ostream& out,
+    const IntervalIndex<FAnnotation, FAllocator>& index);
     
 };
+
+/**
+ * Print the specified IntervalIndex to the specified out stream.
+ */
+template<typename Annotation, typename Allocator>
+inline std::ostream& operator<<(std::ostream& out,
+    const IntervalIndex<Annotation, Allocator>& index) {
+    
+    out << "Interval index:" << std::endl;
+    
+    for(const auto& kv : index) {
+        // Dump one line per interval.
+        out << "Start: " << kv.first.first << ", Length: " << kv.first.second <<
+            std::endl;
+    }
+    
+    out << std::endl;
+    
+    out << "Start and end bits:" << std::endl;
+    for(size_t i = 0; i < std::max(index.startBits->getSize(),
+        index.endBits->getSize()); i++) {
+        
+        // Dump one line per position a range could be at.
+        
+        out << i << ": ";
+        if(i < index.startBits->getSize()) {
+            out << index.startBits->isSet(i) << " ";
+        } else {
+            out << "# ";
+        }
+        
+        if(i < index.endBits->getSize()) {
+            out << index.endBits->isSet(i) << " ";
+        } else {
+            out << "# ";
+        }
+        
+        out << std::endl;
+    }
+    
+    return out;
+}
 
 #endif

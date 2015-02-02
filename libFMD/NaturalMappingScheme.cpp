@@ -195,10 +195,9 @@ std::map<NaturalMappingScheme::Matching,
         std::vector<std::pair<std::pair<size_t, size_t>, Matching>> withKeys;
         
         for(const Matching& matching : kv.second) {
-            // For each matching, put it in the vector with its start, end
+            // For each matching, put it in the vector with its start, length
             // range.
-            withKeys.push_back({{matching.start,
-                matching.start + matching.length - 1}, matching});
+            withKeys.push_back({{matching.start, matching.length}, matching});
         }
     
         // Make in IntervalIndex from the vector of mappings and keys. This
@@ -389,10 +388,10 @@ std::map<NaturalMappingScheme::Matching,
         // Find the max matching
         const Matching& maxMatching = getMaxMatching(maxMatchings, minMatching);
         // Give this min matching to it. TODO: have a helper function to
-        // annotate matchings with their ranges like this, sicne we do it in
-        // several places.
-        vectorForMax[maxMatching].push_back({{minMatching.start,
-            minMatching.start + minMatching.length - 1}, minMatching});
+        // annotate matchings with their ranges like this, sine we do it in
+        // several places and keep getting it wrong.
+        vectorForMax[maxMatching].push_back({{minMatching.start, 
+            minMatching.length}, minMatching});
     }
     
     // But we really need this map from max matching to IntervalIndex of min
@@ -470,7 +469,7 @@ std::map<NaturalMappingScheme::Matching, std::vector<size_t>>
             Log::debug() << "Initialized DP table for " << minMatching <<
                 std::endl;
             
-            for(const auto& edge : maxMatchingGraph.at(maxMatching)) {
+            for(const auto& edge : graph.at(maxMatching)) {
                 // For each max matching we can pull from, and the cost to get
                 // there (at least the self edge must exist)
                 const Matching& prevMax = edge.first;
@@ -480,29 +479,51 @@ std::map<NaturalMappingScheme::Matching, std::vector<size_t>>
                 // matching, in ascending order.
                 const IntervalIndex<Matching>& prevMins = minsForMax.at(
                     prevMax);
-            
+                    
                 // There is only one min matching we need to consider coming
                 // from: the last non-overlapping min matching in that max
                 // matching (if we are going forward), or the first one (if we
                 // are going backwards).
                 
                 // TODO: make hasEndingBefore and friends use open intervals.
-                if(isForward ? (minMatching.start == 0 ||
-                    !prevMins.hasEndingBefore(minMatching.start - 1)) : 
-                    !prevMins.hasStartingAfter(minMatching.start + 
-                    minMatching.length)) {
-                
-                    // The previous max match has no min matches with their DP
-                    // tables filled in that don't overlap this one. This is
-                    // probably because we are looking at the self edge to the
-                    // current max matching and we are the first min matching in
-                    // it.
+                if(isForward) {
+                    // We are going forward, so we need to make sure there's
+                    // something left of this min matching in that max matching.
                     
-                    Log::debug() << "Nothing in " << prevMax <<
-                        " we can use from " << minMatching << std::endl;
+                    if(minMatching.start == 0) {
+                        Log::debug() << "Nothing in " << prevMax <<
+                            " can end before our start of 0." << std::endl;
+                        
+                        // Skip on to the next graph edge.
+                        continue;
+                    }
                     
-                    // Skip on to the next graph edge.
-                    continue;
+                    if(!prevMins.hasEndingBefore(minMatching.start - 1)) {
+                        Log::debug() << "Nothing in " << prevMax <<
+                        " ends at or left of " << minMatching.start - 1 <<
+                        std::endl;
+                        
+                        // Skip on to the next graph edge.
+                        continue;
+                    }
+                    
+                } else {
+                    // We are going backward, so we need to make sure there's
+                    // something right of this min matching in that max
+                    // matching.
+                    
+                    if(!prevMins.hasStartingAfter(minMatching.start + 
+                        minMatching.length)) {
+                    
+                        Log::debug() << "Nothing in " << prevMax <<
+                            " starts at or right of " << minMatching.start +
+                            minMatching.length << std::endl;
+                        
+                        // Skip on to the next graph edge.    
+                        continue;
+                    
+                    }
+                    
                 }
                 
                 // Get the min matching that we need to consider coming from.
@@ -573,9 +594,9 @@ std::set<NaturalMappingScheme::Matching>
     std::vector<std::pair<std::pair<size_t, size_t>, Matching>> toIndex;
     for(const Matching& maxMatching : maxMatchings) {
         // Populate it with the inclusive start, end interval for each max
-        // matching.
-        toIndex.push_back({{maxMatching.start,
-            maxMatching.start + maxMatching.length - 1}, maxMatching});
+        // matching. Make sure we do (start, length) pairs as required.
+        toIndex.push_back({{maxMatching.start, maxMatching.length},
+            maxMatching});
     }
     // Index the max matchings by interval
     IntervalIndex<Matching> index(toIndex);
@@ -599,28 +620,58 @@ std::set<NaturalMappingScheme::Matching>
     // Make the set to return.
     std::set<Matching> toReturn;
     
-    for(const Matching& minMatching : minMatchings) {
-        // For each min matching
-        
-        for(size_t forwardCost = 0; forwardCost <= maxHammingDistance;
-            forwardCost++) {
+    for(const Matching& maxMatching : maxMatchings) {
+    
+        Log::debug() << "Evaluating max matching " << maxMatching << std::endl;
+    
+        for(const auto& minMatchingRecord : minsForMax[maxMatching]) {
+            // For each min matching, which we pull out of its index record...
+            const Matching& minMatching = minMatchingRecord.second;
             
-            // For each way to apportion the mismatch cost between forward and
-            // reverse directions...
-            size_t reverseCost = maxHammingDistance - forwardCost;
+            // How long of a synteny chain is it in?
+            size_t bestChain = 0;
             
-            // How long a run can we get on that budget in each direction?
-            // Subtract 1 so we don't double-count this min match.
-            size_t runLength = forwardChains[minMatching][forwardCost] +
-                reverseChains[minMatching][reverseCost] - 1;
+            for(size_t forwardCost = 0; forwardCost <= maxHammingDistance;
+                forwardCost++) {
                 
-            if(runLength >= minHammingBound) {
-                // This run is sufficiently good. Mark the max matching as good
-                // too.
-                toReturn.insert(getMaxMatching(index, minMatching));
+                // For each way to apportion the mismatch cost between forward
+                // and reverse directions...
+                size_t reverseCost = maxHammingDistance - forwardCost;
+                
+                // How long a run can we get on that budget in each direction?
+                // Subtract 1 so we don't double-count this min match.
+                size_t runLength = forwardChains[minMatching][forwardCost] +
+                    reverseChains[minMatching][reverseCost] - 1;
+                   
+               Log::debug() << "Cost " << forwardCost << "|" << reverseCost <<
+                    ": chain with " <<
+                    forwardChains[minMatching][forwardCost] << " + " <<
+                    reverseChains[minMatching][reverseCost] << " - 1 = " <<
+                    runLength << " min matchings" << std::endl;
+                    
+                bestChain = std::max(bestChain, runLength);
             }
             
+            if(bestChain >= minHammingBound) {
+                // This max matching has a min matching involved in a good
+                // enough chain, so keep it.
+                toReturn.insert(maxMatching);
+                
+                Log::debug() << "Taking " << maxMatching << " with chain of " <<
+                    bestChain << std::endl;
+                
+                // Skip the rest of the min matchings.
+                break;
+            } else {
+                // We couldn't find a good enough chain through this min
+                // matching.
+                Log::debug() << "Best synteny chain involving " <<
+                    minMatching << " is only " << bestChain << " long" <<
+                    std::endl;
+            }
+                
         }
+    
     }
     
     for(const auto& goodMatch : toReturn) {
@@ -747,7 +798,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             leftReferenceStart.addLocalOffset(-leftReferenceLength);
             
             Log::debug() << "Doing alignment 0-" << leftQueryLength <<
-                " against " << leftReferenceStart << " - " <<
+                " against " << leftReferenceStart << " + " <<
                 leftReferenceLength << std::endl;
             
             // What's the cost to reach out to the left end of the query? We
@@ -779,6 +830,11 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             size_t rightReferenceLength = std::min(2 * rightQueryLength, 
                 index.getContigLength(rightReferenceStart.getContigNumber()) -
                 rightReferenceStart.getOffset());
+            
+            Log::debug() << "Doing alignment " << rightQueryStart << "-" << 
+                rightQueryStart + rightQueryLength << " against " <<
+                rightReferenceStart << " + " << rightReferenceLength <<
+                std::endl;
             
             // What's the cost to reach out to the right end of the query? We
             // left justify the alignment, and we don't care about the exact
@@ -814,7 +870,7 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
                     blacklist[i] = true;
                     
                     Log::debug() << "Blacklisting base " << i << 
-                        " for participation in max matching" << matching <<
+                        " for participation in max matching " << matching <<
                         std::endl;
                     
                     // TODO: Make this count as conflict if it stops any bases

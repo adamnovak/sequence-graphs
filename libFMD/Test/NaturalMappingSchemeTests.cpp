@@ -181,8 +181,9 @@ void NaturalMappingSchemeTests::testSkipMismatches() {
     //                                     v Here
     std::string query = "CATGCTTCGGCGATTCGAGGCTCATCTGCGACTCT";
     
-    // Configure the scheme to be slightly more tolerant.
-    scheme->minHammingBound = 2;
+    // Configure the scheme to be slightly more tolerant, but also so that it
+    // needs to chain max matchings..
+    scheme->minHammingBound = 6;
     scheme->maxHammingDistance = 1;
     
     // Map the query and see how much maps.
@@ -206,8 +207,9 @@ void NaturalMappingSchemeTests::testSkipInserts() {
     //                               v Here      
     std::string query = "CATGCTTCGGCGTATTCGACGCTCATCTGCGACTCT";
     
-    // Configure the scheme to be slightly more tolerant.
-    scheme->minHammingBound = 2;
+    // Configure the scheme to be slightly more tolerant, but also so that it
+    // needs to chain max matchings.
+    scheme->minHammingBound = 6;
     scheme->maxHammingDistance = 1;
     
     // Map the query and see how much maps.
@@ -235,8 +237,9 @@ void NaturalMappingSchemeTests::testSkipDeletes() {
     //                                 v Was here  
     std::string query = "CATGCTTCGGCGATCGACGCTCATCTGCGACTCT";
     
-    // Configure the scheme to be slightly more tolerant.
-    scheme->minHammingBound = 2;
+    // Configure the scheme to be slightly more tolerant, but also so that it
+    // needs to chain max matchings.
+    scheme->minHammingBound = 6;
     scheme->maxHammingDistance = 1;
     
     // Map the query and see how much maps.
@@ -251,6 +254,49 @@ void NaturalMappingSchemeTests::testSkipDeletes() {
     // We should not map the one remaining T of the double T, but the rest
     // should map as before.
     CPPUNIT_ASSERT_EQUAL(query.size() - 4 - 4 - 1, mappedBases);   
+}
+
+/**
+ * Make sure synteny chaining can cross several errors.
+ */
+void NaturalMappingSchemeTests::testSkipAll() {
+    // Grab all of the first contig, with an insertion, mismatch, and deletion.
+    // Chosen so as not to create spurious matchings and thus blacklistings I
+    // don't expect.
+    //                                v     v Here    v
+    std::string query = "CATGCTTCGGCGAGTTCGAGGCTCATCTGGACTCT";
+    
+    // Configure the scheme so that we can't map without chaining max matchings
+    scheme->minHammingBound = 6;
+    
+    // Map the query and see how much maps, without mismatch tolerance
+    size_t mappedBases = 0;
+    scheme->map(query, [&](size_t i, TextPosition mappedTo) {
+        // Count bases that map
+        mappedBases++;
+    });
+    
+    // Nothing should map.
+    CPPUNIT_ASSERT_EQUAL((size_t) 0, mappedBases);
+    
+    // Configure the scheme to be quite tolerant, so we can actually do the
+    // chaining.
+    scheme->maxHammingDistance = 4;
+    
+    // Map the query and see how much maps.
+    mappedBases = 0;
+    scheme->map(query, [&](size_t i, TextPosition mappedTo) {
+        // Make sure each base maps to nthe right text.
+        // TODO: also make sure theyt map to the right places.
+        CPPUNIT_ASSERT_EQUAL((size_t) 0, mappedTo.getText());
+        mappedBases++;
+        
+        Log::info() << i << " (" << query[i] << "): " << mappedTo << std::endl;
+    });
+    
+    // We should not map the changed or inserted bases, or very near the ends,
+    // but the rest should map
+    CPPUNIT_ASSERT_EQUAL(query.size() - 4 - 4 - 2, mappedBases);   
 }
 
 
