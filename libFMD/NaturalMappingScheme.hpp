@@ -140,101 +140,10 @@ protected:
         inline Matching(size_t start, TextPosition location, size_t length): 
             start(start), location(location), length(length) {
         }
-        
-        // We also have some metadata we use for maximal Matchings.
-        // TODO: Make that its own type?
-        
-        /**
-         * How many minimal matchings are in this maximal matching?
-         */
-        size_t minMatchings = 0;
-        
-        /**
-         * What is their total length?
-         */
-        size_t minMatchingLength = 0;
-        
-        /**
-         * How many of them are non-overlapping?
-         */
-        size_t nonOverlapping = 0;
-        
-        /**
-         * How many mismatches do you have to collect before grabbing this
-         * maximal unique matching in its synteny block? Assumes you are coming
-         * in from the right.
-         */
-        size_t mismatchesBefore = 0;
-        
-        /**
-         * Is this maximal match flagged as able to produce matchings?
-         */
-        bool canMatch = false;
-        
-        /**
-         * Is this maximal match supposed to create conflicting matchings but
-         * not map? If this is true, canMatch must also be true.
-         */
-        bool blacklist = false;
-        
     };
     
     // Make sure the output overload for Matchings has access to the type.
     friend std::ostream& operator<<(std::ostream& out, const Matching& thing);
-    
-    /**
-     * A Run of Matchings (referenced by indices) with a certain total min
-     * unique matchings and total Hamming/edit distance.
-     */
-    struct Run {
-        /**
-         * Holds indices of the Matchings in this run.
-         */
-        std::deque<size_t> matchings;
-        
-        /**
-         * Holds the total number of non-overlapping minimal unique matchings in
-         * the run. TODO: Need to account for overlap in a run when maximal
-         * unique matches in the same run overlap.
-         */
-        size_t totalClearance;
-        
-        /**
-         * Total Hamming/edit distance between the query ant the reference for
-         * this run.
-         */
-        size_t totalCost;
-        
-    };
-    
-    /**
-     * Keep track of a run of maximal exact matchings which we have decided form
-     * a synteny block, and ought to be presented to the filters as a group.
-     * This keeps track of all of the state that is needed to implement the
-     * various filters, as well as the information needed to actually make the
-     * mappings.
-     */
-    struct SyntenyBlock {
-        /**
-         * What maximal matchings are in this block (in right to left order)?
-         */
-        std::vector<Matching> maximalMatchings;
-    
-        // Default constructor is OK, we always start empty.
-        
-        // Default copy constructor, assignment operator, and so on are fine.
-        
-        /**
-         * Extend a SyntenyBlock with the next maximal unique Matching to the
-         * left. Takes the new Matching, which must have its metadata filled in.
-         * Modifies the block in place.
-         */
-        inline void extendLeft(Matching maximal) {
-            // And add in the matching
-            maximalMatchings.push_back(maximal);
-        }
-        
-    };
     
     /**
      * Find all of the maximal unique matchings between query string characters
@@ -308,38 +217,6 @@ protected:
         maxMatchings, const std::vector<Matching>& minMatchings,
         const std::string& query) const;
     
-    /**
-     * Scan through the given SyntenyBlock and do the inchworm algorithm to flag
-     * all of the maximal matchings that pass the scheme's configured
-     * thresholds. Also make sure to blacklist any maximal unique matches that
-     * could eventually pass those thresholds on extension.
-     */
-    void scan(SyntenyBlock& block, const std::string& query) const;
-    
-    /**
-     * Go through the maximal unique matchings in the query, and see which of
-     * them are in Runs sufficiently good to be accepted, and which of them are
-     * in substandard runs but are still not trivially short, or are close
-     * enough to the edges that they could join better runs eventually and thus
-     * need to be blacklisted.
-     */
-    void identifyGoodMatchingRuns(const std::string& query,
-        std::vector<Matching>& maxMatchings,
-        const std::vector<std::vector<size_t>>& matchingGraph) const;
-    
-    /**
-     * Count the mismatches between a query and a text in the index, in a range.
-     * If the range would go out of the query, stop counting there. If the range
-     * would go out of the reference, return the threshold number of mismatches
-     * (if set), or the total counted. If threshold is not -1, will count until
-     * the end or until that many mismatches are found. Direction can be 1 or -1
-     * and determines the direction to count in (forwards or backwards from the
-     * inclusive start positions given).
-     */
-    size_t countMismatches(const std::string& query, size_t queryStart,
-        TextPosition referenceStart, size_t length,
-        int64_t threshold = -1, char direction = 1) const;
-        
     /**
      * Compute the edit distance between the specified region of the query and
      * the specified region of the reference. If the distance would be greater
