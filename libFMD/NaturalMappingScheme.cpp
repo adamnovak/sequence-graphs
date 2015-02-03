@@ -164,11 +164,13 @@ std::vector<Matching>  NaturalMappingScheme::findMinMatchings(
     return toReturn;
 }
 
-std::map<Matching, std::vector<std::pair<Matching, size_t>>>
+std::unordered_map<Matching, std::vector<std::pair<Matching, size_t>>>
     NaturalMappingScheme::generateMaxMatchingGraph(
     std::vector<Matching> maxMatchings, const std::string& query) const {
     
-    // Bucket the matchings by text and diagonal.
+    // Bucket the matchings by text and diagonal. TODO: make this an
+    // unordered_map and provide a way to hash pairs (which really seems like it
+    // ought to be in the STL already...)
     std::map<std::pair<size_t, int64_t>, std::vector<Matching>> buckets;
     
     for(const Matching& matching : maxMatchings) {
@@ -207,7 +209,7 @@ std::map<Matching, std::vector<std::pair<Matching, size_t>>>
     
     // Now we have our index built. We need to turn this into a graph with
     // costs.
-    std::map<Matching, std::vector<std::pair<Matching, size_t>>> graph;
+    std::unordered_map<Matching, std::vector<std::pair<Matching, size_t>>> graph;
     
     for(const Matching& matching : maxMatchings) {
         // For each matching
@@ -313,12 +315,12 @@ std::map<Matching, std::vector<std::pair<Matching, size_t>>>
     return graph;
 }
 
-std::map<Matching, std::vector<std::pair<Matching, size_t>>>
-    NaturalMappingScheme::invertGraph(const std::map<Matching,
+std::unordered_map<Matching, std::vector<std::pair<Matching, size_t>>>
+    NaturalMappingScheme::invertGraph(const std::unordered_map<Matching,
     std::vector<std::pair<Matching, size_t>>>& graph) const {
     
     // We need to invert the graph, so we need a new graph.
-    std::map<Matching, std::vector<std::pair<Matching, size_t>>> inverted;
+    std::unordered_map<Matching, std::vector<std::pair<Matching, size_t>>> inverted;
     
     for(const auto& kv : graph) {
         // For each source node and its edges
@@ -364,7 +366,7 @@ const Matching& NaturalMappingScheme::getMaxMatching(
     
 }
 
-std::map<Matching, IntervalIndex<Matching>> 
+std::unordered_map<Matching, IntervalIndex<Matching>> 
     NaturalMappingScheme::assignMinMatchings(
     const IntervalIndex<Matching>& maxMatchings,
     const std::vector<Matching>& minMatchings) const {
@@ -373,7 +375,7 @@ std::map<Matching, IntervalIndex<Matching>>
     
     // We keep a map from max matching to vector of min matchings with their
     // ranges, in ascending order.
-    std::map<Matching, std::vector<std::pair<std::pair<size_t, size_t>,
+    std::unordered_map<Matching, std::vector<std::pair<std::pair<size_t, size_t>,
         Matching>>> vectorForMax;
     
     for(const auto& minMatching : minMatchings) {
@@ -392,7 +394,7 @@ std::map<Matching, IntervalIndex<Matching>>
     
     // But we really need this map from max matching to IntervalIndex of min
     // matchings, instead of a map from max matching to vector of min matchings.
-    std::map<Matching, IntervalIndex<Matching>> minsForMax;
+    std::unordered_map<Matching, IntervalIndex<Matching>> minsForMax;
     
     // Now we index the mins in each max.
     for(const auto& kv : vectorForMax) {
@@ -404,10 +406,10 @@ std::map<Matching, IntervalIndex<Matching>>
     return minsForMax;
 }
 
-std::map<Matching, std::vector<size_t>>
-    NaturalMappingScheme::getMinMatchingChains(const std::map<
+std::unordered_map<Matching, std::vector<size_t>>
+    NaturalMappingScheme::getMinMatchingChains(const std::unordered_map<
     Matching, std::vector<std::pair<
-    Matching, size_t>>>& maxMatchingGraph, const std::map<
+    Matching, size_t>>>& maxMatchingGraph, const std::unordered_map<
     Matching, IntervalIndex<
     Matching>>& minsForMax, const std::vector<
     Matching>& maxMatchings, bool isForward) const {
@@ -434,7 +436,7 @@ std::map<Matching, std::vector<size_t>>
     // Make a DP table, storing achievable numbers of non-overlapping min
     // matchings in a chain by min matching and then by mismatch cost (<=
     // maxHammingDistance).
-    std::map<Matching, std::vector<size_t>> table;
+    std::unordered_map<Matching, std::vector<size_t>> table;
     
     for(size_t i = isForward ? 0 : maxMatchings.size() - 1;
         isForward ? i < maxMatchings.size() : i != (size_t) -1;

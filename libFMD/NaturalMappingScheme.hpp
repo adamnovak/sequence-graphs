@@ -7,6 +7,8 @@
 #include "Log.hpp"
 #include "Matching.hpp"
 
+#include <unordered_map>
+
 /**
  * Mapping scheme implementing Benedict's "natural" mapping scheme. If all
  * the unique-in-the-reference strings overlapping a query base agree about
@@ -125,7 +127,7 @@ protected:
      * start position. Note that this is the reverse order of the
      * mindMaxMatchings method! TODO: Typedef this return type.
      */
-    std::map<Matching, std::vector<std::pair<Matching, size_t>>>
+    std::unordered_map<Matching, std::vector<std::pair<Matching, size_t>>>
         generateMaxMatchingGraph(std::vector<Matching> maxMatchings,
         const std::string& query) const;
         
@@ -134,9 +136,9 @@ protected:
      * gap cost of the connection, invert all the directed edges in the graph,
      * creating a new graph. Edges from a node may be in any order.
      */
-    std::map<Matching, std::vector<std::pair<Matching, size_t>>>
-        invertGraph(const std::map<Matching, std::vector<std::pair<Matching,
-        size_t>>>& graph) const;
+    std::unordered_map<Matching, std::vector<std::pair<Matching, size_t>>>
+        invertGraph(const std::unordered_map<Matching,
+        std::vector<std::pair<Matching, size_t>>>& graph) const;
         
     /**
      * Look up the max matching that contains a given min matching.
@@ -149,7 +151,7 @@ protected:
      * ascending order (opposite of findMinMatchings), produce a map from max
      * matchings to the indexed min matchings they contain, in ascending order.
      */
-    std::map<Matching, IntervalIndex<Matching>> assignMinMatchings(
+    std::unordered_map<Matching, IntervalIndex<Matching>> assignMinMatchings(
         const IntervalIndex<Matching>& maxMatchings,
         const std::vector<Matching>& minMatchings) const;
         
@@ -163,9 +165,10 @@ protected:
      * order), and the list of max matchings (in ascending order). The graph
      * should contain self edges at cost 0.
      */
-    std::map<Matching, std::vector<size_t>> getMinMatchingChains(
-        const std::map<Matching, std::vector<std::pair<Matching, size_t>>>&
-        maxMatchingGraph, const std::map<Matching, IntervalIndex<Matching>>&
+    std::unordered_map<Matching, std::vector<size_t>> getMinMatchingChains(
+        const std::unordered_map<Matching, 
+        std::vector<std::pair<Matching, size_t>>>& maxMatchingGraph,
+        const std::unordered_map<Matching, IntervalIndex<Matching>>&
         minsForMax, const std::vector<Matching>& maxMatchings,
         bool isForward) const;
         
