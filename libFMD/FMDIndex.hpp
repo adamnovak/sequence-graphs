@@ -5,6 +5,7 @@
 #include <vector>
 #include <stdint.h>
 #include <map>
+#include <unordered_map>
 #include <mutex>
 
 #include "BWT.h"

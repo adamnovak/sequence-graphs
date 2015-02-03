@@ -8,7 +8,7 @@
 #include <utility>
 #include <mutex>
 
-#define BITVECTOR_SDSL
+#define BITVECTOR_CSA
 #ifdef BITVECTOR_CSA
     // Using CSA bitvectors
     #include "BitVector.hpp"
@@ -46,8 +46,11 @@ public:
     /**
      * Create a bitvector from scratch. Must call finish before using rank and
      * select.
+     *
+     * sizeHint can give a hint to the bitvector of how long it will eventually
+     * be.
      */
-    GenericBitVector();
+    GenericBitVector(size_t sizeHint = 0);
     
     /**
      * Create a bitvector by scanning the other one and marking all its 1

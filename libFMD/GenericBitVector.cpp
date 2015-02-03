@@ -58,16 +58,17 @@ GenericBitVector::GenericBitVector(const std::string& filename):
 }
 
 #ifdef BITVECTOR_CSA
-GenericBitVector::GenericBitVector(): encoder(new BitVectorEncoder(32)), 
+GenericBitVector::GenericBitVector(size_t sizeHint): encoder(new BitVectorEncoder(32)), 
     bitvector(NULL), size(0), iterator(NULL), iteratorMutex() {
 
     // Nothing to do, already made the encoder.
+    // TODO: actually use the size hint.
 }
 #endif
 
 #ifdef BITVECTOR_SDSL
-GenericBitVector::GenericBitVector(): bitvector(), rankSupport(NULL), 
-    selectSupport(NULL) {
+GenericBitVector::GenericBitVector(size_t sizeHint): bitvector(size_hint),
+    rankSupport(NULL), selectSupport(NULL) {
 
     // Nothing to do
 }

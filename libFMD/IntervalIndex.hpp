@@ -64,8 +64,11 @@ public:
      * Create a new interval index given the possibly unsorted vector of
      * intervals and their associated values.
      *
+     * Must contain at least one interval.
+     *
      * Takes O(n) time if intervals are already sorted by both start and end
-     * coordinates, and O(n log n) time otherwise.
+     * coordinates, and O(n log n) time otherwise (assuming bit vector
+     * construction is O(number of ones)).
      */
     IntervalIndex(const std::vector<value_type, Allocator>& intervals): 
         records(intervals) {
@@ -85,9 +88,13 @@ public:
             totalLength =  lastKey.first + lastKey.second;
         }
         
+        if(totalLength == 0) {
+            throw std::runtime_error("Can't make an empty IntervalIndex");
+        }
+        
         // We're going to make a 1 in this bit vector at every place an interval
-        // starts.
-        startBits = new GenericBitVector();
+        // starts. We give it a hint about how long to be.
+        startBits = new GenericBitVector(totalLength);
         
         for(size_t i = 0; i < records.size(); i++) {
             // For each record
@@ -126,8 +133,9 @@ public:
         // We keep them in ascending order because it's not all that hard to get
         // the rank in either direction.
         
-        // Make the bit vector for indexing the end positions.
-        endBits = new GenericBitVector();
+        // Make the bit vector for indexing the end positions. Hint to it how
+        // long it should be.
+        endBits = new GenericBitVector(totalLength);
         
         for(size_t i = 0; i < ends.size(); i++) {
             // For each end, record number pair

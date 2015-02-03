@@ -412,8 +412,8 @@ std::unordered_map<Matching, IntervalIndex<Matching>>
     
     // Now we index the mins in each max.
     for(const auto& kv : vectorForMax) {
-        // Just (implicitly) make an IntervalIndex of each vector.
-        minsForMax[kv.first] = kv.second;
+        // Just make an IntervalIndex of each vector.
+        minsForMax.emplace(kv.first, IntervalIndex<Matching>(kv.second));
     }
     
     // Give back the assignments.
