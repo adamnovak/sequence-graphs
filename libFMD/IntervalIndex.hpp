@@ -14,8 +14,13 @@
  * Represents a container for (start, length) intervals of size_ts, with an
  * Annotation associated with each interval.
  *
- * Supports finding the latest-starting interval that starts at or before a
- * position, and the earliest-ending interval that ends at or after a position.
+ * Supports finding the latest-starting interval that starts/ends at or before a
+ * position, and the earliest-ending interval that starts/ends at or after a
+ * position.
+ *
+ * These queries are all inclusive, because otherwise length-1 intervals at 0
+ * would not be visible from the left (as they would not start/end after 0, and
+ * -1 is not passable as a size_t).
  *
  * The Allocator type parameter is just to let us accept vectors of any
  * allocator in the constructor. TODO: Is there a way to get it to infer
@@ -351,10 +356,6 @@ public:
         return records[startRecords[rank]];
     }
      
-     
-        
-
-
 private:
     /**
      * Holds all the intervals and their annotations, defining a size_t index
