@@ -173,6 +173,8 @@ std::unordered_map<Matching, std::vector<std::pair<Matching, size_t>>>
     // ought to be in the STL already...)
     std::map<std::pair<size_t, int64_t>, std::vector<Matching>> buckets;
     
+    Log::info() << "Bucketing max matchings" << std::endl;
+    
     for(const Matching& matching : maxMatchings) {
         // Claculate the diagonal: offset between the query and the reference
         int64_t diagonal = (int64_t) matching.start - 
@@ -188,6 +190,8 @@ std::unordered_map<Matching, std::vector<std::pair<Matching, size_t>>>
     
     // Index each bucket for preceeding-range queries
     std::map<std::pair<size_t, int64_t>, IntervalIndex<Matching>> indices;
+    
+    Log::info() << "Indexing " << buckets.size() << " buckets" << std::endl;
     
     for(const auto& kv : buckets) {
         // For each bucket...
@@ -209,7 +213,10 @@ std::unordered_map<Matching, std::vector<std::pair<Matching, size_t>>>
     
     // Now we have our index built. We need to turn this into a graph with
     // costs.
-    std::unordered_map<Matching, std::vector<std::pair<Matching, size_t>>> graph;
+    std::unordered_map<Matching, std::vector<std::pair<Matching, size_t>>>
+        graph;
+        
+    Log::info() << "Building graph" << std::endl;
     
     for(const Matching& matching : maxMatchings) {
         // For each matching
@@ -375,8 +382,12 @@ std::unordered_map<Matching, IntervalIndex<Matching>>
     
     // We keep a map from max matching to vector of min matchings with their
     // ranges, in ascending order.
-    std::unordered_map<Matching, std::vector<std::pair<std::pair<size_t, size_t>,
-        Matching>>> vectorForMax;
+    std::unordered_map<Matching,
+        std::vector<std::pair<std::pair<size_t, size_t>, Matching>>>
+        vectorForMax;
+        
+    Log::info() << "Assigning " << minMatchings.size() << 
+        " min matchings to max matchings" << std::endl;
     
     for(const auto& minMatching : minMatchings) {
         // For each min matching, find the max matching it belongs to and put it
@@ -396,6 +407,9 @@ std::unordered_map<Matching, IntervalIndex<Matching>>
     // matchings, instead of a map from max matching to vector of min matchings.
     std::unordered_map<Matching, IntervalIndex<Matching>> minsForMax;
     
+    Log::info() << "Indexing " << vectorForMax.size() <<
+        " min matching vectors" << std::endl;
+    
     // Now we index the mins in each max.
     for(const auto& kv : vectorForMax) {
         // Just (implicitly) make an IntervalIndex of each vector.
@@ -414,7 +428,7 @@ std::unordered_map<Matching, std::vector<size_t>>
     Matching>>& minsForMax, const std::vector<
     Matching>& maxMatchings, bool isForward) const {
  
-    Log::debug() << "Constructing min matching chains (forward: " <<
+    Log::info() << "Constructing min matching chains (forward: " <<
         isForward << ")" << std::endl;
         
     for(const auto& kv : minsForMax) {
@@ -588,6 +602,8 @@ std::set<Matching>
     // Make the max matching cost graph
     auto graph = generateMaxMatchingGraph(maxMatchings, query);
     
+    Log::info() << "Indexing all max matchings" << std::endl;
+    
     // Make a vector of max matchings with their occupied intervals.
     std::vector<std::pair<std::pair<size_t, size_t>, Matching>> toIndex;
     for(const Matching& maxMatching : maxMatchings) {
@@ -617,6 +633,8 @@ std::set<Matching>
         
     // Make the set to return.
     std::set<Matching> toReturn;
+    
+    Log::info() << "Checking for passing max matchings" << std::endl;
     
     for(const Matching& maxMatching : maxMatchings) {
     
