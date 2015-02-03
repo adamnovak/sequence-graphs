@@ -167,6 +167,8 @@ public:
         endBits(new GenericBitVector(*(other.endBits))), 
         endRecords(other.endRecords) {
         
+        Log::info() << "Copying an IntervalIndex" << std::endl;
+        
         // Nothing to do!
     
     }
@@ -175,6 +177,8 @@ public:
      * Replace an IntervalIndex with a copy of another.
      */
     IntervalIndex& operator=(const IntervalIndex& other) {
+        Log::info() << "Copy-assigning an IntervalIndex" << std::endl;
+    
         // Delete our dynamically-allocated memory.
         delete startBits;
         delete endBits;
@@ -185,6 +189,18 @@ public:
         startRecords = other.startRecords;
         endBits = new GenericBitVector(*(other.endBits)); 
         endRecords = other.endRecords;
+    }
+    
+    /**
+     * Move an IntervalIndex. Implemented as a swap.
+     */
+    IntervalIndex& operator=(IntervalIndex&& other) {
+        // Swap each member.
+        std::swap(records, other.records);
+        std::swap(startBits, other.startBits);
+        std::swap(startRecords, other.startRecords);
+        std::swap(endBits, other.endBits);
+        std::swap(endRecords, other.endRecords);
     }
     
     /**

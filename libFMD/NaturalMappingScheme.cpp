@@ -205,10 +205,10 @@ std::unordered_map<Matching, std::vector<std::pair<Matching, size_t>>>
             withKeys.push_back({{matching.start, matching.length}, matching});
         }
     
-        // Make in IntervalIndex from the vector of mappings and keys. This
+        // Make an IntervalIndex from the vector of mappings and keys. This
         // should be pre-sorted. Store it under the same text and diagonal as
         // the bucket.
-        indices[kv.first] = IntervalIndex<Matching>(withKeys);
+        indices.emplace(kv.first, IntervalIndex<Matching>(withKeys));
     }
     
     // Now we have our index built. We need to turn this into a graph with
