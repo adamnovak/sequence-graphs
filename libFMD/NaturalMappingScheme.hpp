@@ -5,6 +5,7 @@
 #include "Mapping.hpp"
 #include "IntervalIndex.hpp"
 #include "Log.hpp"
+#include "Matching.hpp"
 
 /**
  * Mapping scheme implementing Benedict's "natural" mapping scheme. If all
@@ -106,46 +107,6 @@ protected:
     std::vector<Mapping> naturalMap(const std::string& query) const;
     
     /**
-     * Keep track of an occurrence of a unique string which matches a query
-     * position to a reference position. Since we work only on a single query at
-     * a time, a Matching is defined by a start and a length.
-     */
-    struct Matching {
-        /**
-         * Where does it start in the query?
-         */
-        size_t start;
-        /**
-         * Where is it in the reference?
-         */
-        TextPosition location;
-        /**
-         * How long is it?
-         */
-        size_t length;
-        
-        /**
-         * Is this Matching less than that one of the same type on the same
-         * query? TODO: account for all the fields?
-         */
-        inline bool operator<(const Matching& other) const {
-            // Order by start, then by length.
-            return (start < other.start) ||
-                (start == other.start && length < other.length);
-        }
-        
-        /**
-         * Make a new Matching.
-         */
-        inline Matching(size_t start, TextPosition location, size_t length): 
-            start(start), location(location), length(length) {
-        }
-    };
-    
-    // Make sure the output overload for Matchings has access to the type.
-    friend std::ostream& operator<<(std::ostream& out, const Matching& thing);
-    
-    /**
      * Find all of the maximal unique matchings between query string characters
      * and the reference, in descending order by left endpoint.
      */
@@ -236,13 +197,4 @@ protected:
     
 };
 
-/**
- * Write this Matching to an output stream. Reports query coordinates.
- */
-inline std::ostream& operator<<(std::ostream& out, 
-    const NaturalMappingScheme::Matching& thing) {
-
-    return out << thing.start << " - " << thing.start + thing.length;
-}
-   
 #endif

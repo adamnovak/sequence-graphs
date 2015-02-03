@@ -57,33 +57,6 @@
 // good way to share it?
 
 /**
- * Keep track of an occurrence of a unique string which matches a query
- * position to a reference position.
- */
-struct Matching {
-    /**
-     * Where does it start in the query?
-     */
-    size_t start;
-    /**
-     * Where is it in the reference?
-     */
-    TextPosition location;
-    /**
-     * How long is it?
-     */
-    size_t length;
-    
-    /**
-     * Make a new Matching.
-     */
-    inline Matching(size_t start, TextPosition location, size_t length): 
-        start(start), location(location), length(length) {
-    }
-    
-};
-
-/**
  * Find all of the minimal unique matchings between query string characters
  * and the reference, in descending order by left endpoint.
  */

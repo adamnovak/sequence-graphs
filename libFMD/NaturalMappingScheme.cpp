@@ -7,8 +7,8 @@
 
 #include <boost/range/adaptor/reversed.hpp>
 
-std::vector<NaturalMappingScheme::Matching>
-    NaturalMappingScheme::findMaxMatchings(const std::string& query) const {
+std::vector<Matching> NaturalMappingScheme::findMaxMatchings(
+    const std::string& query) const {
  
     // What matchings have we found?
     std::vector<Matching> toReturn;
@@ -74,8 +74,8 @@ std::vector<NaturalMappingScheme::Matching>
     return toReturn;
 }
 
-std::vector<NaturalMappingScheme::Matching>
-    NaturalMappingScheme::findMinMatchings(const std::string& query) const {
+std::vector<Matching>  NaturalMappingScheme::findMinMatchings(
+    const std::string& query) const {
 
     // What matchings have we found?
     std::vector<Matching> toReturn;
@@ -164,8 +164,7 @@ std::vector<NaturalMappingScheme::Matching>
     return toReturn;
 }
 
-std::map<NaturalMappingScheme::Matching,
-    std::vector<std::pair<NaturalMappingScheme::Matching, size_t>>>
+std::map<Matching, std::vector<std::pair<Matching, size_t>>>
     NaturalMappingScheme::generateMaxMatchingGraph(
     std::vector<Matching> maxMatchings, const std::string& query) const {
     
@@ -314,11 +313,9 @@ std::map<NaturalMappingScheme::Matching,
     return graph;
 }
 
-std::map<NaturalMappingScheme::Matching,
-    std::vector<std::pair<NaturalMappingScheme::Matching, size_t>>>
-    NaturalMappingScheme::invertGraph(const std::map<
-    NaturalMappingScheme::Matching, std::vector<std::pair<
-    NaturalMappingScheme::Matching, size_t>>>& graph) const {
+std::map<Matching, std::vector<std::pair<Matching, size_t>>>
+    NaturalMappingScheme::invertGraph(const std::map<Matching,
+    std::vector<std::pair<Matching, size_t>>>& graph) const {
     
     // We need to invert the graph, so we need a new graph.
     std::map<Matching, std::vector<std::pair<Matching, size_t>>> inverted;
@@ -334,9 +331,9 @@ std::map<NaturalMappingScheme::Matching,
     return inverted;
 }
 
-const NaturalMappingScheme::Matching& NaturalMappingScheme::getMaxMatching(
-    const IntervalIndex<NaturalMappingScheme::Matching>& maxMatchings,
-    const NaturalMappingScheme::Matching& minMatching) const {
+const Matching& NaturalMappingScheme::getMaxMatching(
+    const IntervalIndex<Matching>& maxMatchings,
+    const Matching& minMatching) const {
     
     // What max matching contains this min matching? It should be the last one
     // starting before it.
@@ -367,11 +364,10 @@ const NaturalMappingScheme::Matching& NaturalMappingScheme::getMaxMatching(
     
 }
 
-std::map<NaturalMappingScheme::Matching,
-    IntervalIndex<NaturalMappingScheme::Matching>>
+std::map<Matching, IntervalIndex<Matching>> 
     NaturalMappingScheme::assignMinMatchings(
-    const IntervalIndex<NaturalMappingScheme::Matching>& maxMatchings,
-    const std::vector<NaturalMappingScheme::Matching>& minMatchings) const {
+    const IntervalIndex<Matching>& maxMatchings,
+    const std::vector<Matching>& minMatchings) const {
 
     // We need to assign the min matchings to max matchings.
     
@@ -408,13 +404,13 @@ std::map<NaturalMappingScheme::Matching,
     return minsForMax;
 }
 
-std::map<NaturalMappingScheme::Matching, std::vector<size_t>>
+std::map<Matching, std::vector<size_t>>
     NaturalMappingScheme::getMinMatchingChains(const std::map<
-    NaturalMappingScheme::Matching, std::vector<std::pair<
-    NaturalMappingScheme::Matching, size_t>>>& maxMatchingGraph, const std::map<
-    NaturalMappingScheme::Matching, IntervalIndex<
-    NaturalMappingScheme::Matching>>& minsForMax, const std::vector<
-    NaturalMappingScheme::Matching>& maxMatchings, bool isForward) const {
+    Matching, std::vector<std::pair<
+    Matching, size_t>>>& maxMatchingGraph, const std::map<
+    Matching, IntervalIndex<
+    Matching>>& minsForMax, const std::vector<
+    Matching>& maxMatchings, bool isForward) const {
  
     Log::debug() << "Constructing min matching chains (forward: " <<
         isForward << ")" << std::endl;
@@ -576,10 +572,10 @@ std::map<NaturalMappingScheme::Matching, std::vector<size_t>>
     return table;
 }
 
-std::set<NaturalMappingScheme::Matching>
+std::set<Matching>
     NaturalMappingScheme::maxMatchingsInSyntenyRuns(
-    const std::vector<NaturalMappingScheme::Matching>& maxMatchings,
-    const std::vector<NaturalMappingScheme::Matching>& minMatchings,
+    const std::vector<Matching>& maxMatchings,
+    const std::vector<Matching>& minMatchings,
     const std::string& query) const {
 
     // We need to make the connectivity graph, call the two directions of DP,
