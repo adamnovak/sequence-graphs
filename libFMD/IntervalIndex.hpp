@@ -101,7 +101,6 @@ public:
             // Note that this is an interval starting at this position.
             startBits->addBit(records[i].first.first);
             startRecords.push_back(i);
-            Log::info() << "Start bit at " << records[i].first.first << std::endl;
         }
         
         // We're done marking start positions.
@@ -142,7 +141,6 @@ public:
             // Note that this points to an interval ending at this position.
             endBits->addBit(ends[i].first);
             endRecords.push_back(ends[i].second);
-            Log::info() << "End bit at " << ends[i].first << std::endl;
         }
         
         // Finish off the bit vector with the total length of the region we care
