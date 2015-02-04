@@ -11,6 +11,8 @@
 #include "util.hpp"
 #include "Log.hpp"
 
+thread_local std::map<const FMDIndex*, std::map<size_t,
+    std::map<size_t, std::string>::iterator>> FMDIndex::threadContigCache;
 
 FMDIndex::FMDIndex(std::string basename, SuffixArray* fullSuffixArray, 
     MarkovModel* markovModel): names(), starts(), lengths(), 
@@ -815,25 +817,21 @@ char FMDIndex::display(size_t contig, size_t offset) const {
     return display(bwtIndex);
 }
 
-char FMDIndex::displayCached(TextPosition position) const {
+char FMDIndex::displayCached(const TextPosition& position) const {
+    
+    // Grab the reference contig in the cache
+    const std::string& referenceContig = displayContigCached(
+        position.getContigNumber());
+        
+    // Grab the text-local offset
+    size_t offset = position.getOffset();
     
     if(position.getStrand()) {
-        // On the reverse strand.
-        
-        // Flip our copy of the position.
-        position.flip(getContigLength(position.getContigNumber()));
-        
-        // Get the character on the other strand and complement it.
-        return complement(displayCached(position));
+        // We need to get counting from the other end and complement the base.
+        return complement(referenceContig[referenceContig.size() - offset - 1]);
     } else {
-        // On the forward strand
-        
-        // Grab the reference contig in the cache
-        const std::string& referenceContig = displayContigCached(
-            position.getContigNumber());
-            
-        // Pull out the correct character.
-        return referenceContig[position.getOffset()];
+        // Just count from the front.
+        return referenceContig[offset];
     }
 }
 
@@ -869,17 +867,32 @@ std::string FMDIndex::displayContig(size_t index) const {
 }
 
 const std::string& FMDIndex::displayContigCached(size_t index) const {
-    // Lock the cache
-    std::unique_lock<std::mutex> lock(contigCacheMutex);
+    // Try to find the thing we are looking for
+    auto found = threadContigCache[this].find(index);
     
-    if(!contigCache.count(index)) {
-        // Go get it, we don't have that contig
-        contigCache[index] = displayContig(index);
+    if(found == threadContigCache[this].end()) {
+        // If we don't have a copy thread-local, we'll need to go to the all-
+        // threads cache for this FMDIndex, so we need to synchronize.
+        
+        // Lock the cache
+        std::unique_lock<std::mutex> lock(contigCacheMutex);
+        
+        // Look in it
+        auto globalFound = contigCache.find(index);
+        
+        if(globalFound == contigCache.end()) {
+            // Go get it and insert it, updating the iterator for finding it.
+            globalFound = contigCache.insert({index,
+                displayContig(index)}).first;
+        }
+        
+        // Insert the iterator in the global cache into the local cache.
+        found = threadContigCache[this].insert({index, globalFound}).first;
     }
     
-    // Return what's in the cache. Lock will unlock when it leaves scope.
-    return contigCache[index];
-    
+    // Return a reference to the globally cached copy, which means we have to
+    // dereference twice.
+    return found->second->second;
 }
 
 int64_t FMDIndex::getLF(int64_t index) const {
@@ -2575,26 +2588,26 @@ MisMatchAttemptResults FMDIndex::sortedMisMatchExtend(MisMatchAttemptResults& pr
 }
 
 void FMDIndex::processMisMatchPositions(
-                MisMatchAttemptResults& nextMisMatches,
-                std::vector<std::pair<FMDPosition,size_t>>& waitingMatches,
-                std::vector<std::pair<FMDPosition,size_t>>& waitingMisMatches,
-                const GenericBitVector* mask) const {
-                  
+    MisMatchAttemptResults& nextMisMatches,
+    std::vector<std::pair<FMDPosition,size_t>>& waitingMatches,
+    std::vector<std::pair<FMDPosition,size_t>>& waitingMisMatches,
+    const GenericBitVector* mask) const {
+
     while(!waitingMatches.empty()) {
         if(waitingMatches.back().first.getLength(mask) > 0) {
             nextMisMatches.positions.push_back(waitingMatches.back());
         }
-      
+
         waitingMatches.pop_back();
     }
-  
+
     while(!waitingMisMatches.empty()) {
         if(waitingMisMatches.back().first.getLength(mask) > 0) {
             nextMisMatches.positions.push_back(waitingMisMatches.back());
         }
-      
+
         waitingMisMatches.pop_back();
-  }
-  
-  return;
-  }
+    }
+
+    return;
+}

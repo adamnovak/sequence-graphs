@@ -294,7 +294,7 @@ public:
      * Get the character at a given TextPosition. Efficient if characters are
      * accessed with locality.
      */
-    char displayCached(TextPosition position) const;  
+    char displayCached(const TextPosition& position) const;  
     
     /**
      * Get the character in the first column of the given row in the BWT matrix.
@@ -666,6 +666,16 @@ protected:
      * on multiple threads.
      */
     mutable std::mutex contigCacheMutex;
+    
+    /**
+     * A thread-local mirror of contigCache, so each thread can look for a local
+     * copy before locking the global cache. Holds iterators to entries in the
+     * global cache.
+     *
+     * TODO: how to evict things from deallocated FMDIndexes?
+     */
+    static thread_local std::map<const FMDIndex*, std::map<size_t,
+        std::map<size_t, std::string>::iterator>> threadContigCache;
     
     /**
      * Try left-mapping the given index in the given string, starting from

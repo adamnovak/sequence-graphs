@@ -56,7 +56,7 @@ public:
     /**
      * Create a new empty IntervalIndex.
      */
-    IntervalIndex(): IntervalIndex(std::vector<value_type, Allocator>()) {
+    IntervalIndex(): startBits(NULL), endBits(NULL) {
         // Nothing to do!
     }
     
@@ -73,6 +73,13 @@ public:
     IntervalIndex(const std::vector<value_type, Allocator>& intervals): 
         records(intervals) {
     
+        if(intervals.size() == 0) {
+            // Just make an empty IntervalIndex with no bit vectors.
+            startBits = NULL;
+            endBits = NULL;
+            return;
+        }
+    
         if(!std::is_sorted(records.begin(), records.end())) {
             // If not already sorted (check is O(n), sort is O(n log n))...
             // Sort records by start, length (and then value)
@@ -86,10 +93,6 @@ public:
             // the after-the-end position.
             const key_type& lastKey = records[records.size() - 1].first;
             totalLength =  lastKey.first + lastKey.second;
-        }
-        
-        if(totalLength == 0) {
-            throw std::runtime_error("Can't make an empty IntervalIndex");
         }
         
         // We're going to make a 1 in this bit vector at every place an interval
@@ -162,53 +165,90 @@ public:
      */
     ~IntervalIndex() {
         // Delete our dynamically-allocated memory.
-        delete startBits;
-        delete endBits;
+        if(startBits != NULL) {
+            delete startBits;
+        }
+        
+        if(endBits != NULL) {
+            delete endBits;
+        }
     }
 
     /**
      * Copy an IntervalIndex.
      */
     IntervalIndex(const IntervalIndex& other): records(other.records),
-        startBits(new GenericBitVector(*(other.startBits))),
+        startBits(other.startBist == NULL ? NULL : 
+        new GenericBitVector(*(other.startBits))),
         startRecords(other.startRecords), 
-        endBits(new GenericBitVector(*(other.endBits))), 
+        endBits(other.endBits == NULL ? NULL : 
+        new GenericBitVector(*(other.endBits))), 
         endRecords(other.endRecords) {
         
-        Log::info() << "Copying an IntervalIndex" << std::endl;
-        
-        // Nothing to do!
+        // This isn't the most efficient operation, but we don't want to not
+        // allow it.
+        Log::warning() << "Copying an IntervalIndex" << std::endl;
+    }
     
+    /**
+     * Move an IntervalIndex.
+     */
+    IntervalIndex(IntervalIndex&& other): records(std::move(other.records)),
+        startBits(other.startBits), startRecords(std::move(other.startRecords)),
+        endBits(other.endBits), endRecords(std::move(other.endRecords)) {
+        
+        // Empty the moved object
+        other.startBits = NULL;
+        other.endBits = NULL;
+        other.records.clear();
+        other.startRecords.clear();
+        other.endRecords.clear();
     }
     
     /**
      * Replace an IntervalIndex with a copy of another.
      */
     IntervalIndex& operator=(const IntervalIndex& other) {
-        Log::info() << "Copy-assigning an IntervalIndex" << std::endl;
+        // This isn't the most efficient operation, but we don't want to not
+        // allow it.
+        Log::warning() << "Copy-assigning an IntervalIndex" << std::endl;
     
         // Delete our dynamically-allocated memory.
-        delete startBits;
-        delete endBits;
+        if(startBits != NULL) {
+            delete startBits;
+        }
+        
+        if(endBits != NULL) {
+            delete endBits;
+        }
         
         // Copy the data
         records = other.records;
-        startBits = new GenericBitVector(*(other.startBits));
+        startBits = other.startBist == NULL ? NULL : 
+            new GenericBitVector(*(other.startBits));
         startRecords = other.startRecords;
-        endBits = new GenericBitVector(*(other.endBits)); 
+        endBits = other.endBits == NULL ? NULL : 
+            new GenericBitVector(*(other.endBits));
         endRecords = other.endRecords;
     }
     
     /**
-     * Move an IntervalIndex. Implemented as a swap.
+     * Move an IntervalIndex. Leaves the moved index in an empty state.
      */
     IntervalIndex& operator=(IntervalIndex&& other) {
-        // Swap each member.
-        std::swap(records, other.records);
-        std::swap(startBits, other.startBits);
-        std::swap(startRecords, other.startRecords);
-        std::swap(endBits, other.endBits);
-        std::swap(endRecords, other.endRecords);
+        // Steal their data
+        records = std::move(other.records);
+        startBits = other.startBits;
+        startRecords = std::move(other.startRecords);
+        endBits = other.endBits;
+        endRecords = std::move(other.endRecords);
+        
+        // Empty the moved object
+        other.startBits = NULL;
+        other.endBits = NULL;
+        other.records.clear();
+        other.startRecords.clear();
+        other.endRecords.clear();
     }
     
     /**
@@ -247,6 +287,11 @@ public:
      * position, and false otherwise.
      */
     bool hasStartingBefore(size_t index) const {
+        if(startBits == NULL) {
+            // Nothing is in an empty index.
+            return false;
+        }
+    
         if(index >= startBits->getSize()) {
             // Going too far off the end.
             return hasStartingBefore(startBits->getSize() - 1);
@@ -285,6 +330,11 @@ public:
      * and false otherwise.
      */
     bool hasEndingBefore(size_t index) const {
+        if(endBits == NULL) {
+            // Nothing is in an empty index.
+            return false;
+        }
+    
         if(index >= endBits->getSize()) {
             // Going too far off the end.
             return hasEndingBefore(endBits->getSize() - 1);
@@ -323,6 +373,11 @@ public:
      * and false otherwise.
      */
     bool hasEndingAfter(size_t index) const {
+        if(endBits == NULL) {
+            // Nothing is in an empty index.
+            return false;
+        }
+    
         // There is an interval ending at or after the given index if all of the
         // interval endpoints aren't already before the position.
         if(index >= endBits->getSize()) {
@@ -353,6 +408,11 @@ public:
      * position, and false otherwise.
      */
     bool hasStartingAfter(size_t index) const {
+        if(startBits == NULL) {
+            // Nothing is in an empty index.
+            return false;
+        }
+    
         // There is an interval starting at or after the given index if all of
         // the interval start points aren't already before the position.
         if(index >= startBits->getSize()) {
@@ -386,7 +446,8 @@ private:
     std::vector<value_type> records;
     
     /**
-     * Holds a 1 at each position at which an interval starts.
+     * Holds a 1 at each position at which an interval starts. NULL means the
+     * IntervalIndex is empty.
      */
     GenericBitVector* startBits;
     
@@ -397,7 +458,8 @@ private:
     std::vector<size_t> startRecords;
     
     /**
-     * Holds a 1 at each position at shich an interval ends.
+     * Holds a 1 at each position at shich an interval ends. NULL means the
+     * IntervalIndex is empty.
      */
     GenericBitVector* endBits;
     
@@ -406,7 +468,7 @@ private:
      * position's bit rank in endBits.
      */
     std::vector<size_t> endRecords;
-   
+    
 // Make friends with the output operator.
 template<typename FAnnotation, typename FAllocator>
 friend std::ostream& operator<<(std::ostream& out,
@@ -432,25 +494,29 @@ inline std::ostream& operator<<(std::ostream& out,
     out << std::endl;
     
     out << "Start and end bits:" << std::endl;
-    for(size_t i = 0; i < std::max(index.startBits->getSize(),
-        index.endBits->getSize()); i++) {
+    if(index.startBits != NULL && index.endBits != NULL) {
+        // The bit vectors are defined, because the index isn't empty.
         
-        // Dump one line per position a range could be at.
-        
-        out << i << ": ";
-        if(i < index.startBits->getSize()) {
-            out << index.startBits->isSet(i) << " ";
-        } else {
-            out << "# ";
+        for(size_t i = 0; i < std::max(index.startBits->getSize(),
+            index.endBits->getSize()); i++) {
+            
+            // Dump one line per position a range could be at.
+            
+            out << i << ": ";
+            if(i < index.startBits->getSize()) {
+                out << index.startBits->isSet(i) << " ";
+            } else {
+                out << "# ";
+            }
+            
+            if(i < index.endBits->getSize()) {
+                out << index.endBits->isSet(i) << " ";
+            } else {
+                out << "# ";
+            }
+            
+            out << std::endl;
         }
-        
-        if(i < index.endBits->getSize()) {
-            out << index.endBits->isSet(i) << " ";
-        } else {
-            out << "# ";
-        }
-        
-        out << std::endl;
     }
     
     return out;

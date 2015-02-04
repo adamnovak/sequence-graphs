@@ -8,7 +8,7 @@
 #include <utility>
 #include <mutex>
 
-#define BITVECTOR_CSA
+#define BITVECTOR_SDSL
 #ifdef BITVECTOR_CSA
     // Using CSA bitvectors
     #include "BitVector.hpp"
@@ -48,9 +48,12 @@ public:
      * select.
      *
      * sizeHint can give a hint to the bitvector of how long it will eventually
-     * be.
+     * be. It may be an underestimate, but not an overestimate.
+     *
+     * offsetHint can give a hint to the bitvector about how many leading 0s it
+     * will have. It may be an underestimate, but not an overestimate.
      */
-    GenericBitVector(size_t sizeHint = 0);
+    GenericBitVector(size_t sizeHint = 0, size_t offsetHint = 0);
     
     /**
      * Create a bitvector by scanning the other one and marking all its 1
@@ -113,23 +116,27 @@ public:
         if(rankSupport != NULL || selectSupport != NULL) {
             throw std::runtime_error("Can't add to a finished/loaded vector!");
         }
+        
+        if(index < offset) {
+            throw std::runtime_error("Can't set bit in the leading 0s");
+        }
 
         // What's the size of the bitvector before we make it bigger?
         size_t oldSize = getSize();
 
         if(index >= oldSize) {
             // Make sure we have room
-            bitvector.resize(index + 1);
+            bitvector.resize(index + 1 - offset);
             
             for(size_t i = oldSize; i < index; i++) {
                 // Make sure all the bits we just added in are 0s.
-                bitvector[i] = 0;
+                bitvector[i - offset] = 0;
             }
             
         }
         
         // Set the bit
-        bitvector[index] = 1;
+        bitvector[index - offset] = 1;
     }
     #endif
     
@@ -147,7 +154,12 @@ public:
     #endif
     #ifdef BITVECTOR_SDSL
     inline bool isSet(size_t index) const {
-        return bitvector[index];
+        if(index < offset) {
+            // Everything we clipped off with the offset is 0.
+            return false;
+        }
+        
+        return bitvector[index - offset];
     }
     #endif
     
@@ -182,12 +194,13 @@ public:
     inline size_t rank(size_t index) const {
         if(index >= getSize()) {
             // Get the total number of 1s in the bitvector
-            return (*rankSupport)(getSize()) + isSet(getSize() - 1);
+            return (*rankSupport)(getSize() - offset) +
+                isSet(getSize() - 1 - offset);
         }
         
         // Take the rank of a position (not in at_least mode). Correct for
         // disagreement over what rank is.
-        return (*rankSupport)(index + 1);
+        return (*rankSupport)(index + 1 - offset);
     }
     #endif
 
@@ -231,7 +244,7 @@ public:
     inline size_t select(size_t one) const {
         // Go select the right position. We need to compensate since 0 means the
         // first one to us, but 1 means the first one to SDSL.
-        return (*selectSupport)(one + 1);
+        return (*selectSupport)(one + 1) + offset;
     }
     #endif
     
@@ -350,6 +363,11 @@ private:
         // We seem to be only able to use full uncompressed bitvectors when 
         // we're actually building them...
         sdsl::bit_vector bitvector;
+        
+        // Since we have to keep that big bitvector around, we optimize for the
+        // case of a few 1s very far from 0 by collapsing all those leading 0s
+        // into this offset.
+        size_t offset;
         
         // And we need rank on that
         sdsl::rank_support_v5<>* rankSupport;

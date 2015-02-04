@@ -15,6 +15,9 @@ GenericBitVector::GenericBitVector(std::ifstream& stream): encoder(NULL),
 GenericBitVector::GenericBitVector(std::ifstream& stream): bitvector(),
     rankSupport(NULL), selectSupport(NULL) {
     
+    // Deserialize the offset.
+    stream.read((char*) &offset, sizeof(offset));
+    
     // Deserialize the bitvector
     sdsl::load(bitvector, stream);
     
@@ -40,6 +43,9 @@ GenericBitVector::GenericBitVector(std::ifstream&& stream): encoder(NULL),
 GenericBitVector::GenericBitVector(std::ifstream&& stream): bitvector(),
     rankSupport(NULL), selectSupport(NULL) {
     
+    // Deserialize the offset.
+    stream.read((char*) &offset, sizeof(offset));
+    
     // Deserialize the bitvector
     sdsl::load(bitvector, stream);
     
@@ -58,19 +64,21 @@ GenericBitVector::GenericBitVector(const std::string& filename):
 }
 
 #ifdef BITVECTOR_CSA
-GenericBitVector::GenericBitVector(size_t sizeHint): encoder(new BitVectorEncoder(32)), 
-    bitvector(NULL), size(0), iterator(NULL), iteratorMutex() {
+GenericBitVector::GenericBitVector(size_t sizeHint, size_t offsetHint): 
+    encoder(new BitVectorEncoder(32)), bitvector(NULL), size(0), iterator(NULL),
+    iteratorMutex() {
 
     // Nothing to do, already made the encoder.
-    // TODO: actually use the size hint.
+    // TODO: actually use the size and offset hints.
 }
 #endif
 
 #ifdef BITVECTOR_SDSL
-GenericBitVector::GenericBitVector(size_t sizeHint): bitvector(size_hint),
-    rankSupport(NULL), selectSupport(NULL) {
+GenericBitVector::GenericBitVector(size_t sizeHint, size_t offsetHint):
+    offset(offsetHint), bitvector(sizeHint - offsetHint), rankSupport(NULL),
+    selectSupport(NULL) {
 
-    // Nothing to do
+    // Nothing to do. We just adopt the hint as the offset.
 }
 #endif
 
@@ -160,6 +168,10 @@ void GenericBitVector::writeTo(std::ofstream& stream) const {
 
 #ifdef BITVECTOR_SDSL
 void GenericBitVector::writeTo(std::ofstream& stream) const {
+    // Save the offset.
+    stream.write((char*) &offset, sizeof(offset));
+    
+    // Save the bitvector.
     sdsl::serialize(bitvector, stream);
     
     // TODO: save supports.
