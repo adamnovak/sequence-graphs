@@ -564,6 +564,10 @@ main(
     // Register segfaults with the stack trace handler
     signal(SIGSEGV, stacktraceOnSignal);
     
+    // Register aborts (like uncaught std::bad_alloc) with the stack trace
+    // handler too
+    signal(SIGABRT, stacktraceOnSignal);
+    
     // Parse options with boost::programOptions. See
     // <http://www.radmangames.com/programming/how-to-use-boost-program_options>
 

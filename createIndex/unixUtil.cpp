@@ -60,6 +60,12 @@ void stacktraceOnSignal(int signalNumber) {
             std::endl;
     }
     
+    // Free our stacktrace memory.
+    free(traceMessages);
+    
+    // Dump a memory usage log too.
+    logMemory();
+    
     exit(signalNumber);
 }
 
