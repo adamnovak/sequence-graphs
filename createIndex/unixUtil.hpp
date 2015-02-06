@@ -16,6 +16,11 @@
 void logMemory();
 
 /**
+ * Log the host on which the program is running.
+ */
+void logHostname();
+
+/**
  * Signal handler to exit with exit(), preserving gprof profiling data if
  * applicable.
  */

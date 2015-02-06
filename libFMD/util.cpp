@@ -2,6 +2,9 @@
 #include <cstdlib>
 #include <stdexcept>
 
+#include <cerrno>
+#include <cstring> 
+
 #include "util.hpp"
 
 // Bases ordered alphabetically by reverse complement
@@ -25,8 +28,11 @@ std::string make_tempdir() {
     tempDir += "/tmpXXXXXX";
     // Make the directory, and modify the string in place.
     if(mkdtemp(const_cast<char*>(tempDir.c_str())) == NULL) {
+        // It didn't work. Say why.
+        int error = errno;
+    
         throw std::runtime_error("Could not create temporary directory " +
-            tempDir);
+            tempDir + ": " + std::string(strerror(error)));
     }
     
     // Return the modified string.

@@ -704,6 +704,9 @@ main(
         Log::output() << "Index file: " << *i << std::endl;
     }
     
+    // Dump our hostname
+    logHostname();
+    
     // Index the bottom-level FASTAs. Use the
     // sample rate the user specified.
     FMDIndex* indexPointer = buildIndex(indexDirectory, fastas,

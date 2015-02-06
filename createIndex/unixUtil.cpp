@@ -11,6 +11,8 @@
 #include <sstream>
 #include <string>
 #include <cstring>
+#include <unistd.h>
+#include <limits.h>
 
 // Shouls we try to demangle C++ function names in stack traces?
 #define DEMANGLE_NAMES
@@ -36,6 +38,18 @@ void logMemory() {
     
     
 
+}
+
+void logHostname() {
+    // Where do we store the hostname?
+    char hostname[HOST_NAME_MAX];
+    
+    if(gethostname(hostname, HOST_NAME_MAX) != 0) {
+        Log::error() << "Could not get hostname" << std::endl;
+        return;
+    }
+    
+    Log::output() << "Running on " << hostname << std::endl;
 }
 
 void exitOnSignal(int signalNumber) {
