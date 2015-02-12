@@ -27,7 +27,7 @@ std::vector<Matching> NaturalMappingScheme::findMaxMatchings(
         FMDPosition extended = results;
         index.extendLeftOnly(extended, query[i]);
         
-        if(results.getLength(mask) == 1 && extended.isEmpty(mask)) {
+        if(results.isUnique(mask, ranges) && extended.isEmpty(mask)) {
             // We are already a maximal unique match and can't extend any more.
             // Report ourselves.
             // Note that we can only ever do this once per left endpoint.
@@ -60,7 +60,7 @@ std::vector<Matching> NaturalMappingScheme::findMaxMatchings(
         results = extended;
     }
     
-    if(results.getLength(mask) == 1) {
+    if(results.isUnique(mask, ranges) == 1) {
         // We are a maximal unique match butted up against the left edge. Report
         // it.
         toReturn.push_back(Matching(0,  index.locate(results.getResult(
@@ -129,7 +129,7 @@ std::vector<Matching>  NaturalMappingScheme::findMinMatchings(
         FMDPosition retracted = results;
         index.retractRightOnly(retracted, patternLength - 1);
         
-        while(retracted.getLength(mask) == 1) {
+        while(retracted.isUnique(mask, ranges)) {
             // Retract until we would no longer be unique. Make sure to drop
             // characters from the total pattern length.
             results = retracted;
@@ -137,8 +137,8 @@ std::vector<Matching>  NaturalMappingScheme::findMinMatchings(
             mustRetract = false;
         }
         
-        if(results.getLength(mask) == 1 && retracted.getLength(mask) > 1 &&
-            !mustRetract) {
+        if(results.isUnique(mask, ranges) &&
+            retracted.isAmbiguous(mask, ranges) && !mustRetract) {
             
             // We found a minimally unique match starting at this position and
             // ending patternLength right from here.
@@ -668,9 +668,10 @@ std::set<Matching>
                 bestChain = std::max(bestChain, runLength);
             }
             
-            if(bestChain >= minHammingBound) {
+            if(bestChain >= minHammingBound &&
+                maxMatching.length >= minContext) {
                 // This max matching has a min matching involved in a good
-                // enough chain, so keep it.
+                // enough chain, and is itself sufficiently long, so keep it.
                 toReturn.insert(maxMatching);
                 
                 Log::debug() << "Taking " << maxMatching << " with chain of " <<

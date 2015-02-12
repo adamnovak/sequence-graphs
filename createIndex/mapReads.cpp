@@ -411,6 +411,7 @@ main(
     
     // Make a vector that says every single position in the index is its own
     // range for mapping to.
+    // TODO: Throw away when we make ranges properly optional.
     GenericBitVector ranges;
     for(size_t i = 0; i < index.getBWTLength(); i++) {
         ranges.addBit(i);
@@ -426,7 +427,7 @@ main(
     
     if(options["mapType"].as<std::string>() == "LR") {
         // We want an LRMappingScheme
-        LRMappingScheme* scheme = new LRMappingScheme(index, ranges);
+        LRMappingScheme* scheme = new LRMappingScheme(index, &ranges);
             
         // Populate it
         scheme->minContext = options["context"].as<size_t>();
@@ -438,7 +439,7 @@ main(
         mappingScheme = (MappingScheme*) scheme;
     } else if(options["mapType"].as<std::string>() == "natural") {
         // We want a NaturalMappingScheme
-        NaturalMappingScheme* scheme = new NaturalMappingScheme(index, ranges);
+        NaturalMappingScheme* scheme = new NaturalMappingScheme(index, &ranges);
             
         // Populate it
         scheme->credit = options.count("credit");
@@ -456,7 +457,7 @@ main(
     } else if(options["mapType"].as<std::string>() == "old") {
         // We want an OldNaturalMappingScheme
         OldNaturalMappingScheme* scheme = new OldNaturalMappingScheme(index,
-            ranges);
+            &ranges);
             
         // Populate it
         scheme->credit = options.count("credit");

@@ -47,7 +47,8 @@ public:
     double multContext = 0.0;
     
     /**
-     * What's the minimum run length in bases to use?
+     * What's the minimum max matching length in bases to use? Doesn't interact
+     * with synteny runs exactly right.
      */
     size_t minContext = 0;
     
@@ -112,13 +113,15 @@ protected:
     
     /**
      * Find all of the maximal unique matchings between query string characters
-     * and the reference, in descending order by left endpoint.
+     * and the reference, in descending order by left endpoint. Properly handles
+     * merged reference positions.
      */
     std::vector<Matching> findMaxMatchings(const std::string& query) const;
         
     /**
      * Find all of the minimal unique matchings between query string characters
-     * and the reference, in descending order by left endpoint.
+     * and the reference, in descending order by left endpoint. Properly handles
+     * merged reference positions.
      */
     std::vector<Matching> findMinMatchings(const std::string& query) const;
     

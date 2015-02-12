@@ -8,6 +8,11 @@
 void LRMappingScheme::map(const std::string& query,
     std::function<void(size_t, TextPosition)> callback) const {
     
+    if(ranges == NULL) {
+        // Hack around the fact that all the old mapping methods require ranges.
+        throw std::runtime_error("Need a range vector to use LRMappingScheme");
+    }
+    
     // How many bases have we mapped or not mapped (credit or not).
     size_t mappedBases = 0;
     size_t unmappedBases = 0;
@@ -26,7 +31,7 @@ void LRMappingScheme::map(const std::string& query,
     std::vector<Mapping> leftMappings;    
     
     // Map it on the right.
-    rightMappings = index.misMatchMap(ranges, query, mask, minContext,
+    rightMappings = index.misMatchMap(*ranges, query, mask, minContext,
         addContext, multContext, z_max);
     
     if(addContext == 0 && multContext == 0 && z_max == 0) {
@@ -50,7 +55,7 @@ void LRMappingScheme::map(const std::string& query,
     }
     
     // Map it on the left
-    leftMappings = index.misMatchMap(ranges, reverseComplement(query), mask,
+    leftMappings = index.misMatchMap(*ranges, reverseComplement(query), mask,
         minContext, addContext, multContext, z_max); 
     
     // Flip the left mappings back into the original order. They should stay
@@ -73,7 +78,7 @@ void LRMappingScheme::map(const std::string& query,
     
     if(credit) {
         // Apply a credit filter to the mappings
-        filteredMappings = CreditFilter2(index, ranges, z_max, 
+        filteredMappings = CreditFilter2(index, *ranges, z_max, 
             mask).apply(leftMappings, rightMappings,
             query);
     } else {

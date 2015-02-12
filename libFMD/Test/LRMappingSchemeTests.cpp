@@ -58,7 +58,7 @@ void LRMappingSchemeTests::setUp() {
     ranges->finish(index->getBWTLength());
 
     // Make the mapping scheme
-    scheme = new LRMappingScheme(*index, *ranges);
+    scheme = new LRMappingScheme(*index, ranges);
 }
 
 
@@ -151,7 +151,7 @@ void LRMappingSchemeTests::testMapWithMask() {
 
     // Turn the genome restriction on
     delete scheme;
-    scheme = new LRMappingScheme(*index, *ranges, &index->getGenomeMask(0));
+    scheme = new LRMappingScheme(*index, ranges, &index->getGenomeMask(0));
     
     size_t mappedBases = 0;
     scheme->map(query, [&](size_t i, TextPosition mappedTo) {

@@ -99,21 +99,67 @@ public:
     /**
      * Is an FMDPosition empty? If a mask is specified, only counts matches with
      * 1s in the mask.
+     *
+     * Does not depend on ranges.
      */
     inline bool isEmpty(const GenericBitVector* mask = NULL) const {
+        // This is guaranteed to take the not-super-slow path, since no ranges
+        // vector is specified.
         return getLength(mask) <= 0;
+    }
+    
+    /**
+     * Does an FMDPosition include exactly one masked-in position or range of
+     * positions?
+     *
+     * If mask is null, assumes all positions are masked in.
+     *
+     * If ranges is null, assumes no positions are merged.
+     */
+    inline bool isUnique(const GenericBitVector* mask = NULL,
+        const GenericBitVector* ranges = NULL) const {
+        
+        if(isEmpty(mask)) {
+            // If it's empty, it's not unique.
+            return false;
+        }
+        
+        // Return true if we can identify a range number, false otherwise (in
+        // which case we span multiple ranges).
+        return range(*ranges, mask) != -1;
+        
+    }
+    
+    /**
+     * Does an FMDPosition select multiple masked-in positions or merged ranges?
+     *
+     * If mask is null, assumes all positions are masked in.
+     *
+     * If ranges is null, assumes no positions are merged.
+     */
+    inline bool isAmbiguous(const GenericBitVector* mask = NULL,
+        const GenericBitVector* ranges = NULL) const {
+        
+        // If it's not empty and it's not unique, it must have multiple things
+        // in it.
+        return !isEmpty(mask) && !isUnique(mask, ranges);
     }
 
     /**
      * Return the actual number of matches represented by an FMDPosition. If a
      * mask is specified, only counts matches with 1s in the mask.
+     *
+     * If ranges is not null, counts each range marked by a leading 1 in that
+     * vector as a single position.
      */
-    inline int64_t getLength(const GenericBitVector* mask = NULL) const {
-        if(mask == NULL || end_offset == -1) {
-            // Fast path: no mask or an actually empty interval. Can just look
-            // at our end offset.
+    inline int64_t getLength(const GenericBitVector* mask = NULL,
+        const GenericBitVector* ranges = NULL) const {
+        
+        if((mask == NULL && ranges == NULL) || end_offset == -1) {
+            // Fast path: no mask or ranges, or an actually empty interval. Can
+            // just look at our end offset.
             return end_offset + 1;
-        } else {
+        } else if(ranges == NULL) {
             // Slow path: need to make rank queries, but we know the interval is
             // nonempty. Get the rank at the end of the region (inclusive), and
             // subtract the rank at the beginning of the region (exclusive). We
@@ -128,6 +174,20 @@ public:
             
             return mask->rank(forward_start + end_offset) + 1 - 
                 mask->rank(forward_start, true);
+        } else if(mask == NULL) {
+            // Slow path: need to make rank queries in the ranges, but we don't
+            // have to deal with a mask.
+            
+            // The answer is 1 more than the number of 1s between the start and
+            // the past-the-end position.
+            return ranges->rank(forward_start + end_offset) - 
+                ranges->rank(forward_start) + 1;
+        } else {
+            // Slowest path: need to deal with both a mask and ranges.
+            
+            // This will just be the number of masked-in ranges.
+            // TODO: are we basically replicating that method here?
+            return this->ranges(*ranges, mask);
         }
     }
     

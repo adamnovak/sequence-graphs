@@ -756,7 +756,7 @@ main(
         
             if(options["mapType"].as<std::string>() == "LR") {
                 // We want an LRMappingScheme
-                LRMappingScheme* scheme = new LRMappingScheme(index, ranges,
+                LRMappingScheme* scheme = new LRMappingScheme(index, &ranges,
                     mask);
                     
                 // Populate it
@@ -770,7 +770,7 @@ main(
             } else if(options["mapType"].as<std::string>() == "natural") {
                 // We want a NaturalMappingScheme
                 NaturalMappingScheme* scheme = new NaturalMappingScheme(index,
-                    ranges, mask);
+                    &ranges, mask);
                     
                 // Populate it
                 scheme->credit = options.count("credit");
@@ -788,7 +788,7 @@ main(
             } else if(options["mapType"].as<std::string>() == "old") {
                 // We want an OldNaturalMappingScheme
                 OldNaturalMappingScheme* scheme = new OldNaturalMappingScheme(
-                    index, ranges, mask);
+                    index, &ranges, mask);
                     
                 // Populate it
                 scheme->credit = options.count("credit");

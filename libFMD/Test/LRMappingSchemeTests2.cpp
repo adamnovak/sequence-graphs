@@ -58,7 +58,7 @@ void LRMappingSchemeTests2::setUp() {
     ranges->finish(index->getBWTLength());
 
     // Make the mapping scheme
-    scheme = new LRMappingScheme(*index, *ranges);
+    scheme = new LRMappingScheme(*index, ranges);
 }
 
 

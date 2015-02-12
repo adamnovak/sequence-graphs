@@ -58,7 +58,7 @@ void NaturalMappingSchemeTests::setUp() {
     ranges->finish(index->getBWTLength());
 
     // Make the mapping scheme
-    scheme = new NaturalMappingScheme(*index, *ranges);
+    scheme = new NaturalMappingScheme(*index, ranges);
 }
 
 
@@ -157,7 +157,7 @@ void NaturalMappingSchemeTests::testMapWithMask() {
 
     // Turn the genome restriction on
     delete scheme;
-    scheme = new NaturalMappingScheme(*index, *ranges,
+    scheme = new NaturalMappingScheme(*index, ranges,
         &index->getGenomeMask(0));
     
     size_t mappedBases = 0;

@@ -83,12 +83,12 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # map_type
         return set([
             # Flat min thresholds
-            #(True, True, False, 20, None, None, None, None, None, "natural"),
-            #(True, True, False, 50, None, None, None, None, None, "natural"),
-            #(True, True, False, 100, None, None, None, None, None, "natural"),
-            #(True, True, False, 150, None, None, None, None, None, "natural"),
-            #(True, True, False, 200, None, None, None, None, None, "natural"),
-            #(True, True, False, 250, None, None, None, None, None, "natural"),
+            (True, True, False, 20, None, None, None, None, None, "natural"),
+            (True, True, False, 50, None, None, None, None, None, "natural"),
+            (True, True, False, 100, None, None, None, None, None, "natural"),
+            (True, True, False, 150, None, None, None, None, None, "natural"),
+            (True, True, False, 200, None, None, None, None, None, "natural"),
+            (True, True, False, 250, None, None, None, None, None, "natural"),
             # Exact credit (tolerating 1 mismatch) with Hamming bound, but no
             # mismatches.
             (True, True, False, None, None, None, None, 1, None, "natural"),

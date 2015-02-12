@@ -25,7 +25,7 @@ public:
      * All other parameters of subclasses ought to be optional, with sensible
      * default values, and settable by public field access.
      */
-    MappingScheme(const FMDIndex& index, const GenericBitVector& ranges,
+    MappingScheme(const FMDIndex& index, const GenericBitVector* ranges = NULL,
         const GenericBitVector* mask = NULL);
 
     // Default copy/move constructors OK    
@@ -72,7 +72,7 @@ protected:
     /**
      * The bit vector defining ranges to map to on the index.
      */
-    const GenericBitVector& ranges;
+    const GenericBitVector* ranges;
     
     /**
      * The mask with which we are mapping.
