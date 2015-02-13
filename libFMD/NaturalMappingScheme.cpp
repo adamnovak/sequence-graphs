@@ -32,10 +32,30 @@ std::vector<Matching> NaturalMappingScheme::findMaxMatchings(
             // Report ourselves.
             // Note that we can only ever do this once per left endpoint.
             
-            // Make sure we fix the endpoint as i + 1, since we moved i left
-            // already and we want to talk about where it was last loop.
-            toReturn.push_back(Matching(i + 1,  index.locate(results.getResult(
-                mask)), patternLength));
+            // What BWT indices are selected?
+            auto bwtIndices = results.getResults(mask);
+            
+            // We're going to find the lowest-text, lowest-offset correxponding
+            // text position. Start out with the biggest a TextPosition can be.
+            TextPosition smallest(std::numeric_limits<size_t>::max(),
+                std::numeric_limits<size_t>::max());
+            
+            for(auto bwtIndex : bwtIndices) {
+                // For each BWT index masked in (there must be at least 1), find
+                // its corresponding TextPosition.
+                TextPosition candidate = index.locate(bwtIndex);
+                
+                if(candidate < smallest) {
+                    // If it has a lower text or offset, use it.
+                    // Guaranteed to overwrite the original fake value.
+                    smallest = candidate;
+                }
+            }
+            
+            // Make a Matching to this chosen place. Make sure we fix the left
+            // endpoint in the query as i + 1, since we moved i left already and
+            // we want to talk about where it was last loop.
+            toReturn.push_back(Matching(i + 1,  smallest, patternLength));
         }
         
         while(extended.isEmpty(mask)) {
@@ -141,7 +161,10 @@ std::vector<Matching>  NaturalMappingScheme::findMinMatchings(
             retracted.isAmbiguous(mask, ranges) && !mustRetract) {
             
             // We found a minimally unique match starting at this position and
-            // ending patternLength right from here.
+            // ending patternLength right from here. Just match it up against
+            // any text that's selected. It would be a lot of work to go through
+            // all the texts available to minimal matches, and we don't really
+            // use their locations much anyway.
             toReturn.push_back(Matching(i,  index.locate(results.getResult(
                 mask)), patternLength));
                 
