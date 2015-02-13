@@ -36,6 +36,54 @@ std::vector<Matching> NaturalMappingScheme::findMaxMatchings(
                 extended.getLength(mask, ranges) << " after" << std::endl;
         }
         
+        if(results.getLength(mask, ranges) < extended.getLength(mask, ranges)) {
+            // We searched for something longer and got more results than for
+            // something shorter.
+            Log::critical() << "Got additional results by extending!" <<
+                std::endl;
+                
+            Log::critical() << "Query part: " <<
+                query.substr(i, patternLength) << std::endl;
+                
+            Log::critical() << "Query range: " << i << " - " <<
+                i + patternLength << std::endl;
+                
+            Log::critical() << "Before extending: " << results << std::endl;
+            for(int64_t j = results.getForwardStart();
+                j < results.getForwardStart() + results.getEndOffset() + 1;
+                j++) {
+                
+                // Log each selected position before
+                
+                Log::critical() << index.display(j) << "\t" <<
+                    index.locate(j) << "\t" << 
+                    (mask == NULL ? -1 : mask->isSet(j)) << "\t" << 
+                    (ranges == NULL ? -1 : ranges->isSet(j)) << "\t" <<
+                    std::endl;
+                
+            }
+            
+            Log::critical() << "After extending: " << extended << std::endl;
+            for(int64_t j = extended.getForwardStart();
+                j < extended.getForwardStart() + extended.getEndOffset() + 1;
+                j++) {
+                
+                // Log each selected position after
+                
+                Log::critical() << index.display(j) << "\t" <<
+                    index.locate(j) << "\t" << 
+                    (mask == NULL ? -1 : mask->isSet(j)) << "\t" << 
+                    (ranges == NULL ? -1 : ranges->isSet(j)) << "\t" <<
+                    std::endl;
+                
+            }
+            
+            Log::critical() << "Aborting run" << std::endl << std::flush;
+            
+            throw std::runtime_error("Got additional results by extending");
+                
+        }
+        
         if(results.isUnique(mask, ranges) && extended.isEmpty(mask)) {
             // We are already a maximal unique match and can't extend any more.
             // Report ourselves.
