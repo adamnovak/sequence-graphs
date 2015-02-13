@@ -10,6 +10,8 @@
 std::vector<Matching> NaturalMappingScheme::findMaxMatchings(
     const std::string& query) const {
  
+    Log::info() << "Looking for max matchings" << std::endl;
+ 
     // What matchings have we found?
     std::vector<Matching> toReturn;
  
@@ -26,6 +28,13 @@ std::vector<Matching> NaturalMappingScheme::findMaxMatchings(
         // We're going to extend backward with this new base.
         FMDPosition extended = results;
         index.extendLeftOnly(extended, query[i]);
+        
+        if(i < 100) {
+            // See if we are somehow getting more results on extension.
+            Log::info() << results.getLength(mask, ranges) <<
+                " results before extending, " <<
+                extended.getLength(mask, ranges) << " after" << std::endl;
+        }
         
         if(results.isUnique(mask, ranges) && extended.isEmpty(mask)) {
             // We are already a maximal unique match and can't extend any more.
@@ -55,8 +64,28 @@ std::vector<Matching> NaturalMappingScheme::findMaxMatchings(
             // Make a Matching to this chosen place. Make sure we fix the left
             // endpoint in the query as i + 1, since we moved i left already and
             // we want to talk about where it was last loop.
-            toReturn.push_back(Matching(i + 1,  smallest, patternLength));
+            auto maxMatching = Matching(i + 1,  smallest, patternLength);
+            
+            // Send it off
+            if(i < 100) {
+                Log::info() << "Found max matching " << maxMatching << std::endl;
+            }
+            toReturn.push_back(maxMatching);
+        } else if(results.isUnique(mask, ranges)) {
+            // We're unique but not maximal on the left (extended is not empty
+            // under mask)
+            if(i < 100) {
+                Log::info() << "Extending max matching left to " << i << " + " <<
+                    patternLength << std::endl;
+            }
+        } else {
+            // We aren't unique yet
+            if(i < 100) {
+                Log::info() << "Not yet unique at " << i << " + " << patternLength <<
+                    std::endl;
+            }
         }
+        
         
         while(extended.isEmpty(mask)) {
             // If you can't extend, retract until you can. TODO: Assumes we
@@ -67,24 +96,65 @@ std::vector<Matching> NaturalMappingScheme::findMaxMatchings(
             // Make sure to drop characters from the total pattern length.
             index.retractRightOnly(retracted, --patternLength);
             
+            if(i < 100) {
+                Log::info() << "Retracting to " << patternLength << std::endl;
+            }
+            
             // Try extending again
             extended = retracted;
             index.extendLeftOnly(extended, query[i]);
+            
+            if(i < 100) {
+                Log::info() << retracted.getLength(mask, ranges) <<
+                    " results after retracting, " <<
+                    extended.getLength(mask, ranges) << " after extending" <<
+                    std::endl;
+            }
             
             // Say that last step we came from retracted.
             results = retracted;
         }
     
         // We successfully extended.
-        patternLength++;
         results = extended;
+        // Increment the pattern length since we did actually extedn by 1. 
+        patternLength++;
     }
     
-    if(results.isUnique(mask, ranges) == 1) {
+    if(results.isUnique(mask, ranges)) {
+        Log::info() << "Unique at left edge" << std::endl;
+    
         // We are a maximal unique match butted up against the left edge. Report
         // it.
-        toReturn.push_back(Matching(0,  index.locate(results.getResult(
-            mask)), patternLength));
+        // TODO: don't duplicate this code.
+        // What BWT indices are selected?
+        auto bwtIndices = results.getResults(mask);
+        
+        // We're going to find the lowest-text, lowest-offset correxponding
+        // text position. Start out with the biggest a TextPosition can be.
+        TextPosition smallest(std::numeric_limits<size_t>::max(),
+            std::numeric_limits<size_t>::max());
+        
+        for(auto bwtIndex : bwtIndices) {
+            // For each BWT index masked in (there must be at least 1), find
+            // its corresponding TextPosition.
+            TextPosition candidate = index.locate(bwtIndex);
+            
+            if(candidate < smallest) {
+                // If it has a lower text or offset, use it.
+                // Guaranteed to overwrite the original fake value.
+                smallest = candidate;
+            }
+        }
+        
+        // Make a Matching to this chosen place.
+        auto maxMatching = Matching(0,  smallest, patternLength);
+        
+        // Send it off
+        Log::info() << "Found max matching " << maxMatching << std::endl;
+        toReturn.push_back(maxMatching);
+    } else {
+        Log::info() << "Not unique at left edge" << std::endl;
     }
     
     // This works: if there were a longer unique match on the right, we would
@@ -372,8 +442,16 @@ const Matching& NaturalMappingScheme::getMaxMatching(
     
     if(!maxMatchings.hasStartingBefore(minMatching.start)) {
         // Somehow we have an orphan min matching.
+        Log::critical() << "Min matching " << minMatching << 
+            " starts too early to be in a max matching!" << std::endl <<
+            std::flush;
+            
+        Log::critical() << "Next starting max matching is " <<
+            maxMatchings.getStartingAfter(minMatching.start).second <<
+            std::endl << std::flush;
+            
         throw std::runtime_error(
-            "Min matching not contained in a max matching");
+            "Min matching starts too early");
     }
 
     // Find the matching it has to be    
@@ -384,8 +462,17 @@ const Matching& NaturalMappingScheme::getMaxMatching(
         minMatching.start + minMatching.length) {
         
         // The max matching stops too early.
+        
+        Log::critical() << "Min matching " << minMatching << 
+            " ends too late to be in a max matching!" << std::endl <<
+            std::flush;
+            
+        Log::critical() << "Next ending max matching is " <<
+            maxMatchings.getEndingAfter(minMatching.start +
+            minMatching.length - 1).second << std::endl << std::flush;
+            
         throw std::runtime_error(
-            "Min matching not contained in a max matching");
+            "Min matching ends too late");
     }
     
     Log::debug() << "Min matching " << minMatching << " has max matching " <<
@@ -410,7 +497,8 @@ std::unordered_map<Matching, IntervalIndex<Matching>>
         vectorForMax;
         
     Log::info() << "Assigning " << minMatchings.size() << 
-        " min matchings to max matchings" << std::endl;
+        " min matchings to " << maxMatchings.size() << " max matchings" <<
+        std::endl;
     
     for(const auto& minMatching : minMatchings) {
         // For each min matching, find the max matching it belongs to and put it
@@ -625,7 +713,8 @@ std::set<Matching>
     // Make the max matching cost graph
     auto graph = generateMaxMatchingGraph(maxMatchings, query);
     
-    Log::info() << "Indexing all max matchings" << std::endl;
+    Log::info() << "Indexing all " << maxMatchings.size() << " max matchings" <<
+        std::endl;
     
     // Make a vector of max matchings with their occupied intervals.
     std::vector<std::pair<std::pair<size_t, size_t>, Matching>> toIndex;
@@ -635,6 +724,15 @@ std::set<Matching>
         toIndex.push_back({{maxMatching.start, maxMatching.length},
             maxMatching});
     }
+    
+    if(toIndex.size() > 0) {
+        Log::info() << "First max matching: " << (*toIndex.begin()).second <<
+            std::endl;
+        
+        Log::info() << "Last max matching: " << (*toIndex.rbegin()).second <<
+            std::endl;
+    }
+    
     // Index the max matchings by interval
     IntervalIndex<Matching> index(toIndex);
     
@@ -1034,9 +1132,6 @@ size_t NaturalMappingScheme::countEdits(const std::string& query,
         referenceLength > maxAlignmentSize) {
     
         // This alignment would be bigger than the biggest one we want to do.
-        Log::warning() << "Skipping " << queryLength << " x " <<
-            referenceLength << " alignment" << std::endl;
-            
         return threshold;
     }
 
