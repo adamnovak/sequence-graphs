@@ -176,6 +176,10 @@ FMDIndex::FMDIndex(std::string basename, SuffixArray* fullSuffixArray,
 }
 
 FMDIndex::~FMDIndex() {
+    // Drop any entries for this object from the thread-local static cache
+    // (which is supposed to be simulating thread-local members).
+    clearThreadLocalCache();
+
     if(fullSuffixArray != NULL) {
         // If we were holding a full SuffixArray, throw it out.
         delete fullSuffixArray;
@@ -893,6 +897,13 @@ const std::string& FMDIndex::displayContigCached(size_t index) const {
     // Return a reference to the globally cached copy, which means we have to
     // dereference twice.
     return found->second->second;
+}
+
+void FMDIndex::clearThreadLocalCache() const {
+    // Remove the entry for this object in the global-scope thread-local cache,
+    // in case we later have to work with a different object at the same
+    // address.
+    threadContigCache.erase(this);
 }
 
 int64_t FMDIndex::getLF(int64_t index) const {

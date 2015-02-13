@@ -822,8 +822,8 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             // right justify the alignment, and we don't care about the exact
             // value if it's more than our maxHammingDistance.
             size_t leftEndCost = countEdits(query, 0,  leftQueryLength,
-            leftReferenceStart, leftReferenceLength, maxHammingDistance + 1, 
-            false, true);
+                leftReferenceStart, leftReferenceLength, maxHammingDistance + 1, 
+                false, true);
             
             // TODO: We repeat most of this stuff in the opposite polarity for
             // the right side. Unify somehow?

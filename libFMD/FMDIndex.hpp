@@ -313,6 +313,18 @@ public:
     const std::string& displayContigCached(size_t index) const;
     
     /**
+     * Remove any entries for this object in the global thread-local contig
+     * cache. This prevents a new object at the same memory address from picking
+     * up cache entries from an old, destructed object at that address.
+     *
+     * A hack since the destructor can't go talk to all the threads.
+     *
+     * Should be called whenever a thread is done with an index, and might use
+     * another. Automatically called by the destructor.
+     */
+    void clearThreadLocalCache() const;
+    
+    /**
      * Given an index in the BWT, do an LF-mapping to get where the character
      * that appears in the first column at this index shows up in the last
      * column.
