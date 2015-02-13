@@ -96,9 +96,9 @@ void NaturalMappingSchemeTests2::testMap() {
     });
     
     // All the bases inside the protection of the outermost min matchings should
-    // map. The first mappable position is 4, and the last is 30, giving 27
+    // map. The first mappable position is 4, and the last is 31, giving 28
     // mappable positions.
-    CPPUNIT_ASSERT_EQUAL(query.size() - 4 - 4, mappedBases);
+    CPPUNIT_ASSERT_EQUAL(query.size() - 4 - 3, mappedBases);
     
     // Grab all of the first contig's reverse strand.
     std::string query2 = "AGAGTCGCAGATGAGCGTCGAATCGCCGAAGCATG";
@@ -117,6 +117,6 @@ void NaturalMappingSchemeTests2::testMap() {
     
     // All mappable bases should map; the uniqueness structure is the same as
     // the forward strand.
-    CPPUNIT_ASSERT_EQUAL(query2.size() - 4 - 4, mappedBases);
+    CPPUNIT_ASSERT_EQUAL(query2.size() - 4 - 3, mappedBases);
 }
 
