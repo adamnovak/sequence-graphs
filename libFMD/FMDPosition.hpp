@@ -221,8 +221,6 @@ public:
     inline int64_t getResult(const GenericBitVector* mask = NULL) const {
         // TODO: Implement based on rank and select. For now we just scan.
         
-        std::vector<int64_t> toReturn;
-        
         for(size_t i = getForwardStart();
             i <= getForwardStart() + getEndOffset(); i++) {
         

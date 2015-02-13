@@ -611,12 +611,11 @@ main(
         ("sampleRate", boost::program_options::value<unsigned int>()
             ->default_value(64), 
             "Set the suffix array sample rate to use")
-        // These next two options should be ->required(), but that's not in the
-        // Boost version I can convince our cluster admins to install. From now
-        // on I shall work exclusively in Docker containers or something.
-        ("indexDirectory", boost::program_options::value<std::string>(), 
+        ("indexDirectory", boost::program_options::value<std::string>()
+            ->required(), 
             "Directory to make the index in; will be deleted and replaced!")
         ("fastas", boost::program_options::value<std::vector<std::string> >()
+            ->required()
             ->multitoken(),
             "FASTA files to load")
         ("credit", "Enable mapping on credit")
@@ -751,6 +750,7 @@ main(
             // Make a new MappingScheme for this step and return a pointer to
             // it. TODO: would it be better to just make one MappingScheme and
             // let the ranges and mask be updated? Or passed to the map method?
+            
             // Hiding our parameters by sneaking an option struct into a closure
             // seems a bit odd...
         
