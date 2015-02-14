@@ -36,9 +36,8 @@ std::vector<Matching> NaturalMappingScheme::findMaxMatchings(
                 extended.getLength(mask, ranges) << " after" << std::endl;
         }
         
-        if(results.getLength(mask, ranges) < extended.getLength(mask, ranges)) {
-            // We searched for something longer and got more results than for
-            // something shorter.
+        if(results.isUnique(mask, ranges) && !extended.isUnique(mask, ranges)) {
+            // We searched for something longer and got un-unique
             Log::critical() << "Got additional results by extending!" <<
                 std::endl;
                 
