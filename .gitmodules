@@ -1,9 +1,9 @@
 [submodule "deps/pinchesAndCacti"]
 	path = deps/pinchesAndCacti
-	url = git@github.com:benedictpaten/pinchesAndCacti.git
+	url = https://github.com/benedictpaten/pinchesAndCacti.git
 [submodule "deps/sonLib"]
 	path = deps/sonLib
-	url = git@github.com:benedictpaten/sonLib.git
+	url = https://github.com/benedictpaten/sonLib.git
 [submodule "deps/vflib"]
 	path = deps/vflib
 	url = https://github.com/adamnovak/vflib.git
