@@ -30,6 +30,9 @@ RUN apt-get install -y swig
 # Get cmake
 RUN apt-get install -y cmake
 
+# Make sure we can use third-party HTTPS APT repositories (like SBT)
+RUN apt-get install -y apt-transport-https
+
 # Get SBT
 RUN echo "deb https://dl.bintray.com/sbt/debian /" | tee -a /etc/apt/sources.list.d/sbt.list
 RUN apt-get update
