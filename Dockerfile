@@ -3,7 +3,7 @@
 # installation instructions.
 
 # Get Ubuntu Whatever with a JDK on it, and up to date packages.
-FROM java:oracle-java7
+FROM dockerfile/java:oracle-java7
 MAINTAINER Adam Novak <anovak@soe.ucsc.edu>
 RUN apt-get update
 RUN apt-get upgrade -y
