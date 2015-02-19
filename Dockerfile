@@ -32,14 +32,13 @@ RUN \
     add-apt-repository -y ppa:webupd8team/java && \
     apt-get update && \
     apt-get install -y oracle-java7-installer && \
-    rm -rf /var/lib/apt/lists/* && \
     rm -rf /var/cache/oracle-jdk7-installer
 
 # And set JAVA_HOME    
 ENV JAVA_HOME /usr/lib/jvm/java-7-oracle
 
 # Get Git
-RUN apt-get install -y git-core
+RUN apt-get install -y git
 
 # Put in GCC. We need 4.9+ for std::regex support
 RUN apt-get install -y gcc g++ build-essential
