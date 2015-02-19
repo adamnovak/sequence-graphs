@@ -14,77 +14,59 @@ MAINTAINER Adam Novak <anovak@soe.ucsc.edu>
 # Turn on Multiverse, as in <https://github.com/dockerfile/ubuntu/blob/master/Dockerfile>
 RUN sed -i 's/# \(.*multiverse$\)/\1/g' /etc/apt/sources.list
 
-# Set up to install stuff
-RUN apt-get update
-RUN apt-get upgrade -y
-
-# We need apt-add-repository
-RUN apt-get install -y software-properties-common
-
-# And we need wget
-RUN apt-get install -y wget
+# We need apt-add-repository to add the java installer repository.
 
 # Use the commands from <https://github.com/dockerfile/java/blob/master/oracle-
 # java7/Dockerfile> to install Oracle Java 7 JDK and programmatically accept the
-# license.
+# license. But then also install all the packages we need and clear out the
+# package index.
 RUN \
+    apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y software-properties-common && \
     echo oracle-java7-installer shared/accepted-oracle-license-v1-1 select true | debconf-set-selections && \
     add-apt-repository -y ppa:webupd8team/java && \
     apt-get update && \
-    apt-get install -y oracle-java7-installer && \
-    rm -rf /var/cache/oracle-jdk7-installer
+    apt-get install -y oracle-java7-installer wget git gcc g++ build-essential \
+    libboost-all-dev libsparsehash-dev libcppunit-dev  cmake maven python2.7 \
+    libpcre3-dev && \
+    rm -rf /var/cache/oracle-jdk7-installer && \
+    rm -rf /var/lib/apt/lists/*
 
 # And set JAVA_HOME    
 ENV JAVA_HOME /usr/lib/jvm/java-7-oracle
 
+# Package installation summary:
 # Get Git
-RUN apt-get install -y git
-
 # Put in GCC. We need 4.9+ for std::regex support
-RUN apt-get install -y gcc g++ build-essential
-
 # Get Boost
-RUN apt-get install -y libboost-all-dev
-
 # Get sparse hash library
-RUN apt-get install -y libsparsehash-dev
-
 # Get cppunit
-RUN apt-get install -y libcppunit-dev
-
 # Get cmake
-RUN apt-get install -y cmake
-
 # Get maven
-RUN apt-get install -y maven
-
 # Get Python 2.7
-RUN apt-get install -y python2.7
-
 # Get PCRE, which we need to build SWIG
-RUN apt-get install -y libpcre3-dev
 
 # Get SWIG 3, which we need to parse C++11. This is going to be in Ubuntu Utopic
 # and higher, but we have to work with the Ubuntu that the Java images use, so
 # we have to build from source.
 RUN wget http://downloads.sourceforge.net/swig/swig-3.0.5.tar.gz && \
-    tar -xvzf swig-3.0.5.tar.gz
-RUN cd swig-3.0.5 && ./configure --prefix=/usr && make && make install
+    tar -xvzf swig-3.0.5.tar.gz && cd swig-3.0.5 && \
+    ./configure --prefix=/usr && make && make install && cd .. && \
+    rm -Rf swig-3.0.5 && rm swig-3.0.5.tar.gz
 
 # Get SBT manually, since their HTTPS source segfaults my apt-get
-RUN wget https://dl.bintray.com/sbt/debian/sbt-0.13.7.deb
-RUN dpkg -i sbt-0.13.7.deb
+RUN wget https://dl.bintray.com/sbt/debian/sbt-0.13.7.deb && \
+    dpkg -i sbt-0.13.7.deb && rm sbt-0.13.7.deb
 
 # Get the SDSL dependency and install it under /usr so we don't need to mess
 # with compiler paths.
 RUN git clone https://github.com/simongog/sdsl-lite.git && \
-    cd sdsl-lite && \
-    ./install.sh /usr
+    cd sdsl-lite && ./install.sh /usr && cd .. && rm -Rf sdsl-lite
 
 # Clone my code and all the submodules
 RUN git clone --recursive https://github.com/adamnovak/sequence-graphs.git && \
-    cd sequence-graphs && \
-    make
+    cd sequence-graphs && make
 
 # Set everything up so we can enter the container sanely.
 ENTRYPOINT ["/bin/bash"]
