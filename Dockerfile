@@ -64,9 +64,14 @@ RUN wget https://dl.bintray.com/sbt/debian/sbt-0.13.7.deb && \
 RUN git clone https://github.com/simongog/sdsl-lite.git && \
     cd sdsl-lite && ./install.sh /usr && cd .. && rm -Rf sdsl-lite
 
-# Clone my code and all the submodules
-RUN git clone --recursive https://github.com/adamnovak/sequence-graphs.git && \
-    cd sequence-graphs && make
+# Add in the entire Git repo that you are supposed to be running this from. We
+# do this so we can build off a working copy, instead of going to Github and
+# always building master.
+ADD . sequence-graphs
+# Make sure it is actually a git repo, make sure we have the submodules, and
+# build.
+RUN cd sequence-graphs && git init && git submodule init && \
+    git submodule update && make
     
 # Test our build
 RUN cd sequence-graphs && make check
