@@ -86,6 +86,6 @@ RUN git clone --recursive https://github.com/adamnovak/sequence-graphs.git && \
     cd sequence-graphs && \
     make
 
-# Set everything up so we can use the container like a command
-ENTRYPOINT ["sequence-graphs/createIndex/createIndex"]
-CMD ["--help"]
+# Set everything up so we can enter the container sanely.
+ENTRYPOINT ["/bin/bash"]
+CMD ["-c", "cd sequence-graphs && /bin/bash"]
