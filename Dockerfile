@@ -39,7 +39,7 @@ RUN \
 ENV JAVA_HOME /usr/lib/jvm/java-7-oracle
 
 # Get Git
-RUN apt-get install -y git
+RUN apt-get install -y git-core
 
 # Put in GCC. We need 4.9+ for std::regex support
 RUN apt-get install -y gcc g++ build-essential
