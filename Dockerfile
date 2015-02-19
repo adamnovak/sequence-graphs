@@ -67,6 +67,9 @@ RUN git clone https://github.com/simongog/sdsl-lite.git && \
 # Clone my code and all the submodules
 RUN git clone --recursive https://github.com/adamnovak/sequence-graphs.git && \
     cd sequence-graphs && make
+    
+# Test our build
+RUN cd sequence-graphs && make check
 
 # Set everything up so we can enter the container sanely.
 ENTRYPOINT ["/bin/bash"]
