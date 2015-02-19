@@ -42,12 +42,10 @@ RUN apt-get install -y python2.7
 
 # Get the SDSL dependency and install it under /usr so we don't need to mess
 # with compiler paths.
-RUN git clone https://github.com/simongog/sdsl-lite.git
-RUN cd sdsl-lite && ./install.sh /usr
+RUN git clone https://github.com/simongog/sdsl-lite.git && cd sdsl-lite && ./install.sh /usr
 
 # Clone my code and all the submodules
-RUN git clone --recursive https://github.com/adamnovak/sequence-graphs.git
-RUN cd sequence-graphs && make
+RUN git clone --recursive https://github.com/adamnovak/sequence-graphs.git && cd sequence-graphs && make
 
 # Set everything up so we can use the container like a command
 ENTRYPOINT ["/sequence-graphs/createIndex/createIndex"]
