@@ -2,6 +2,8 @@
 # sequence graph test code can run successfully. It can also double as
 # installation instructions.
 
+# This file borrows heavvily from dockerfiles from Dockerfile.
+
 # Start with an Ubuntu that provides a decent C++11 compiler (that doesn't stub
 # out std::regex, 14.04), because that's hard to change. We need gcc 4.9+
 FROM ubuntu:14.10 
@@ -9,10 +11,21 @@ FROM ubuntu:14.10
 # I made this!
 MAINTAINER Adam Novak <anovak@soe.ucsc.edu>
 
-# Get Ubuntu Whatever with a JDK on it, and up to date packages.
+# Turn on Multiverse, as in <https://github.com/dockerfile/ubuntu/blob/master/Dockerfile>
+RUN sed -i 's/# \(.*multiverse$\)/\1/g' /etc/apt/sources.list
+
+# Set up to install stuff
+RUN apt-get update
+RUN apt-get upgrade -y
+
+# We need apt-add-repository
+RUN apt-get install -y software-properties-common
+
+# And we need wget
+RUN apt-get install -y wget
 
 # Use the commands from <https://github.com/dockerfile/java/blob/master/oracle-
-# java7/Dockerfile> to install Oracle Java 7 and programmatically accept the
+# java7/Dockerfile> to install Oracle Java 7 JDK and programmatically accept the
 # license.
 RUN \
     echo oracle-java7-installer shared/accepted-oracle-license-v1-1 select true | debconf-set-selections && \
@@ -24,10 +37,6 @@ RUN \
 
 # And set JAVA_HOME    
 ENV JAVA_HOME /usr/lib/jvm/java-7-oracle
-
-# Set up to install all my packages
-RUN apt-get update
-RUN apt-get upgrade -y
 
 # Get Git
 RUN apt-get install -y git
