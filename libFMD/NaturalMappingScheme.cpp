@@ -36,10 +36,14 @@ std::vector<Matching> NaturalMappingScheme::findMaxMatchings(
                 extended.getLength(mask, ranges) << " after" << std::endl;
         }
         
-        if(results.isUnique(mask, ranges) && !extended.isUnique(mask, ranges)) {
+        if(results.isUnique(mask, ranges) && extended.isAmbiguous(mask, ranges)) {
             // We searched for something longer and got un-unique
             Log::critical() << "Got additional results by extending!" <<
                 std::endl;
+                
+            Log::critical() << results.getLength(mask, ranges) <<
+                " results before extending, " <<
+                extended.getLength(mask, ranges) << " after" << std::endl;
                 
             Log::critical() << "Query part: " <<
                 query.substr(i, patternLength) << std::endl;
