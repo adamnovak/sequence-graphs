@@ -33,10 +33,11 @@ RUN apt-get install -y cmake
 # Make sure we can use third-party HTTPS APT repositories (like SBT)
 RUN apt-get install -y apt-transport-https
 
-# Get SBT
+# Get SBT (which oddly uses HTTPS for package signing instead of real package
+# signing)
 RUN echo "deb https://dl.bintray.com/sbt/debian /" | tee -a /etc/apt/sources.list.d/sbt.list
 RUN apt-get update
-RUN apt-get install -y sbt
+RUN apt-get install -y --force-yes sbt
 
 # Get maven
 RUN apt-get install -y maven
