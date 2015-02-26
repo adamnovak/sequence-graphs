@@ -22,6 +22,59 @@ class TargetQueuer(object):
     
     """
     
+    class SubtaskContext(object):
+        """
+        Represents a subtask context. Just a shell around the
+        subtask_serial()/subtask_parallel() and end_subtask() methods to make a
+        with block call them right.
+        
+        TODO: refactor and make this primary.
+        
+        """
+        
+        def __init__(self, queuer, mode, name = None):
+            """
+            Makes a new SubtaskContext for a subtask in the given TargetQueuer,
+            in "serial" or "parallel" mode, using the given task name.
+            
+            """
+            
+            # Save our parameters
+            self.queuer = queuer
+            self.mode = mode
+            self.name = name
+            
+        def __enter__(self):
+            """
+            Enter a with block for this context. Make sure queued tasks end up
+            in this subtask.
+            """
+            
+            if self.mode == "serial":
+                # Start a serial subtask
+                self.queuer.subtask_serial(self.name)
+            elif self.mode == "parallel":
+                # Start a parallel subtask
+                self.queuer.subtask_parallel(self.name)
+            else:
+                raise RuntimeError("{} is not a valid mode".format(self.mode))
+                
+            # Don't return us, so the caller can't get us and with us twice or
+            # soemthing.
+            
+        def __exit__(self, exception_type, value, traceback):
+            """
+            Exit a with block for this context. Close the subtask we made.
+            """
+            
+            # End our subtask. The caller better not have messed with it.
+            self.queuer.end_subtask()
+            
+            # Pass any errors through by returning false.
+            return False
+            
+            
+    
     def __init__(self, target):
         """
         Make a new TargetQueuer to queue up targets. No subtasks exist by
@@ -98,6 +151,15 @@ class TargetQueuer(object):
                 raise Exception("Trying to set root twice!")
             
             self.root = target
+            
+    def subtask(self, mode, name=None):
+        """
+        Produce a SubtaskContext in the given mode ("serial" or "parallel") for
+        use with a with statement.
+        
+        """
+        
+        return TargetQueuer.SubtaskContext(self, mode, name)
             
     def get_root(self):
         """
@@ -300,203 +362,234 @@ class AlignerAssessmentTarget(jobTree.scriptTree.target.Target):
         queuer = TargetQueuer(self)
         
         # Start out saying things to do in serial.
-        queuer.subtask_serial("shredThenMap")
+        with queuer.subtask("serial", "shredThenMap"):
         
-        # Make a file for each query's reads
-        read_files = [queuer.tempfile() for _ in self.fasta_list[1:]]
-           
-        # Shred all the reads in parallel
-        queuer.subtask_parallel("mapInParallel")
-        for contig, reads in itertools.izip(self.fasta_list[1:], read_files):
-            queuer.append(ShredTarget(contig, reads))
-        queuer.end_subtask()
-        
-        # Map reads with each scheme in parallel
-        queuer.subtask_parallel("mapAllSchemes")
-        
-        # And we need a serial subtask for BWA: do all the mappings, then merge
-        # them.
-        queuer.subtask_serial("mapConcatBWA")
-        
-        # Do all the mappings and check all the genes.
-        queuer.subtask_parallel("mapAllGenomes")
-            
-        # This holds the checkGenes class counts files from each genome mapped
-        class_count_files = []
-        
-        # This holds the gene set files
-        gene_set_files = []
-            
-        for reads in read_files:
-            # Make a file to save the BWA mappings from this set of reads in
-            bwa_mappings = queuer.tempfile()
-                
-            # We need to BWA map and check genes in serial.
-            queuer.subtask_serial("mapThenCheck")
-                
-            # Make a target to do the mapping
-            queuer.append(BWATarget(self.fasta_list[0], reads, bwa_mappings))
-            
-            # Make a file to put the class counts in
-            class_count_file = queuer.tempfile()
-            class_count_files.append(class_count_file)
-            
-            # Make a file to put the gene sets in
-            gene_set_file = queuer.tempfile()
-            gene_set_files.append(gene_set_file)
-            
-            # And one to do the gene checking
-            queuer.append(TsvGeneCheckerTarget(bwa_mappings, self.gene_beds, 
-                class_count_file, gene_set_file))
-                
-            queuer.end_subtask()
-            
-        # We finished all the mapping and gene checking
-        queuer.end_subtask()
-        
-        # Now we need to merge the checkGenes output TSVs
-        queuer.subtask_parallel("concat")
-        # Concatenate the class counts
-        queuer.append(ConcatenateTarget(class_count_files, 
-            self.out_dir + "/BWA.counts"))
-        # And the gene set files
-        queuer.append(ConcatenateTarget(gene_set_files, 
-            self.out_dir + "/BWA.genes"))
-        # Output TSVs are merged
-        queuer.end_subtask()
-            
-        # End the subtask of the serial steps for the BWA scheme
-        queuer.end_subtask()
-        
-        # And we need a serial subtask for the strict version ofn BWA respecting
-        # mapping quality: do all the mappings, then merge them.
-        queuer.subtask_serial("mapConcatBWAStrict")
-        
-        # Do all the mappings and check all the genes.
-        queuer.subtask_parallel("mapAllGenomes")
-            
-        # This holds the checkGenes class counts files from each genome mapped
-        class_count_files = []
-        
-        # This holds the gene set files
-        gene_set_files = []
-            
-        for reads in read_files:
-            # Make a file to save the BWA mappings from this set of reads in
-            bwa_mappings = queuer.tempfile()
-                
-            # We need to BWA map and check genes in serial.
-            queuer.subtask_serial("mapThenCheck")
-                
-            # Make a target to do the mapping, enforcing a quality bound.
-            queuer.append(BWATarget(self.fasta_list[0], reads, bwa_mappings,
-                min_quality=60))
-            
-            # Make a file to put the class counts in
-            class_count_file = queuer.tempfile()
-            class_count_files.append(class_count_file)
-            
-            # Make a file to put the gene sets in
-            gene_set_file = queuer.tempfile()
-            gene_set_files.append(gene_set_file)
-            
-            # And one to do the gene checking
-            queuer.append(TsvGeneCheckerTarget(bwa_mappings, self.gene_beds, 
-                class_count_file, gene_set_file))
-                
-            queuer.end_subtask()
-            
-        # We finished all the mapping and gene checking
-        queuer.end_subtask()
-        
-        # Now we need to merge the checkGenes output TSVs
-        queuer.subtask_parallel("concat")
-        # Concatenate the class counts
-        queuer.append(ConcatenateTarget(class_count_files, 
-            self.out_dir + "/BWAStrict.counts"))
-        # And the gene set files
-        queuer.append(ConcatenateTarget(gene_set_files, 
-            self.out_dir + "/BWAStrict.genes"))
-        # Output TSVs are merged
-        queuer.end_subtask()
-            
-        # End the subtask of the serial steps for the BWAStrict scheme
-        queuer.end_subtask()
-        
-        for scheme_name, extra_args in self.generateSchemes():
-            # Now we need to do all the other schemes. Each will have a mapping
-            # step and a concatenate step in order.
-            queuer.subtask_serial("mapConcatScheme")
-            
-            # Do all the mappings and check all the genes.
-            queuer.subtask_parallel("mapAllScheme")
-                
-            # This holds the checkGenes class counts files from each genome
-            # mapped
-            class_count_files = []
-            
-            # This holds the gene set files
-            gene_set_files = []
-            
-            # This holds mapping stat files
-            mapping_stat_files = []
-                
-            for reads in read_files:
-                # Make a file to save the mapReads mappings from this set of
-                # reads
-                mappings = queuer.tempfile()
+            # Make a file for each query's reads
+            read_files = [queuer.tempfile() for _ in self.fasta_list[1:]]
+               
+            # Shred all the reads in parallel
+            with queuer.subtask("parallel", "mapInParallel"):
+                for contig, reads in itertools.izip(self.fasta_list[1:],
+                    read_files):
                     
-                # We need to map and check genes in serial for each genome.
-                queuer.subtask_serial("mapThenCheck")
+                    queuer.append(ShredTarget(contig, reads))
+            
+            # Map reads with each scheme in parallel
+            with queuer.subtask("parallel", "mapAllSchemes"):
+            
+                # And we need a serial subtask for BWA: do all the mappings,
+                # then merge them.
+                with queuer.subtask("serial", "mapConcatBWA"):
                 
-                # Make a file to put the mapping stats in
-                mapping_stat_file = queuer.tempfile()
-                mapping_stat_files.append(mapping_stat_file)
+                    # Do all the mappings and check all the genes.
+                    with queuer.subtask("parallel", "mapAllGenomes"):
+                        
+                        # This holds the checkGenes class counts files from each
+                        # genome mapped
+                        class_count_files = []
+                        
+                        # This holds the gene set files
+                        gene_set_files = []
+                            
+                        for reads in read_files:
+                            # Make a file to save the BWA mappings from this set
+                            # of reads in
+                            bwa_mappings = queuer.tempfile()
+                                
+                            # We need to BWA map and check genes in serial.
+                            with queuer.subtask("serial", "mapThenCheck"):
+                                
+                                # Make a target to do the mapping
+                                queuer.append(BWATarget(self.fasta_list[0],
+                                    reads, bwa_mappings))
+                                
+                                # Make a file to put the class counts in
+                                class_count_file = queuer.tempfile()
+                                class_count_files.append(class_count_file)
+                                
+                                # Make a file to put the gene sets in
+                                gene_set_file = queuer.tempfile()
+                                gene_set_files.append(gene_set_file)
+                                
+                                # And one to do the gene checking
+                                queuer.append(TsvGeneCheckerTarget(bwa_mappings,
+                                    self.gene_beds, class_count_file,
+                                    gene_set_file))
+                            
                     
-                # Make a target to do the mapping
-                queuer.append(MapReadsTarget(self.fasta_list[0], reads,
-                    mappings, stats=mapping_stat_file, extra_args=extra_args))
-                
-                # Make a file to put the class counts in
-                class_count_file = queuer.tempfile()
-                class_count_files.append(class_count_file)
-                
-                # Make a file to put the gene sets in
-                gene_set_file = queuer.tempfile()
-                gene_set_files.append(gene_set_file)
-                
-                # And one to do the gene checking
-                queuer.append(TsvGeneCheckerTarget(mappings, self.gene_beds, 
-                    class_count_file, gene_set_file))
+                    # Now we need to merge the checkGenes output TSVs
+                    with queuer.subtask("parallel", "concat"):
+                        # Concatenate the class counts
+                        queuer.append(ConcatenateTarget(class_count_files, 
+                            self.out_dir + "/BWA.counts"))
+                        # And the gene set files
+                        queuer.append(ConcatenateTarget(gene_set_files, 
+                            self.out_dir + "/BWA.genes"))
+                        
                     
-                queuer.end_subtask()
+                # And we need a serial subtask for the strict version of BWA
+                # respecting mapping quality: do all the mappings, then merge
+                # them.
+                with queuer.subtask("serial", "mapConcatBWAStrict"):
                 
-            # We finished all the mapping and gene checking
-            queuer.end_subtask()
-            
-            # Now we need to merge the checkGenes output TSVs
-            queuer.subtask_parallel("concat")
-            # Concatenate the class counts
-            queuer.append(ConcatenateTarget(class_count_files, 
-                self.out_dir + "/" + scheme_name + ".counts"))
-            # And the gene set files
-            queuer.append(ConcatenateTarget(gene_set_files, 
-                self.out_dir + "/" + scheme_name + ".genes"))
-            # And the stats files
-            queuer.append(ConcatenateTarget(mapping_stat_files, 
-                self.out_dir + "/" + scheme_name + ".mapstats"))
-            # Output TSVs are merged
-            queuer.end_subtask()
-            
-            # And that was the last serial step for this scheme.
-            queuer.end_subtask()
-            
-        # End the subtask of doing all the schemes in parallel
-        queuer.end_subtask()
-        
-        # And end the shred-then-map process.
-        queuer.end_subtask()
-        
+                    # Do all the mappings and check all the genes.
+                    with queuer.subtask("parallel", "mapAllGenomes"):
+                        
+                        # This holds the checkGenes class counts files from each
+                        # genome mapped
+                        class_count_files = []
+                        
+                        # This holds the gene set files
+                        gene_set_files = []
+                            
+                        for reads in read_files:
+                            # Make a file to save the BWA mappings from this set
+                            # of reads in
+                            bwa_mappings = queuer.tempfile()
+                                
+                            # We need to BWA map and check genes in serial.
+                            with queuer.subtask("serial", "mapThenCheck"):
+                                
+                                # Make a target to do the mapping, enforcing a
+                                # quality bound.
+                                queuer.append(BWATarget(self.fasta_list[0],
+                                    reads, bwa_mappings, min_quality=60))
+                                
+                                # Make a file to put the class counts in
+                                class_count_file = queuer.tempfile()
+                                class_count_files.append(class_count_file)
+                                
+                                # Make a file to put the gene sets in
+                                gene_set_file = queuer.tempfile()
+                                gene_set_files.append(gene_set_file)
+                                
+                                # And one to do the gene checking
+                                queuer.append(TsvGeneCheckerTarget(bwa_mappings,
+                                    self.gene_beds, class_count_file,
+                                    gene_set_file))
+                                
+                    # Now we need to merge the checkGenes output TSVs
+                    with queuer.subtask("parallel", "concat"):
+                        # Concatenate the class counts
+                        queuer.append(ConcatenateTarget(class_count_files, 
+                            self.out_dir + "/BWAStrict.counts"))
+                        # And the gene set files
+                        queuer.append(ConcatenateTarget(gene_set_files, 
+                            self.out_dir + "/BWAStrict.genes"))
+                            
+                # And we need a serial subtask for the less strict version of
+                # BWA for comparison.
+                with queuer.subtask("serial", "mapConcatBWALessStrict"):
+                
+                    # Do all the mappings and check all the genes.
+                    with queuer.subtask("parallel", "mapAllGenomes"):
+                        
+                        # This holds the checkGenes class counts files from each
+                        # genome mapped
+                        class_count_files = []
+                        
+                        # This holds the gene set files
+                        gene_set_files = []
+                            
+                        for reads in read_files:
+                            # Make a file to save the BWA mappings from this set
+                            # of reads in
+                            bwa_mappings = queuer.tempfile()
+                                
+                            # We need to BWA map and check genes in serial.
+                            with queuer.subtask("serial", "mapThenCheck"):
+                                
+                                # Make a target to do the mapping, enforcing a
+                                # slightly lower quality bound.
+                                queuer.append(BWATarget(self.fasta_list[0],
+                                    reads, bwa_mappings, min_quality=59))
+                                
+                                # Make a file to put the class counts in
+                                class_count_file = queuer.tempfile()
+                                class_count_files.append(class_count_file)
+                                
+                                # Make a file to put the gene sets in
+                                gene_set_file = queuer.tempfile()
+                                gene_set_files.append(gene_set_file)
+                                
+                                # And one to do the gene checking
+                                queuer.append(TsvGeneCheckerTarget(bwa_mappings,
+                                    self.gene_beds, class_count_file,
+                                    gene_set_file))
+                                
+                    # Now we need to merge the checkGenes output TSVs
+                    with queuer.subtask("parallel", "concat"):
+                        # Concatenate the class counts
+                        queuer.append(ConcatenateTarget(class_count_files, 
+                            self.out_dir + "/BWALessStrict.counts"))
+                        # And the gene set files
+                        queuer.append(ConcatenateTarget(gene_set_files, 
+                            self.out_dir + "/BWALessStrict.genes"))
+                
+                
+                for scheme_name, extra_args in self.generateSchemes():
+                    # Now we need to do all the other schemes. Each will have a
+                    # mapping step and a concatenate step in order.
+                    with queuer.subtask("serial", "mapConcatScheme"):
+                    
+                        # Do all the mappings and check all the genes.
+                        with queuer.subtask("parallel", "mapAllScheme"):
+                            
+                            # This holds the checkGenes class counts files from
+                            # each genome mapped
+                            class_count_files = []
+                            
+                            # This holds the gene set files
+                            gene_set_files = []
+                            
+                            # This holds mapping stat files
+                            mapping_stat_files = []
+                                
+                            for reads in read_files:
+                                # Make a file to save the mapReads mappings from
+                                # this set of reads
+                                mappings = queuer.tempfile()
+                                    
+                                # We need to map and check genes in serial for
+                                # each genome.
+                                with queuer.subtask("serial", "mapThenCheck"):
+                                
+                                    # Make a file to put the mapping stats in
+                                    mapping_stat_file = queuer.tempfile()
+                                    mapping_stat_files.append(mapping_stat_file)
+                                        
+                                    # Make a target to do the mapping
+                                    queuer.append(MapReadsTarget(
+                                        self.fasta_list[0], reads, mappings,
+                                        stats=mapping_stat_file,
+                                        extra_args=extra_args))
+                                    
+                                    # Make a file to put the class counts in
+                                    class_count_file = queuer.tempfile()
+                                    class_count_files.append(class_count_file)
+                                    
+                                    # Make a file to put the gene sets in
+                                    gene_set_file = queuer.tempfile()
+                                    gene_set_files.append(gene_set_file)
+                                    
+                                    # And one to do the gene checking
+                                    queuer.append(TsvGeneCheckerTarget(mappings,
+                                        self.gene_beds, class_count_file,
+                                        gene_set_file))
+                        
+                        # Now we need to merge the checkGenes output TSVs
+                        with queuer.subtask("parallel", "concat"):
+                            # Concatenate the class counts
+                            queuer.append(ConcatenateTarget(class_count_files, 
+                                self.out_dir + "/" + scheme_name + ".counts"))
+                            # And the gene set files
+                            queuer.append(ConcatenateTarget(gene_set_files, 
+                                self.out_dir + "/" + scheme_name + ".genes"))
+                            # And the stats files
+                            queuer.append(ConcatenateTarget(mapping_stat_files, 
+                                self.out_dir + "/" + scheme_name + ".mapstats"))
+                            # Output TSVs are merged
+                        
         # Run all the tasks we put in the queuer.
         self.addChildTarget(queuer.get_root())
             
