@@ -95,7 +95,7 @@ LABEL_OPTS=()
 # Do BWA as a group
 GROUPING_OPTS+=("--grouping" "BWA" "--grouping" "BWAStrict")
 CATEGORY_OPTS+=("--categories" "BWA" "--categories" "BWAStrict")
-LABEL_OPTS+=("--category_labels" "BWA" "--category_labels" "$(printf 'BWA\n$Q \\geq 60$')")
+LABEL_OPTS+=("--category_labels" "BWA" "--category_labels" "$(printf 'BWA\nMax MAPQ')")
 
 # And the weakly stable ones
 GROUPING_OPTS+=("--grouping" "Weakly Stable")
