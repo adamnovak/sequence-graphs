@@ -20,7 +20,7 @@ Of course, the many benefits of Docker containerization are unavailable to those
 
 If you don't want to use Docker, but you can actually use your distribution's package manager and install software from source as root on your machine, have a look at the `Dockerfile` and just do what Docker would do.
 
-If you can't use Docker because you can't use your system's package manager, first complain to your system administrator, and then try following the [instructions for manual installation](Manual Installation.md). 
+If you can't use Docker because you can't use your system's package manager, first complain to your system administrator, and then try following the [instructions for manual installation](https://github.com/adamnovak/sequence-graphs/blob/master/Manual%20Installation.md). 
 
 #Running tests
 
