@@ -14,6 +14,28 @@ docker run -ti adamnovak/sequence-graphs
 
 This will put you in your own clone of this Git repository, on a dedicated Ubuntu 14.10 Linux container pre-configured with all the dependencies. The binaries will already have been built for you, and will reside in `createIndex/`. (Don't forget the `-ti` options, or you won't actually get a shell in the container.)
 
+If you want to use the tools on particular files, you will need to download them inside the container, or look into configuring Docker to allow your container to access your computer's filesystem.
+
+When you are done, leave the container's shell with:
+
+```
+exit
+```
+
+Later, to go back to your container, get its name (which will be of the form `<adjective>_<scientist>`) with:
+
+```
+docker ps -a
+```
+
+And then re-start it with
+
+```
+docker start -ai <container_name>
+```
+
+If you `docker run` again, you will create a fresh container, which won't have access to any of the files in the other container.
+
 ##Without Docker
 
 Of course, the many benefits of Docker containerization are unavailable to those who need it most: poor grad students who are trying to use their university's decade-old CentOS servers with outdated versions of everything and no root access to get work done. 
