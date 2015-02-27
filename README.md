@@ -34,6 +34,17 @@ Even if you can't run any of the other tools (which are themselves actually just
 
 #Running command-line tools
 
+The package contains several command-line tools, all of which live in the `createIndex/` subdirectory:
+
+* `createIndex/createIndex`: align and merge FASTA files into a sequence graph using context-driven mapping.
+* `createIndex/mapReads`: index a single FASTA, and map reads from other FASTAs to it using context-driven mapping.
+* `createIndex/evaluateMapability`: index a single FASTA, and determine the context lengths required to map to its positions under context-driven mapping.
+* `createIndex/cactusMerge`: merge two pairs of `.c2h` and `.fa` files.
+
+These tools are currently useful more for the debugging information and alignment statistics that they produce than for the actual alignments or indexes themselves.
+
+##createIndex
+
 The main command line tool is `createIndex`, somewhat confusingly hidden in the `createIndex` directory. Its job is to take one or more FASTA files and align them together using context-driven mapping, producing as output a compressed index to which new sequences can be aligned later. It has a large number of debug options, which are the real point of the tool: it is much more interesting to know how what portion of each sequence is getting aligned, and what the internal graph structure of the alignment is, than it is to align sequences to the completed index. Indeed, the tool to align sequences to the index is currently unfinished.
 
 To run createIndex, do something like:
@@ -43,3 +54,5 @@ createIndex/createIndex testIndex --scheme greedy --mapType natural data/edit1.f
 ```
 
 This will create an index in the directory testIndex (which, as said above, isn't useful for much at the moment) and will more importantly dump a Cactus2HAL-format alignment and associated FASTA file describing the structure of the merged sequence graph produced by mapping `data/edit2.fa` to `data/edit1.fa` and merging corresponding positions. The `.c2h` file can be read according to the specification [here](https://github.com/benedictpaten/cactus/blob/development/hal/impl/hal.c#L13) and the example [here] (https://github.com/adamnovak/sequence-graphs/blob/31992e4f89e2d33604c23df766fdee63fa9123e0/createIndex/pinchGraphUtil.hpp#L53). You can also use the [`halAppendCactusSubtree` tool](https://github.com/glennhickey/cactus2hal/blob/master/src/halAppendCactusSubtree.cpp), which must be installed seperately, to produce a somewhat-more-standard [HAL format](https://github.com/glennhickey/hal) alignment.
+
+
