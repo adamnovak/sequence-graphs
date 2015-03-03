@@ -58,6 +58,11 @@ function series {
         # Write a mean precision/recall point for this series.
         printf "${SERIES_NAME}\t${MEAN_PRECISION}\t${MEAN_RECALL}\n" >> ${FILE_NAME}
         
+        # Log F score
+        F_SCORE=$(echo 2 / \( 1 / ${MEAN_PRECISION} + 1 / ${MEAN_RECALL} \) | bc -l)
+        
+        echo "${SERIES_NAME} scores F=${F_SCORE} at ${MEAN_PRECISION}, ${MEAN_RECALL}"
+        
     done
 }
 
