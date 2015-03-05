@@ -1,10 +1,10 @@
-This repository contains tools for generating and working with Reference Structures and Reference Hierarchies.
+This repository contains tools for generating and working with Reference Structures.
 
 #Installation
 
 ##With Docker
 
-The correct way to install and run the sequence graph tools is through Docker. This repository is automatically built into a [Docker container on the Docker Hub](https://registry.hub.docker.com/u/adamnovak/sequence-graphs/).
+The correct way to install and run the sequence graph tools is through Docker. [This repository](https://github.com/adamnovak/sequence-graphs) is automatically built into a [Docker container on the Docker Hub](https://registry.hub.docker.com/u/adamnovak/sequence-graphs/).
 
 Assuming you have Docker installed and configured to allow your user to run containers, do:
 
