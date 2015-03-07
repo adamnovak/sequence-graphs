@@ -9,10 +9,12 @@ The correct way to install and run the sequence graph tools is through Docker. [
 Assuming you have Docker installed and configured to allow your user to run containers, do:
 
 ````
-docker run -ti adamnovak/sequence-graphs
+docker run -ti adamnovak/sequence-graphs:v0.01
 ```
 
 This will put you in your own clone of this Git repository, on a dedicated Ubuntu 14.10 Linux container pre-configured with all the dependencies. The binaries will already have been built for you, and will reside in `createIndex/`. (Don't forget the `-ti` options, or you won't actually get a shell in the container.)
+
+This gives you a Docker container of a particular stable version. If you want the latest and buggiest version, omit the `:v0.01`.
 
 If you want to use the tools on particular files, you will need to download them inside the container, or look into configuring Docker to allow your container to access your computer's filesystem.
 
