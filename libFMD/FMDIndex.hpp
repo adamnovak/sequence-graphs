@@ -11,14 +11,11 @@
 #include "BWT.h"
 #include "SampledSuffixArray.h"
 #include "SuffixArray.h"
-#include "MarkovModel.hpp"
 
 #include "TextPosition.hpp"
 #include "FMDIndexIterator.hpp"
 #include "GenericBitVector.hpp"
 #include "Mapping.hpp"
-#include "MapAttemptResult.hpp"
-#include "MismatchResultSet.hpp"
 #include "LCPArray.hpp"
 
 // State that the test cases class exists, even though we can't see it.
@@ -43,25 +40,11 @@ public:
     /**
      * Load an FMD and metadata from the given basename. Optionally, specify a
      * complete suffix array that the index can use. The index takes ownership
-     * of that suffix array, and will free it on destruction. Also optionally
-     * takes a MarkovModel to allow enforcing a minimum coding cost for mapping.
-     * The index takes ownership of the Markov model too.
+     * of that suffix array, and will free it on destruction.
      */
-    FMDIndex(std::string basename, SuffixArray* fullSuffixArray = NULL, 
-        MarkovModel* markovModel = NULL);
+    FMDIndex(std::string basename, SuffixArray* fullSuffixArray = NULL);
     
     ~FMDIndex();
-    
-    /***************************************************************************
-     * Index Component Update Functions
-     **************************************************************************/
-    
-    /** 
-     * Use the given Markov model to model the probabilities of query sequences.
-     * Takes ownership of the model (which may be NULL);
-     */
-    void setMarkovModel(MarkovModel* model);
-    
     
     /***************************************************************************
      * Metadata Access Functions
@@ -332,232 +315,6 @@ public:
     int64_t getLF(int64_t index) const;
     
     /***************************************************************************
-     * Mapping Functions
-     **************************************************************************/
-      
-    /**
-     * Attempt to RIGHT-map each base in the query string to a (text, position)
-     * pair. The vector returned will have one entry for each character in the
-     * selected range. Things that right-map to forward strands are on even
-     * texts.
-     * 
-     * If a mask is non-NULL, only positions in the index with a 1 in the mask
-     * will be counted for mapping purposes.
-     *
-     */
-    std::vector<Mapping> mapRight(const std::string& query, 
-        const GenericBitVector* mask, int minContext = 0) const;
-        
-    /**
-     * RIGHT-map to a specific genome, or to all genomes if genome is -1. Same
-     * semantics as the function above.
-     */
-    std::vector<Mapping> mapRight(const std::string& query, int64_t genome = -1, 
-        int minContext = 0) const;
-     
-    /**
-     * LEFT-map to a specific genome, or to all genomes if genome is -1. Same
-     * semantics as the function above. Things that left-map to forward strands
-     * are on even texts.
-     */    
-    std::vector<Mapping> mapLeft(const std::string& query,
-        int64_t genome = -1, int minContext = 0) const;
-    
-    /**
-     * Both left- and right-map the given string to the given genome (or all
-     * genomes if genome is -1). Things that map to forward strands are on even
-     * texts.
-     */
-    std::vector<Mapping> mapBoth(const std::string& query, int64_t genome = -1, 
-        int minContext = 0) const;
-        
-      
-    /**
-     * Try RIGHT-mapping each base in the query to one of the ranges represented
-     * by the range vector. The range vector is in BWT space, and has a 1 in the
-     * first position in each range, and is 0 everywhere else. So rank(k) on it
-     * gives the one-based number of the range containing position k, and we can
-     * easily check if both the start and end of our (backwards) search interval
-     * are in the same range.
-     *
-     * The range starting points must be such that the ranges described are "bi-
-     * ranges": each range has its reverse-complement range also present.
-     *
-     * If a mask is non-NULL, only positions in the index with a 1 in the mask
-     * will be counted for mapping purposes.
-     *
-     * Returns a vector of one-based range numbers for left-mapping each base,
-     * or -1 if the base did not map to a range.
-     */
-    std::vector<int64_t> mapRight(const GenericBitVector& ranges,
-        const std::string& query, const GenericBitVector* mask,
-        int minContext = 0) const;
-        
-    /**
-     * RIGHT-map to ranges using contexts from a specific genome, or all genomes
-     * if genome is -1. Same semantics as the function above.
-     */
-    std::vector<int64_t> mapRight(const GenericBitVector& ranges,
-        const std::string& query, int64_t genome = -1,
-        int minContext = 0) const;
-      
-    /**
-     * Exact left-map without ranges.
-     */
-    std::vector<Mapping> map(const std::string& query, 
-        const GenericBitVector* mask = NULL, int minContext = 0, int start = 0, 
-        int length = -1) const; 
-
-    /**
-     * Exact left-map with ranges ranges by original restart-based algorithm.
-     */
-    std::vector<std::pair<int64_t,size_t>> map(const GenericBitVector& ranges,
-        const std::string& query, const GenericBitVector* mask, 
-        int minContext = 0, int addContext = 0, double multContext = 0, 
-        double minCodingCost = 0, int start = 0, int length = -1) const;
-        
-    /**
-     * Exact left-map with ranges to a genome by original restart-based
-     * algorithm.
-     *
-     * minContext is the minuimum number of bases of context needed to map,
-     * including the base being mapped.
-     *
-     * addContext is the number of bases required after uniqueness in order to 
-     * map.
-     *
-     * multContext is the minimum fraction of the context length at which the
-     * context became unique that is required in order to map. So if it is 2 and
-     * you were unique at 70 bases, you would need at least 140 bases to map.
-     *
-     * minCodingCost is the minimum coding cost under this FMIndex's Markov
-     * model for potential input sequences required for a context to map a base,
-     * in bits.
-     */
-    std::vector<std::pair<int64_t,size_t>> map(const GenericBitVector& ranges,
-        const std::string& query, int64_t genome = -1, int minContext = 0, 
-        int addContext = 0, double multContext = 0, double minCodingCost = 0,
-        int start = 0, int length = -1) const;
-
-    /**
-     * Given a left mapping and a right mapping for a base, disambiguate them to
-     * produce one mapping. Things that consistently left and right-mapped to a
-     * forward strand will be on an even text.
-     *
-     * TODO: Should this be Mapping::disambiguate()?
-     */
-    Mapping disambiguate(const Mapping& left, const Mapping& right) const;
-    
-    /***************************************************************************
-     * Mismatch
-     **************************************************************************/
-    
-    /**
-     * Given a query string, a number of mismatches, and a mask of elligible
-     * positions (which may be null), find all the strings in the index that are
-     * within the specified number of mismatches of the query.
-     *
-     * Returns a MismatchResultSet which contains ranges for each string
-     * within the specified number of mismatches that has any results.
-     *
-     * ranges is a bit vector marking the ranges that belong to each position,
-     * so that we can check for uniqueness and set the is_mapped flag
-     * appropriately.
-     *
-     * pattern gives the query string to be searched for.
-     *
-     * z_max gives the maximum number of mismatches.
-     *
-     * mask indicates which BWT positions should be included by setting their
-     * bits to 1. If it is null, all BWT positions are included.
-     */
-    MismatchResultSet mismatchCount(const GenericBitVector& ranges,
-        const std::string& pattern, size_t z_max, 
-        const GenericBitVector* mask = NULL) const;
-    
-    /**
-     * Given a set of mismatch search results, extend each result in the set,
-     * throwing out those which do not exist in the reference.
-     * 
-     * z_max is the maximum number of mismatches allowed
-     * 
-     * if startExtension is true, we only extend by the correct base.
-     * 
-     * if finishExtension is true we only extend by the incorrect bases.
-     * 
-     * These two options are used for right extension of left-context results,
-     * respectively left extension of right-context results
-     * 
-     * If both bools are false, then we extend with everything. This is what
-     * happens when left-extending a set of left context results.
-     * 
-     * For speed, this implementation does not sort search results.
-     */ 
-    MisMatchAttemptResults misMatchExtend(MisMatchAttemptResults& prevMisMatches,
-        char c, bool backward, size_t z_max, const GenericBitVector* mask,
-        bool startExtension = false, bool finishExtension = false) const;
-        
-    /**
-     * An old implementation of the method described above, sorting the results
-     * in order of number of mismatches. This will allow a speed-up if ever we
-     * want to find the match with the fewest number of mismatches.
-     */
-    MisMatchAttemptResults sortedMisMatchExtend(MisMatchAttemptResults& prevMisMatches,
-            char c, bool backward, size_t z_max, const GenericBitVector* mask) const;
-        
-    /**
-     * A submethod of sortedMisMatchExtend to check for existence and then sort
-     * extension results
-     */
-    void processMisMatchPositions(
-        MisMatchAttemptResults& nextMisMatches,
-        std::vector<std::pair<FMDPosition,size_t>>& waitingMatches,
-        std::vector<std::pair<FMDPosition,size_t>>& waitingMisMatches,
-        const GenericBitVector* mask) const;
-                
-    /**
-     * Implementing mismatch search for Left-Right exact contexts. addContext is
-     * minimum additional context after uniqueness required to map.
-     *
-     * keepIntermediates can be set to false to force a restart at every base,
-     * so minContext will be accurate; there's no way to calculate it if we're
-     * allowed to extend from a previous result.
-     *
-     * Does right mapping.
-     *
-     * Returns mappings to ranges, with their TextPositions set to TextPositions
-     * that are guaranteed to be in those ranges.
-     */
-    std::vector<Mapping> misMatchMap(const GenericBitVector& ranges,
-        const std::string& query, const GenericBitVector* mask, 
-        int minContext = 0, int addContext = 0, double multContext = 0,
-        size_t z_max = 0, bool keepIntermediates = true, int start = 0,
-        int length = -1) const;
-        
-    std::vector<Mapping> misMatchMap(const GenericBitVector& ranges, 
-        const std::string& query, int64_t genome = -1, int minContext = 0, 
-        int addContext = 0, double multContext = 0, size_t z_max = 0,
-        bool keepIntermediates = true, int start = 0, int length = -1) const;
-        
-    // We have to pass back the extra context after uniqueness through a
-    // pointer, because this design is not really suitable for all the extra
-    // options and constraints we want to be able to tack on.
-    MisMatchAttemptResults misMatchMapPosition(const GenericBitVector& ranges, 
-        const std::string& pattern, size_t index, size_t minContext, 
-        size_t addContext, double multContext, 
-        int64_t* extraContext, size_t z_max, 
-        const GenericBitVector* mask = NULL, bool maxContext=true) const;
-        
-    // Here is a slightly better designed overload of the above which leaves min
-    // context enforcement up to its caller, and can be run in two modes to get
-    // min and max context so that that is actually practical. Now can also
-    // consider mismatches on the base being mapped, to produce a properly
-    // extensible intermediate result.
-    MisMatchAttemptResults misMatchMapPosition(const GenericBitVector& ranges, 
-        const std::string& pattern, size_t index, size_t z_max, bool maxContext,
-        bool allowFirstMismatch, const GenericBitVector* mask = NULL) const;
-    
-    /***************************************************************************
      * Iteration Functions
      **************************************************************************/
      
@@ -658,11 +415,6 @@ protected:
     SuffixArray* fullSuffixArray;
     
     /**
-     * Holds a MarkovModel for calculating the coding costs of search strings.
-     */
-    MarkovModel* markovModel;
-    
-    /**
      * Holds the longest common prefix array.
      */
     LCPArray lcpArray;
@@ -688,56 +440,6 @@ protected:
      */
     static thread_local std::map<const FMDIndex*, std::map<size_t,
         std::map<size_t, std::string>::iterator>> threadContigCache;
-    
-    /**
-     * Try left-mapping the given index in the given string, starting from
-     * scratch. Start a backwards search at that index in the string and extend
-     * left until we map to exactly one or zero places. Returns true or false
-     * depending on whether we map, an FMDPosition (in BWT coordinates) that, if
-     * nonempty, can be extended right to try and map the next base to the
-     * right, and the number of characters in the pattern used to make that
-     * FMDPosition.
-     *
-     * If the mapping succeeded, the FMDPosition returned has one thing in it,
-     * which is the mapping upstream context.
-     *
-     * Index must be a valid character position in the string.
-     *
-     * If a mask is specified, only positions in the index with a 1 in the mask
-     * will be counted for mapping purposes.
-     */
-    MapAttemptResult mapPosition(const std::string& pattern,
-        size_t index, const GenericBitVector* mask = NULL) const;
-      
-    /**
-     * Try RIGHT-mapping the given index in the given string to a unique forward-
-     * strand range according to the bit vector of range start points, starting
-     * from scratch. Start a backwards search at that index in the string and
-     * extend left until we map to exactly one or zero ranges. Returns true or
-     * false depending on whether we map, an FMDPosition (in BWT coordinates)
-     * that, if nonempty, can be extended right to try and map the next base to
-     * the right, and the number of characters in the pattern used to make that
-     * FMDPosition.
-     *
-     * The range starting points must be such that the ranges described are "bi-
-     * ranges": each range has its reverse-complement range also present.
-     *
-     * If the mapping succeeded, the FMDPosition returned is completely
-     * contained within one range, which is the range to which the base has been
-     * mapped.
-     *
-     * Index must be a valid character position in the string.
-     *
-     * If a mask is specified, only positions in the index with a 1 in the mask
-     * will be counted for mapping purposes.
-     */
-    creditMapAttemptResult CmapPosition(const GenericBitVector& ranges, 
-        const std::string& pattern, size_t index, 
-        const GenericBitVector* mask = NULL) const;
-        
-    MapAttemptResult mapPosition(const GenericBitVector& ranges, 
-        const std::string& pattern, size_t index, 
-        const GenericBitVector* mask = NULL) const;
         
 private:
     

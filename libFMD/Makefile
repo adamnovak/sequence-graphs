@@ -4,9 +4,7 @@ CXX=g++
 OBJS=FMDIndex.o FMDIndexBuilder.o util.o FMDIndexIterator.o Mapping.o \
 	FMDPosition.o LCPArray.o CSA/BitBuffer.o CSA/BitVectorBase.o \
 	CSA/BitVector.o Log.o GenericBitVector.o ResultRange.o Fasta.o \
-	MarkovModel.o DisambiguateFilter.o CreditFilter.o CreditFilter2.o \
-	MismatchResult.o MismatchResultSet.o MappingScheme.o LRMappingScheme.o \
-	NaturalMappingScheme.o OldNaturalMappingScheme.o StatTracker.o
+	MappingScheme.o NaturalMappingScheme.o StatTracker.o
 	
 # What are our SWIG JNI wrapper objects?
 SWIG_OBJS=swigbindings_wrap.o
@@ -14,11 +12,8 @@ SWIG_OBJS=swigbindings_wrap.o
 # What do we need for our test runner binary?
 TEST_OBJS=Test/TestRunner.o Test/GenericBitVectorTests.o \
 	Test/BWTTests.o Test/FMDIndexBuilderTests.o \
-	Test/FMDIndexTests.o Test/SmallSideTests.o Test/MarkovModelTests.o \
-	Test/DisambiguateFilterTests.o Test/CreditFilterTests.o \
-	Test/FMDIndexMismatchTests.o Test/LRMappingSchemeTests.o \
-	Test/LRMappingSchemeTests2.o Test/IntervalIndexTests.o \
-	Test/NaturalMappingSchemeTests.o Test/NaturalMappingSchemeTests2.o
+	Test/FMDIndexTests.o Test/SmallSideTests.o Test/IntervalIndexTests.o \
+	Test/NaturalMappingSchemeTests.o
 	
 # What projects do we depend on? We have rules for each of these.
 DEPS=libsuffixtools

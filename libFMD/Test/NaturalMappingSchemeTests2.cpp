@@ -9,7 +9,6 @@
 
 #include "../FMDIndex.hpp"
 #include "../FMDIndexBuilder.hpp"
-#include "../MismatchResultSet.hpp"
 #include "../util.hpp"
 
 #include "NaturalMappingSchemeTests2.hpp"
