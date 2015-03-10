@@ -5,7 +5,7 @@ OBJS=pinchGraphUtil.o unixUtil.o indexUtil.o
     
 # What objects do we need for our createIndex binary?
 CREATEINDEX_OBJS=createIndex.o MergeApplier.o MergeScheme.o \
-OverlapMergeScheme.o MappingMergeScheme.o adjacencyComponentUtil.o
+MappingMergeScheme.o adjacencyComponentUtil.o
 
 # And for our mapReads binary?
 MAPREADS_OBJS=mapReads.o

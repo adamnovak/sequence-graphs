@@ -33,9 +33,7 @@
 #include <Log.hpp>
 #include <Fasta.hpp>
 #include <MappingScheme.hpp>
-#include <LRMappingScheme.hpp>
 #include <NaturalMappingScheme.hpp>
-#include <OldNaturalMappingScheme.hpp>
 
 // Grab timers from libsuffixtools
 #include <Timer.h>
@@ -43,7 +41,6 @@
 
 #include "IDSource.hpp"
 #include "ConcurrentQueue.hpp"
-#include "OverlapMergeScheme.hpp"
 #include "MappingMergeScheme.hpp"
 #include "MergeApplier.hpp"
 
@@ -196,7 +193,7 @@ main(
             "File to save context lengths to, one per line")
         ("minHammingBound", boost::program_options::value<size_t>()
             ->default_value(0), 
-            "Minimum Hamming distance lower bound on a maximum unique match");
+            "Minimum edit distance lower bound on a maximum unique match");
             
         
     // And set up our positional arguments

@@ -32,9 +32,7 @@
 #include <Log.hpp>
 #include <Fasta.hpp>
 #include <MappingScheme.hpp>
-#include <LRMappingScheme.hpp>
 #include <NaturalMappingScheme.hpp>
-#include <OldNaturalMappingScheme.hpp>
 
 // Grab timers from libsuffixtools
 #include <Timer.h>
@@ -42,7 +40,6 @@
 
 #include "IDSource.hpp"
 #include "ConcurrentQueue.hpp"
-#include "OverlapMergeScheme.hpp"
 #include "MappingMergeScheme.hpp"
 #include "MergeApplier.hpp"
 
@@ -281,15 +278,6 @@ main(
     // Add all the options
     description.add_options() 
         ("help", "Print help messages") 
-        ("context", boost::program_options::value<size_t>()
-            ->default_value(0), 
-            "Minimum required context length to merge on")
-        ("addContext", boost::program_options::value<size_t>()
-            ->default_value(0), 
-            "Extra context beyond that needed to be unique for greedy LR")
-        ("multContext", boost::program_options::value<double>()
-            ->default_value(0), 
-            "Minimum context length as a fraction of uniqueness distance")
         ("sampleRate", boost::program_options::value<unsigned int>()
             ->default_value(64), 
             "Set the suffix array sample rate to use")
@@ -309,25 +297,28 @@ main(
         ("threads", boost::program_options::value<size_t>()
             ->default_value(16),
             "Number of mapping threads to run")
-        ("credit", "Mapping on credit for greedy scheme")
+        ("stats", boost::program_options::value<std::string>(),
+            "TSV file to save statistics to")
+        ("mapType", boost::program_options::value<std::string>()
+            ->default_value("natural"),
+            "Merging scheme (\"natural\" only)")
+        ("context", boost::program_options::value<size_t>()
+            ->default_value(0), 
+            "Minimum required context length to map on")
+        ("credit", "Enable mapping on credit")
         ("mismatches", boost::program_options::value<size_t>()
             ->default_value(0), 
-            "Maximum allowed number of mismatches")
-        ("mapType", boost::program_options::value<std::string>()
-            ->default_value("LR"),
-            "Mapping scheme (\"natural\", \"old\", or \"LR\")")
+            "Maximum allowed number of mismatches for credit")
         ("ignoreMatchesBelow", boost::program_options::value<size_t>()
             ->default_value(0), 
             "Length below which to ignore maximal unique matches")
         ("minHammingBound", boost::program_options::value<size_t>()
             ->default_value(0), 
-            "Minimum Hamming distance lower bound on a maximum unique match")
+            "Minimum *edit* distance lower bound on a maximum unique match")
         ("maxHammingDistance", boost::program_options::value<size_t>()
             ->default_value(0), 
-            "Maximum Hamming distance from reference location")
-        ("unstable", "Allow unstable mapping for increased coverage")
-        ("stats", boost::program_options::value<std::string>(),
-            "TSV file to save statistics to");
+            "Maximum *edit* distance from reference location")
+        ("unstable", "Allow unstable mapping for increased coverage");
         
     // And set up our positional arguments
     boost::program_options::positional_options_description positionals;
@@ -425,39 +416,9 @@ main(
     // createIndex's code for this.
     MappingScheme* mappingScheme;
     
-    if(options["mapType"].as<std::string>() == "LR") {
-        // We want an LRMappingScheme
-        LRMappingScheme* scheme = new LRMappingScheme(index, &ranges);
-            
-        // Populate it
-        scheme->minContext = options["context"].as<size_t>();
-        scheme->addContext = options["addContext"].as<size_t>();
-        scheme->multContext = options["multContext"].as<double>();
-        scheme->credit = options.count("credit");
-        scheme->z_max = options["mismatches"].as<size_t>();
-        
-        mappingScheme = (MappingScheme*) scheme;
-    } else if(options["mapType"].as<std::string>() == "natural") {
+    if(options["mapType"].as<std::string>() == "natural") {
         // We want a NaturalMappingScheme
         NaturalMappingScheme* scheme = new NaturalMappingScheme(index, &ranges);
-            
-        // Populate it
-        scheme->credit = options.count("credit");
-        scheme->minContext = options["context"].as<size_t>();
-        scheme->z_max = options["mismatches"].as<size_t>();
-        scheme->ignoreMatchesBelow = options[
-            "ignoreMatchesBelow"].as<size_t>();
-        scheme->minHammingBound = options[
-            "minHammingBound"].as<size_t>();
-        scheme->maxHammingDistance = options[
-            "maxHammingDistance"].as<size_t>();
-        scheme->unstable = options.count("unstable");
-        
-        mappingScheme = (MappingScheme*) scheme;
-    } else if(options["mapType"].as<std::string>() == "old") {
-        // We want an OldNaturalMappingScheme
-        OldNaturalMappingScheme* scheme = new OldNaturalMappingScheme(index,
-            &ranges);
             
         // Populate it
         scheme->credit = options.count("credit");

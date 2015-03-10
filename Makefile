@@ -5,9 +5,6 @@ all: createIndex speedMap
 scala: libFMD-jar
 	sbt stage
 
-speedMap:
-	$(MAKE) -C speedMap
-
 createIndex:
 	$(MAKE) -C createIndex
 

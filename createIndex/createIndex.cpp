@@ -29,9 +29,7 @@
 #include <SmallSide.hpp>
 #include <Log.hpp>
 #include <MappingScheme.hpp>
-#include <LRMappingScheme.hpp>
 #include <NaturalMappingScheme.hpp>
-#include <OldNaturalMappingScheme.hpp>
 
 // Grab timers from libsuffixtools
 #include <Timer.h>
@@ -39,7 +37,6 @@
 
 #include "IDSource.hpp"
 #include "ConcurrentQueue.hpp"
-#include "OverlapMergeScheme.hpp"
 #include "MappingMergeScheme.hpp"
 #include "MergeApplier.hpp"
 
@@ -348,58 +345,6 @@ void saveLevelIndex(
 
 /**
  * Create a new thread set from the given FMDIndex, and merge it down by the
- * overlap merging scheme, in parallel. Returns the pinched thread set.
- * 
- * If a context is specified, will not merge on fewer than that many bases of
- * context on a side, whether there is a unique mapping or not.
- */
-stPinchThreadSet*
-mergeOverlap(
-    const FMDIndex& index,
-    size_t context = 0
-) {
-
-    Log::info() << "Creating initial pinch thread set" << std::endl;
-    
-    // Make a thread set from our index.
-    stPinchThreadSet* threadSet = makeThreadSet(index);
-    
-    // Make the merge scheme we want to use
-    OverlapMergeScheme scheme(index, context);
-
-    // Set it running and grab the queue where its results come out.
-    ConcurrentQueue<Merge>& queue = scheme.run();
-    
-    // Make a merge applier to apply all those merges, and plug it in.
-    MergeApplier applier(index, queue, threadSet);
-    
-    // Wait for these things to be done.
-    scheme.join();
-    applier.join();
-    
-    // Write a report before joining trivial boundaries.
-    Log::output() << "Before joining boundaries:" << std::endl;
-    Log::output() << "Pinch Blocks: " <<
-        stPinchThreadSet_getTotalBlockNumber(threadSet) << std::endl;
-    logMemory();
-    
-    // Now GC the boundaries in the pinch set
-    Log::info() << "Joining trivial boundaries..." << std::endl;
-    stPinchThreadSet_joinTrivialBoundaries(threadSet);
-    
-    // Write a similar report afterwards.
-    Log::output() << "After joining boundaries:" << std::endl;
-    Log::output() << "Pinch Blocks: " <<
-        stPinchThreadSet_getTotalBlockNumber(threadSet) << std::endl;
-    logMemory();
-    
-    // Now our thread set has been pinched. Return it.
-    return threadSet;
-
-}
-
-/**
- * Create a new thread set from the given FMDIndex, and merge it down by the
  * greedy merging scheme, in parallel. Returns the pinched thread set.
  *
  * The greedy merging scheme is to take one genome, map the next genome to it,
@@ -581,9 +526,6 @@ main(
     description.add_options() 
         ("help", "Print help messages") 
         ("noMerge", "Don't compute merged level, only make lowest-level index")
-        ("scheme", boost::program_options::value<std::string>()
-            ->default_value("overlap"),
-            "Merging scheme (\"overlap\" or \"greedy\")")
         ("alignment", boost::program_options::value<std::string>(), 
             "File to save .c2h-format alignment in")
         ("alignmentFasta", boost::program_options::value<std::string>(), 
@@ -599,15 +541,6 @@ main(
         ("nontrivialRearrangements", 
             boost::program_options::value<std::string>(), 
             "File in which to dump nontrivial rearrangements")
-        ("context", boost::program_options::value<size_t>()
-            ->default_value(0), 
-            "Minimum required context length to merge on")
-        ("addContext", boost::program_options::value<size_t>()
-            ->default_value(0), 
-            "Extra context beyond that needed to be unique for greedy LR")
-        ("multContext", boost::program_options::value<double>()
-            ->default_value(0), 
-            "Minimum context length as a fraction of uniqueness distance")
         ("sampleRate", boost::program_options::value<unsigned int>()
             ->default_value(64), 
             "Set the suffix array sample rate to use")
@@ -618,22 +551,28 @@ main(
             ->required()
             ->multitoken(),
             "FASTA files to load")
-        ("credit", "Enable mapping on credit")
+        ("scheme", boost::program_options::value<std::string>()
+            ->default_value("greedy"),
+            "Merging scheme (\"greedy\" only)")
         ("mapType", boost::program_options::value<std::string>()
-            ->default_value("LR"),
-            "Merging scheme (\"natural\", \"old\", or \"LR\")")
+            ->default_value("natural"),
+            "Merging scheme (\"natural\" only)")
+        ("context", boost::program_options::value<size_t>()
+            ->default_value(0), 
+            "Minimum required context length to map on")
+        ("credit", "Enable mapping on credit")
         ("mismatches", boost::program_options::value<size_t>()
             ->default_value(0), 
-            "Maximum allowed number of mismatches")
+            "Maximum allowed number of mismatches for credit")
         ("ignoreMatchesBelow", boost::program_options::value<size_t>()
             ->default_value(0), 
             "Length below which to ignore maximal unique matches")
         ("minHammingBound", boost::program_options::value<size_t>()
             ->default_value(0), 
-            "Minimum Hamming distance lower bound on a maximum unique match")
+            "Minimum *edit* distance lower bound on a maximum unique match")
         ("maxHammingDistance", boost::program_options::value<size_t>()
             ->default_value(0), 
-            "Maximum Hamming distance from reference location")
+            "Maximum *edit* distance from reference location")
         ("unstable", "Allow unstable mapping for increased coverage");
         
     // And set up our positional arguments
@@ -738,11 +677,7 @@ main(
     
     // We want to flag whether we want mismatches
     
-    if(mergeScheme == "overlap") {
-        // Make a thread set that's all merged, with the given minimum merge
-        // context.
-        threadSet = mergeOverlap(index, options["context"].as<size_t>());
-    } else if(mergeScheme == "greedy") {
+    if(mergeScheme == "greedy") {
         // Use the greedy merge instead.
         threadSet = mergeGreedy(index, [&](const FMDIndex& index,
             const GenericBitVector& ranges, const GenericBitVector* mask) {
@@ -754,41 +689,10 @@ main(
             // Hiding our parameters by sneaking an option struct into a closure
             // seems a bit odd...
         
-            if(options["mapType"].as<std::string>() == "LR") {
-                // We want an LRMappingScheme
-                LRMappingScheme* scheme = new LRMappingScheme(index, &ranges,
-                    mask);
-                    
-                // Populate it
-                scheme->minContext = options["context"].as<size_t>();
-                scheme->addContext = options["addContext"].as<size_t>();
-                scheme->multContext = options["multContext"].as<double>();
-                scheme->credit = options.count("credit");
-                scheme->z_max = options["mismatches"].as<size_t>();
-                
-                return (MappingScheme*) scheme;
-            } else if(options["mapType"].as<std::string>() == "natural") {
+            if(options["mapType"].as<std::string>() == "natural") {
                 // We want a NaturalMappingScheme
                 NaturalMappingScheme* scheme = new NaturalMappingScheme(index,
                     &ranges, mask);
-                    
-                // Populate it
-                scheme->credit = options.count("credit");
-                scheme->minContext = options["context"].as<size_t>();
-                scheme->z_max = options["mismatches"].as<size_t>();
-                scheme->ignoreMatchesBelow = options[
-                    "ignoreMatchesBelow"].as<size_t>();
-                scheme->minHammingBound = options[
-                    "minHammingBound"].as<size_t>();
-                scheme->maxHammingDistance = options[
-                    "maxHammingDistance"].as<size_t>();
-                scheme->unstable = options.count("unstable");
-                
-                return (MappingScheme*) scheme;
-            } else if(options["mapType"].as<std::string>() == "old") {
-                // We want an OldNaturalMappingScheme
-                OldNaturalMappingScheme* scheme = new OldNaturalMappingScheme(
-                    index, &ranges, mask);
                     
                 // Populate it
                 scheme->credit = options.count("credit");
@@ -826,36 +730,19 @@ main(
     }
     
     if(options.count("alignment")) {
-        if(mergeScheme == "overlap") {
-            // We can have self-alignment in the first sequence, so we need to
-            // use this serializer.
         
-            // Save the alignment defined by the pinched pinch graph to the file
-            // the user specified. Save the number of bases of root sequence
-            // that were used in the center of the star tree.
-            size_t rootBases = writeAlignment(threadSet, index,
-                options["alignment"].as<std::string>());
-                
-            if(options.count("alignmentFasta")) {
-                // Also save a FASTA with the sequences necessary to generate a
-                // HAL from the above.
-                writeAlignmentFasta(fastas, rootBases,
-                    options["alignmentFasta"].as<std::string>());
-            }
-        } else {
-            // We are using the greedy scheme and can't have self-alignment in
-            // the first genome, so we can use this star tree serializer.
+        // We are using the greedy scheme and can't have self-alignment in
+        // the first genome, so we can use this star tree serializer.
+        
+        writeAlignmentWithReference(threadSet, index, 
+            options["alignment"].as<std::string>(), 0);
             
-            writeAlignmentWithReference(threadSet, index, 
-                options["alignment"].as<std::string>(), 0);
-                
-            if(options.count("alignmentFasta")) {
-                // Also save a FASTA, without the rootSeq sequence at all.
-                writeAlignmentFasta(fastas, -1,
-                    options["alignmentFasta"].as<std::string>());
-            }
-            
+        if(options.count("alignmentFasta")) {
+            // Also save a FASTA, without the rootSeq sequence at all.
+            writeAlignmentFasta(fastas, -1,
+                options["alignmentFasta"].as<std::string>());
         }
+            
     }
     
     // Make an IDSource to produce IDs not already claimed by contigs.

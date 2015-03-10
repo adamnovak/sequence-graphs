@@ -3,9 +3,6 @@
 #include <Log.hpp>
 #include <util.hpp>
 
-#include <CreditFilter2.hpp>
-#include <DisambiguateFilter.hpp>
-
 #include "MappingMergeScheme.hpp"
 
 const size_t MappingMergeScheme::MAX_THREADS = 32;
