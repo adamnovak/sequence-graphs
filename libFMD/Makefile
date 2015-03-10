@@ -3,7 +3,7 @@ CXX=g++
 # What are our generic objects?
 OBJS=FMDIndex.o FMDIndexBuilder.o util.o FMDIndexIterator.o Mapping.o \
 	FMDPosition.o LCPArray.o CSA/BitBuffer.o CSA/BitVectorBase.o \
-	CSA/BitVector.o Log.o GenericBitVector.o ResultRange.o Fasta.o \
+	CSA/BitVector.o Log.o GenericBitVector.o Fasta.o \
 	MappingScheme.o NaturalMappingScheme.o StatTracker.o
 	
 # What are our SWIG JNI wrapper objects?

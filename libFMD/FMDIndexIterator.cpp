@@ -174,7 +174,7 @@ bool FMDIndexIterator::recurse(size_t baseNumber) {
 
 
 
-    if(extension.isEmpty()) {
+    if(extension.getLength() == 0) {
         // This would be a suffix that doesn't appear.
         return false;
     }

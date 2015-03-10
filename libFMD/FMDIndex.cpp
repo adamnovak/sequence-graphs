@@ -711,7 +711,7 @@ FMDPosition FMDIndex::count(std::string pattern) const {
     // Start at the end and select the first character.
     FMDPosition position = getCharPosition(pattern[pattern.size() - 1]);
     
-    for(int i = pattern.size() - 2; !position.isEmpty() && i >= 0; i--) {
+    for(int i = pattern.size() - 2; position.getLength() > 0 && i >= 0; i--) {
         // Extend backwards with each character
         extendFast(position, pattern[i], true);
     }

@@ -75,6 +75,17 @@ public:
         end_offset = value;
     }
     
+    /**
+     * How many BWT indices are selected by this range (ignoring any sort of
+     * view, mask, etc.)?
+     *
+     * Minimum length is 0.
+     */
+    inline size_t getLength() {
+        // Make sure we don't try and return a negative number as a size_t.
+        return std::min(end_offset + (int64_t) 1, (int64_t) 0);        
+    }
+    
     /** 
      * Flip the FMDPosition around so the reverse complement interval is the
      * forward interval and visa versa.
