@@ -5,11 +5,6 @@
 #include <algorithm>
 #include <utility>
 
-// Forward declaration because we have a bit of a circular dependency with us
-// and the index and the view.
-class FMDPosition;
-
-#include "FMDIndexView.hpp"
 #include "GenericBitVector.hpp"
 #include "Log.hpp"
 
@@ -101,75 +96,6 @@ public:
 
 
     /**
-     * Is an FMDPosition empty under the specified view?
-     */
-    inline bool isEmpty(const FMDIndexView& view) {
-        return getLength(view) <= 0;
-    }
-
-    /**
-     * Does this FMDPosition indicate a unique merged position under the gievn
-     * view? This relies on the view not having ranges defined with nothing
-     * masked in, and thus can avoid needing to check if multiple merged ranges
-     * belong to the same position.
-     */
-    inline bool isUnique(const FMDIndexView& view) {
-    
-        if(isEmpty(view)) {
-            // If it's empty, it's not unique.
-            return false;
-        }
-        
-        // Return true if we can identify a range number, false otherwise (in
-        // which case we span multiple ranges).
-        return range(view) != -1;
-    
-    }
-    
-    /**
-     * Does an FMDPosition select multiple masked-in positions or merged ranges
-     * under the given view?
-     */
-    inline bool isAmbiguous(const FMDIndexView& view) const {
-        
-        // If it's not empty and it's not unique, it must have multiple things
-        // in it.
-        return !isEmpty(view) && !isUnique(view);
-    }
-    
-    /**
-     * Given that this FMDPosition is unique, get the TextPosition it uniquely
-     * maps to.
-     */
-    inline TextPosition getTextPosition(const FMDIndexView& view) const {
-        // Since we are unique, we know range is not -1. Grab it.
-        int64_t rangeNumber = getRangeNumber(view);
-        
-        if(view.getPositions().count(rangeNumber)) == 0) {
-            // This range has no assigned position, so it must belong to the
-            // TextPosition you get if you locate its first BWT position (i.e.
-            // the one at that 1).
-            
-            if(view.getRanges() == nullptr) {
-                // But ranges aren't even merged, so the range number is just a
-                // BWT index. We can just locate it.
-                return view.getIndex().locate(rangeNumber);
-            } else {
-                // This is an actual range number. Find the 1 that begins this
-                // range, and locate it, and use that TextPosition.
-                return view.getIndex().locate(view.getRanges().select(
-                    rangeNumber));
-            }
-            
-        } else {
-            // Go look up the right TextPosition for this range and use that.
-            return view.getPositions()[rangeNumber];
-        }
-        
-    }
-
-
-    /**
      * Provide pretty-printing for FMDPositions. See
      * <http://www.parashift.com/c++-faq/output-operator.html>
      */
@@ -177,14 +103,6 @@ public:
         FMDPosition const& position);
 
 protected:
-    /**
-     * Return the index of the range that the forward-strand interval of this
-     * FMDPosition is contained in, or -1 if it is not contained in any such
-     * interval.
-     */
-    int64_t getRangeNumber(const FMDIndexView& view) const;
-
-    
     int64_t forward_start;
     int64_t reverse_start;
     // Offset 0 = only the entry at start/end. -1 = empty.

@@ -52,6 +52,101 @@ public:
     const inline std::map<size_t, TextPosition>& getPositions() const {
         return positions;    
     }
+    
+    /***************************************************************************
+     * Functions for working with FMDPositions
+     **************************************************************************/
+    
+    /**
+     * Is an FMDPosition empty under this view?
+     */
+    inline bool isEmpty(const FMDPosition& position) {
+        if(position.getEndOffset() < 0) {
+            // It has no BWT positions in it
+            return true;
+        } else if(getMask() != nullptr) {
+            // It has some BWT positions in it, and we have a mask
+            
+            // Return whether we have any ones in the mask between the interval
+            // endpoints.
+            return getMask()->rank(position.getForwardStart() + 
+                position.getEndOffset()) + 1 - getMask()->rank(
+                position.getForwardStart(), true) > 0;
+        } else {
+            // It contains BWT positions and we have no mask, so they are all
+            // masked in.
+            return false;
+        }
+    }
+
+    /**
+     * Does this FMDPosition indicate a unique merged position under this view?
+     * This relies on the view not having ranges defined with nothing masked in,
+     * and thus can avoid needing to check if multiple merged ranges belong to
+     * the same position.
+     */
+    inline bool isUnique(const FMDPosition& position) {
+    
+        if(isEmpty(position)) {
+            // If it's empty, it's not unique.
+            return false;
+        }
+        
+        // Return true if we can identify a range number, false otherwise (in
+        // which case we span multiple ranges).
+        return getRangeNumber(position) != -1;
+    
+    }
+    
+    /**
+     * Does an FMDPosition select multiple masked-in positions or merged ranges
+     * under this view?
+     */
+    inline bool isAmbiguous(const FMDPosition& position) const {
+        
+        // If it's not empty and it's not unique, it must have multiple things
+        // in it.
+        return !isEmpty(position) && !isUnique(position);
+    }
+    
+    /**
+     * Given that this FMDPosition is unique, get the TextPosition it uniquely
+     * maps to.
+     */
+    inline TextPosition getTextPosition(
+        const FMDIndexPosition& position) const {
+        
+        // Since we are unique, we know range is not -1. Grab it.
+        int64_t rangeNumber = getRangeNumber(view);
+        
+        if(getPositions().count(rangeNumber)) == 0) {
+            // This range has no assigned position, so it must belong to the
+            // TextPosition you get if you locate its first BWT position (i.e.
+            // the one at that 1).
+            
+            if(getRanges() == nullptr) {
+                // But ranges aren't even merged, so the range number is just a
+                // BWT index. We can just locate it.
+                return getIndex().locate(rangeNumber);
+            } else {
+                // This is an actual range number. Find the 1 that begins this
+                // range, and locate it, and use that TextPosition.
+                return getIndex().locate(getRanges().select(rangeNumber));
+            }
+            
+        } else {
+            // Go look up the right TextPosition for this range and use that.
+            return getPositions()[rangeNumber];
+        }
+        
+    }
+    
+    /**
+     * Return the index of the range that the forward-strand interval of this
+     * FMDPosition is contained in, or -1 if it is not contained in any such
+     * interval.
+     */
+    int64_t getRangeNumber(const FMDIndexView& view) const;
 
 private:
     /**
