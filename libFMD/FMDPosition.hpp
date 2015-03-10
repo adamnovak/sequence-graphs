@@ -5,6 +5,11 @@
 #include <algorithm>
 #include <utility>
 
+// Forward declaration because we have a bit of a circular dependency with us
+// and the index and the view.
+class FMDPosition;
+
+#include "FMDIndexView.hpp"
 #include "GenericBitVector.hpp"
 #include "Log.hpp"
 
@@ -75,8 +80,6 @@ public:
         end_offset = value;
     }
     
-    
-    
     /** 
      * Flip the FMDPosition around so the reverse complement interval is the
      * forward interval and visa versa.
@@ -96,174 +99,92 @@ public:
      */
     bool operator==(const FMDPosition& other) const;
 
+
     /**
-     * Is an FMDPosition empty? If a mask is specified, only counts matches with
-     * 1s in the mask.
-     *
-     * Does not depend on ranges.
+     * Is an FMDPosition empty under the specified view?
      */
-    inline bool isEmpty(const GenericBitVector* mask = NULL) const {
-        // This is guaranteed to take the not-super-slow path, since no ranges
-        // vector is specified.
-        return getLength(mask) <= 0;
+    inline bool isEmpty(const FMDIndexView& view) {
+        return getLength(view) <= 0;
     }
-    
+
     /**
-     * Does an FMDPosition include exactly one masked-in position or range of
-     * positions?
-     *
-     * If mask is null, assumes all positions are masked in.
-     *
-     * If ranges is null, assumes no positions are merged.
+     * Does this FMDPosition indicate a unique merged position under the gievn
+     * view? This relies on the view not having ranges defined with nothing
+     * masked in, and thus can avoid needing to check if multiple merged ranges
+     * belong to the same position.
      */
-    inline bool isUnique(const GenericBitVector* mask = NULL,
-        const GenericBitVector* ranges = NULL) const {
-        
-        if(isEmpty(mask)) {
+    inline bool isUnique(const FMDIndexView& view) {
+    
+        if(isEmpty(view)) {
             // If it's empty, it's not unique.
             return false;
         }
         
         // Return true if we can identify a range number, false otherwise (in
         // which case we span multiple ranges).
-        return range(*ranges, mask) != -1;
-        
+        return range(view) != -1;
+    
     }
     
     /**
-     * Does an FMDPosition select multiple masked-in positions or merged ranges?
-     *
-     * If mask is null, assumes all positions are masked in.
-     *
-     * If ranges is null, assumes no positions are merged.
+     * Does an FMDPosition select multiple masked-in positions or merged ranges
+     * under the given view?
      */
-    inline bool isAmbiguous(const GenericBitVector* mask = NULL,
-        const GenericBitVector* ranges = NULL) const {
+    inline bool isAmbiguous(const FMDIndexView& view) const {
         
         // If it's not empty and it's not unique, it must have multiple things
         // in it.
-        return !isEmpty(mask) && !isUnique(mask, ranges);
+        return !isEmpty(view) && !isUnique(view);
     }
-
+    
     /**
-     * Return the actual number of matches represented by an FMDPosition. If a
-     * mask is specified, only counts matches with 1s in the mask.
-     *
-     * If ranges is not null, counts each range marked by a leading 1 in that
-     * vector as a single position.
+     * Given that this FMDPosition is unique, get the TextPosition it uniquely
+     * maps to.
      */
-    inline int64_t getLength(const GenericBitVector* mask = NULL,
-        const GenericBitVector* ranges = NULL) const {
+    inline TextPosition getTextPosition(const FMDIndexView& view) const {
+        // Since we are unique, we know range is not -1. Grab it.
+        int64_t rangeNumber = getRangeNumber(view);
         
-        if((mask == NULL && ranges == NULL) || end_offset == -1) {
-            // Fast path: no mask or ranges, or an actually empty interval. Can
-            // just look at our end offset.
-            return end_offset + 1;
-        } else if(ranges == NULL) {
-            // Slow path: need to make rank queries, but we know the interval is
-            // nonempty. Get the rank at the end of the region (inclusive), and
-            // subtract the rank at the beginning of the region (exclusive). We
-            // need a +1 since we actually measure 1 the inclusive rank of the
-            // previous position and need to get rid of the extra 1.
+        if(view.getPositions().count(rangeNumber)) == 0) {
+            // This range has no assigned position, so it must belong to the
+            // TextPosition you get if you locate its first BWT position (i.e.
+            // the one at that 1).
             
-            Log::trace() << "Mask rank at " << forward_start + end_offset <<
-                ": " << mask->rank(forward_start + end_offset) << std::endl;
-                
-            Log::trace() << "Mask rank at least at " << forward_start <<
-                ": " << mask->rank(forward_start, true) << std::endl;
+            if(view.getRanges() == nullptr) {
+                // But ranges aren't even merged, so the range number is just a
+                // BWT index. We can just locate it.
+                return view.getIndex().locate(rangeNumber);
+            } else {
+                // This is an actual range number. Find the 1 that begins this
+                // range, and locate it, and use that TextPosition.
+                return view.getIndex().locate(view.getRanges().select(
+                    rangeNumber));
+            }
             
-            return mask->rank(forward_start + end_offset) + 1 - 
-                mask->rank(forward_start, true);
-        } else if(mask == NULL) {
-            // Slow path: need to make rank queries in the ranges, but we don't
-            // have to deal with a mask.
-            
-            // The answer is 1 more than the number of 1s between the start and
-            // the past-the-end position.
-            return ranges->rank(forward_start + end_offset) - 
-                ranges->rank(forward_start) + 1;
         } else {
-            // Slowest path: need to deal with both a mask and ranges.
-            
-            // This will just be the number of masked-in ranges.
-            // TODO: are we basically replicating that method here?
-            return this->ranges(*ranges, mask);
-        }
-    }
-    
-    /**
-     * Get the BWT index of each selected, masked-in position.
-     */
-    inline std::vector<int64_t> getResults(
-        const GenericBitVector* mask = NULL) const {
-        // TODO: Implement based on rank and select. For now we just scan.
-        
-        std::vector<int64_t> toReturn;
-        
-        for(size_t i = getForwardStart();
-            i <= getForwardStart() + getEndOffset(); i++) {
-        
-            // For each base in the range
-            
-            if(!mask || mask->isSet(i)) {
-                // If there is no mask or we're in it, take this position.
-                toReturn.push_back(i);
-            }
+            // Go look up the right TextPosition for this range and use that.
+            return view.getPositions()[rangeNumber];
         }
         
-        return toReturn;
-    }
-    
-    /**
-     * Get a single BWT position that is selected and masked in. Assumes such a
-     * position exists.
-     */
-    inline int64_t getResult(const GenericBitVector* mask = NULL) const {
-        // TODO: Implement based on rank and select. For now we just scan.
-        
-        for(size_t i = getForwardStart();
-            i <= getForwardStart() + getEndOffset(); i++) {
-        
-            // For each base in the range
-            
-            if(!mask || mask->isSet(i)) {
-                // If there is no mask or we're in it, take this position.
-                return i;
-            }
-        }
-        
-        throw std::runtime_error("Attempted to get non-existent result.");
     }
 
-    /**
-     * Return the index of the range that the forward-strand interval of this
-     * FMDPosition is contained in, or -1 if it is not contained in any such
-     * interval.
-     *
-     * Note that empty intervals (where the end is before the start) may still
-     * be contained in ranges.
-     *
-     * If a mask is specified, only counts matches with 1s in the mask.
-     */
-    int64_t range(const GenericBitVector& ranges, 
-        const GenericBitVector* mask = NULL) const;
 
-    /**
-     * Return the number of ranges that the forward-strand interval of this
-     * FMDPosition overlaps. If a mask is specified, only counts matches with 1s
-     * in the mask.
-     */
-    int64_t ranges(const GenericBitVector& ranges, 
-        const GenericBitVector* mask = NULL) const;
-    
     /**
      * Provide pretty-printing for FMDPositions. See
      * <http://www.parashift.com/c++-faq/output-operator.html>
      */
     friend std::ostream& operator<< (std::ostream& o, 
         FMDPosition const& position);
-    
+
 protected:
+    /**
+     * Return the index of the range that the forward-strand interval of this
+     * FMDPosition is contained in, or -1 if it is not contained in any such
+     * interval.
+     */
+    int64_t getRangeNumber(const FMDIndexView& view) const;
+
+    
     int64_t forward_start;
     int64_t reverse_start;
     // Offset 0 = only the entry at start/end. -1 = empty.
