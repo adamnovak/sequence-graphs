@@ -16,7 +16,7 @@ std::vector<Matching> NaturalMappingScheme::findMaxMatchings(
     std::vector<Matching> toReturn;
  
     // Start with everything selected.
-    FMDPosition results = index.getCoveringPosition();
+    FMDPosition results = view.getIndex().getCoveringPosition();
     
     // How many characters are currently searched?
     size_t patternLength = 0;
@@ -27,140 +27,40 @@ std::vector<Matching> NaturalMappingScheme::findMaxMatchings(
         
         // We're going to extend backward with this new base.
         FMDPosition extended = results;
-        index.extendLeftOnly(extended, query[i]);
+        view.getIndex().extendLeftOnly(extended, query[i]);
         
-        if(i < 100) {
-            // See if we are somehow getting more results on extension.
-            Log::info() << results.getLength(mask, ranges) <<
-                " results before extending, " <<
-                extended.getLength(mask, ranges) << " after" << std::endl;
-        }
-        
-        if(results.isUnique(mask, ranges) && extended.isAmbiguous(mask, ranges)) {
-            // We searched for something longer and got un-unique
-            Log::critical() << "Got additional results by extending!" <<
-                std::endl;
-                
-            Log::critical() << results.getLength(mask, ranges) <<
-                " results before extending, " <<
-                extended.getLength(mask, ranges) << " after" << std::endl;
-                
-            Log::critical() << "Query part: " <<
-                query.substr(i, patternLength) << std::endl;
-                
-            Log::critical() << "Query range: " << i << " - " <<
-                i + patternLength << std::endl;
-                
-            Log::critical() << "Before extending: " << results << std::endl;
-            for(int64_t j = results.getForwardStart();
-                j < results.getForwardStart() + results.getEndOffset() + 1;
-                j++) {
-                
-                // Log each selected position before
-                
-                Log::critical() << index.display(j) << "\t" <<
-                    index.locate(j) << "\t" << 
-                    (mask == NULL ? -1 : mask->isSet(j)) << "\t" << 
-                    (ranges == NULL ? -1 : ranges->isSet(j)) << "\t" <<
-                    std::endl;
-                
-            }
-            
-            Log::critical() << "After extending: " << extended << std::endl;
-            for(int64_t j = extended.getForwardStart();
-                j < extended.getForwardStart() + extended.getEndOffset() + 1;
-                j++) {
-                
-                // Log each selected position after
-                
-                Log::critical() << index.display(j) << "\t" <<
-                    index.locate(j) << "\t" << 
-                    (mask == NULL ? -1 : mask->isSet(j)) << "\t" << 
-                    (ranges == NULL ? -1 : ranges->isSet(j)) << "\t" <<
-                    std::endl;
-                
-            }
-            
-            Log::critical() << "Aborting run" << std::endl << std::flush;
-            
-            throw std::runtime_error("Got additional results by extending");
-                
-        }
-        
-        if(results.isUnique(mask, ranges) && extended.isEmpty(mask)) {
+        if(view.isUnique(results) && view.isEmpty(extended)) {
             // We are already a maximal unique match and can't extend any more.
             // Report ourselves.
             // Note that we can only ever do this once per left endpoint.
             
-            // What BWT indices are selected?
-            auto bwtIndices = results.getResults(mask);
-            
-            // We're going to find the lowest-text, lowest-offset correxponding
-            // text position. Start out with the biggest a TextPosition can be.
-            TextPosition smallest(std::numeric_limits<size_t>::max(),
-                std::numeric_limits<size_t>::max());
-            
-            for(auto bwtIndex : bwtIndices) {
-                // For each BWT index masked in (there must be at least 1), find
-                // its corresponding TextPosition.
-                TextPosition candidate = index.locate(bwtIndex);
-                
-                if(candidate < smallest) {
-                    // If it has a lower text or offset, use it.
-                    // Guaranteed to overwrite the original fake value.
-                    smallest = candidate;
-                }
-            }
             
             // Make a Matching to this chosen place. Make sure we fix the left
             // endpoint in the query as i + 1, since we moved i left already and
             // we want to talk about where it was last loop.
-            auto maxMatching = Matching(i + 1,  smallest, patternLength);
+            auto maxMatching = Matching(i + 1,  view.getTextPosition(results),
+                patternLength);
             
             // Send it off
             if(i < 100) {
                 Log::info() << "Found max matching " << maxMatching << std::endl;
             }
             toReturn.push_back(maxMatching);
-        } else if(results.isUnique(mask, ranges)) {
-            // We're unique but not maximal on the left (extended is not empty
-            // under mask)
-            if(i < 100) {
-                Log::info() << "Extending max matching left to " << i << " + " <<
-                    patternLength << std::endl;
-            }
-        } else {
-            // We aren't unique yet
-            if(i < 100) {
-                Log::info() << "Not yet unique at " << i << " + " << patternLength <<
-                    std::endl;
-            }
         }
         
         
-        while(extended.isEmpty(mask)) {
+        while(view.isEmpty(extended)) {
             // If you can't extend, retract until you can. TODO: Assumes we
             // can find at least one result for any character.
             
             // Retract the character
             FMDPosition retracted = results;
             // Make sure to drop characters from the total pattern length.
-            index.retractRightOnly(retracted, --patternLength);
-            
-            if(i < 100) {
-                Log::info() << "Retracting to " << patternLength << std::endl;
-            }
+            view.getIndex().retractRightOnly(retracted, --patternLength);
             
             // Try extending again
             extended = retracted;
-            index.extendLeftOnly(extended, query[i]);
-            
-            if(i < 100) {
-                Log::info() << retracted.getLength(mask, ranges) <<
-                    " results after retracting, " <<
-                    extended.getLength(mask, ranges) << " after extending" <<
-                    std::endl;
-            }
+            view.getIndex().extendLeftOnly(extended, query[i]);
             
             // Say that last step we came from retracted.
             results = retracted;
@@ -172,34 +72,16 @@ std::vector<Matching> NaturalMappingScheme::findMaxMatchings(
         patternLength++;
     }
     
-    if(results.isUnique(mask, ranges)) {
+    if(view.isUnique(results)) {
         Log::info() << "Unique at left edge" << std::endl;
     
         // We are a maximal unique match butted up against the left edge. Report
         // it.
         // TODO: don't duplicate this code.
-        // What BWT indices are selected?
-        auto bwtIndices = results.getResults(mask);
-        
-        // We're going to find the lowest-text, lowest-offset correxponding
-        // text position. Start out with the biggest a TextPosition can be.
-        TextPosition smallest(std::numeric_limits<size_t>::max(),
-            std::numeric_limits<size_t>::max());
-        
-        for(auto bwtIndex : bwtIndices) {
-            // For each BWT index masked in (there must be at least 1), find
-            // its corresponding TextPosition.
-            TextPosition candidate = index.locate(bwtIndex);
-            
-            if(candidate < smallest) {
-                // If it has a lower text or offset, use it.
-                // Guaranteed to overwrite the original fake value.
-                smallest = candidate;
-            }
-        }
         
         // Make a Matching to this chosen place.
-        auto maxMatching = Matching(0,  smallest, patternLength);
+        auto maxMatching = Matching(0,  view.getTextPosition(results),
+            patternLength);
         
         // Send it off
         Log::info() << "Found max matching " << maxMatching << std::endl;
@@ -222,7 +104,7 @@ std::vector<Matching>  NaturalMappingScheme::findMinMatchings(
     std::vector<Matching> toReturn;
  
     // Start with everything selected.
-    FMDPosition results = index.getCoveringPosition();
+    FMDPosition results = view.getIndex().getCoveringPosition();
     
     // How many characters are currently searched?
     size_t patternLength = 0;
@@ -241,21 +123,21 @@ std::vector<Matching>  NaturalMappingScheme::findMinMatchings(
         
         // We're going to extend backward with this new base.
         FMDPosition extended = results;
-        index.extendLeftOnly(extended, query[i]);
+        view.getIndex().extendLeftOnly(extended, query[i]);
         
-        while(extended.isEmpty(mask)) {
+        while(view.isEmpty(extended)) {
             // If you can't extend, retract until you can. TODO: Assumes we
             // can find at least one result for any character.
             
             // Retract the character
             FMDPosition retracted = results;
             // Make sure to drop characters from the total pattern length.
-            index.retractRightOnly(retracted, --patternLength);
+            view.getIndex().retractRightOnly(retracted, --patternLength);
             mustRetract = false;
             
             // Try extending again
             extended = retracted;
-            index.extendLeftOnly(extended, query[i]);
+            view.getIndex().extendLeftOnly(extended, query[i]);
             
             // Say that last step we came from retracted.
             results = retracted;
@@ -268,26 +150,26 @@ std::vector<Matching>  NaturalMappingScheme::findMinMatchings(
         // Retract on the right until the next retraction would make us not
         // unique, and report a minimal unique match starting at this position.
         FMDPosition retracted = results;
-        index.retractRightOnly(retracted, patternLength - 1);
+        view.getIndex().retractRightOnly(retracted, patternLength - 1);
         
-        while(retracted.isUnique(mask, ranges)) {
+        while(view.isUnique(retracted)) {
             // Retract until we would no longer be unique. Make sure to drop
             // characters from the total pattern length.
             results = retracted;
-            index.retractRightOnly(retracted, (--patternLength) - 1);
+            view.getIndex().retractRightOnly(retracted, (--patternLength) - 1);
             mustRetract = false;
         }
         
-        if(results.isUnique(mask, ranges) &&
-            retracted.isAmbiguous(mask, ranges) && !mustRetract) {
+        if(view.isUnique(results) && view.isAmbiguous(retracted) &&
+            !mustRetract) {
             
             // We found a minimally unique match starting at this position and
             // ending patternLength right from here. Just match it up against
             // any text that's selected. It would be a lot of work to go through
             // all the texts available to minimal matches, and we don't really
             // use their locations much anyway.
-            toReturn.push_back(Matching(i,  index.locate(results.getResult(
-                mask)), patternLength));
+            toReturn.push_back(Matching(i,  view.getTextPosition(results),
+                patternLength));
                 
             // We can't find another minimal match until we move the right
             // endpoint.
@@ -1017,7 +899,8 @@ std::vector<Mapping> NaturalMappingScheme::naturalMap(
             // On the right side, we need again either twice the query length,
             // or however much is available.
             size_t rightReferenceLength = std::min(2 * rightQueryLength, 
-                index.getContigLength(rightReferenceStart.getContigNumber()) -
+                view.getIndex().getContigLength(
+                rightReferenceStart.getContigNumber()) -
                 rightReferenceStart.getOffset());
             
             Log::debug() << "Doing alignment " << rightQueryStart << "-" << 
@@ -1217,7 +1100,8 @@ size_t NaturalMappingScheme::countEdits(const std::string& query,
         // Dump all the reference characters as a line
         TextPosition referencePosition = referenceStart;
         referencePosition.addLocalOffset(j - 1);
-        headerLine << std::setw(3) << index.displayCached(referencePosition);
+        headerLine << std::setw(3) <<
+        view.getIndex().displayCached(referencePosition);
     }
     headerLine << std::endl;
     
@@ -1255,7 +1139,7 @@ size_t NaturalMappingScheme::countEdits(const std::string& query,
             referencePosition.addLocalOffset(j - 1);
             int matchMismatchCost = matrix[i - 1][j - 1] + 
                 (query[queryStart + i - 1] !=
-                index.displayCached(referencePosition));
+                view.getIndex().displayCached(referencePosition));
                 
             // Adopt the cost of whatever the best choice was.
             matrix[i][j] = std::min(std::min(queryGapCost, referenceGapCost),
@@ -1354,7 +1238,7 @@ void NaturalMappingScheme::map(const std::string& query,
                     naturalMappings[provider].getLocation();
                 implied.addLocalOffset((int64_t) i - (int64_t) provider);
                 
-                if(implied.getOffset() >= index.getContigLength(
+                if(implied.getOffset() >= view.getIndex().getContigLength(
                     implied.getContigNumber())) {
                     
                     // This position is implied to zip off the end of the
@@ -1362,11 +1246,11 @@ void NaturalMappingScheme::map(const std::string& query,
                     continue;
                 }
                     
-                if(index.displayCached(implied) != query[i]) {
+                if(view.getIndex().displayCached(implied) != query[i]) {
                     // This is a mismatch
                     mismatchesSeen++;
                     
-                    Log::trace() << index.displayCached(implied) << 
+                    Log::trace() << view.getIndex().displayCached(implied) << 
                         " at " << implied << " mismatches " << query[i] <<
                         std::endl;
                 }
@@ -1412,7 +1296,7 @@ void NaturalMappingScheme::map(const std::string& query,
                     naturalMappings[provider].getLocation();
                 implied.addLocalOffset((int64_t) i - (int64_t) provider);
                 
-                if(implied.getOffset() >= index.getContigLength(
+                if(implied.getOffset() >= view.getIndex().getContigLength(
                     implied.getContigNumber())) {
                     
                     // This position is implied to zip off the end of the
@@ -1420,11 +1304,11 @@ void NaturalMappingScheme::map(const std::string& query,
                     continue;
                 }
                     
-                if(index.displayCached(implied) != query[i]) {
+                if(view.getIndex().displayCached(implied) != query[i]) {
                     // This is a mismatch
                     mismatchesSeen++;
                     
-                    Log::trace() << index.displayCached(implied) <<
+                    Log::trace() << view.getIndex().displayCached(implied) <<
                         " at " << implied << " mismatches " << query[i] <<
                         std::endl;
                 }
@@ -1453,7 +1337,7 @@ void NaturalMappingScheme::map(const std::string& query,
                 // Work out where to (the only element in the set)
                 TextPosition candidate = *(zippings[i].begin());
                 
-                if(index.displayCached(candidate) == query[i]) {
+                if(view.getIndex().displayCached(candidate) == query[i]) {
                     // Dispatch the callback with this query index and this
                     // TextPosition.
                     callback(i, candidate);

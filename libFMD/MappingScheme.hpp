@@ -2,7 +2,7 @@
 #define MAPPINGSCHEME_HPP
 
 #include "GenericBitVector.hpp"
-#include "FMDIndex.hpp"
+#include "FMDIndexView.hpp"
 #include "TextPosition.hpp"
 #include "StatTracker.hpp"
 
@@ -18,15 +18,13 @@ class MappingScheme {
 public:
 
     /**
-     * Make a new MappingScheme against the given FMDIndex, mapping to the given
-     * ranges, and using the given mask of mappable BWT positions.
+     * Make a new MappingScheme against the given view of an FMDIndex.
      *
      * This constructor ought to be inherited by all subclasses with "using".
      * All other parameters of subclasses ought to be optional, with sensible
      * default values, and settable by public field access.
      */
-    MappingScheme(const FMDIndex& index, const GenericBitVector* ranges = NULL,
-        const GenericBitVector* mask = NULL);
+    MappingScheme(const FMDIndexView& index);
 
     // Default copy/move constructors OK    
     MappingScheme(const MappingScheme& other) = default;
@@ -65,19 +63,10 @@ protected:
     // uses an FMDIndex (all the ones we care about) will need.
     
     /**
-     * The FMDIndex against which we are mapping.
+     * The FMDIndexView against which we are mapping. The FMDIndex which we map
+     * against is accessible through this.
      */
-    const FMDIndex& index;
-    
-    /**
-     * The bit vector defining ranges to map to on the index.
-     */
-    const GenericBitVector* ranges;
-    
-    /**
-     * The mask with which we are mapping.
-     */
-    const GenericBitVector* mask;
+    const FMDIndexView& view;
     
     /**
      * We keep a StatTracker around for tracking stats. It is mutable so that

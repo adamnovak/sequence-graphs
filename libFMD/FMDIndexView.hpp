@@ -60,7 +60,7 @@ public:
     /**
      * Is an FMDPosition empty under this view?
      */
-    inline bool isEmpty(const FMDPosition& position) {
+    inline bool isEmpty(const FMDPosition& position) const {
         if(position.getEndOffset() < 0) {
             // It has no BWT positions in it
             return true;
@@ -85,7 +85,7 @@ public:
      * and thus can avoid needing to check if multiple merged ranges belong to
      * the same position.
      */
-    inline bool isUnique(const FMDPosition& position) {
+    inline bool isUnique(const FMDPosition& position) const {
     
         if(isEmpty(position)) {
             // If it's empty, it's not unique.
@@ -114,12 +114,12 @@ public:
      * maps to.
      */
     inline TextPosition getTextPosition(
-        const FMDIndexPosition& position) const {
+        const FMDPosition& position) const {
         
         // Since we are unique, we know range is not -1. Grab it.
-        int64_t rangeNumber = getRangeNumber(view);
+        int64_t rangeNumber = getRangeNumber(position);
         
-        if(getPositions().count(rangeNumber)) == 0) {
+        if(getPositions().count(rangeNumber) == 0) {
             // This range has no assigned position, so it must belong to the
             // TextPosition you get if you locate its first BWT position (i.e.
             // the one at that 1).
@@ -131,24 +131,24 @@ public:
             } else {
                 // This is an actual range number. Find the 1 that begins this
                 // range, and locate it, and use that TextPosition.
-                return getIndex().locate(getRanges().select(rangeNumber));
+                return getIndex().locate(getRanges()->select(rangeNumber));
             }
             
         } else {
             // Go look up the right TextPosition for this range and use that.
-            return getPositions()[rangeNumber];
+            return getPositions().at(rangeNumber);
         }
         
     }
     
+protected:
     /**
      * Return the index of the range that the forward-strand interval of this
      * FMDPosition is contained in, or -1 if it is not contained in any such
      * interval.
      */
-    int64_t getRangeNumber(const FMDIndexView& view) const;
+    int64_t getRangeNumber(const FMDPosition& position) const;
 
-private:
     /**
      * What FMDIndex are we a view of? It must of course outlive us.
      */
