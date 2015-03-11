@@ -1,6 +1,15 @@
 #include "FMDIndexView.hpp"
 
-int64_t FMDIndexView::getRangeNumber(const FMDIndexPosition& position) const {
+FMDIndexView::FMDIndexView(const FMDIndex& index, const GenericBitVector* mask,
+    const GenericBitVector* ranges,
+    const std::map<size_t, TextPosition> positions): index(index), mask(mask),
+    ranges(ranges), positions(std::move(positions)) {
+    
+    
+    // Nothing to do!
+}
+
+int64_t FMDIndexView::getRangeNumber(const FMDPosition& position) const {
 
     // What's the first index in the BWT that the range would need to cover?
     size_t interval_start;
@@ -59,7 +68,7 @@ int64_t FMDIndexView::getRangeNumber(const FMDIndexPosition& position) const {
         interval_end = position.getForwardStart() + position.getEndOffset();   
     }
 
-    if(interval_end < interval_start || end_offset < 0) {
+    if(interval_end < interval_start || position.getEndOffset() < 0) {
         // Our range is actually empty.
         // TODO: Do we need this check?
         return -1;
@@ -72,10 +81,10 @@ int64_t FMDIndexView::getRangeNumber(const FMDIndexPosition& position) const {
         // Merged ranges are actually defined.
     
         // Look up the range that the forward starting position is in
-        int64_t start_range = getRanges().rank(interval_start);
+        int64_t start_range = getRanges()->rank(interval_start);
 
         // And the range the forward end is in
-        int64_t end_range = getRanges().rank(interval_end);
+        int64_t end_range = getRanges()->rank(interval_end);
         
         if(start_range == end_range) {
             // Both ends of the interval are in the same range.

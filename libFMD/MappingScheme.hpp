@@ -24,7 +24,7 @@ public:
      * All other parameters of subclasses ought to be optional, with sensible
      * default values, and settable by public field access.
      */
-    MappingScheme(const FMDIndexView& index);
+    MappingScheme(const FMDIndexView index);
 
     // Default copy/move constructors OK    
     MappingScheme(const MappingScheme& other) = default;
@@ -66,7 +66,7 @@ protected:
      * The FMDIndexView against which we are mapping. The FMDIndex which we map
      * against is accessible through this.
      */
-    const FMDIndexView& view;
+    const FMDIndexView view;
     
     /**
      * We keep a StatTracker around for tracking stats. It is mutable so that

@@ -49,15 +49,8 @@ void NaturalMappingSchemeTests::setUp() {
     // full SA).
     index = new FMDIndex(tempDir + "/index.basename");
     
-    // Declare everything to be a range
-    ranges = new GenericBitVector();
-    for(size_t i = 0; i < index->getBWTLength(); i++) {
-        ranges->addBit(i);
-    }
-    ranges->finish(index->getBWTLength());
-
-    // Make the mapping scheme
-    scheme = new NaturalMappingScheme(*index, ranges);
+    // Make the mapping scheme, using a view of the whole index with no merging.
+    scheme = new NaturalMappingScheme(FMDIndexView(*index));
 }
 
 
@@ -70,9 +63,6 @@ void NaturalMappingSchemeTests::tearDown() {
     
     // Delete the index
     delete index;
-    
-    // And the ranges bit vector
-    delete ranges;
 }
 
 /**
@@ -156,8 +146,8 @@ void NaturalMappingSchemeTests::testMapWithMask() {
 
     // Turn the genome restriction on
     delete scheme;
-    scheme = new NaturalMappingScheme(*index, ranges,
-        &index->getGenomeMask(0));
+    scheme = new NaturalMappingScheme(FMDIndexView(*index,
+        &index->getGenomeMask(0)));
     
     size_t mappedBases = 0;
     scheme->map(query, [&](size_t i, TextPosition mappedTo) {

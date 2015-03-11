@@ -57,8 +57,10 @@ void NaturalMappingSchemeTests2::setUp() {
     }
     ranges->finish(index->getBWTLength());
 
-    // Make the mapping scheme
-    scheme = new NaturalMappingScheme(*index, ranges);
+    // Make the mapping scheme. Leave the mask empty so everything is masked in,
+    // but use our ranges. Don't care at all about what positions are assigned
+    // to ranges.
+    scheme = new NaturalMappingScheme(*index, nullptr, ranges);
 }
 
 

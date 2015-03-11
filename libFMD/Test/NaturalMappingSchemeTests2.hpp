@@ -25,7 +25,7 @@ class NaturalMappingSchemeTests2 : public CppUnit::TestFixture {
     // Keep a NaturalMappingScheme around.
     NaturalMappingScheme* scheme;
     
-    // And a ranges bitvector of all 1s
+    // And a ranges bitvector merging some positions
     GenericBitVector* ranges;
     
 public:

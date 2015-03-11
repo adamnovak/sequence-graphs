@@ -30,9 +30,6 @@ class NaturalMappingSchemeTests : public CppUnit::TestFixture {
     // Keep a NaturalMappingScheme around.
     NaturalMappingScheme* scheme;
     
-    // And a ranges bitvector of all 1s
-    GenericBitVector* ranges;
-    
 public:
     NaturalMappingSchemeTests();
     ~NaturalMappingSchemeTests();
