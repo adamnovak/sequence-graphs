@@ -126,6 +126,17 @@ std::vector<Matching>  NaturalMappingScheme::findMinMatchings(
         view.getIndex().extendLeftOnly(extended, query[i]);
         
         while(view.isEmpty(extended)) {
+            Log::info() << extended << " is empty" << std::endl;
+        
+            if(patternLength <= 1) {
+                // We only work if all bases exist in the index (A and C and G
+                // and T). This is not a difficult requirement to meet, but
+                // somehow we didn't meet it.
+                throw std::runtime_error(
+                    "Could not find any results for a " +
+                        std::to_string(patternLength) + " length pattern!");
+            }
+        
             // If you can't extend, retract until you can. TODO: Assumes we
             // can find at least one result for any character.
             
@@ -134,6 +145,8 @@ std::vector<Matching>  NaturalMappingScheme::findMinMatchings(
             // Make sure to drop characters from the total pattern length.
             view.getIndex().retractRightOnly(retracted, --patternLength);
             mustRetract = false;
+            
+            Log::info() << "Retracted to " << patternLength << std::endl;
             
             // Try extending again
             extended = retracted;
