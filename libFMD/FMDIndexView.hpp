@@ -67,11 +67,15 @@ public:
         } else if(getMask() != nullptr) {
             // It has some BWT positions in it, and we have a mask
             
-            // Return whether we have any ones in the mask between the interval
-            // endpoints.
-            return getMask()->rank(position.getForwardStart() + 
-                position.getEndOffset()) + 1 - getMask()->rank(
-                position.getForwardStart(), true) > 0;
+            // Where's the last position that's in the BWT range? TODO: we use
+            // this pattern so much it should be a method on FMDPosition.
+            size_t endInclusive = position.getForwardStart() + 
+                position.getEndOffset();
+                
+            // Return true if we *don't* have any 1s in the mask between the
+            // interval endpoints.
+            return (getMask()->rank(endInclusive) + 1 - getMask()->rank(
+                position.getForwardStart(), true) <= 0);
         } else {
             // It contains BWT positions and we have no mask, so they are all
             // masked in.
