@@ -174,20 +174,20 @@ void FMDIndexTests::testDisplay() {
 void FMDIndexTests::testSearch() {
     
     // Doesn't find spurious things
-    CPPUNIT_ASSERT(index->count("GATTACA").getLength() == 0);
+    CPPUNIT_ASSERT_EQUAL((size_t) 0, index->count("GATTACA").getLength());
     
     // Finds things which appear once
-    CPPUNIT_ASSERT(index->count("TCTTTT").getLength() == 1);
+    CPPUNIT_ASSERT_EQUAL((size_t) 1, index->count("TCTTTT").getLength());
     
     // On both strands
-    CPPUNIT_ASSERT(index->count("AAAAGA").getLength() == 1);
+    CPPUNIT_ASSERT_EQUAL((size_t) 1, index->count("AAAAGA").getLength());
     
     // Finds things which appear twice
-    CPPUNIT_ASSERT(index->count("TTCG").getLength() == 2);
+    CPPUNIT_ASSERT_EQUAL((size_t) 2, index->count("TTCG").getLength());
     
     // Finds whole strands
-    CPPUNIT_ASSERT(
-        index->count("CGGGCGCATCGCTATTATTTCTTTCTCTTTTCACA").getLength() == 1);
+    CPPUNIT_ASSERT_EQUAL((size_t) 1, 
+        index->count("CGGGCGCATCGCTATTATTTCTTTCTCTTTTCACA").getLength());
     
 }
 

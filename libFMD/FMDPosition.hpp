@@ -82,8 +82,9 @@ public:
      * Minimum length is 0.
      */
     inline size_t getLength() {
-        // Make sure we don't try and return a negative number as a size_t.
-        return std::min(end_offset + (int64_t) 1, (int64_t) 0);        
+        // Make sure we don't try and return a negative number as a size_t, by
+        // maxing against 0 while signed.
+        return std::max(end_offset + (int64_t) 1, (int64_t) 0);        
     }
     
     /** 
