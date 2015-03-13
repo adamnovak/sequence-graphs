@@ -1,14 +1,14 @@
-#ifndef NATURALMAPPINGSCHEMETESTS2_HPP
-#define NATURALMAPPINGSCHEMETESTS2_HPP
+#ifndef ZIPMAPPINGSCHEMETESTS_HPP
+#define ZIPMAPPINGSCHEMETESTS_HPP
 
 #include <cppunit/extensions/HelperMacros.h>
-#include "../NaturalMappingScheme.hpp"
+#include "../ZipMappingScheme.hpp"
 
 /**
- * Test for the natural mapping scheme, using sequences we can merge.
+ * Test for the zip mapping scheme, using sequences we can merge.
  */
-class NaturalMappingSchemeTests2 : public CppUnit::TestFixture {
-    CPPUNIT_TEST_SUITE(NaturalMappingSchemeTests2);
+class ZipMappingSchemeTests : public CppUnit::TestFixture {
+    CPPUNIT_TEST_SUITE(ZipMappingSchemeTests);
     CPPUNIT_TEST(testMap);
     CPPUNIT_TEST_SUITE_END();
     
@@ -22,15 +22,15 @@ class NaturalMappingSchemeTests2 : public CppUnit::TestFixture {
     // it up between test cases.
     FMDIndex const* index;
     
-    // Keep a NaturalMappingScheme around.
-    NaturalMappingScheme* scheme;
+    // Keep a ZipMappingScheme around.
+    ZipMappingScheme* scheme;
     
     // And a ranges bitvector merging some positions
     GenericBitVector* ranges;
     
 public:
-    NaturalMappingSchemeTests2();
-    ~NaturalMappingSchemeTests2();
+    ZipMappingSchemeTests();
+    ~ZipMappingSchemeTests();
     
     void setUp();
     void tearDown();

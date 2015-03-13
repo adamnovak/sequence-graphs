@@ -81,29 +81,40 @@ void ZipMappingScheme::map(const std::string& query,
         Log::debug() << "Base " << i << " = " << query[i] << " selects " <<
             rightContexts[i] << " and " << leftContexts[i] << std::endl;
     
-        // Find the forward-orientation positions selected by the right context.
-        std::set<TextPosition> forwardPositions = view.getTextPositions(
-            rightContexts[i]);
+        // Find the reverse-orientation positions selected by the right context.
+        std::set<TextPosition> rightPositions;
+        
+        for(auto rightPosition : view.getTextPositions(rightContexts[i])) {
+            // Flip each right position around to the other strand.
+            rightPosition.flip(view.getIndex().getContigLength(
+                rightPosition.getContigNumber()));
             
-        // And the reverse-orientation positions selected by the left contexts.
-        std::set<TextPosition> reversePositions = view.getTextPositions(
+            // And then put it in the set.
+            rightPositions.insert(rightPosition);
+        }
+            
+        // And the forward-orientation positions selected by the left contexts.
+        std::set<TextPosition> leftPositions = view.getTextPositions(
             leftContexts[i]);
             
-        // We're going to keep a set of TextPositions that appeared forward in
-        // the forward set and backwards in the reverse set here.
+        // We're going to keep a set of TextPositions that appeared in both
+        // directions.
         std::set<TextPosition> intersection;
             
-        for(auto reversePosition : reversePositions) {
-            // Flip our temporary TextPosition in place. TODO: Can we make this
-            // use pattern shorter? Maybe pass the index or have the index do it
-            // or something?
-            reversePosition.flip(view.getIndex().getContigLength(
-                reversePosition.getContigNumber()));
             
-            if(forwardPositions.count(reversePosition)) {
-                intersection.insert(reversePosition);
-                Log::debug() << "\tTextPosition " << reversePosition <<
-                    " is shared." << std::endl;
+        for(auto rightPosition : rightPositions) {
+            Log::debug() << "\tTextPosition " << rightPosition <<
+                " is selected by right context." << std::endl;
+        }
+            
+        for(auto leftPosition : leftPositions) {
+            if(rightPositions.count(leftPosition)) {
+                intersection.insert(leftPosition);
+                Log::debug() << "\tTextPosition " << leftPosition <<
+                    " is shared by left context." << std::endl;
+            } else {
+                Log::debug() << "\tTextPosition " << leftPosition <<
+                    " is left only." << std::endl;
             }
             
             // TODO: Fail mapping fast if we find a nonempty intersection.

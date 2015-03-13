@@ -1,4 +1,4 @@
-// Test the Natural MappingScheme
+// Test the Zip MappingScheme
 
 #include <boost/filesystem.hpp>
 #include <boost/algorithm/string.hpp>
@@ -11,22 +11,22 @@
 #include "../FMDIndexBuilder.hpp"
 #include "../util.hpp"
 
-#include "NaturalMappingSchemeTests2.hpp"
+#include "ZipMappingSchemeTests.hpp"
 
 
 // Register the fixture to be run.
-CPPUNIT_TEST_SUITE_REGISTRATION( NaturalMappingSchemeTests2 );
+CPPUNIT_TEST_SUITE_REGISTRATION( ZipMappingSchemeTests );
 
 // Define constants
-const std::string NaturalMappingSchemeTests2::filename = "Test/duplicated.fa";
+const std::string ZipMappingSchemeTests::filename = "Test/duplicated.fa";
 
-NaturalMappingSchemeTests2::NaturalMappingSchemeTests2() {
+ZipMappingSchemeTests::ZipMappingSchemeTests() {
 }
 
-NaturalMappingSchemeTests2::~NaturalMappingSchemeTests2() {
+ZipMappingSchemeTests::~ZipMappingSchemeTests() {
 }
 
-void NaturalMappingSchemeTests2::setUp() {
+void ZipMappingSchemeTests::setUp() {
     // We need a built index as a fixture, and we don't want to rebuild it for
     // every test.
 
@@ -60,11 +60,11 @@ void NaturalMappingSchemeTests2::setUp() {
     // Make the mapping scheme. Leave the mask empty so everything is masked in,
     // but use our ranges. Don't care at all about what positions are assigned
     // to ranges.
-    scheme = new NaturalMappingScheme(*index, nullptr, ranges);
+    scheme = new ZipMappingScheme(FMDIndexView(*index, nullptr, ranges));
 }
 
 
-void NaturalMappingSchemeTests2::tearDown() {
+void ZipMappingSchemeTests::tearDown() {
     // Clean up the mapping scheme
     delete scheme;
     
@@ -81,7 +81,7 @@ void NaturalMappingSchemeTests2::tearDown() {
 /**
  * Make sure mapping works
  */
-void NaturalMappingSchemeTests2::testMap() {
+void ZipMappingSchemeTests::testMap() {
     // Grab all of the duplicated contig.
     std::string query = "CATGCTTCGGCGATTCGACGCTCATCTGCGACTCT";
     
