@@ -30,6 +30,7 @@
 #include <Log.hpp>
 #include <MappingScheme.hpp>
 #include <NaturalMappingScheme.hpp>
+#include <ZipMappingScheme.hpp>
 
 // Grab timers from libsuffixtools
 #include <Timer.h>
@@ -151,15 +152,13 @@ writeDegrees(
  * will be able to break up ranges.
  *
  * Returns a GenericBitVector marking each such range with a 1 at the start, and
- * a vector of canonicalized positions. Each anonicalized position is a contig
- * number, a base number, and a face flag.
+ * a vector of canonicalized TextPositions.
  *
  * All BWT positions must be represented in the pinch set.
  *
  * Scans through the entire BWT.
  */
-std::pair<GenericBitVector*, 
-    std::vector<std::pair<std::pair<size_t, size_t>, bool>>> 
+std::pair<GenericBitVector*, std::vector<TextPosition>>
 identifyMergedRuns(
     stPinchThreadSet* threadSet, 
     const FMDIndex& index,
@@ -171,7 +170,7 @@ identifyMergedRuns(
     GenericBitVector* encoder = new GenericBitVector();
     
     // We also need to make a vector of canonical positions.
-    std::vector<std::pair<std::pair<size_t, size_t>, bool> > mappings;
+    std::vector<TextPosition> mappings;
     
     Log::info() << "Building merged run index by scan..." << std::endl;
     
@@ -180,8 +179,7 @@ identifyMergedRuns(
 
     // Keep track of the ID and relative orientation for the last position we
     // canonicalized.
-    // TODO: typedef this! It is getting silly.
-    std::pair<std::pair<size_t, size_t>, bool> lastCanonicalized;
+    TextPosition lastCanonicalized;
     
     for(int64_t j = index.getNumberOfContigs() * 2; j < index.getBWTLength();
         j++) {
@@ -202,10 +200,8 @@ identifyMergedRuns(
         // Where is it located?
         TextPosition base = index.locate(j);
         
-        // Canonicalize it. The second field here will be the relative
-        // orientation and determine the Side.
-        std::pair<std::pair<size_t, size_t>, bool> canonicalized = 
-            canonicalize(index, threadSet, base);
+        // Canonicalize it.
+        TextPosition canonicalized = canonicalize(index, threadSet, base);
             
         if(j == 0 || canonicalized != lastCanonicalized) {
             // We need to start a new range here, because this BWT base maps to
@@ -241,71 +237,6 @@ identifyMergedRuns(
     
     // Return the bit vector and the canonicalized base vector
     return std::make_pair(encoder, mappings);
-}
-
-/**
- * Make the range vector and list of matching Sides for the hierarchy level
- * implied by the given thread set in the given index. Gets IDs for created
- * positions from the given source.
- * 
- * Manages this by scanning the BWT from left to right, seeing what cannonical
- * position and orientation each base belongs to, and putting 1s in the range
- * vector every time a new one starts.
- *
- * Don't forget to delete the bit vector when done!
- */
-std::pair<GenericBitVector*, std::vector<SmallSide> > 
-makeLevelIndexScanning(
-    stPinchThreadSet* threadSet, 
-    const FMDIndex& index, 
-    IDSource<long long int>& source
-) {
-    
-    // First, canonicalize everything, yielding a bitvector of ranges and a
-    // vector of canonicalized positions.
-    auto mergedRuns = identifyMergedRuns(threadSet, index);
-    
-    // We also need to make a vector of SmallSides, which are the things that
-    // get matched to by the corresponding ranges in the bit vector.
-    std::vector<SmallSide> mappings;
-    
-    // We also need this map of position IDs (long long ints) by canonical
-    // contig name (a size_t) and base index (also a size_t). Relative
-    // orientation is always forward.
-    std::map<std::pair<size_t, size_t>, long long int>
-        idReservations;
-
-    
-    size_t runNumber = 0;
-
-    Log::info() << "Building mapping data structure..." << std::endl;
-    
-    for(auto canonicalized : mergedRuns.second) {
-        
-        // For each canonical 1-based ((contig, base), face) corresponding to a
-        // merged range...
-        
-        // What position is that?
-        long long int positionCoordinate;
-        if(idReservations.count(canonicalized.first) > 0) {
-            // Load the previously chosen ID
-            positionCoordinate = 
-                idReservations[canonicalized.first];
-        } else {
-            // Allocate and remember a new ID.
-            positionCoordinate = 
-                idReservations[canonicalized.first] = 
-                source.next();
-        }
-            
-        // Say this range is going to belong to the ID we just looked up, on
-        // the appropriate face.
-        mappings.push_back(
-            SmallSide(positionCoordinate, canonicalized.second));
-    }
-            
-    // Return the bit vector and the Side vector
-    return std::make_pair(mergedRuns.first, mappings);
 }
 
 /**
@@ -357,9 +288,7 @@ void saveLevelIndex(
 stPinchThreadSet*
 mergeGreedy(
     const FMDIndex& index,
-    std::function<MappingScheme*(const FMDIndex&,
-        const GenericBitVector& ranges, const GenericBitVector* mask)> 
-        mappingSchemeFactory
+    std::function<MappingScheme*(const FMDIndexView&)> mappingSchemeFactory
 ) {
 
     Log::info() << "Creating initial pinch thread set" << std::endl;
@@ -377,15 +306,27 @@ mergeGreedy(
     const GenericBitVector* includedPositions = &index.getGenomeMask(0);
     
     // Canonicalize everything, yielding a bitvector (pointer) of ranges and a
-    // vector of canonicalized positions.
-    auto mergedRuns = identifyMergedRuns(threadSet, index);
+    // vector of canonicalized positions. Make sure only the selected positions
+    // are included, because the graph mapping stuff doesn't work if you have
+    // positions breaking up ranges that aren't masked in.
+    auto mergedRuns = identifyMergedRuns(threadSet, index, includedPositions);
     
     for(size_t genome = 1; genome < index.getNumberOfGenomes(); genome++) {
         // For each genome that we have to merge in...
         
+        // Make a map for all the merged positions, because that's what's
+        // required by the view. TODO: Do this conversion earlier, and filter
+        // out ranges that are just mapped to the expected places.
+        std::map<size_t, TextPosition> rangesToPositions;
+        for(size_t i = 0; i < mergedRuns.second.size(); i++) {
+            // Enter every entry in the map. TODO: be selective, or just convert
+            // to a full vector representation always.
+            rangesToPositions[i] = mergedRuns.second[i];
+        }
+        
         // Allocate a new MappingScheme, giving it the ranges and mask bitvectors.
-        MappingScheme* mappingScheme = mappingSchemeFactory(index,
-            *mergedRuns.first, includedPositions);
+        MappingScheme* mappingScheme = mappingSchemeFactory(FMDIndexView(index,
+            mergedRuns.first, includedPositions, rangesToPositions));
         
         // Make the merge scheme we want to use. We choose a mapping-to-second-
         // level-based merge scheme, to which we need to feed the details of the
@@ -556,7 +497,7 @@ main(
             "Merging scheme (\"greedy\" only)")
         ("mapType", boost::program_options::value<std::string>()
             ->default_value("natural"),
-            "Merging scheme (\"natural\" only)")
+            "Merging scheme (\"natural\" or \"zip\")")
         ("context", boost::program_options::value<size_t>()
             ->default_value(0), 
             "Minimum required context length to map on")
@@ -679,8 +620,7 @@ main(
     
     if(mergeScheme == "greedy") {
         // Use the greedy merge instead.
-        threadSet = mergeGreedy(index, [&](const FMDIndex& index,
-            const GenericBitVector& ranges, const GenericBitVector* mask) {
+        threadSet = mergeGreedy(index, [&](const FMDIndexView& view) {
         
             // Make a new MappingScheme for this step and return a pointer to
             // it. TODO: would it be better to just make one MappingScheme and
@@ -691,8 +631,7 @@ main(
         
             if(options["mapType"].as<std::string>() == "natural") {
                 // We want a NaturalMappingScheme
-                NaturalMappingScheme* scheme = new NaturalMappingScheme(index,
-                    &ranges, mask);
+                NaturalMappingScheme* scheme = new NaturalMappingScheme(view);
                     
                 // Populate it
                 scheme->credit = options.count("credit");
@@ -706,6 +645,14 @@ main(
                     "maxHammingDistance"].as<size_t>();
                 scheme->unstable = options.count("unstable");
                 
+                return (MappingScheme*) scheme;
+            } else if(options["mapType"].as<std::string>() == "zip") {
+                // Make a ZipMappingScheme, which can handle graphs. But we need
+                // the forward and reverse versions of merged ranges to agree on
+                // what positions they are assigned when merging, but the view
+                // takes care of that.
+                ZipMappingScheme* scheme = new ZipMappingScheme(view);
+                    
                 return (MappingScheme*) scheme;
             } else {
                 // They asked for a mapping scheme we don't have.
@@ -750,17 +697,6 @@ main(
     
     // This will hold the computed level index of the merged level.
     std::pair<GenericBitVector*, std::vector<SmallSide> > levelIndex;
-    
-    // We also want to time the merged level index building code
-    Timer* levelIndexTimer = new Timer("Level Index Construction");
-    
-    // Use a scanning strategy for indexing.
-    levelIndex = makeLevelIndexScanning(threadSet, index, source);
-    
-    delete levelIndexTimer;
-        
-    // Write it out, deleting the bit vector in the process
-    saveLevelIndex(levelIndex, indexDirectory + "/level1");
     
     // Now, while we still have the threadSet, we can work out the adjacency
     // components. 

@@ -11,6 +11,13 @@ class TextPosition {
 public:
 
     /**
+     * Make a TextPosition with undefined contents.
+     */
+    inline TextPosition(): TextPosition(0, 1) {
+        // Nothing to do!
+    }
+
+    /**
      * Create a new TextPosition on the given text at the given 0-based offset.
      */    
     inline TextPosition(size_t text, size_t offset): text(text), 

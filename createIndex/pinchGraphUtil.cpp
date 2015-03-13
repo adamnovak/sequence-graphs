@@ -21,13 +21,33 @@ makeThreadSet(
     return threadSet;
 }
 
-std::pair<std::pair<size_t, size_t>, bool>
+TextPosition
 canonicalize(
+    const FMDIndex& index, 
     stPinchThreadSet* threadSet, 
-    size_t contigNumber,
-    size_t offset,
-    bool strand
+    TextPosition base
 ) {
+    
+    Log::trace() << "Canonicalizing " << base << std::endl;
+    
+    // What contig corresponds to that text?
+    size_t contigNumber = index.getContigNumber(base);
+    // And what strand corresponds to that text? This tells us what
+    // orientation we're actually looking at the base in.
+    bool strand = (bool) index.getStrand(base);
+    // And what base position is that from the front of the contig? This is
+    // 1-based.
+    size_t offset = index.getContigOffset(base);
+    
+    if(offset <= 0 || offset > index.getContigLength(contigNumber)) {
+        // Complain that we got an out of bounds offset from this thing.
+        throw std::runtime_error("Tried to canonicalize text " +
+            std::to_string(base.getText()) + " offset " + 
+            std::to_string(base.getOffset()) + 
+            " which is out of bounds on length " + 
+            std::to_string(index.getContigLength(contigNumber)) + " contig " + 
+            std::to_string(contigNumber));
+    }
     
     Log::trace() << "Canonicalizing " << contigNumber << ":" << offset << 
         "." << strand << std::endl;
@@ -93,8 +113,7 @@ canonicalize(
         offset << " to contig " << canonicalContig << " offset " << 
         canonicalOffset << std::endl;
     
-    // Return all three values, and be sad about not having real tuples. What
-    // orientation should we use?  Well, we have the canonical position's
+    // What orientation should we use?  Well, we have the canonical position's
     // orientation within the block, our position's orientation within the
     // block, and the orientation that this context attaches to the position in.
     // Flipping any of those will flip the orientation in which we need to map,
@@ -104,6 +123,8 @@ canonicalize(
     Log::trace() << "Segment orientation: " << segmentOrientation << 
             std::endl;
     Log::trace() << "Strand: " << strand << std::endl;
+    bool finalStrand = (canonicalOrientation != segmentOrientation !=
+        strand);
 
     if(canonicalOffset <= 0 || 
         canonicalOffset > stPinchThread_getLength(
@@ -116,41 +137,10 @@ canonicalize(
             " out of range for 1-based position");
     }
 
-    return std::make_pair(std::make_pair(canonicalContig, canonicalOffset),
-        canonicalOrientation != segmentOrientation != strand);
-}
-
-std::pair<std::pair<size_t, size_t>, bool>
-canonicalize(
-    const FMDIndex& index, 
-    stPinchThreadSet* threadSet, 
-    TextPosition base
-) {
-    
-    Log::trace() << "Canonicalizing 0-based " << base << std::endl;
-    
-    // What contig corresponds to that text?
-    size_t contigNumber = index.getContigNumber(base);
-    // And what strand corresponds to that text? This tells us what
-    // orientation we're actually looking at the base in.
-    bool strand = (bool) index.getStrand(base);
-    // And what base position is that from the front of the contig? This is
-    // 1-based.
-    size_t offset = index.getContigOffset(base);
-    
-    if(offset <= 0 || offset > index.getContigLength(contigNumber)) {
-        // Complain that we got an out of bounds offset from this thing.
-        throw std::runtime_error("Tried to canonicalize text " +
-            std::to_string(base.getText()) + " offset " + 
-            std::to_string(base.getOffset()) + 
-            " which is out of bounds on length " + 
-            std::to_string(index.getContigLength(contigNumber)) + " contig " + 
-            std::to_string(contigNumber));
-    }
-    
-    // Canonicalize that pinch thread set position.
-    return canonicalize(threadSet, contigNumber, offset, strand);
-    
+    // Encode the strand in the text, convert to a 0-based offset, and return a
+    // canonicalized TextPosition.
+    return TextPosition(canonicalContig * (1 + finalStrand),
+        canonicalOffset - 1);
 }
 
 size_t

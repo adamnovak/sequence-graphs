@@ -24,26 +24,12 @@ makeThreadSet(
     const FMDIndex& index
 );
 
-/**
- * Turn the given (contig number, 1-based offset from start, orientation)
- * position into the same sort of structure for the canonical base that
- * represents all the bases it has been pinched with.
- */
-std::pair<std::pair<size_t, size_t>, bool>
-canonicalize(
-    stPinchThreadSet* threadSet, 
-    size_t contigNumber,
-    size_t offset,
-    bool strand
-);
 
 /**
- * Turn the given (text, 0-based offset offset) pair into a canonical (contig
- * number, 1-based offset from contig start, orientation), using the given
- * FMDIndex and the given thread set. The orientation is which face of the
- * canonical base this (text, offset) pair means.
+ * Turn the given TextPosition into the TextPosition for the canonical base that
+ * represents all the bases it has been pinched with.
  */
-std::pair<std::pair<size_t, size_t>, bool>
+TextPosition
 canonicalize(
     const FMDIndex& index, 
     stPinchThreadSet* threadSet, 

@@ -1,5 +1,5 @@
-#ifndef NATURALMAPPINGSCHEME_HPP
-#define NATURALMAPPINGSCHEME_HPP
+#ifndef ZIPMAPPINGSCHEME_HPP
+#define ZIPMAPPINGSCHEME_HPP
 
 #include "MappingScheme.hpp"
 #include "Mapping.hpp"
