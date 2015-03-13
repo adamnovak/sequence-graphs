@@ -51,6 +51,9 @@ std::vector<FMDPosition> ZipMappingScheme::findRightContexts(
         // Increment the pattern length since we did actually extedn by 1. 
         patternLength++;
         
+        Log::debug() << "Index " << i << " has " << query[i] << " + " << 
+            patternLength - 1 << " selecting " << results << std::endl;
+        
         // Save the search results.
         toReturn[i] = results;
     }
@@ -82,16 +85,8 @@ void ZipMappingScheme::map(const std::string& query,
             rightContexts[i] << " and " << leftContexts[i] << std::endl;
     
         // Find the reverse-orientation positions selected by the right context.
-        std::set<TextPosition> rightPositions;
-        
-        for(auto rightPosition : view.getTextPositions(rightContexts[i])) {
-            // Flip each right position around to the other strand.
-            rightPosition.flip(view.getIndex().getContigLength(
-                rightPosition.getContigNumber()));
-            
-            // And then put it in the set.
-            rightPositions.insert(rightPosition);
-        }
+        std::set<TextPosition> rightPositions = view.getTextPositions(
+            rightContexts[i]);
             
         // And the forward-orientation positions selected by the left contexts.
         std::set<TextPosition> leftPositions = view.getTextPositions(
@@ -108,6 +103,11 @@ void ZipMappingScheme::map(const std::string& query,
         }
             
         for(auto leftPosition : leftPositions) {
+            // Flip the position from the reverse complement around so it's on
+            // the right strand. TODO: this pattern should be simpler.
+            leftPosition.flip(view.getIndex().getContigLength(
+                leftPosition.getContigNumber()));
+        
             if(rightPositions.count(leftPosition)) {
                 intersection.insert(leftPosition);
                 Log::debug() << "\tTextPosition " << leftPosition <<

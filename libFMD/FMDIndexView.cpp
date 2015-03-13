@@ -81,10 +81,10 @@ int64_t FMDIndexView::getRangeNumber(const FMDPosition& position) const {
         // Merged ranges are actually defined.
     
         // Look up the range that the forward starting position is in
-        int64_t start_range = getRanges()->rank(interval_start);
+        int64_t start_range = getRanges()->rank(interval_start) - 1;
 
         // And the range the forward end is in
-        int64_t end_range = getRanges()->rank(interval_end);
+        int64_t end_range = getRanges()->rank(interval_end) - 1;
         
         if(start_range == end_range) {
             // Both ends of the interval are in the same range.
@@ -135,12 +135,21 @@ std::vector<size_t> FMDIndexView::getRangeNumbers(
         // Fast path. Since there's no mask, every range counts. But we do have
         // to go get the ranges instead of just using position numbers.
     
-        // Look up the range that the starting position is in
-        int64_t startRange = getRanges()->rank(position.getForwardStart());
+        // Look up the range that the starting position is in. We have to
+        // subtract 1 because the 0th range begins with a 1.
+        int64_t startRange = getRanges()->rank(position.getForwardStart()) - 1;
 
         // And the range the end is in
         int64_t endRange = getRanges()->rank(position.getForwardStart() +
-            position.getEndOffset());
+            position.getEndOffset()) - 1;
+            
+        Log::debug() << "Looking for ranges between " <<
+            position.getForwardStart() << " in range " << startRange << 
+            " which starts at " << getRanges()->select(startRange) <<
+            " and " << position.getForwardStart() + position.getEndOffset() <<
+            " in range " << endRange << " which starts at " << 
+            getRanges()->select(endRange) << std::endl;
+    
         
         if(endRange < startRange) {
             throw std::runtime_error("End of ranges interval is before start");
@@ -155,6 +164,8 @@ std::vector<size_t> FMDIndexView::getRangeNumbers(
     } else {
         // We have ranges and a mask. Not every range counts, only those that
         // overlap positions with 1s in the mask.
+        
+        // TODO: test this codepath!
 
         // Keep track of the left edge of the interval we still need to count
         // the ranges in.
@@ -172,8 +183,8 @@ std::vector<size_t> FMDIndexView::getRangeNumbers(
                 
                 // This masked-in position is within this FMDPosition. We should
                 // count its range. Go look at what range that BWT position is
-                // in and grab it.
-                toReturn.push_back(getRanges()->rank(nextPosition.first));
+                // in and grab it. Make sure to make it 0-based.
+                toReturn.push_back(getRanges()->rank(nextPosition.first) - 1);
                 
                 // Find the next 1 in the ranges vector after this masked-in
                 // position (exclusive), indicating the start of the next range.
