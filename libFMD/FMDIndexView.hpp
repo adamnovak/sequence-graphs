@@ -114,14 +114,11 @@ public:
     }
     
     /**
-     * Given that this FMDPosition is unique, get the TextPosition it uniquely
-     * maps to.
+     * Convert a range number (which may actually be a BWT position if the view
+     * does not use a range vector) to a TextPosition.
+     * TODO: Make this protected? Would anyone else ever want it?
      */
-    inline TextPosition getTextPosition(
-        const FMDPosition& position) const {
-        
-        // Since we are unique, we know range is not -1. Grab it.
-        int64_t rangeNumber = getRangeNumber(position);
+    inline TextPosition rangeToTextPosition(size_t rangeNumber) const {
         
         if(getPositions().count(rangeNumber) == 0) {
             // This range has no assigned position, so it must belong to the
@@ -145,6 +142,41 @@ public:
         
     }
     
+    /**
+     * Given that this FMDPosition is unique, get the TextPosition it uniquely
+     * maps to.
+     */
+    inline TextPosition getTextPosition(const FMDPosition& position) const {
+        
+        // Since we are unique, we know range is not -1. Grab it and immediately
+        // make it a TextPosition.
+        return rangeToTextPosition(getRangeNumber(position));
+        
+    }
+    
+    /**
+     * Get all of the TextPositions that this FMDPosition selects. Automatically
+     * de-duplicates those that might be included through multiple ranges.
+     */
+    inline std::set<TextPosition> getTextPositions(
+        const FMDPosition& position) const {
+        
+        // Get all the range numbers we have masked-in positions in.
+        std::vector<size_t> rangeNumbers = getRangeNumbers(position);
+        
+        // We'll convert the range numbers to text positions and populate this.
+        std::set<TextPosition> toReturn;
+        
+        for(const auto& rangeNumber : rangeNumbers) {
+            // Map the range-number-to-text-position over the range numbers,
+            // putting the results in the set.
+            toReturn.insert(rangeToTextPosition(rangeNumber));
+        }
+        
+        // Return the results.
+        return toReturn;
+    }
+    
 protected:
     /**
      * Return the index of the range that the forward-strand interval of this
@@ -152,6 +184,12 @@ protected:
      * interval.
      */
     int64_t getRangeNumber(const FMDPosition& position) const;
+    
+    /**
+     * Return the indices of all of the ranges that the forward-strand interval
+     * of this FMDPosition has masked-in positions in.
+     */
+    std::vector<size_t> getRangeNumbers(const FMDPosition& position) const;
 
     /**
      * What FMDIndex are we a view of? It must of course outlive us.

@@ -104,3 +104,93 @@ int64_t FMDIndexView::getRangeNumber(const FMDPosition& position) const {
         }
     }
 }
+
+std::vector<size_t> FMDIndexView::getRangeNumbers(
+    const FMDPosition& position) const {
+    
+    // TODO: make this use callbacks or something. TODO: Be able to go from
+    // TextPosition to reverse complement to range number somehow?
+
+    // We'll populate this with the number of every range for which we overlap a
+    // 1 in the mask, each of which will appear once.
+    std::vector<size_t> toReturn;
+
+    if(position.getEndOffset() < 0) {
+        // Special case the empty FMDPosition so we don't have to deal with that
+        // case later.
+        
+        // Just skip all this stuff and end up returning our empty vector.
+        
+    } else if(getMask() == nullptr && getRanges() == nullptr) {
+        // No mask and no ranges to deal with. Return the position number for
+        // each selected position.
+        
+        for(size_t i = position.getForwardStart(); 
+            i <= position.getForwardStart() + position.getEndOffset(); i++) {
+            // Make an entry for each of the BWT positions
+            toReturn.push_back(i);
+        }
+        
+    } else if(getMask() == nullptr && getRanges() != nullptr) {
+        // Fast path. Since there's no mask, every range counts. But we do have
+        // to go get the ranges instead of just using position numbers.
+    
+        // Look up the range that the starting position is in
+        int64_t startRange = getRanges()->rank(position.getForwardStart());
+
+        // And the range the end is in
+        int64_t endRange = getRanges()->rank(position.getForwardStart() +
+            position.getEndOffset());
+        
+        if(endRange < startRange) {
+            throw std::runtime_error("End of ranges interval is before start");
+        }
+        
+        for(size_t i = startRange; i <= endRange; i++) {
+            // Make an entry for each of those ranges in our result vector.
+            // TODO: make sure we don't have the end range as the max size_t.
+            toReturn.push_back(i);
+        }
+    
+    } else {
+        // We have ranges and a mask. Not every range counts, only those that
+        // overlap positions with 1s in the mask.
+
+        // Keep track of the left edge of the interval we still need to count
+        // the ranges in.
+        size_t left = position.getForwardStart();
+
+        while(left <= position.getForwardStart() + position.getEndOffset()) {
+            // Until the next range starts outside this FMDPosition...
+        
+            // Find the (index, rank) of the first 1 in the mask that's here or
+            // beyond our current position.
+            auto nextPosition = getMask()->valueAfter(left);
+            
+            if(nextPosition.first <= position.getForwardStart() +
+                position.getEndOffset()) {
+                
+                // This masked-in position is within this FMDPosition. We should
+                // count its range. Go look at what range that BWT position is
+                // in and grab it.
+                toReturn.push_back(getRanges()->rank(nextPosition.first));
+                
+                // Find the next 1 in the ranges vector after this masked-in
+                // position (exclusive), indicating the start of the next range.
+                auto nextRange = getRanges()->valueAfter(
+                    nextPosition.first + 1);
+                    
+                // Look in or after that range for the next masked-in position.
+                left = nextRange.first;
+            } else {
+                // The next masked-in position is out of us. We're done finding
+                // ranges.
+                break;
+            }
+            
+        }
+    }
+    
+    // Return the occupied ranges.
+    return toReturn;
+}

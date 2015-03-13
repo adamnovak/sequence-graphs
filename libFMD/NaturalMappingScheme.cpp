@@ -5,8 +5,6 @@
 #include <algorithm>
 #include <cstdlib>
 
-#include <boost/range/adaptor/reversed.hpp>
-
 std::vector<Matching> NaturalMappingScheme::findMaxMatchings(
     const std::string& query) const {
  
