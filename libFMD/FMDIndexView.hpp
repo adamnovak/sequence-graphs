@@ -177,6 +177,36 @@ public:
         return toReturn;
     }
     
+    /**
+     * Find TextPositions for all the BWT positions which were not selected in
+     * the old FMDPosition but which are selected in the wider one. Note that
+     * some of the returned TextPositions may be ones that were already selected
+     * in the old range, if new BWT positions merged into the same TextPositions
+     * are selected.
+     *
+     * The wider FMDPosition must represent a range containing that of the old
+     * FMDPosition.
+     */
+    inline std::set<TextPosition> getNewTextPositions(
+        const FMDPosition& old, const FMDPosition& wider) const {
+        
+        // Get all the range numbers we found new stuff in.
+        std::vector<size_t> rangeNumbers = getNewRangeNumbers(old, wider);
+        
+        // We'll convert the range numbers to text positions and populate this.
+        std::set<TextPosition> toReturn;
+        
+        for(const auto& rangeNumber : rangeNumbers) {
+            // Map the range-number-to-text-position over the range numbers,
+            // putting the results in the set.
+            toReturn.insert(rangeToTextPosition(rangeNumber));
+        }
+        
+        // Return the results.
+        return toReturn;
+        
+    }
+    
 protected:
     /**
      * Return the index of the range that the forward-strand interval of this
@@ -190,6 +220,17 @@ protected:
      * of this FMDPosition has masked-in positions in.
      */
     std::vector<size_t> getRangeNumbers(const FMDPosition& position) const;
+    
+    /**
+     * Return the indices of all of the ranges that the forward-strand interval
+     * of the wider FMDPosition has masked-in positions in, in the part of it
+     * not overlapped by the old interval.
+     *
+     * The wider FMDPosition must represent a range containing that of the old
+     * FMDPosition.
+     */
+    std::vector<size_t> getNewRangeNumbers(const FMDPosition& old,
+        const FMDPosition& wider) const;
 
     /**
      * What FMDIndex are we a view of? It must of course outlive us.

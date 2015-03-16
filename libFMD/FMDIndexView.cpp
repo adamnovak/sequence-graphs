@@ -205,3 +205,30 @@ std::vector<size_t> FMDIndexView::getRangeNumbers(
     // Return the occupied ranges.
     return toReturn;
 }
+
+std::vector<size_t> FMDIndexView::getNewRangeNumbers(
+    const FMDPosition& old, const FMDPosition& wider) const {
+    
+    // We can just make FMDPositions for the new ranges, keeping track of only
+    // the forward bits.
+    
+    // Make sure to subtract 1 from the length, since a 0 offset means 1 base.
+    FMDPosition newLeft(wider.getForwardStart(), 0, 
+        old.getForwardStart() - wider.getForwardStart() - 1);
+        
+    FMDPosition newRight(old.getForwardStart() + old.getEndOffset() + 1, 0, 
+        wider.getForwardStart() + wider.getEndOffset() - old.getForwardStart() -
+        old.getEndOffset() - 1);
+        
+    // Get the answers on each side
+    std::vector<size_t> leftRanges = getRangeNumbers(newLeft);
+    
+    std::vector<size_t> rightRanges = getRangeNumbers(newRight);
+    
+    // Add the new ranges on the right to the new ranges on the left. See
+    // <http://stackoverflow.com/a/201729/402891>
+    leftRanges.insert(leftRanges.end(), rightRanges.begin(), rightRanges.end());
+        
+    // Return them all.
+    return leftRanges;
+}

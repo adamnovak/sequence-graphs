@@ -3,6 +3,8 @@
 #include "util.hpp"
 
 #include <vector>
+#include <map>
+#include <queue>
 #include <algorithm>
 #include <cstdlib>
 
@@ -117,7 +119,7 @@ void ZipMappingScheme::map(const std::string& query,
                     " is left only." << std::endl;
             }
             
-            // TODO: Fail mapping fast if we find a nonempty intersection.
+            // TODO: Fail mapping fast if we find a too big intersection.
         }
         
         // TODO: If we can't find anything, try retracting a few bases on one or
@@ -141,4 +143,259 @@ void ZipMappingScheme::map(const std::string& query,
     // positions it matches for both forward and reverse complement.
     
 }
+
+std::set<TextPosition> ZipMappingScheme::exploreRetractions(
+    const FMDPosition& left, size_t patternLengthLeft,
+    const FMDPosition& right, size_t patternLengthRight) const {
+
+    // List the unique TextPosition we found, if we found one. Hosld more than
+    // one TextPosition (though not necessarily all of them) if we're ambiguous,
+    // and none if we have no results. Holds TextPositions for right contexts.
+    std::set<TextPosition> toReturn;
+
+    // We have this DP space we have to traverse defined in 2d by how much we
+    // retract on either side. Call this l and r. If we find we have any overlap
+    // at (l, r), we don't have to explore (l1>=l, r1>=r) because we know it
+    // will not have any new unique matches.
+    
+    // I can do my DP by always considering retracting on the left from a state,
+    // and only considering retracting on the right on the very edge of the
+    // space (i.e. if the left is still full-length).
+    
+    // First check the maximum extensions we have been given.
+    
+    // Find the reverse-orientation positions selected by the right context.
+    std::set<TextPosition> rightPositions = view.getTextPositions(right);
+        
+    // And the forward-orientation positions selected by the left contexts.
+    std::set<TextPosition> leftPositions = view.getTextPositions(left);
+            
+    for(auto leftPosition : leftPositions) {
+        // Flip the position from the reverse complement around so it's on
+        // the right strand. TODO: this pattern should be simpler.
+        leftPosition.flip(view.getIndex().getContigLength(
+            leftPosition.getContigNumber()));
+    
+        if(rightPositions.count(leftPosition)) {
+            // We found an intersection before even retracting.
+            toReturn.insert(leftPosition);
+            Log::debug() << "\tTextPosition " << leftPosition <<
+                " is shared by left context." << std::endl;
+                
+            // TODO: Fail mapping fast if this happens more than once.
+        }
+        
+        
+    }
+    
+    if(toReturn.size() > 0) {
+        // We found results without even doing any DP. It may be unique or not,
+        // but either way we can just return the whole intersection we found.
+        return toReturn;
+    }
+    
+    // If we get here, we had no intersection with the longest contexts on each
+    // side, so we need to do the DP and try various retractions.
+    
+    // Define a type for an FMDPosition retracted a certain distance from the
+    // original, with a set of selected TextPositions.
+    using Retraction = std::tuple<FMDPosition, size_t, std::set<TextPosition>>;
+    // Define a dynamic programming state as a pair of retractions: left and
+    // right.
+    using DPState = std::pair<Retraction, Retraction>;
+    
+    // Make a queue of the retractions to process.
+    std::queue<DPState> todo;
+    
+    // Start by handling no retraction on either side.
+    todo.push({std::make_tuple(left, 0, leftPositions), std::make_tuple(right,
+        0, rightPositions)});
+    
+    // Make a map of the maximum r we will ever have to explore for any given l.
+    // We can use upper_bound for the lookups so we only have to insert l,r
+    // pairs where we have overlap.
+    std::map<size_t, size_t> maxRightRetract;
+    
+    // A function to see if we need to text a certain combination of left and
+    // right retractions, or if it's a more general context of one we already
+    // had overlapping results for (or out of range for the pattern lengths)
+    auto needToTest = [&](size_t leftRetraction, size_t rightRetraction) {
+        if(leftRetraction >= patternLengthLeft ||
+            rightRetraction >= patternLengthRight) {
+            // We would retract all of the characters (or more) on one or both
+            // sides. Since we need to keep a nonempty search string, we
+            // shouldn't expore out to here.
+            return false;
+        }
+        
+        // Find the max right retraction distance for things with left
+        // retractions equal to this one.
+        auto maxRightIterator = maxRightRetract.find(leftRetraction);
+        if(maxRightIterator == maxRightRetract.end()) {
+            // Find the max right retraction distance for things with left
+            // retractions less than this one.
+            maxRightIterator = maxRightRetract.upper_bound(leftRetraction);
+        }
+        
+        if(maxRightIterator != maxRightRetract.end() &&
+            (*maxRightIterator).second <= rightRetraction) {
+            // We've retracted far enough that we don't need to process this
+            // retraction, since it's a less general context than one we already
+            // found results for.
+            return false;
+        }
+        
+        // We do need to process this retraction.
+        return true;
+    };
+    
+    while(todo.size() > 0) {
+        // Process things off the queue until we run out.
+        auto state = todo.front();
+        todo.pop();
+        
+        // Pull out the result ranges, the retraction lengths, and the sets of
+        // selected TextPositions on either side.
+        FMDPosition leftResults = std::get<0>(state.first);
+        size_t leftRetraction = std::get<1>(state.first);
+        const std::set<TextPosition>& leftSet = std::get<2>(state.first);
+        
+        FMDPosition rightResults = std::get<0>(state.second);
+        size_t rightRetraction = std::get<1>(state.second);
+        const std::set<TextPosition>& rightSet = std::get<2>(state.first);
+        
+        // See if the spot down and to the left of us needs doing
+        if(needToTest(leftRetraction + 1, rightRetraction)) {
+        
+            // Retract on the left. 
+            FMDPosition leftRetracted = leftResults;
+            view.getIndex().retractRightOnly(leftRetracted,
+                patternLengthLeft - leftRetraction - 1);
+                
+            // See what new stuff we select on the left.
+            std::set<TextPosition> newlySelected = view.getNewTextPositions(
+                leftResults, leftRetracted);
+        
+            // Make a set of overlapping positions
+            std::set<TextPosition> overlaps;
+        
+            for(auto newResult : newlySelected) {
+                // Flip each result to look it up in the opposing set.
+                newResult.flip(view.getIndex().getContigLength(
+                    newResult.getContigNumber()));
+                    
+                if(rightSet.count(newResult)) {
+                    // We have an overlap!
+                    overlaps.insert(newResult);
+                    // TODO: Fail fast if this happens more than once.
+                }
+            }
+        
+        
+            if(overlaps.size() > 0) {
+                // We have overlap between the new stuff we select on the left
+                // and the old stuff we had selected on the right.
+                
+                // If so, we don't need to look at its descendants.
+                maxRightRetract[leftRetraction + 1] = rightRetraction;
+                
+                if(overlaps.size() == 1) {
+                    // If it's unique, we can spit out a unique match here.
+                    toReturn.insert(*(overlaps.begin()));
+                    
+                    // TODO: fail fast if we now have multiple unique matches.
+                }
+            } else {
+                // We do need to look at the descendants
+            
+                // Expand the left set with the new stuff. This is apparently
+                // hard. See <http://choorucode.com/2010/07/16/c-stl-inserting-
+                // vector-into-set/>
+                std::set<TextPosition> newLeftSet = leftSet;
+                std::copy(newlySelected.begin(), newlySelected.end(),
+                    std::inserter(newLeftSet, newLeftSet.end()));
+                
+                // Queue up a DP job to expand off of there.
+                todo.push({std::make_tuple(leftRetracted, leftRetraction + 1,
+                    newLeftSet), std::make_tuple(rightResults, rightRetraction,
+                    rightSet)});
+            }
+        }
+        
+        if(leftRetraction == 0 &&
+            needToTest(leftRetraction, rightRetraction + 1)) {
+        
+            // We are on the right edge, and the spot down and to the right of
+            // us needs doing
+            
+            // Retract on the right. 
+            FMDPosition rightRetracted = rightResults;
+            view.getIndex().retractRightOnly(rightRetracted,
+                patternLengthRight - rightRetraction - 1);
+                
+            // See what new stuff we select on the right.
+            std::set<TextPosition> newlySelected = view.getNewTextPositions(
+                rightResults, rightRetracted);
+        
+            // Make a set of overlapping positions
+            std::set<TextPosition> overlaps;
+        
+            for(auto newResult : newlySelected) {
+                // Flip each result to look it up in the opposing set.
+                newResult.flip(view.getIndex().getContigLength(
+                    newResult.getContigNumber()));
+                    
+                if(leftSet.count(newResult)) {
+                    // We have an overlap!
+                    overlaps.insert(newResult);
+                    // TODO: Fail fast if this happens more than once.
+                }
+            }
+        
+        
+            if(overlaps.size() > 0) {
+                // We have overlap between the new stuff we select on the right
+                // and the old stuff we had selected on the left.
+                
+                // If so, we don't need to look at its descendants. TODO: we
+                // already handle this by not making a new job in the queue.
+                // Simplify the needToTest system to work with our top-down
+                // organization of job children.
+                maxRightRetract[leftRetraction] = rightRetraction + 1;
+                
+                if(overlaps.size() == 1) {
+                    // If it's unique, we can spit out a unique match here. But
+                    // we need to flip it around.
+                    auto overlap = *(overlaps.begin());
+                    overlap.flip(view.getIndex().getContigLength(
+                        overlap.getContigNumber()));
+                    
+                    toReturn.insert(overlap);
+                    
+                    // TODO: fail fast if we now have multiple unique matches.
+                }
+            } else {
+                // We do need to look at the descendants
+            
+                // Expand the right set with the new stuff.
+                // TODO: Somehow avoid a copy?
+                std::set<TextPosition> newRightSet = rightSet;
+                std::copy(newlySelected.begin(), newlySelected.end(),
+                    std::inserter(newRightSet, newRightSet.end()));
+                
+                // Queue up a DP job to expand off of there.
+                todo.push({std::make_tuple(leftResults, leftRetraction,
+                    leftSet), std::make_tuple(rightRetracted,
+                    rightRetraction + 1, newRightSet)});
+            }
+        }
+        
+    }
+    
+    // If we get here, we've finished all the DP jobs. Return all the
+    // TextPositions we found where they were the unique overlap at some place
+    // we explored in the DP table.
+    return toReturn;
+
+} 
 

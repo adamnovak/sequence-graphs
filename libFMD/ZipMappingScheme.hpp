@@ -44,7 +44,18 @@ protected:
      * the reference for each base in the query. Results are in the same order
      * as the characters in the string.
      */
-    std::vector<FMDPosition> findRightContexts(const std::string& query) const;    
+    std::vector<FMDPosition> findRightContexts(const std::string& query) const;
+    
+    /**
+     * Explore all retractions of the two FMDPositions. Return either an empty
+     * set (if no explored retraction finds overlapping positions between the
+     * two sides), a set with one element (if we find exactly one such
+     * overlap), or a set with two (or more) elements (if we find multiple
+     * overlaps).
+     */
+    std::set<TextPosition> exploreRetractions(const FMDPosition& left,
+        size_t patternLengthLeft, const FMDPosition& right,
+        size_t patternLengthRight) const;    
     
 };
 
