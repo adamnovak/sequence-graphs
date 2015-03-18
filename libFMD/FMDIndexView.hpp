@@ -119,14 +119,17 @@ public:
     /**
      * Convert a range number (which may actually be a BWT position if the view
      * does not use a range vector) to a TextPosition.
+     *
+     * There must be at least one masked-in BWT position in the range.
+     *
      * TODO: Make this protected? Would anyone else ever want it?
      */
     inline TextPosition rangeToTextPosition(size_t rangeNumber) const {
         
         if(getPositions().count(rangeNumber) == 0) {
             // This range has no assigned position, so it must belong to the
-            // TextPosition you get if you locate its first BWT position (i.e.
-            // the one at that 1).
+            // TextPosition you get if you locate its first masked in BWT
+            // position.
             
             if(getRanges() == nullptr) {
                 // But ranges aren't even merged, so the range number is just a
@@ -134,8 +137,30 @@ public:
                 return getIndex().locate(rangeNumber);
             } else {
                 // This is an actual range number. Find the 1 that begins this
-                // range, and locate it, and use that TextPosition.
-                return getIndex().locate(getRanges()->select(rangeNumber));
+                // range, get the first masked in position after that (if
+                // applicable) and locate it, and use that TextPosition.
+                
+                // Where does this range start?
+                auto bwtIndex = getRanges()->select(rangeNumber);
+                
+                if(getMask() != nullptr) {
+                    // Make sure we select a masked-in position.
+                    bwtIndex = getMask()->valueAfter(bwtIndex).first;
+                    
+                    if(bwtIndex >= getRanges()->select(rangeNumber + 1)) {
+                        // Complain if the next masked-in position is not in
+                        // this range.
+                        throw std::runtime_error("Tried to get a "
+                            "TextPosition for a range with nothing in it!");
+                    }
+                }
+                
+                // Find the TextPosition for the selected BWT position.
+                auto pos = getIndex().locate(bwtIndex);
+                
+                Log::debug() << "Range " << rangeNumber <<
+                    " is TextPosition " << pos << std::endl;
+                return pos;
             }
             
         } else {

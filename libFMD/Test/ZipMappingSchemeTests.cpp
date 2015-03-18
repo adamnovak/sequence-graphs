@@ -126,10 +126,19 @@ void ZipMappingSchemeTests::testMapWithMask() {
     // Grab all of the duplicated contig.
     std::string query = "CATGCTTCGGCGATTCGACGCTCATCTGCGACTCT";
 
+    // Make a mask for only one of the duplicates
+    auto mask = new GenericBitVector();
+    for(size_t i = 0; i < index->getBWTLength(); i++) {
+        if(index->locate(i).getContigNumber() == 0) {
+            // Only include the first contig
+            mask->addBit(i);
+        }
+    }
+    mask->finish(index->getBWTLength());
+
     // Turn the genome restriction on, and don't use a merged ranges vector
     delete scheme;
-    scheme = new ZipMappingScheme(FMDIndexView(*index,
-        &index->getGenomeMask(0)));
+    scheme = new ZipMappingScheme(FMDIndexView(*index, mask));
     
     size_t mappedBases = 0;
     scheme->map(query, [&](size_t i, TextPosition mappedTo) {
@@ -139,8 +148,12 @@ void ZipMappingSchemeTests::testMapWithMask() {
         mappedBases++;
     });
     
+    delete mask;
+    
     // All of the bases should map
     CPPUNIT_ASSERT_EQUAL(query.size(), mappedBases);    
+    
+    
 }
 
 /**
@@ -151,10 +164,19 @@ void ZipMappingSchemeTests::testMapWithMaskAndRanges() {
     // Grab all of the duplicated contig.
     std::string query = "CATGCTTCGGCGATTCGACGCTCATCTGCGACTCT";
 
+    // Make a mask for the other of the duplicates
+    auto mask = new GenericBitVector();
+    for(size_t i = 0; i < index->getBWTLength(); i++) {
+        if(index->locate(i).getContigNumber() == 1) {
+            // Only include the second contig
+            mask->addBit(i);
+        }
+    }
+    mask->finish(index->getBWTLength());
+
     // Turn the genome restriction on, and do use the merged ranges vector
     delete scheme;
-    scheme = new ZipMappingScheme(FMDIndexView(*index,
-        &index->getGenomeMask(1), ranges));
+    scheme = new ZipMappingScheme(FMDIndexView(*index, mask, ranges));
     
     size_t mappedBases = 0;
     scheme->map(query, [&](size_t i, TextPosition mappedTo) {
@@ -163,6 +185,8 @@ void ZipMappingSchemeTests::testMapWithMaskAndRanges() {
         CPPUNIT_ASSERT_EQUAL(i, mappedTo.getOffset());
         mappedBases++;
     });
+    
+    delete mask;
     
     // All of the bases should map
     CPPUNIT_ASSERT_EQUAL(query.size(), mappedBases);    
