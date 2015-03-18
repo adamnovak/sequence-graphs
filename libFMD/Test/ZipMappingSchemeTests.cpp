@@ -118,3 +118,53 @@ void ZipMappingSchemeTests::testMap() {
     CPPUNIT_ASSERT_EQUAL(query2.size(), mappedBases);
 }
 
+/**
+ * Make sure mapping works with a mask on.
+ */
+void ZipMappingSchemeTests::testMapWithMask() {
+
+    // Grab all of the duplicated contig.
+    std::string query = "CATGCTTCGGCGATTCGACGCTCATCTGCGACTCT";
+
+    // Turn the genome restriction on, and don't use a merged ranges vector
+    delete scheme;
+    scheme = new ZipMappingScheme(FMDIndexView(*index,
+        &index->getGenomeMask(0)));
+    
+    size_t mappedBases = 0;
+    scheme->map(query, [&](size_t i, TextPosition mappedTo) {
+        // Make sure each base maps in order to the first text.
+        CPPUNIT_ASSERT_EQUAL((size_t) 0, mappedTo.getText());
+        CPPUNIT_ASSERT_EQUAL(i, mappedTo.getOffset());
+        mappedBases++;
+    });
+    
+    // All of the bases should map
+    CPPUNIT_ASSERT_EQUAL(query.size(), mappedBases);    
+}
+
+/**
+ * Make sure mapping works with a mask on and ranges.
+ */
+void ZipMappingSchemeTests::testMapWithMaskAndRanges() {
+
+    // Grab all of the duplicated contig.
+    std::string query = "CATGCTTCGGCGATTCGACGCTCATCTGCGACTCT";
+
+    // Turn the genome restriction on, and do use the merged ranges vector
+    delete scheme;
+    scheme = new ZipMappingScheme(FMDIndexView(*index,
+        &index->getGenomeMask(1), ranges));
+    
+    size_t mappedBases = 0;
+    scheme->map(query, [&](size_t i, TextPosition mappedTo) {
+        // Make sure each base maps in order to text 2 (the one we masked in).
+        CPPUNIT_ASSERT_EQUAL((size_t) 2, mappedTo.getText());
+        CPPUNIT_ASSERT_EQUAL(i, mappedTo.getOffset());
+        mappedBases++;
+    });
+    
+    // All of the bases should map
+    CPPUNIT_ASSERT_EQUAL(query.size(), mappedBases);    
+}
+
