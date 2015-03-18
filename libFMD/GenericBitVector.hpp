@@ -254,8 +254,9 @@ public:
     GenericBitVector* createUnion(const GenericBitVector& other) const;
     
     /**
-     * Given an indes, return the index of the next 1 at or after that position,
-     * paired with its rank.
+     * Given an index, return the index of the last 1 at or before that
+     * position, paired with its rank. Wraps around if no such value is found.
+     * The index must be within the BitVector.
      */
     #ifdef BITVECTOR_CSA
     inline std::pair<size_t, size_t> valueBefore(size_t index) const {
@@ -294,8 +295,8 @@ public:
     #endif
     
     /**
-     * Given an indes, return the index of the last 1 at or before that
-     * position, paired with its rank. Wraps around if no such value is found.
+     * Given an index, return the index of the next 1 at or after that position,
+     * paired with its rank. The index must be within the BitVector.
      */
     #ifdef BITVECTOR_CSA
     inline std::pair<size_t, size_t> valueAfter(size_t index) const {

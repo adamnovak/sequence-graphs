@@ -160,8 +160,41 @@ std::vector<size_t> FMDIndexView::getRangeNumbers(
             // TODO: make sure we don't have the end range as the max size_t.
             toReturn.push_back(i);
         }
+    } else if(getMask() != nullptr && getRanges() == nullptr) {
+        // We have a mask but no ranges vector.
+        
+        // Return the position number for each selected position that's masked
+        // in.
+        
+        // Keep track of the left edge of the interval we still need to count
+        // the masked-in BWT positions in.
+        size_t left = position.getForwardStart();
+
+        while(left <= position.getForwardStart() + position.getEndOffset()) {
+            // Until the next masked-in position is outside this FMDPosition...
+        
+            // Find the (index, rank) of the first 1 in the mask that's here or
+            // beyond our current position.
+            auto nextPosition = getMask()->valueAfter(left);
+            
+            if(nextPosition.first <= position.getForwardStart() +
+                position.getEndOffset()) {
+                
+                // This masked-in position is within this FMDPosition. We should
+                // count it.
+                toReturn.push_back(nextPosition.first);
+                
+                // Look after there.
+                left = nextPosition.first + 1;
+            } else {
+                // The next masked-in position is out of us. We're done finding
+                // ranges.
+                break;
+            }
+            
+        }
     
-    } else {
+    } else if(getMask() != nullptr && getRanges() != nullptr) {
         // We have ranges and a mask. Not every range counts, only those that
         // overlap positions with 1s in the mask.
         
@@ -191,6 +224,12 @@ std::vector<size_t> FMDIndexView::getRangeNumbers(
                 auto nextRange = getRanges()->valueAfter(
                     nextPosition.first + 1);
                     
+                if(nextRange.first <= left) {
+                    // We wrapped around because we ran out of values, but
+                    // landed in the selected range again.
+                    break;
+                }
+                    
                 // Look in or after that range for the next masked-in position.
                 left = nextRange.first;
             } else {
@@ -200,6 +239,11 @@ std::vector<size_t> FMDIndexView::getRangeNumbers(
             }
             
         }
+    } else {
+        // We broke the law of the excluded middle; we checked all the cases but
+        // none of them were true.
+        throw std::runtime_error(
+            "Impossible combination of range vector and mask vector");
     }
     
     // Return the occupied ranges.

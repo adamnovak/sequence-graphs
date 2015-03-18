@@ -17,6 +17,9 @@ public:
      * Make a new FMDIndexView for the given FMDIndex, with the given mask, the
      * given bitvector of merged ranges, and the given map from range number to
      * assigned position.
+     *
+     * All pointers must be to objects that will outlive this FMDIndexView. No
+     * ownership is taken.
      */
     FMDIndexView(const FMDIndex& index, const GenericBitVector* mask = nullptr,
         const GenericBitVector* ranges = nullptr,
