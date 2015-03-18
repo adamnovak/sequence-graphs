@@ -53,7 +53,7 @@ std::vector<std::pair<FMDPosition, size_t>> ZipMappingScheme::findRightContexts(
         // Increment the pattern length since we did actually extedn by 1. 
         patternLength++;
         
-        Log::debug() << "Index " << i << " has " << query[i] << " + " << 
+        Log::trace() << "Index " << i << " has " << query[i] << " + " << 
             patternLength - 1 << " selecting " << results << std::endl;
         
         // Save the search results.
@@ -86,41 +86,12 @@ void ZipMappingScheme::map(const std::string& query,
             rightContexts[i].first << " and " << leftContexts[i].first <<
             std::endl;
     
-        // Find the reverse-orientation positions selected by the right context.
-        std::set<TextPosition> rightPositions = view.getTextPositions(
-            rightContexts[i].first);
-            
-        // And the forward-orientation positions selected by the left contexts.
-        std::set<TextPosition> leftPositions = view.getTextPositions(
-            leftContexts[i].first);
-            
-        // We're going to keep a set of TextPositions that appeared in both
-        // directions.
-        std::set<TextPosition> intersection;
-            
-            
-        for(auto rightPosition : rightPositions) {
-            Log::debug() << "\tTextPosition " << rightPosition <<
-                " is selected by right context." << std::endl;
-        }
-            
-        for(auto leftPosition : leftPositions) {
-            // Flip the position from the reverse complement around so it's on
-            // the right strand. TODO: this pattern should be simpler.
-            leftPosition.flip(view.getIndex().getContigLength(
-                leftPosition.getContigNumber()));
-        
-            if(rightPositions.count(leftPosition)) {
-                intersection.insert(leftPosition);
-                Log::debug() << "\tTextPosition " << leftPosition <<
-                    " is shared by left context." << std::endl;
-            } else {
-                Log::debug() << "\tTextPosition " << leftPosition <<
-                    " is left only." << std::endl;
-            }
-            
-            // TODO: Fail mapping fast if we find a too big intersection.
-        }
+        // Go look at these two contexts in opposite directions, and all their
+        // (reasonable to think about) retractions, and see whether this base
+        // belongs to 0, 1, or multiple TextPositions.
+        std::set<TextPosition> intersection = exploreRetractions(
+            leftContexts[i].first, leftContexts[i].second,
+            rightContexts[i].first, rightContexts[i].second);
         
         // TODO: If we can't find anything, try retracting a few bases on one or
         // both sides until we get a shared result.
@@ -179,14 +150,20 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
         if(rightPositions.count(leftPosition)) {
             // We found an intersection before even retracting.
             toReturn.insert(leftPosition);
-            Log::debug() << "\tTextPosition " << leftPosition <<
-                " is shared by left context." << std::endl;
-                
-            // TODO: Fail mapping fast if this happens more than once.
+            Log::debug() << "TextPosition " << leftPosition <<
+                " is shared at top level." << std::endl;
+               
+            if(toReturn.size() > 1) { 
+                // Fail mapping fast if we find more than one at this top level.
+                return toReturn;
+            }
         }
         
         
     }
+    
+    Log::debug() << toReturn.size() << " positions shared at top level" <<
+        std::endl;
     
     if(toReturn.size() > 0) {
         // We found results without even doing any DP. It may be unique or not,
@@ -225,6 +202,11 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
             // We would retract all of the characters (or more) on one or both
             // sides. Since we need to keep a nonempty search string, we
             // shouldn't expore out to here.
+            
+            Log::debug() << leftRetraction << ", " <<
+                rightRetraction << " is too far out of bounds " <<
+                patternLengthLeft << ", " << patternLengthRight << std::endl;
+            
             return false;
         }
         
@@ -242,6 +224,12 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
             // We've retracted far enough that we don't need to process this
             // retraction, since it's a less general context than one we already
             // found results for.
+            
+            Log::debug() << "Skipping " << leftRetraction << ", " <<
+                rightRetraction << " as it is covered by " <<
+                (*maxRightIterator).first << ", " <<
+                (*maxRightIterator).second << std::endl;
+            
             return false;
         }
         
@@ -267,6 +255,9 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
         // See if the spot down and to the left of us needs doing
         if(needToTest(leftRetraction + 1, rightRetraction)) {
         
+            Log::debug() << "Considering retraction " << leftRetraction + 1 <<
+                ", " << rightRetraction << std::endl;
+        
             // Retract on the left. 
             FMDPosition leftRetracted = leftResults;
             view.getIndex().retractRightOnly(leftRetracted,
@@ -287,7 +278,11 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
                 if(rightSet.count(newResult)) {
                     // We have an overlap!
                     overlaps.insert(newResult);
-                    // TODO: Fail fast if this happens more than once.
+                    
+                    if(overlaps.size() > 1) { 
+                        // Fail fast if we have more than one.
+                        break;
+                    }
                 }
             }
         
@@ -296,6 +291,9 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
                 // We have overlap between the new stuff we select on the left
                 // and the old stuff we had selected on the right.
                 
+                Log::debug() << overlaps.size() <<
+                    " overlaps found for left child." << std::endl;
+                
                 // If so, we don't need to look at its descendants.
                 maxRightRetract[leftRetraction + 1] = rightRetraction;
                 
@@ -303,10 +301,17 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
                     // If it's unique, we can spit out a unique match here.
                     toReturn.insert(*(overlaps.begin()));
                     
-                    // TODO: fail fast if we now have multiple unique matches.
+                    if(toReturn.size() > 1) { 
+                        // Fail mapping fast if we have multiple unique matches
+                        // for different retractions.
+                        return toReturn;
+                    }
                 }
             } else {
                 // We do need to look at the descendants
+                
+                Log::debug() << "No results, queueing left descendant" <<
+                    std::endl;
             
                 // Expand the left set with the new stuff. This is apparently
                 // hard. See <http://choorucode.com/2010/07/16/c-stl-inserting-
@@ -320,10 +325,15 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
                     newLeftSet), std::make_tuple(rightResults, rightRetraction,
                     rightSet)});
             }
+        } else {
+            Log::debug() << "Don't need to test left descendant"  << std::endl;
         }
         
         if(leftRetraction == 0 &&
             needToTest(leftRetraction, rightRetraction + 1)) {
+        
+            Log::debug() << "Considering retraction " << leftRetraction <<
+                ", " << rightRetraction + 1 << std::endl;
         
             // We are on the right edge, and the spot down and to the right of
             // us needs doing
@@ -348,7 +358,12 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
                 if(leftSet.count(newResult)) {
                     // We have an overlap!
                     overlaps.insert(newResult);
-                    // TODO: Fail fast if this happens more than once.
+                    
+                    if(overlaps.size() > 1) { 
+                        // Fail fast if we have more than one.
+                        break;
+                    }
+                    
                 }
             }
         
@@ -363,6 +378,9 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
                 // organization of job children.
                 maxRightRetract[leftRetraction] = rightRetraction + 1;
                 
+                Log::debug() << overlaps.size() <<
+                    " overlaps found for right child." << std::endl;
+                
                 if(overlaps.size() == 1) {
                     // If it's unique, we can spit out a unique match here. But
                     // we need to flip it around.
@@ -372,10 +390,17 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
                     
                     toReturn.insert(overlap);
                     
-                    // TODO: fail fast if we now have multiple unique matches.
+                    if(toReturn.size() > 1) { 
+                        // Fail mapping fast if we have multiple unique matches
+                        // for different retractions.
+                        return toReturn;
+                    }
                 }
             } else {
                 // We do need to look at the descendants
+            
+                Log::debug() << "No results, queueing right descendant" <<
+                    std::endl;
             
                 // Expand the right set with the new stuff.
                 // TODO: Somehow avoid a copy?
@@ -388,6 +413,8 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
                     leftSet), std::make_tuple(rightRetracted,
                     rightRetraction + 1, newRightSet)});
             }
+        } else {
+            Log::debug() << "Don't need to test right descendant"  << std::endl;
         }
         
     }

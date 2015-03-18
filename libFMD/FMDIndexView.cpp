@@ -143,7 +143,7 @@ std::vector<size_t> FMDIndexView::getRangeNumbers(
         int64_t endRange = getRanges()->rank(position.getForwardStart() +
             position.getEndOffset()) - 1;
             
-        Log::debug() << "Looking for ranges between " <<
+        Log::trace() << "Looking for ranges between " <<
             position.getForwardStart() << " in range " << startRange << 
             " which starts at " << getRanges()->select(startRange) <<
             " and " << position.getForwardStart() + position.getEndOffset() <<

@@ -59,7 +59,7 @@
  */
 std::vector<Matching>
 findMinMatchings(
-    const FMDIndex& index,
+    const FMDIndexView& view,
     const std::string& query
 ) {
 
@@ -67,7 +67,7 @@ findMinMatchings(
     std::vector<Matching> toReturn;
  
     // Start with everything selected.
-    FMDPosition results = index.getCoveringPosition();
+    FMDPosition results = view.getIndex().getCoveringPosition();
     
     // How many characters are currently searched?
     size_t patternLength = 0;
@@ -86,21 +86,21 @@ findMinMatchings(
         
         // We're going to extend backward with this new base.
         FMDPosition extended = results;
-        index.extendLeftOnly(extended, query[i]);
+        view.getIndex().extendLeftOnly(extended, query[i]);
         
-        while(extended.isEmpty()) {
+        while(view.isEmpty(extended)) {
             // If you can't extend, retract until you can. TODO: Assumes we
             // can find at least one result for any character.
             
             // Retract the character
             FMDPosition retracted = results;
             // Make sure to drop characters from the total pattern length.
-            index.retractRightOnly(retracted, --patternLength);
+            view.getIndex().retractRightOnly(retracted, --patternLength);
             mustRetract = false;
             
             // Try extending again
             extended = retracted;
-            index.extendLeftOnly(extended, query[i]);
+            view.getIndex().extendLeftOnly(extended, query[i]);
             
             // Say that last step we came from retracted.
             results = retracted;
@@ -113,13 +113,13 @@ findMinMatchings(
         // Retract on the right until the next retraction would make us not
         // unique, and report a minimal unique match starting at this position.
         FMDPosition retracted = results;
-        index.retractRightOnly(retracted, patternLength - 1);
+        view.getIndex().retractRightOnly(retracted, patternLength - 1);
         
         while(retracted.getLength() == 1) {
             // Retract until we would no longer be unique. Make sure to drop
             // characters from the total pattern length.
             results = retracted;
-            index.retractRightOnly(retracted, (--patternLength) - 1);
+            view.getIndex().retractRightOnly(retracted, (--patternLength) - 1);
             mustRetract = false;
         }
         
@@ -128,7 +128,7 @@ findMinMatchings(
             
             // We found a minimally unique match starting at this position and
             // ending patternLength right from here.
-            toReturn.push_back(Matching(i,  index.locate(results.getResult()),
+            toReturn.push_back(Matching(i, view.getTextPosition(results),
                 patternLength));
                 
             // We can't find another minimal match until we move the right

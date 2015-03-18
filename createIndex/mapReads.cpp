@@ -418,7 +418,8 @@ main(
     
     if(options["mapType"].as<std::string>() == "natural") {
         // We want a NaturalMappingScheme
-        NaturalMappingScheme* scheme = new NaturalMappingScheme(index, &ranges);
+        NaturalMappingScheme* scheme = new NaturalMappingScheme(FMDIndexView(
+            index, nullptr, &ranges));
             
         // Populate it
         scheme->credit = options.count("credit");
