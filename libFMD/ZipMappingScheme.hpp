@@ -42,9 +42,11 @@ protected:
     /**
      * Use the inchworm algorithm to find the longest right context present in
      * the reference for each base in the query. Results are in the same order
-     * as the characters in the string.
+     * as the characters in the string, and consist of an FMDPosition of search
+     * results and a context length.
      */
-    std::vector<FMDPosition> findRightContexts(const std::string& query) const;
+    std::vector<std::pair<FMDPosition, size_t>> findRightContexts(
+        const std::string& query) const;
     
     /**
      * Explore all retractions of the two FMDPositions. Return either an empty

@@ -10,11 +10,11 @@
 
 #include <boost/range/adaptor/reversed.hpp>
 
-std::vector<FMDPosition> ZipMappingScheme::findRightContexts(
+std::vector<std::pair<FMDPosition, size_t>> ZipMappingScheme::findRightContexts(
     const std::string& query) const {
  
     // This will hold the right context of every position.
-    std::vector<FMDPosition> toReturn(query.size());
+    std::vector<std::pair<FMDPosition, size_t>> toReturn(query.size());
  
     // Start with everything selected.
     FMDPosition results = view.getIndex().getCoveringPosition();
@@ -57,7 +57,7 @@ std::vector<FMDPosition> ZipMappingScheme::findRightContexts(
             patternLength - 1 << " selecting " << results << std::endl;
         
         // Save the search results.
-        toReturn[i] = results;
+        toReturn[i] = std::make_pair(results, patternLength);
     }
 
     // Now we have inchwormed all the way from right to left, retracting only
@@ -70,13 +70,12 @@ void ZipMappingScheme::map(const std::string& query,
     
     // Get the right contexts
     Log::info() << "Looking for right contexts" << std::endl;
-    std::vector<FMDPosition> rightContexts = findRightContexts(query);
+    auto rightContexts = findRightContexts(query);
     
     // And the left contexts (which is the reverse of the contexts for the
     // reverse complement.
     Log::info() << "Looking for left contexts" << std::endl;
-    std::vector<FMDPosition> leftContexts = findRightContexts(
-        reverseComplement(query));
+    auto leftContexts = findRightContexts(reverseComplement(query));
     std::reverse(leftContexts.begin(), leftContexts.end());
     
     // For each pair, figure out if the forward and reverse FMDPositions select
@@ -84,15 +83,16 @@ void ZipMappingScheme::map(const std::string& query,
     for(size_t i = 0; i < query.size(); i++) {
     
         Log::debug() << "Base " << i << " = " << query[i] << " selects " <<
-            rightContexts[i] << " and " << leftContexts[i] << std::endl;
+            rightContexts[i].first << " and " << leftContexts[i].first <<
+            std::endl;
     
         // Find the reverse-orientation positions selected by the right context.
         std::set<TextPosition> rightPositions = view.getTextPositions(
-            rightContexts[i]);
+            rightContexts[i].first);
             
         // And the forward-orientation positions selected by the left contexts.
         std::set<TextPosition> leftPositions = view.getTextPositions(
-            leftContexts[i]);
+            leftContexts[i].first);
             
         // We're going to keep a set of TextPositions that appeared in both
         // directions.
