@@ -147,6 +147,9 @@ public:
                     // Make sure we select a masked-in position.
                     bwtIndex = getMask()->valueAfter(bwtIndex).first;
                     
+                    // TODO: make sure this obeys all the preconditions on the
+                    // bitvector.
+                    
                     if(bwtIndex >= getRanges()->select(rangeNumber + 1)) {
                         // Complain if the next masked-in position is not in
                         // this range.
