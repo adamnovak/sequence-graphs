@@ -118,13 +118,11 @@ canonicalize(
     // block, and the orientation that this context attaches to the position in.
     // Flipping any of those will flip the orientation in which we need to map,
     // so we need to xor them all together, which for bools is done with !=.
-    Log::trace() << "Canonical orientation: " << canonicalOrientation << 
+    Log::trace() << "Canonical block orientation: " << canonicalOrientation << 
             std::endl;
     Log::trace() << "Segment orientation: " << segmentOrientation << 
             std::endl;
-    Log::trace() << "Strand: " << strand << std::endl;
-    bool finalStrand = (canonicalOrientation != segmentOrientation !=
-        strand);
+    Log::trace() << "Original strand: " << strand << std::endl;
 
     if(canonicalOffset <= 0 || 
         canonicalOffset > stPinchThread_getLength(
@@ -137,10 +135,19 @@ canonicalize(
             " out of range for 1-based position");
     }
 
-    // Encode the strand in the text, convert to a 0-based offset, and return a
-    // canonicalized TextPosition.
-    return TextPosition(canonicalContig * (1 + finalStrand),
-        canonicalOffset - 1);
+    // Double the contig to get the forward strand text, add a 1 if the
+    // canonical contig is backwards, and convert the 1-based pinch graph offset
+    // to a 0-based offset.
+    TextPosition canonicalizedPosition(canonicalContig * 2 + 
+        canonicalOrientation, canonicalOffset - 1);
+        
+    if(segmentOrientation != strand) {
+        Log::trace() << " Flipping to other strand" << std::endl;
+        // We need to be on the other strand.
+        canonicalizedPosition.flip(index.getContigLength(canonicalContig));
+    }
+    
+    return canonicalizedPosition;
 }
 
 size_t

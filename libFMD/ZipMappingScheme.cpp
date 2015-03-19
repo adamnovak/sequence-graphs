@@ -157,9 +157,17 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
                 // Fail mapping fast if we find more than one at this top level.
                 return toReturn;
             }
+        } else {
+            Log::debug() << "TextPosition " << leftPosition <<
+                " is left only" << std::endl;
         }
         
         
+    }
+    
+    for(auto rightPosition : rightPositions) {
+        Log::debug() << "TextPosition " << rightPosition <<
+            " is on the right" << std::endl;
     }
     
     Log::debug() << toReturn.size() << " positions shared at top level" <<

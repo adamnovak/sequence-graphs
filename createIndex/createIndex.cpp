@@ -202,6 +202,9 @@ identifyMergedRuns(
         
         // Canonicalize it.
         TextPosition canonicalized = canonicalize(index, threadSet, base);
+        
+        Log::debug() << base << " canonicalizes to " << canonicalized <<
+            std::endl;
             
         if(j == 0 || canonicalized != lastCanonicalized) {
             // We need to start a new range here, because this BWT base maps to
@@ -319,14 +322,17 @@ mergeGreedy(
         // out ranges that are just mapped to the expected places.
         std::map<size_t, TextPosition> rangesToPositions;
         for(size_t i = 0; i < mergedRuns.second.size(); i++) {
+            Log::debug() << i << " = " << mergedRuns.second[i] << std::endl;
+            
             // Enter every entry in the map. TODO: be selective, or just convert
             // to a full vector representation always.
             rangesToPositions[i] = mergedRuns.second[i];
         }
         
-        // Allocate a new MappingScheme, giving it the ranges and mask bitvectors.
+        // Allocate a new MappingScheme, giving it the mask and ranges
+        // bitvectors.
         MappingScheme* mappingScheme = mappingSchemeFactory(FMDIndexView(index,
-            mergedRuns.first, includedPositions, rangesToPositions));
+            includedPositions, mergedRuns.first, rangesToPositions));
         
         // Make the merge scheme we want to use. We choose a mapping-to-second-
         // level-based merge scheme, to which we need to feed the details of the
