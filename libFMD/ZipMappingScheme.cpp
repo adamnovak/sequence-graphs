@@ -167,6 +167,9 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
         return toReturn;
     }
     
+    // Skip the retractions
+    return toReturn;
+    
     // If we get here, we had no intersection with the longest contexts on each
     // side, so we need to do the DP and try various retractions.
     

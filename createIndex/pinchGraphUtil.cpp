@@ -123,6 +123,8 @@ canonicalize(
     Log::trace() << "Segment orientation: " << segmentOrientation << 
             std::endl;
     Log::trace() << "Original strand: " << strand << std::endl;
+    bool finalOrientation = (canonicalOrientation != segmentOrientation !=
+        strand);
 
     if(canonicalOffset <= 0 || 
         canonicalOffset > stPinchThread_getLength(
@@ -135,18 +137,16 @@ canonicalize(
             " out of range for 1-based position");
     }
 
-    // Double the contig to get the forward strand text, add a 1 if the
-    // canonical contig is backwards, and convert the 1-based pinch graph offset
-    // to a 0-based offset.
-    TextPosition canonicalizedPosition(canonicalContig * 2 + 
-        canonicalOrientation, canonicalOffset - 1);
+    // Double the contig to get the forward strand text, and convert the 1-based
+    // pinch graph offset to a 0-based offset.
+    TextPosition canonicalizedPosition(canonicalContig * 2,
+        canonicalOffset - 1);
         
-    if(segmentOrientation != strand) {
-        Log::trace() << " Flipping to other strand" << std::endl;
-        // We need to be on the other strand.
+    if(finalOrientation) {
+        // Go to the other strand if needed.
         canonicalizedPosition.flip(index.getContigLength(canonicalContig));
     }
-    
+        
     return canonicalizedPosition;
 }
 
