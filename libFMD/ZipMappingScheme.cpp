@@ -140,6 +140,11 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
         
     // And the forward-orientation positions selected by the left contexts.
     std::set<TextPosition> leftPositions = view.getTextPositions(left);
+    
+    Log::debug() << "Left locates at " << view.getIndex().locate(
+        left.getForwardStart()) << std::endl;
+    Log::debug() << "Right locates at " << view.getIndex().locate(
+        right.getForwardStart()) << std::endl;
             
     for(auto leftPosition : leftPositions) {
         // Flip the position from the reverse complement around so it's on
@@ -165,11 +170,6 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
         
     }
     
-    for(auto rightPosition : rightPositions) {
-        Log::debug() << "TextPosition " << rightPosition <<
-            " is on the right" << std::endl;
-    }
-    
     Log::debug() << toReturn.size() << " positions shared at top level" <<
         std::endl;
     
@@ -178,6 +178,13 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
         // but either way we can just return the whole intersection we found.
         return toReturn;
     }
+    
+    for(auto rightPosition : rightPositions) {
+        Log::debug() << "TextPosition " << rightPosition <<
+            " is right only" << std::endl;
+    }
+    
+    return toReturn;
     
     // If we get here, we had no intersection with the longest contexts on each
     // side, so we need to do the DP and try various retractions.

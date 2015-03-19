@@ -203,9 +203,6 @@ identifyMergedRuns(
         // Canonicalize it.
         TextPosition canonicalized = canonicalize(index, threadSet, base);
         
-        Log::debug() << base << " canonicalizes to " << canonicalized <<
-            std::endl;
-            
         if(j == 0 || canonicalized != lastCanonicalized) {
             // We need to start a new range here, because this BWT base maps to
             // a different position than the last one.
@@ -213,12 +210,9 @@ identifyMergedRuns(
             // Say this range is going to belong to the canonical base.
             mappings.push_back(canonicalized);
             
-            if(j != index.getNumberOfContigs() * 2) {
-                // Record a 1 in the vector at the start of every range except
-                // the first. The first needs no 1 before it so it will be rank
-                // 0 (and match up with mapping 0), and it's OK not to split it
-                // off from the stop characters since they can't ever be
-                // searched.
+            if(j >= index.getNumberOfContigs() * 2) {
+                // Record a 1 in the vector at the start of every range,
+                // including the first.
                 encoder->addBit(j);
                 Log::trace() << "Set bit " << j << std::endl;
             }
@@ -322,7 +316,6 @@ mergeGreedy(
         // out ranges that are just mapped to the expected places.
         std::map<size_t, TextPosition> rangesToPositions;
         for(size_t i = 0; i < mergedRuns.second.size(); i++) {
-            Log::debug() << i << " = " << mergedRuns.second[i] << std::endl;
             
             // Enter every entry in the map. TODO: be selective, or just convert
             // to a full vector representation always.
