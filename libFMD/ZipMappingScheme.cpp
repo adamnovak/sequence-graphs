@@ -86,7 +86,7 @@ void ZipMappingScheme::map(const std::string& query,
             leftContexts[i].second << "|+" << rightContexts[i].second << 
             ") selects " << leftContexts[i].first << " and " << 
             rightContexts[i].first << std::endl;
-    
+            
         // Go look at these two contexts in opposite directions, and all their
         // (reasonable to think about) retractions, and see whether this base
         // belongs to 0, 1, or multiple TextPositions.
@@ -136,11 +136,39 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
     
     // First check the maximum extensions we have been given.
     
+    if(left.getEndOffset() < 5) {
+        for(size_t i = 0; i <= left.getEndOffset(); i++) {
+            // Announce each actual BWT index we have selected on the left.            
+            Log::debug() << "Left has selected BWT " <<
+                left.getForwardStart() + i << " = " <<
+                view.getIndex().locate(left.getForwardStart() + i) << std::endl;
+        }
+    }
+    
     // Find the reverse-orientation positions selected by the right context.
     std::set<TextPosition> rightPositions = view.getTextPositions(right);
         
     // And the forward-orientation positions selected by the left contexts.
     std::set<TextPosition> leftPositions = view.getTextPositions(left);
+    
+    Log::debug() << leftPositions.size() << " positions on the left, " <<
+        rightPositions.size() << " on the right" << std::endl;
+        
+    if(leftPositions.size() < 5) {
+        Log::debug() << "Left:" << std::endl;
+        for(auto position : leftPositions) {
+            position.flip(view.getIndex().getContigLength(
+                position.getContigNumber()));
+            Log::debug() << "\t" << position << std::endl;
+        }
+    }
+    
+    if(rightPositions.size() < 5) {
+        Log::debug() << "Right:" << std::endl;
+        for(auto position : rightPositions) {
+            Log::debug() << "\t" << position << std::endl;
+        }
+    }
     
     for(auto leftPosition : leftPositions) {
         // Flip the position from the reverse complement around so it's on
