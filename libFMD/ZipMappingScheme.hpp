@@ -36,6 +36,20 @@ public:
     virtual void map(const std::string& query,
         std::function<void(size_t, TextPosition)> callback) const override;
         
+        
+    // Mapping scheme parameters
+    
+    /**
+     * Determines whether the retraction dynamic programming code will be used
+     * to try and find shorter left and right contexts that are unique taken
+     * together.
+     */
+    bool useRetraction = true;
+    
+    /**
+     * What is the minimum total context length to accept?
+     */
+    size_t minContextLength = 20;
     
 protected:
 

@@ -134,6 +134,11 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
     // and only considering retracting on the right on the very edge of the
     // space (i.e. if the left is still full-length).
     
+    if(patternLengthLeft + patternLengthRight - 1 < minContextLength) {
+        // There isn't enough context for this base even with nothing retracted.
+        return toReturn;
+    }
+    
     // First check the maximum extensions we have been given.
     
     if(left.getEndOffset() < 5) {
@@ -195,8 +200,12 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
         return toReturn;
     }
     
-    // Skip the retractions
-    return toReturn;
+    if(!useRetraction) {
+        // We let the user disable our retraction operations.
+        Log::debug() << "Skipping retraction according to configuration." <<
+            std::endl;
+        return toReturn;
+    }
     
     // If we get here, we had no intersection with the longest contexts on each
     // side, so we need to do the DP and try various retractions.
@@ -233,6 +242,16 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
             Log::debug() << leftRetraction << ", " <<
                 rightRetraction << " is too far out of bounds " <<
                 patternLengthLeft << ", " << patternLengthRight << std::endl;
+            
+            return false;
+        }
+        
+        if(patternLengthLeft - leftRetraction + patternLengthRight - 
+            rightRetraction - 1 < minContextLength) {
+            
+            // Apply our min context length. Subtract 1 because each direction
+            // counts the present base.
+            Log::debug() << "Context length would be too low" << std::endl;
             
             return false;
         }
