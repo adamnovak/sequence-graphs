@@ -677,11 +677,12 @@ main(
     
     if(options.count("alignment")) {
         
-        // We are using the greedy scheme and can't have self-alignment in
-        // the first genome, so we can use this star tree serializer.
+        // We are using the greedy scheme, but there may be alignment between
+        // things not in the first genome, so we have to use this fake-root
+        // output format.
         
-        writeAlignmentWithReference(threadSet, index, 
-            options["alignment"].as<std::string>(), 0);
+        writeAlignment(threadSet, index,
+            options["alignment"].as<std::string>());
             
         if(options.count("alignmentFasta")) {
             // Also save a FASTA, without the rootSeq sequence at all.

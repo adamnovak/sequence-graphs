@@ -82,9 +82,10 @@ void ZipMappingScheme::map(const std::string& query,
     // one single consistent TextPosition.
     for(size_t i = 0; i < query.size(); i++) {
     
-        Log::debug() << "Base " << i << " = " << query[i] << " selects " <<
-            rightContexts[i].first << " and " << leftContexts[i].first <<
-            std::endl;
+        Log::debug() << "Base " << i << " = " << query[i] << " (+" << 
+            leftContexts[i].second << "|+" << rightContexts[i].second << 
+            ") selects " << leftContexts[i].first << " and " << 
+            rightContexts[i].first << std::endl;
     
         // Go look at these two contexts in opposite directions, and all their
         // (reasonable to think about) retractions, and see whether this base
@@ -141,11 +142,6 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
     // And the forward-orientation positions selected by the left contexts.
     std::set<TextPosition> leftPositions = view.getTextPositions(left);
     
-    Log::debug() << "Left locates at " << view.getIndex().locate(
-        left.getForwardStart()) << std::endl;
-    Log::debug() << "Right locates at " << view.getIndex().locate(
-        right.getForwardStart()) << std::endl;
-            
     for(auto leftPosition : leftPositions) {
         // Flip the position from the reverse complement around so it's on
         // the right strand. TODO: this pattern should be simpler.
@@ -162,29 +158,14 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
                 // Fail mapping fast if we find more than one at this top level.
                 return toReturn;
             }
-        } else {
-            Log::debug() << "TextPosition " << leftPosition <<
-                " is left only" << std::endl;
-        }
-        
-        
+        }        
     }
-    
-    Log::debug() << toReturn.size() << " positions shared at top level" <<
-        std::endl;
     
     if(toReturn.size() > 0) {
         // We found results without even doing any DP. It may be unique or not,
         // but either way we can just return the whole intersection we found.
         return toReturn;
     }
-    
-    for(auto rightPosition : rightPositions) {
-        Log::debug() << "TextPosition " << rightPosition <<
-            " is right only" << std::endl;
-    }
-    
-    return toReturn;
     
     // If we get here, we had no intersection with the longest contexts on each
     // side, so we need to do the DP and try various retractions.
@@ -251,6 +232,8 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
         // We do need to process this retraction.
         return true;
     };
+    
+    Log::debug() << "Trying retractions..." << std::endl;
     
     while(todo.size() > 0) {
         // Process things off the queue until we run out.
@@ -433,6 +416,8 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
         }
         
     }
+    
+    Log::debug() << "Found " << toReturn.size() << " locations" << std::endl;
     
     // If we get here, we've finished all the DP jobs. Return all the
     // TextPositions we found where they were the unique overlap at some place
