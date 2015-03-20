@@ -382,7 +382,7 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
                         rightSet)});
                 }
             } else {
-                Log::debug() << "Next left results already covered" <<
+                Log::debug() << "Next left results are not relevant" <<
                     std::endl;
             }
         } else {
@@ -400,79 +400,91 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
             
             // Retract on the right. 
             FMDPosition rightRetracted = rightResults;
-            view.getIndex().retractRightOnly(rightRetracted,
-                patternLengthRight - rightRetraction - 1);
+            size_t retractedLength = view.getIndex().retractRightOnly(
+                rightRetracted);
                 
-            // See what new stuff we select on the right.
-            std::set<TextPosition> newlySelected = view.getNewTextPositions(
-                rightResults, rightRetracted);
-        
-            // Make a set of overlapping positions
-            std::set<TextPosition> overlaps;
-        
-            for(auto newResult : newlySelected) {
-                // Flip each result to look it up in the opposing set.
-                newResult.flip(view.getIndex().getContigLength(
-                    newResult.getContigNumber()));
-                    
-                if(leftSet.count(newResult)) {
-                    // We have an overlap!
-                    overlaps.insert(newResult);
-                    
-                    if(overlaps.size() > 1) { 
-                        // Fail fast if we have more than one.
-                        break;
+            Log::debug() << "More results at " << 
+                leftRetraction << ", " << 
+                patternLengthRight - retractedLength << std::endl;
+            
+            if(needToTest(leftRetraction,
+                patternLengthRight - retractedLength)) {
+                
+                // See what new stuff we select on the right.
+                std::set<TextPosition> newlySelected = view.getNewTextPositions(
+                    rightResults, rightRetracted);
+            
+                // Make a set of overlapping positions
+                std::set<TextPosition> overlaps;
+            
+                for(auto newResult : newlySelected) {
+                    // Flip each result to look it up in the opposing set.
+                    newResult.flip(view.getIndex().getContigLength(
+                        newResult.getContigNumber()));
+                        
+                    if(leftSet.count(newResult)) {
+                        // We have an overlap!
+                        overlaps.insert(newResult);
+                        
+                        if(overlaps.size() > 1) { 
+                            // Fail fast if we have more than one.
+                            break;
+                        }
+                        
                     }
-                    
                 }
-            }
-        
-        
-            if(overlaps.size() > 0) {
-                // We have overlap between the new stuff we select on the right
-                // and the old stuff we had selected on the left.
-                
-                // If so, we don't need to look at its descendants. TODO: we
-                // already handle this by not making a new job in the queue.
-                // Simplify the needToTest system to work with our top-down
-                // organization of job children.
-                maxRightRetract[leftRetraction] = rightRetraction + 1;
-                
-                Log::debug() << overlaps.size() <<
-                    " overlaps found for right child." << std::endl;
-                
-                if(overlaps.size() == 1) {
-                    // If it's unique, we can spit out a unique match here. But
-                    // we need to flip it around.
-                    auto overlap = *(overlaps.begin());
-                    overlap.flip(view.getIndex().getContigLength(
-                        overlap.getContigNumber()));
+            
+            
+                if(overlaps.size() > 0) {
+                    // We have overlap between the new stuff we select on the right
+                    // and the old stuff we had selected on the left.
                     
-                    toReturn.insert(overlap);
+                    // If so, we don't need to look at its descendants. TODO: we
+                    // already handle this by not making a new job in the queue.
+                    // Simplify the needToTest system to work with our top-down
+                    // organization of job children.
+                    maxRightRetract[leftRetraction] = rightRetraction + 1;
                     
-                    if(toReturn.size() > 1) { 
-                        // Fail mapping fast if we have multiple unique matches
-                        // for different retractions.
-                        return toReturn;
+                    Log::debug() << overlaps.size() <<
+                        " overlaps found for right child." << std::endl;
+                    
+                    if(overlaps.size() == 1) {
+                        // If it's unique, we can spit out a unique match here. But
+                        // we need to flip it around.
+                        auto overlap = *(overlaps.begin());
+                        overlap.flip(view.getIndex().getContigLength(
+                            overlap.getContigNumber()));
+                        
+                        toReturn.insert(overlap);
+                        
+                        if(toReturn.size() > 1) { 
+                            // Fail mapping fast if we have multiple unique matches
+                            // for different retractions.
+                            return toReturn;
+                        }
                     }
+                } else {
+                    // We do need to look at the descendants
+                
+                    Log::debug() << "No results, queueing right descendant" <<
+                        std::endl;
+                
+                    // Expand the right set with the new stuff.
+                    // TODO: Somehow avoid a copy?
+                    std::set<TextPosition> newRightSet = rightSet;
+                    std::copy(newlySelected.begin(), newlySelected.end(),
+                        std::inserter(newRightSet, newRightSet.end()));
+                    
+                    // Queue up a DP job to expand off of there.
+                    todo.push({std::make_tuple(leftResults, leftRetraction,
+                        leftSet), std::make_tuple(rightRetracted,
+                        rightRetraction + 1, newRightSet)});
                 }
             } else {
-                // We do need to look at the descendants
-            
-                Log::debug() << "No results, queueing right descendant" <<
+                Log::debug() << "Next right results are not relevant" <<
                     std::endl;
+            }    
             
-                // Expand the right set with the new stuff.
-                // TODO: Somehow avoid a copy?
-                std::set<TextPosition> newRightSet = rightSet;
-                std::copy(newlySelected.begin(), newlySelected.end(),
-                    std::inserter(newRightSet, newRightSet.end()));
-                
-                // Queue up a DP job to expand off of there.
-                todo.push({std::make_tuple(leftResults, leftRetraction,
-                    leftSet), std::make_tuple(rightRetracted,
-                    rightRetraction + 1, newRightSet)});
-            }
         } else {
             Log::debug() << "Don't need to test right descendant"  << std::endl;
         }
