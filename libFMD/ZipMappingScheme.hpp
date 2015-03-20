@@ -51,6 +51,12 @@ public:
      */
     size_t minContextLength = 20;
     
+    /**
+     * What is the maximum number of BWT merged ranges we will check for a place
+     * where left and right contexts will agree on, at each retraction step.
+     */
+    size_t maxRangeCount = 10;
+    
 protected:
 
     /**

@@ -238,6 +238,21 @@ public:
         
     }
     
+    /**
+     * Find (approximately) the number of merged ranges selected by an
+     * FMDPosition. Provides an overestimate of the number of items in the set
+     * getTextPositions() will return.
+     */
+    size_t getApproximateNumberOfRanges(const FMDPosition& position) const;
+        
+    /**
+     * Find (approximately) the number of merged ranges selected by a new
+     * FMDPosition over an old one. Provides an overestimate of the number of
+     * items in the set getNewTextPositions() will return.
+     */
+    size_t getApproximateNumberOfNewRanges(const FMDPosition& old,
+        const FMDPosition& wider) const;
+    
 protected:
     /**
      * Return the index of the range that the forward-strand interval of this

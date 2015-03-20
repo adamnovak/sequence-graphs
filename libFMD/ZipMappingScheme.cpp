@@ -150,6 +150,28 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
         }
     }
     
+    // Figure out how many things we would have to look at on each side.
+    size_t leftRangeCount = view.getApproximateNumberOfRanges(left);
+    size_t rightRangeCount = view.getApproximateNumberOfRanges(right);
+    
+    // TODO: If one is too big but the other is unique, we still need to try the
+    // extend-long-through-short trick.
+    
+    Log::debug() << "Range counts: " << leftRangeCount << ", " <<
+        rightRangeCount << std::endl;
+        
+    if(leftRangeCount > maxRangeCount) {
+        // Just give up and don't find anything.
+        Log::debug() << "Too many ranges on the left!" << std::endl;
+        return toReturn;
+    }
+    
+    if(rightRangeCount > maxRangeCount) {
+        // Just give up and don't find anything.
+        Log::debug() << "Too many ranges on the right!" << std::endl;
+        return toReturn;
+    }
+    
     // Find the reverse-orientation positions selected by the right context.
     std::set<TextPosition> rightPositions = view.getTextPositions(right);
         
@@ -311,12 +333,17 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
             size_t retractedLength = view.getIndex().retractRightOnly(
                 leftRetracted);
                 
+            // How many new ranges will we need to visit?
+            size_t newRangeCount = view.getApproximateNumberOfNewRanges(
+                leftResults, leftRetracted);
+                
             Log::debug() << "More results at " << 
                 patternLengthLeft - retractedLength << ", " << 
-                rightRetraction << std::endl;
+                rightRetraction << " (+" << newRangeCount << " ranges)" <<
+                std::endl;
                 
             if(needToTest(patternLengthLeft - retractedLength,
-                rightRetraction)) {
+                rightRetraction) && newRangeCount < maxRangeCount) {
                 // We actually care about the place we have ended up
                 
                 // See what new stuff we select on the left.
@@ -403,12 +430,18 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
             size_t retractedLength = view.getIndex().retractRightOnly(
                 rightRetracted);
                 
+            // How many new ranges will we need to visit?
+            size_t newRangeCount = view.getApproximateNumberOfNewRanges(
+                rightResults, rightRetracted);
+                
             Log::debug() << "More results at " << 
                 leftRetraction << ", " << 
-                patternLengthRight - retractedLength << std::endl;
+                patternLengthRight - retractedLength << " (+" <<
+                newRangeCount << " ranges)" << std::endl;
             
             if(needToTest(leftRetraction,
-                patternLengthRight - retractedLength)) {
+                patternLengthRight - retractedLength) && 
+                newRangeCount < maxRangeCount) {
                 
                 // See what new stuff we select on the right.
                 std::set<TextPosition> newlySelected = view.getNewTextPositions(

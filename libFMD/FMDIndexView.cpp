@@ -17,6 +17,9 @@ int64_t FMDIndexView::getRangeNumber(const FMDPosition& position) const {
     size_t interval_end;
 
     if(getMask() != nullptr) {
+        // We know every range has at least 1 masked-in position, but we don't
+        // know if we cover it.
+        
         // Slow path. We need to only count positions with 1s in the mask.
         // Like this:
         //  Mask:                               1  1
@@ -254,7 +257,7 @@ std::vector<size_t> FMDIndexView::getNewRangeNumbers(
     const FMDPosition& old, const FMDPosition& wider) const {
     
     // We can just make FMDPositions for the new ranges, keeping track of only
-    // the forward bits.
+    // the forward intervals.
     
     // Make sure to subtract 1 from the length, since a 0 offset means 1 base.
     FMDPosition newLeft(wider.getForwardStart(), 0, 
@@ -276,3 +279,72 @@ std::vector<size_t> FMDIndexView::getNewRangeNumbers(
     // Return them all.
     return leftRanges;
 }
+
+size_t FMDIndexView::getApproximateNumberOfRanges(
+    const FMDPosition& position) const {
+
+    if(getRanges() != nullptr) {
+        // We have a ranges vector. Don't worry about the mask, just provide an
+        // over-estimate on the number of ranges we may have selected. We know
+        // at least one mask 1 is in every range, so this can't be off by too
+        // much because of that.
+        
+        // Look up the range that the starting position is in. We have to
+        // subtract 1 because the 0th range begins with a 1.
+        int64_t startRange = getRanges()->rank(position.getForwardStart()) - 1;
+
+        // And the range the end is in
+        int64_t endRange = getRanges()->rank(position.getForwardStart() +
+            position.getEndOffset()) - 1;
+            
+        // Return the total number of ranges we overlap
+        return endRange - startRange + 1;
+        
+    } else {
+        // Ranges is null. Just count the positions, since each may be a
+        // different merged range.
+        
+        if(getMask() != nullptr) {
+            // Count only masked-in positions
+            
+            // How many masked-in positions exist before we start?
+            int64_t startMask = getMask()->rank(position.getForwardStart());
+            
+            // And how many exist before we end?            
+            int64_t endMask = getMask()->rank(position.getForwardStart() +
+                position.getEndOffset());
+                
+            // Cound how many we touch because of that. TODO: Unit test this!
+            return endMask - startMask + 1;
+        } else {
+            // Count all the BWT positions. COnvert the end offset to an actual
+            // length.
+            return position.getEndOffset() + 1;
+        }
+    }
+}
+
+size_t FMDIndexView::getApproximateNumberOfNewRanges(const FMDPosition& old,
+        const FMDPosition& wider) const {
+
+    // We can just make FMDPositions for the new ranges, keeping track of only
+    // the forward intervals.
+    
+    // Make sure to subtract 1 from the length, since a 0 offset means 1 base.
+    FMDPosition newLeft(wider.getForwardStart(), 0, 
+        old.getForwardStart() - wider.getForwardStart() - 1);
+        
+    FMDPosition newRight(old.getForwardStart() + old.getEndOffset() + 1, 0, 
+        wider.getForwardStart() + wider.getEndOffset() - old.getForwardStart() -
+        old.getEndOffset() - 1);
+        
+    // Sum up the number of ranges on both sides.
+    return getApproximateNumberOfRanges(newLeft) +
+        getApproximateNumberOfRanges(newRight);
+
+}
+
+
+
+
+
