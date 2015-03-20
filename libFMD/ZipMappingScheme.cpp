@@ -306,72 +306,84 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
             Log::debug() << "Considering retraction " << leftRetraction + 1 <<
                 ", " << rightRetraction << std::endl;
         
-            // Retract on the left. 
+            // Retract on the left until you get a new result.
             FMDPosition leftRetracted = leftResults;
-            view.getIndex().retractRightOnly(leftRetracted,
-                patternLengthLeft - leftRetraction - 1);
+            size_t retractedLength = view.getIndex().retractRightOnly(
+                leftRetracted);
                 
-            // See what new stuff we select on the left.
-            std::set<TextPosition> newlySelected = view.getNewTextPositions(
-                leftResults, leftRetracted);
-        
-            // Make a set of overlapping positions
-            std::set<TextPosition> overlaps;
-        
-            for(auto newResult : newlySelected) {
-                // Flip each result to look it up in the opposing set.
-                newResult.flip(view.getIndex().getContigLength(
-                    newResult.getContigNumber()));
-                    
-                if(rightSet.count(newResult)) {
-                    // We have an overlap!
-                    overlaps.insert(newResult);
-                    
-                    if(overlaps.size() > 1) { 
-                        // Fail fast if we have more than one.
-                        break;
+            Log::debug() << "More results at " << 
+                patternLengthLeft - retractedLength << ", " << 
+                rightRetraction << std::endl;
+                
+            if(needToTest(patternLengthLeft - retractedLength,
+                rightRetraction)) {
+                // We actually care about the place we have ended up
+                
+                // See what new stuff we select on the left.
+                std::set<TextPosition> newlySelected = view.getNewTextPositions(
+                    leftResults, leftRetracted);
+            
+                // Make a set of overlapping positions
+                std::set<TextPosition> overlaps;
+            
+                for(auto newResult : newlySelected) {
+                    // Flip each result to look it up in the opposing set.
+                    newResult.flip(view.getIndex().getContigLength(
+                        newResult.getContigNumber()));
+                        
+                    if(rightSet.count(newResult)) {
+                        // We have an overlap!
+                        overlaps.insert(newResult);
+                        
+                        if(overlaps.size() > 1) { 
+                            // Fail fast if we have more than one.
+                            break;
+                        }
                     }
                 }
-            }
-        
-        
-            if(overlaps.size() > 0) {
-                // We have overlap between the new stuff we select on the left
-                // and the old stuff we had selected on the right.
-                
-                Log::debug() << overlaps.size() <<
-                    " overlaps found for left child." << std::endl;
-                
-                // If so, we don't need to look at its descendants.
-                maxRightRetract[leftRetraction + 1] = rightRetraction;
-                
-                if(overlaps.size() == 1) {
-                    // If it's unique, we can spit out a unique match here.
-                    toReturn.insert(*(overlaps.begin()));
+            
+            
+                if(overlaps.size() > 0) {
+                    // We have overlap between the new stuff we select on the
+                    // left and the old stuff we had selected on the right.
                     
-                    if(toReturn.size() > 1) { 
-                        // Fail mapping fast if we have multiple unique matches
-                        // for different retractions.
-                        return toReturn;
+                    Log::debug() << overlaps.size() <<
+                        " overlaps found for left child." << std::endl;
+                    
+                    // If so, we don't need to look at its descendants.
+                    maxRightRetract[leftRetraction + 1] = rightRetraction;
+                    
+                    if(overlaps.size() == 1) {
+                        // If it's unique, we can spit out a unique match here.
+                        toReturn.insert(*(overlaps.begin()));
+                        
+                        if(toReturn.size() > 1) { 
+                            // Fail mapping fast if we have multiple unique matches
+                            // for different retractions.
+                            return toReturn;
+                        }
                     }
+                } else {
+                    // We do need to look at the descendants
+                    
+                    Log::debug() << "No results, queueing left descendant" <<
+                        std::endl;
+                
+                    // Expand the left set with the new stuff. This is apparently
+                    // hard. See <http://choorucode.com/2010/07/16/c-stl-inserting-
+                    // vector-into-set/>
+                    std::set<TextPosition> newLeftSet = leftSet;
+                    std::copy(newlySelected.begin(), newlySelected.end(),
+                        std::inserter(newLeftSet, newLeftSet.end()));
+                    
+                    // Queue up a DP job to expand off of there.
+                    todo.push({std::make_tuple(leftRetracted, leftRetraction + 1,
+                        newLeftSet), std::make_tuple(rightResults, rightRetraction,
+                        rightSet)});
                 }
             } else {
-                // We do need to look at the descendants
-                
-                Log::debug() << "No results, queueing left descendant" <<
+                Log::debug() << "Next left results already covered" <<
                     std::endl;
-            
-                // Expand the left set with the new stuff. This is apparently
-                // hard. See <http://choorucode.com/2010/07/16/c-stl-inserting-
-                // vector-into-set/>
-                std::set<TextPosition> newLeftSet = leftSet;
-                std::copy(newlySelected.begin(), newlySelected.end(),
-                    std::inserter(newLeftSet, newLeftSet.end()));
-                
-                // Queue up a DP job to expand off of there.
-                todo.push({std::make_tuple(leftRetracted, leftRetraction + 1,
-                    newLeftSet), std::make_tuple(rightResults, rightRetraction,
-                    rightSet)});
             }
         } else {
             Log::debug() << "Don't need to test left descendant"  << std::endl;
