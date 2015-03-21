@@ -87,6 +87,116 @@ void ZipMappingScheme::map(const std::string& query,
             ") selects " << leftContexts[i].first << " and " << 
             rightContexts[i].first << std::endl;
             
+        // See if we can use the extend-through-the-other heuristic. TODO: make
+        // this a function!
+        if(view.isUnique(leftContexts[i].first) && rightContexts[i].second < 
+            maxExtendThrough) {
+            
+            Log::debug() << "Trying to extend the left through the right" <<
+                std::endl;
+                
+            // We're going to retract it until it's no longer unique, then go
+            // back and retract it one less.
+            FMDPosition noLongerUnique = leftContexts[i].first;
+            size_t nonUniqueLength = view.getIndex().retractRightOnly(
+                noLongerUnique);
+            
+            // Go back and retract one less (to a length one longer).
+            FMDPosition barelyUnique = leftContexts[i].first;
+            view.getIndex().retractRightOnly(barelyUnique, nonUniqueLength + 1);
+            
+            // Now go extend through with the right, starting with the first
+            // base that isn't the one we're looking at. Stop when we get all
+            // the way through or run out of results.
+            for(size_t j = 1; j < rightContexts[i].second - 1 && 
+                !view.isEmpty(barelyUnique); j++) {
+                
+                Log::debug() << "Extending right with " << 
+                    complement(query[i + j]) << std::endl;
+                
+                view.getIndex().extendLeftOnly(barelyUnique,
+                    complement(query[i + j]));
+            }
+            
+            if(!view.isEmpty(barelyUnique)) {
+                // We made it through the whole LR context without running out
+                // of results! We can map to our unique place, specified by the
+                // left set.
+                
+                Log::debug() << "Index " << i << " maps." << std::endl;
+                
+                // Where is that?
+                TextPosition mappedTo = view.getTextPosition(
+                    leftContexts[i].first);
+                    
+                // Flip it since right is forward
+                mappedTo.flip(view.getIndex().getContigLength(
+                    mappedTo.getContigNumber()));
+                
+                // Call the callback
+                callback(i, mappedTo);
+                
+                // Map the next base.
+                continue;
+            } else {
+                Log::debug() << 
+                    "Can't find whole LR context, trying retractions" << 
+                    std::endl;
+            }
+        }
+        
+        // TODO: Abstract this over left and right with some kind of function.
+        if(view.isUnique(rightContexts[i].first) && leftContexts[i].second < 
+            maxExtendThrough) {
+            
+            Log::debug() << "Trying to extend the right through the left" <<
+                std::endl;
+                
+            // We're going to retract it until it's no longer unique, then go
+            // back and retract it one less.
+            FMDPosition noLongerUnique = rightContexts[i].first;
+            size_t nonUniqueLength = view.getIndex().retractRightOnly(
+                noLongerUnique);
+            
+            // Go back and retract one less (to a length one longer).
+            FMDPosition barelyUnique = rightContexts[i].first;
+            view.getIndex().retractRightOnly(barelyUnique, nonUniqueLength + 1);
+            
+            // Now go extend through with the left, starting with the first
+            // base that isn't the one we're looking at. Stop when we get all
+            // the way through or run out of results.
+            for(size_t j = 1; j < leftContexts[i].second - 1 && 
+                !view.isEmpty(barelyUnique); j++) {
+                
+                Log::debug() << "Extending left with " << query[i - j] <<
+                    std::endl;
+                
+                view.getIndex().extendLeftOnly(barelyUnique, query[i - j]);
+            }
+            
+            if(!view.isEmpty(barelyUnique)) {
+                // We made it through the whole LR context without running out
+                // of results! We can map to our unique place, specified by the
+                // right set.
+                
+                Log::debug() << "Index " << i << " maps." << std::endl;
+                
+                // Where is that?
+                TextPosition mappedTo = view.getTextPosition(
+                    rightContexts[i].first);
+                    
+                // Call the callback
+                callback(i, mappedTo);
+                
+                // Map the next base.
+                continue;
+            } else {
+                Log::debug() << 
+                    "Can't find whole LR context, trying retractions" << 
+                    std::endl;
+            }
+        }
+            
         // Go look at these two contexts in opposite directions, and all their
         // (reasonable to think about) retractions, and see whether this base
         // belongs to 0, 1, or multiple TextPositions.

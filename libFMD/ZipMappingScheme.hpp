@@ -57,6 +57,14 @@ public:
      */
     size_t maxRangeCount = 10;
     
+    /**
+     * What is the maximum number of bases that we are willing to extend through
+     * when trying to confirm if a context unique on one side is consistent with
+     * the other?
+     * TODO: Make this work for more than just the very top level.
+     */
+    size_t maxExtendThrough = 20;
+    
 protected:
 
     /**
