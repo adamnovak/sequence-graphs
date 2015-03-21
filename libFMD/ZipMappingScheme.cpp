@@ -89,8 +89,9 @@ void ZipMappingScheme::map(const std::string& query,
             
         // See if we can use the extend-through-the-other heuristic. TODO: make
         // this a function!
-        if(view.isUnique(leftContexts[i].first) && rightContexts[i].second < 
-            maxExtendThrough) {
+        if(view.isUnique(leftContexts[i].first) && 
+            view.isAmbiguous(rightContexts[i].first) && 
+            rightContexts[i].second < maxExtendThrough) {
             
             Log::debug() << "Trying to extend the left through the right" <<
                 std::endl;
@@ -108,7 +109,7 @@ void ZipMappingScheme::map(const std::string& query,
             // Now go extend through with the right, starting with the first
             // base that isn't the one we're looking at. Stop when we get all
             // the way through or run out of results.
-            for(size_t j = 1; j < rightContexts[i].second - 1 && 
+            for(size_t j = 1; j <= rightContexts[i].second - 1 && 
                 !view.isEmpty(barelyUnique); j++) {
                 
                 Log::debug() << "Extending right with " << 
@@ -146,8 +147,9 @@ void ZipMappingScheme::map(const std::string& query,
         }
         
         // TODO: Abstract this over left and right with some kind of function.
-        if(view.isUnique(rightContexts[i].first) && leftContexts[i].second < 
-            maxExtendThrough) {
+        if(view.isUnique(rightContexts[i].first) && 
+            view.isAmbiguous(leftContexts[i].first) &&
+            leftContexts[i].second < maxExtendThrough) {
             
             Log::debug() << "Trying to extend the right through the left" <<
                 std::endl;
@@ -165,7 +167,7 @@ void ZipMappingScheme::map(const std::string& query,
             // Now go extend through with the left, starting with the first
             // base that isn't the one we're looking at. Stop when we get all
             // the way through or run out of results.
-            for(size_t j = 1; j < leftContexts[i].second - 1 && 
+            for(size_t j = 1; j <= leftContexts[i].second - 1 && 
                 !view.isEmpty(barelyUnique); j++) {
                 
                 Log::debug() << "Extending left with " << query[i - j] <<
