@@ -27,7 +27,7 @@
 // Info: Messages about the operation of the program
 #define INFO_STREAM OutStream
 // Debug: Messages about the internals of the program.
-#define DEBUG_STREAM OutStream
+#define DEBUG_STREAM NullStream
 // Trace: Messages that pedantically describe what the program is doing.
 #define TRACE_STREAM NullStream
 

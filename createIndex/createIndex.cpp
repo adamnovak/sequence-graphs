@@ -329,53 +329,6 @@ mergeGreedy(
         // Allocate a new MappingScheme using the view. 
         MappingScheme* mappingScheme = mappingSchemeFactory(view);
             
-        for(size_t i = index.getNumberOfContigs() * 2; i < index.getBWTLength();
-            i++) {
-            // Check merged runs by testing the canonicalization of each
-            // position (that isn't a stop character)
-            
-            if(!includedPositions->isSet(i)) {
-                // Skip positions that aren't included.
-                continue;
-            }
-            
-            Log::debug() << "Verifying BWT index " << i << std::endl;
-            
-            // What's the non-canonical position?
-            auto noncanonical = index.locate(i);
-            
-            // Canonicalize it
-            auto canonical = canonicalize(index, threadSet, noncanonical);
-            
-            // Canonicalize it again
-            auto doubleCanonical = canonicalize(index, threadSet, canonical);
-            
-            if(canonical != doubleCanonical) {
-                Log::critical() <<
-                    "Canonicalization not returning fixed points: " << 
-                    noncanonical << " -> " << canonical << " -> " << 
-                    doubleCanonical << std::endl;
-                throw std::runtime_error("Canonicalization is noncanonical.");
-            }
-            
-            // See what it looks like
-            Log::info() << noncanonical << " -> " << canonical << std::endl;
-            
-            // Make an FMDPosition for just this base.
-            FMDPosition hereOnly(i, 0, 0);
-            
-            // What do we get if we ask the view to locate this position?
-            auto fromView = view.getTextPosition(hereOnly);
-            
-            if(fromView != canonical) {
-                // It's not what the pinch set says, so complain.
-                Log::critical() << fromView << " is not " << canonical <<
-                    std::endl;
-                throw std::runtime_error("Mismatch between direct "
-                    "canonicalization and asking the index.");
-            }
-        }
-        
         // Make the merge scheme we want to use. We choose a mapping-to-second-
         // level-based merge scheme, to which we need to feed the details of the
         // second level (range vector, representative positions to merge into)
