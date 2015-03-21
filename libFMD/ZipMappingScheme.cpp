@@ -87,6 +87,17 @@ void ZipMappingScheme::map(const std::string& query,
             ") selects " << leftContexts[i].first << " and " << 
             rightContexts[i].first << std::endl;
             
+        if(leftContexts[i].second + rightContexts[i].second - 1 <
+            minContextLength) {
+            // Don't do the extend through if it's too little context overall.
+            
+            Log::debug() <<
+                "Skipping immediately due to too little combined context." <<
+                std::endl;
+                
+            continue;
+        }
+            
         // See if we can use the extend-through-the-other heuristic. TODO: make
         // this a function!
         if(view.isUnique(leftContexts[i].first) && 
