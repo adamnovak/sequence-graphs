@@ -686,15 +686,15 @@ main(
         // things not in the first genome, so we have to use this fake-root
         // output format.
         
-        writeAlignment(threadSet, index,
+        size_t rootSeqLength = writeAlignment(threadSet, index,
             options["alignment"].as<std::string>());
             
         if(options.count("alignmentFasta")) {
-            // Also save a FASTA, without the rootSeq sequence at all.
-            writeAlignmentFasta(fastas, -1,
+            // Also save a FASTA, with the root seq
+            writeAlignmentFasta(fastas, rootSeqLength,
                 options["alignmentFasta"].as<std::string>());
         }
-            
+        
     }
     
     // Make an IDSource to produce IDs not already claimed by contigs.
