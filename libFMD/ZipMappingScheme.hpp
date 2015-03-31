@@ -170,9 +170,9 @@ protected:
         
     /**
      * Returns true if the given unique search result can be extended through
-     * the given context string on the other side. That string must start with
+     * the given context string on the other side. That string must end with
      * the base shared with the search result set (which is not used to extend
-     * again).
+     * again), and is extended through right to left.
      */
     bool canExtendThrough(FMDPosition context,
         const std::string& opposingQuery) const;

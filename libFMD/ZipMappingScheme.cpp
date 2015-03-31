@@ -130,16 +130,20 @@ bool ZipMappingScheme::canExtendThrough(FMDPosition context,
     FMDPosition barelyUnique = context;
     view.getIndex().retractRightOnly(barelyUnique, nonUniqueLength + 1);
     
-    for(size_t i = 1; i < opposingQuery.size() && !view.isEmpty(barelyUnique);
-        i++) {
-        // Now go extend through with the opposing string. We skip the first
-        // character (the one we are actually in the process of mapping) because
-        // that's already searched, and we keep going until we run out of
-        // results or we make it all the way through.
+    for(size_t i = opposingQuery.size() - 2; i != (size_t) -1 &&
+        !view.isEmpty(barelyUnique); i--) {
+        // Now go extend through with the opposing string, from right to left.
+        // We skip the rightmost character (the one we are actually in the
+        // process of mapping) because that's already searched, and we keep
+        // going until we run out of results or we make it all the way through.
         
         Log::debug() << "Extending with " << opposingQuery[i] << std::endl;
         
         view.getIndex().extendLeftOnly(barelyUnique, opposingQuery[i]);
+    }
+    
+    if(view.isEmpty(barelyUnique)) {
+        Log::debug() << "Extension failed" << std::endl;
     }
     
     // Let the caller know whether we got all the way through (in which case the
@@ -170,9 +174,9 @@ std::pair<bool, std::set<TextPosition>> ZipMappingScheme::exploreRetraction(
     
     if(view.isUnique(task.left) && view.isAmbiguous(task.right) && 
         task.rightContext < maxExtendThrough && canExtendThrough(task.left, 
-        query.substr(queryBase, task.rightContext))) {
-        // We tried to extend the left context through the right context and
-        // succeeded. 
+        reverseComplement(query.substr(queryBase, task.rightContext)))) {
+        // We tried to extend the left context through the (reverse
+        // complemented) right context and succeeded.
         
         Log::debug() << "Successfully extended left through right" << std::endl;
         
