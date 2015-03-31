@@ -8,7 +8,7 @@
 #include "Matching.hpp"
 
 #include <iomanip>
-
+#include <queue>
 #include <unordered_map>
 
 /**
@@ -68,6 +68,98 @@ public:
 protected:
 
     /**
+     * Represents a retraction that needs to be checked for results.
+     */
+    struct DPTask {
+        /**
+         * Left search to look at.
+         */
+        FMDPosition left;
+        /** 
+         * Right search to look at.
+         */
+        FMDPosition right;
+        /**
+         * Left search interval from the last step. If not equal to left, then
+         * this task represents a retraction on the left.
+         */
+        FMDPosition lastLeft;
+        /**
+         * Right search interval from the last step. If not equal to right, then
+         * this task represents a retraction on the right.
+         */
+        FMDPosition lastRight;
+        /**
+         * How many bases are searched on the left?
+         */
+        size_t leftContext;
+        /**
+         * How many bases are searched on the right?
+         */
+        size_t rightContext;
+        /**
+         * What TextPositions are known to be selected by lastLeft? Ignored for
+         * the root. These are going to have their strands backwards to the
+         * actual positions that correspond to the searched *left* context.
+         */         
+        std::set<TextPosition> lastLeftPositions;
+        /**
+         * What TextPositions are known to be selected by lastRight? Ignored for
+         * the root.
+         */  
+        std::set<TextPosition> lastRightPositions;
+        /**
+         * Has this DPTask only ever been retracted right since the root?
+         */
+        bool isRightEdge;
+        
+        /**
+         * Make a new DPTask for the root of the DP tree (with nothing yet
+         * retracted).
+         */
+        inline DPTask(const FMDPosition& initialLeft, size_t initialLeftContext,
+            const FMDPosition& initialRight, size_t initialRightContext): 
+            left(initialLeft), right(initialRight), lastLeft(left), 
+            lastRight(right), leftContext(initialLeftContext), 
+            rightContext(initialRightContext), isRightEdge(true) {
+                
+            // lastLeftPositions and lastRightPositions will be ignored since
+            // this is the root.
+        }
+        
+        /**
+         * Return a copy retracted on the left (if false) or the right (if
+         * true). It's the caller's responsibility to fix up lastLeftPositions
+         * and/or lastRightPositions as appropriate, depending on which side was
+         * retracted on to get the DPTask now being retracted.
+         */
+        inline DPTask retract(const FMDIndex& index, bool isRight) const {
+            // Make the copy
+            DPTask retracted = *this;
+            
+            if(isRight) {
+                // Save history
+                retracted.lastRight = retracted.right;
+                // Retract the right context.
+                retracted.rightContext = index.retractRightOnly(
+                    retracted.right);
+            } else {
+                // Save history
+                retracted.lastLeft = retracted.left;
+                // Retract the left context (still on its local right).
+                retracted.leftContext = index.retractRightOnly(
+                    retracted.left);
+                // This retracted copy has now been retracted on the left, and
+                // no longer needs to throw off right retractions.
+                retracted.isRightEdge = false;
+            }
+            
+            // Give back the modified copy
+            return retracted;
+        }
+    }; 
+
+    /**
      * Use the inchworm algorithm to find the longest right context present in
      * the reference for each base in the query. Results are in the same order
      * as the characters in the string, and consist of an FMDPosition of search
@@ -75,6 +167,32 @@ protected:
      */
     std::vector<std::pair<FMDPosition, size_t>> findRightContexts(
         const std::string& query) const;
+        
+    /**
+     * Returns true if the given unique search result can be extended through
+     * the given context string on the other side. That string must start with
+     * the base shared with the search result set (which is not used to extend
+     * again).
+     */
+    bool canExtendThrough(FMDPosition context,
+        const std::string& opposingQuery) const;
+    
+    /**
+     * Evaluate the retraction represented by the given DPTask (which may be
+     * either a root DPTask or a retraction). If it is possible to ascertain
+     * whether the DPTask contains 0, 1, or many shared results, it will return
+     * true and a set of 0, 1, or many results. If it is not possible to make
+     * that determination (for example, because the number of newly selected
+     * positions on the retracted side is too large) it will return false and an
+     * unspecified set (in which case the position being examined needs to be
+     * banned from mapping.
+     *
+     * Is not responsible for deciding whether a finding of results by one
+     * DPTask means that other DPTasks do not need to be executed.
+     */
+    std::pair<bool, std::set<TextPosition>> exploreRetraction(
+        const DPTask& task, std::queue<DPTask>& taskQueue,
+        const std::string& query, size_t queryBase) const;
     
     /**
      * Explore all retractions of the two FMDPositions. Return either an empty
@@ -85,7 +203,8 @@ protected:
      */
     std::set<TextPosition> exploreRetractions(const FMDPosition& left,
         size_t patternLengthLeft, const FMDPosition& right,
-        size_t patternLengthRight) const;    
+        size_t patternLengthRight, const std::string& query,
+        size_t queryBase) const;    
     
 };
 
