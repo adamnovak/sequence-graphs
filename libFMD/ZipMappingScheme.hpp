@@ -47,6 +47,13 @@ public:
     bool useRetraction = true;
     
     /**
+     * If true, abort a mapping if you come to a retraction where it is too hard
+     * to tell if the left and right have any overlaps. If false, just stop
+     * searching that DP branch but continue all the other branches.
+     */
+    bool giveUpIfHard = true;
+    
+    /**
      * What is the minimum total context length to accept?
      */
     size_t minContextLength = 0;
@@ -55,14 +62,14 @@ public:
      * What is the maximum number of BWT merged ranges we will check for a place
      * where left and right contexts will agree on, at each retraction step.
      */
-    size_t maxRangeCount = (size_t) -1;
+    size_t maxRangeCount = (size_t) 100;
     
     /**
      * What is the maximum number of bases that we are willing to extend through
      * when trying to confirm if a context unique on one side is consistent with
      * the other?
      */
-    size_t maxExtendThrough = (size_t) -1;
+    size_t maxExtendThrough = (size_t) 100;
     
 protected:
 
@@ -111,6 +118,13 @@ protected:
          * Has this DPTask only ever been retracted right since the root?
          */
         bool isRightEdge;
+        /**
+         * Is the DP task still usable for set comparison, or are we only using
+         * the extend-through heuristic because one of the sets on one side
+         * would have gotten too big?
+         */
+        bool setsValid;
+        
         
         /**
          * Make a new DPTask for the root of the DP tree (with nothing yet
@@ -120,7 +134,8 @@ protected:
             const FMDPosition& initialRight, size_t initialRightContext): 
             left(initialLeft), right(initialRight), lastLeft(left), 
             lastRight(right), leftContext(initialLeftContext), 
-            rightContext(initialRightContext), isRightEdge(true) {
+            rightContext(initialRightContext), isRightEdge(true),
+            setsValid(true) {
                 
             // lastLeftPositions and lastRightPositions will be ignored since
             // this is the root.

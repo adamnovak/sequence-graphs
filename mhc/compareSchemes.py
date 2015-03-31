@@ -78,57 +78,25 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         
         """
         
-        # Plan out all the schemes as mismatch, credit, unstable, min_context,
-        # add_context, mult_context, ignore_below, hamming_bound, hamming_max,
-        # map_type
+        # Plan out all the schemes. They all start with map_type. For "natural"
+        # schemes, we have map_type, min context, credit, mismatches for credit,
+        # min edit distance bound, max edit distance. For "zip" schemes we have
+        # map_type, min context, max range count.
         return set([
-            # Flat min thresholds
-            (True, True, False, 20, None, None, None, None, None, "natural"),
-            (True, True, False, 50, None, None, None, None, None, "natural"),
-            (True, True, False, 100, None, None, None, None, None, "natural"),
-            (True, True, False, 150, None, None, None, None, None, "natural"),
-            (True, True, False, 200, None, None, None, None, None, "natural"),
-            (True, True, False, 250, None, None, None, None, None, "natural"),
-            # Exact credit (tolerating 1 mismatch) with Hamming bound, but no
-            # mismatches.
-            (True, True, False, None, None, None, None, 1, None, "natural"),
-            (True, True, False, None, None, None, None, 2, None, "natural"),
-            (True, True, False, None, None, None, None, 3, None, "natural"),
-            (True, True, False, None, None, None, None, 4, None, "natural"),
-            (True, True, False, None, None, None, None, 5, None, "natural"),
-            (True, True, False, None, None, None, None, 6, None, "natural"),
-            # Exact credit (tolerating 1 mismatch) with Hamming bound and
-            # Hamming distance allowance (i.e. mismatches again). Scheme under
-            # test.
-            (True, True, False, None, None, None, None, 6, 1, "natural"),
-            (True, True, False, None, None, None, None, 6, 2, "natural"),
-            (True, True, False, None, None, None, None, 6, 3, "natural"),
-            (True, True, False, None, None, None, None, 6, 4, "natural"),
-            (True, True, False, None, None, None, None, 6, 5, "natural"),
-            # Lower Hamming bounds: 5
-            (True, True, False, None, None, None, None, 5, 1, "natural"),
-            (True, True, False, None, None, None, None, 5, 2, "natural"),
-            (True, True, False, None, None, None, None, 5, 3, "natural"),
-            (True, True, False, None, None, None, None, 5, 4, "natural"),
-            # Same with weak stability, for testing stability
-            (True, True, True, None, None, None, None, 5, 1, "natural"),
-            (True, True, True, None, None, None, None, 5, 2, "natural"),
-            (True, True, True, None, None, None, None, 5, 3, "natural"),
-            (True, True, True, None, None, None, None, 5, 4, "natural"),
-            # Lower Hamming bounds: 4
-            (True, True, False, None, None, None, None, 4, 1, "natural"),
-            (True, True, False, None, None, None, None, 4, 2, "natural"),
-            (True, True, False, None, None, None, None, 4, 3, "natural"),
-            # Lower Hamming bounds: 3
-            (True, True, False, None, None, None, None, 3, 1, "natural"),
-            (True, True, False, None, None, None, None, 3, 2, "natural"),
-            # Lower Hamming bounds: 2
-            (True, True, False, None, None, None, None, 2, 1, "natural"),
-            # 5 with no credit.
-            (True, False, False, None, None, None, None, 5, 1, "natural"),
-            (True, False, False, None, None, None, None, 5, 2, "natural"),
-            (True, False, False, None, None, None, None, 5, 3, "natural"),
-            (True, False, False, None, None, None, None, 5, 4, "natural"),
+            # Natural with flat min thresholds
+            ("natural", 20, False, False, None, None),
+            ("natural", 50, False, False, None, None),
+            ("natural", 100, False, False, None, None),
+            ("natural", 150, False, False, None, None),
+            ("natural", 200, False, False, None, None),
+            # Do a 5-4-natural scheme with credit. 
+            ("natural", None, True, True, 5, 4),
+            # Do zip with flat mins
+            ("zip", 20, 100),
+            ("zip", 50, 100),
+            ("zip", 100, 100),
+            ("zip", 150, 100),
+            ("zip", 200, 100)
         ])
             
 
@@ -143,29 +111,41 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
         # to run.
         scheme_plan = self.getSchemePlan()
         
-        for mismatch, credit, unstable, min_context, add_context, \
-            mult_context, ignore_below, hamming_bound, hamming_max, map_type \
-            in scheme_plan:
-            # Unpack each planned scheme
+        for plan_item in scheme_plan:
+            # Pull out each planned scheme and see what map type it is using,
+            # which determines its parameters.
+            map_type = plan_item[0]
             
             # Start out with no configuration arguments
             extra_args = []
             
             # Give the scheme a name to stick on our output files
             scheme_name = "E"
-            if mismatch:
-                # Add the args and scheme name component for mismatch
-                extra_args.append("--mismatches")
-                extra_args.append("1")
-                scheme_name = "I"
-            if credit:
-                # Add the args and scheme name component for credit
-                extra_args.append("--credit")
-                scheme_name += "C"
-            else:
-                # Add an N for no credit
-                scheme_name += "N"
             
+            if map_type == "natural":
+                # Unpack the parameters.
+                map_type, min_context, credit, mismatch, hamming_bound, \
+                    hamming_max = plan_item
+                    
+                
+                
+                if mismatch:
+                    # Add the args and scheme name component for mismatch
+                    extra_args.append("--mismatches")
+                    extra_args.append("1")
+                    scheme_name = "I"
+                if credit:
+                    # Add the args and scheme name component for credit
+                    extra_args.append("--credit")
+                    scheme_name += "C"
+                else:
+                    # Add an N for no credit
+                    scheme_name += "N"
+                    
+            elif map_type = "zip":
+                # Unpack the parameters
+                map_type, min_context, range_count = plan_item
+                
             # Handle mapping types
             scheme_name += map_type
             extra_args.append("--mapType")
@@ -179,60 +159,38 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                 # Include min conext in the name if in use
                 scheme_name += "Min{}".format(min_context)
                 
-            if add_context is not None:
-                # Require an additional context
-                extra_args.append("--addContext")
-                extra_args.append(str(add_context))
+            if map_type == "natural":
+            
+                if hamming_bound is not None:
+                    # For the natural mapping scheme, don't map on a maximum
+                    # unique match run unless we can get a lower bound on its
+                    # Hamming distance from all other reference locations that
+                    # is at least this high.
+                    extra_args.append("--minHammingBound")
+                    extra_args.append(str(hamming_bound))
+                    
+                    # Mention it in the scheme name
+                    scheme_name += "Ham{}".format(hamming_bound)
+                    
+                if hamming_max is not None:
+                    # For the natural mapping scheme, allow this many mismatches
+                    # in maximal unique match runs.
+                    extra_args.append("--maxHammingDistance")
+                    extra_args.append(str(hamming_max))
+                    
+                    # Mention it in the scheme name
+                    scheme_name += "Mis{}".format(hamming_max)
+                    
+            if map_type == "zip":
                 
-                # Include additional context if in use. No need for padding
-                # since we can now natural sort.
-                scheme_name += "Add{}".format(add_context)
-                
-            if mult_context is not None:
-                # Require a context multiplier
-                extra_args.append("--multContext")
-                extra_args.append(str(mult_context))
-                
-                # Include multiplicative context if in use. Don't let any .s
-                # into the scheme name since it needs to be a valid file
-                # extension.
-                scheme_name += "Mult{}".format(mult_context).replace(".", "p")
-                
-            if ignore_below is not None:
-                # For the natrual mapping scheme, require a minimum length to
-                # even count a maximum unique match (so short by-chance ones
-                # can't cause conflicts that blacklist bases.)
-                extra_args.append("--ignoreMatchesBelow")
-                extra_args.append(str(ignore_below))
-                
-                # Mention it in the scheme name
-                scheme_name += "Ign{}".format(ignore_below)
-                
-            if hamming_bound is not None:
-                # For the natural mapping scheme, don't map on a maximum unique
-                # match run unless we can get a lower bound on its Hamming
-                # distance from all other reference locations that is at least
-                # this high.
-                extra_args.append("--minHammingBound")
-                extra_args.append(str(hamming_bound))
-                
-                # Mention it in the scheme name
-                scheme_name += "Ham{}".format(hamming_bound)
-                
-            if hamming_max is not None:
-                # For the natural mapping scheme, allow this many mismatches in
-                # maximal unique match runs.
-                extra_args.append("--maxHammingDistance")
-                extra_args.append(str(hamming_max))
-                
-                # Mention it in the scheme name
-                scheme_name += "Mis{}".format(hamming_max)
-                
-            if unstable:
-                # Allow some instability
-                extra_args.append("--unstable")
-                scheme_name += "U"
-                
+                if range_count is not None:
+                    # Handle a limit on the max number of ranges to visit
+                    extra_args.append("--maxRangeCount")
+                    extra_args.append(str(range_count))
+                    
+                    # Mention it in the scheme name
+                    scheme_name += "Range{}".format(hamming_max)
+        
             # Yield the name with the args.
             yield (scheme_name, extra_args)
         

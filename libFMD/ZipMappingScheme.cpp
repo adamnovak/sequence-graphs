@@ -171,38 +171,66 @@ std::pair<bool, std::set<TextPosition>> ZipMappingScheme::exploreRetraction(
         return {true, {}};
     }
           
+    // We keep track of whether we tried to extend the left through the right,
+    // or the right through the left. If we did, we know we will try the same
+    // things if we retract on the opposite side, and we will queue up those
+    // retractions even if we can't afford to correctly populate their sets.
+    bool triedLeftExtend = false;
+    bool triedRightExtend = false;
+          
     
     if(view.isUnique(task.left) && view.isAmbiguous(task.right) && 
-        task.rightContext < maxExtendThrough && canExtendThrough(task.left, 
-        reverseComplement(query.substr(queryBase, task.rightContext)))) {
-        // We tried to extend the left context through the (reverse
-        // complemented) right context and succeeded.
+        task.rightContext < maxExtendThrough) {
         
-        Log::debug() << "Successfully extended left through right" << std::endl;
+        // We will try extending the left through the right.
+        triedLeftExtend = true;
         
-        // We can now cheat and return the one-element set of whatever the left
-        // context selects, flipped.
-        TextPosition matchedTo = view.getTextPosition(task.left);
-        matchedTo.flip(view.getIndex().getContigLength(
-            matchedTo.getContigNumber()));
-        return {true, {matchedTo}};
+        if(canExtendThrough(task.left, reverseComplement(query.substr(queryBase,
+            task.rightContext)))) {
+            // We tried to extend the left context through the (reverse
+            // complemented) right context and succeeded.
+            
+            Log::debug() << "Successfully extended left through right" <<
+                std::endl;
+            
+            // We can now cheat and return the one-element set of whatever the
+            // left context selects, flipped.
+            TextPosition matchedTo = view.getTextPosition(task.left);
+            matchedTo.flip(view.getIndex().getContigLength(
+                matchedTo.getContigNumber()));
+            return {true, {matchedTo}};
+        } else {
+            Log::debug() << "Failed to extend left though right" << std::endl;
+        }
+        
+        // If we don't succeed, we still need to check for set overlap.
+    } else if(view.isUnique(task.right) && view.isAmbiguous(task.left) && 
+        task.leftContext < maxExtendThrough) {
+        
+        // We will try extending the right through the left.
+        triedRightExtend = true;
+        
+        if(canExtendThrough(task.right, query.substr(
+            queryBase - (task.leftContext - 1), task.leftContext))) {
+            // We tried to extend the right context through the left context and
+            // succeeded
+            
+            Log::debug() << "Successfully extended right through left" <<
+                std::endl;
+            
+            // We can now cheat and return the one-element set of whatever the
+            // right context selects.
+            TextPosition matchedTo = view.getTextPosition(task.right);
+            return {true, {matchedTo}};
+        } else {
+            Log::debug() << "Failed to extend right though left" << std::endl;
+        }
+        
+        // If we don't succeed, we still need to check for set overlap.
     }
     
-    if(view.isUnique(task.right) && view.isAmbiguous(task.left) && 
-        task.leftContext < maxExtendThrough && canExtendThrough(task.right, 
-        query.substr(queryBase - (task.leftContext - 1), task.leftContext))) {
-        // We tried to extend the right context through the left context and
-        // succeeded
-        
-        Log::debug() << "Successfully extended right through left" << std::endl;
-        
-        // We can now cheat and return the one-element set of whatever the right
-        // context selects.
-        TextPosition matchedTo = view.getTextPosition(task.right);
-        return {true, {matchedTo}};
-    }
-    
-    // If not, can we successfully bang the sets together?
+    // If we can't or won't try to extend one through the other, can we
+    // successfully bang the sets together?
     
     // What's the set of newly found results?
     std::set<TextPosition> newResults;
@@ -213,138 +241,187 @@ std::pair<bool, std::set<TextPosition>> ZipMappingScheme::exploreRetraction(
     // What's the set of results we knew about on the opposing side?
     std::set<TextPosition> opposingResults;
     
-    if(task.left == task.lastLeft && task.right == task.lastRight) {
-        // We're a root task, we need the entirety of both sets.
-        
-        if(view.getApproximateNumberOfRanges(task.left) > maxRangeCount ||
-            view.getApproximateNumberOfRanges(task.right) > maxRangeCount) {
-            
-            Log::debug() << "Can't hold all the ranges at the root" <<
-                std::endl;
-            
-            // We can't actually evaluate this node because one side has too
-            // many things.
-            return {false, {}};
-            
-        }
-        
-        // We can touch all the results
-        newResults = view.getTextPositions(task.right);
-        oldResults = std::set<TextPosition>();
-        opposingResults = view.getTextPositions(task.left);
-    } else if(task.left == task.lastLeft) {
-        // We retracted on the right and left the left alone
-        
-        if(view.getApproximateNumberOfNewRanges(task.lastRight, task.right) >
-            maxRangeCount) {
-            
-            Log::debug() << "Can't hold all the ranges on the right" <<
-                std::endl;
-            
-            // We found too many new things, we have to give up.
-            return {false, {}};
-        }
-        
-        // Our new results are just the new stuff we found
-        newResults = view.getNewTextPositions(task.lastRight, task.right);
-        // We pull our old already-known results from the task. TODO: Can we
-        // move the set here?
-        oldResults = task.lastRightPositions;
-        opposingResults = task.lastLeftPositions;
-        
-    } else {
-        // We retracted on the left and left the right alone
-        
-        if(view.getApproximateNumberOfNewRanges(task.lastLeft, task.left) >
-            maxRangeCount) {
-            
-            Log::debug() << "Can't hold all the ranges on the left" <<
-                std::endl;
-            
-            // We found too many new things, we have to give up.
-            return {false, {}};
-        }
-        
-        // Our new results are just the new stuff we found
-        newResults = view.getNewTextPositions(task.lastLeft, task.left);
-        // We pull our old already-known results from the task. TODO: Can we
-        // move the set here?
-        oldResults = task.lastLeftPositions;
-        opposingResults = task.lastRightPositions;
-    }
+    // We keep track of whether we can actually populate the sets if we queue up
+    // retractions. This will only ever be true if the sets in the task we are
+    // executing are valid and the newly selected stuff is also small enough.
+    bool canTouchResults = task.setsValid;
     
-    // What TextPositions are shared? Always holds things from the right context
-    // perspective.
-    std::set<TextPosition> shared;
+    if(task.setsValid) {
+        // The sets in the task are up to date, and we can use them to do a set
+        // comparison for the new things we've selected.
     
-    for(auto result : newResults) {
-        
-        // Flip each result around and see if it is in the opposing set
-        TextPosition flipped = result;
-        flipped.flip(view.getIndex().getContigLength(
-            flipped.getContigNumber()));
+        if(task.left == task.lastLeft && task.right == task.lastRight) {
+            // We're a root task, we need the entirety of both sets.
             
-        if(opposingResults.count(flipped)) {
-            // We found it!
-            if(task.left == task.lastLeft) {
-                // We didn't retract on the left, so we're going through right
-                // contexts.
-                shared.insert(result);
+            if(view.getApproximateNumberOfRanges(task.left) > maxRangeCount ||
+                view.getApproximateNumberOfRanges(task.right) > maxRangeCount) {
+                
+                Log::debug() << "Can't hold all the new ranges at the root" <<
+                    std::endl;
+                
+                // We can't actually evaluate this node because one side has too
+                // many things.
+                canTouchResults = false;
+                
             } else {
-                // We're going through left contexts, and we need to save
-                // overlaps in right context space.
-                shared.insert(flipped);
+            
+                // We can touch all the results
+                newResults = view.getTextPositions(task.right);
+                oldResults = std::set<TextPosition>();
+                opposingResults = view.getTextPositions(task.left);
+            }
+        } else if(task.left == task.lastLeft) {
+            // We retracted on the right and left the left alone
+            
+            if(view.getApproximateNumberOfNewRanges(task.lastRight,
+                task.right) > maxRangeCount) {
+                
+                Log::debug() << "Can't hold all the new ranges on the right" <<
+                    std::endl;
+                
+                // We found too many new things, we have to give up.
+                canTouchResults = false;
+            } else {
+            
+                // Our new results are just the new stuff we found
+                newResults = view.getNewTextPositions(task.lastRight,
+                    task.right);
+                // We pull our old already-known results from the task. TODO:
+                // Can we move the set here?
+                oldResults = task.lastRightPositions;
+                opposingResults = task.lastLeftPositions;
             }
             
-            if(shared.size() > 1) {
-                
-                Log::debug() << "Found multiple shared new results" <<
-                    std::endl;
+        } else {
+            // We retracted on the left and left the right alone
             
-                // We can short circuit now because we found multiple shared
-                // TextPositions.
+            if(view.getApproximateNumberOfNewRanges(task.lastLeft, task.left) >
+                maxRangeCount) {
+                
+                Log::debug() << "Can't hold all the new ranges on the left" <<
+                    std::endl;
+                
+                // We found too many new things, we have to give up.
+                canTouchResults = false;
+            } else {
+                
+                // Our new results are just the new stuff we found
+                newResults = view.getNewTextPositions(task.lastLeft, task.left);
+                // We pull our old already-known results from the task. TODO:
+                // Can we move the set here?
+                oldResults = task.lastLeftPositions;
+                opposingResults = task.lastRightPositions;
+            }
+        }
+    
+        if(canTouchResults) {
+            // We can actually look at the results on both sides and see if any
+            // are shared.
+            
+            // What TextPositions are shared? Always holds things from the right
+            // context perspective.
+            std::set<TextPosition> shared;
+            
+            for(auto result : newResults) {
+                
+                // Flip each result around and see if it is in the opposing set
+                TextPosition flipped = result;
+                flipped.flip(view.getIndex().getContigLength(
+                    flipped.getContigNumber()));
+                    
+                if(opposingResults.count(flipped)) {
+                    // We found it!
+                    if(task.left == task.lastLeft) {
+                        // We didn't retract on the left, so we're going through
+                        // right contexts.
+                        shared.insert(result);
+                    } else {
+                        // We're going through left contexts, and we need to
+                        // save overlaps in right context space.
+                        shared.insert(flipped);
+                    }
+                    
+                    if(shared.size() > 1) {
+                        
+                        Log::debug() << "Found multiple shared new results" <<
+                            std::endl;
+                    
+                        // We can short circuit now because we found multiple
+                        // shared TextPositions.
+                        return {true, shared};
+                    }
+                }
+                
+                // If we're still going, make sure to add this new results to
+                // the set with the old results from its side.
+                oldResults.insert(result);
+            }
+            
+            // If we get here, we went through all the new results.
+            if(shared.size() > 0) {
+            
+                Log::debug() << "Found single shared new result" << std::endl;
+            
+                // If we found any overlap at all, say we found something.
                 return {true, shared};
             }
+        
+            Log::debug() << "Could look at result sets but found no overlap" <<
+                std::endl;
+        
+            // Otherwise we didn't find anything and have to continue with our
+            // descendants.
+            
         }
         
-        // If we're still going, make sure to add this new results to the
-        // set with the old results from its side.
-        oldResults.insert(result);
-    }
-    
-    // If we get here, we went through all the new results.
-    if(shared.size() > 0) {
-    
-        Log::debug() << "Found single shared new result" << std::endl;
-    
-        // If we found any overlap at all, say we found something.
-        return {true, shared};
-    }
-    
-    // Otherwise we didn't find anything and have to continue with our
-    // descendants.
-    
-    // Make a task that reflects our new sets.
-    DPTask toRetract = task;
-    if(task.left == task.lastLeft) {
-        // We didn't retract on the left. We can use this code path to fill in
-        // the setd for roots and right retractions.
-        toRetract.lastLeftPositions = opposingResults;
-        // The old results have now been updated to include the new results
-        toRetract.lastRightPositions = oldResults;
     } else {
-        // We did retract on the left, flip these around.
-        toRetract.lastLeftPositions = oldResults;
-        toRetract.lastRightPositions = opposingResults;
+        Log::debug() << "Previous result sets not valid" << std::endl;
     }
     
-    if(task.leftContext > 1) {
+    // Make a task that we can retract to make child tasks, if needed.
+    DPTask toRetract = task;
+    
+    if(canTouchResults) {
+        // We can afford to fill in the sets on the new task.
+        if(task.left == task.lastLeft) {
+            // We didn't retract on the left. We can use this code path to fill
+            // in the sets for roots and right retractions.
+            toRetract.lastLeftPositions = opposingResults;
+            // The old results have now been updated to include the new results
+            toRetract.lastRightPositions = oldResults;
+        } else {
+            // We did retract on the left, flip these around.
+            toRetract.lastLeftPositions = oldResults;
+            toRetract.lastRightPositions = opposingResults;
+        }
+    } else {
+        // The sets for this next task won't be valid, since we can't (or in the
+        // past couldn't) afford to update them.
+        toRetract.setsValid = false;
+        
+        // Clear them out to avoid copying later. TODO: do this earlier somehow?
+        toRetract.lastLeftPositions.clear();
+        toRetract.lastRightPositions.clear();
+    }
+    
+    if(task.leftContext > 1 && (canTouchResults || triedRightExtend)) {
+        // We have stuff on the left, and either we're operating normally or we
+        // just tried to extend the right through the left and failed.
+        
         // Retract on the left and enqueue that child task.
         Log::debug() << "Queueing retraction on the left" << std::endl;
         taskQueue.push(toRetract.retract(view.getIndex(), false));
     }
     
-    if(task.isRightEdge && task.rightContext > 1) {
+    if(((task.isRightEdge && canTouchResults) || triedLeftExtend) &&
+        task.rightContext > 1) {
+        
+        // Either we're on the right edge (haven't retracted left yet) and we
+        // can look at our results correctly, or we just tried and failed
+        // extending the left through the right (and want to try with a shorter
+        // right). TODO: Am I going to duplicate work here? I think I really do
+        // need to approach some retractions from this side to make things work.
+        
         Log::debug() << "Queueing retraction on the right" << std::endl;
         // Also retract on the right, if the task we just did never retracted on
         // the left.
@@ -353,8 +430,9 @@ std::pair<bool, std::set<TextPosition>> ZipMappingScheme::exploreRetraction(
     
     Log::debug() << "Found no shared results" << std::endl;
     
-    // Say we found nothing in common but we don't want to kill the mapping.
-    return {true, {}};
+    // Report whether we got too many results to think about, and say we found
+    // no overlaps.
+    return {canTouchResults, {}};
         
 }
 
@@ -435,12 +513,17 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
         taskQueue.pop();
         
         if(!flagAndSet.first) {
-            // We encountered something too hard to do, and have to abort
-            // mapping.
-            Log::debug() << "Aborting mapping base " << queryBase <<
-                " because it is too hard." << std::endl;
-            // Return an empty set.
-            return std::set<TextPosition>();
+            // We encountered something too hard to do.
+            
+            if(giveUpIfHard) {
+                // We have to abort mapping.
+                Log::debug() << "Aborting mapping base " << queryBase <<
+                    " because it is too hard." << std::endl;
+                // Return an empty set.
+                return std::set<TextPosition>();
+            } else {
+                Log::debug() << "Ignoring hard task" << std::endl;
+            }
         }
         
         for(auto position : flagAndSet.second) {
@@ -453,6 +536,12 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
             Log::debug() << "Already ambiguous, not retracting any more" <<
                 std::endl;
             return toReturn;
+        }
+        
+        if(!useRetraction) {
+            // Only explore the very first task, which is the root and not
+            // actually retracting on either side.
+            break;
         }
         
     }

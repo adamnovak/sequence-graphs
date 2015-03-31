@@ -520,10 +520,10 @@ main(
             "Maximum *edit* distance from reference location")
         ("unstable", "Allow unstable mapping for increased coverage")
         ("maxRangeCount", boost::program_options::value<size_t>()
-            ->default_value((size_t) -1),
+            ->default_value(100),
             "Maximum number of merged ranges to visit in a mapping step")
         ("maxExtendThrough", boost::program_options::value<size_t>()
-            ->default_value((size_t) -1),
+            ->default_value(100),
             "Maximum number of bases to try to extend through");
         
     // And set up our positional arguments
