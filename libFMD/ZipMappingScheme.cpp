@@ -130,7 +130,7 @@ bool ZipMappingScheme::canExtendThrough(FMDPosition context,
     FMDPosition barelyUnique = context;
     view.getIndex().retractRightOnly(barelyUnique, nonUniqueLength + 1);
     
-    for(size_t i = 0; i < opposingQuery.size() && !view.isEmpty(barelyUnique);
+    for(size_t i = 1; i < opposingQuery.size() && !view.isEmpty(barelyUnique);
         i++) {
         // Now go extend through with the opposing string. We skip the first
         // character (the one we are actually in the process of mapping) because
