@@ -126,6 +126,11 @@ bool ZipMappingScheme::canExtendThrough(FMDPosition context,
     FMDPosition noLongerUnique = context;
     size_t nonUniqueLength = view.getIndex().retractRightOnly(noLongerUnique);
     
+    while(view.isUnique(noLongerUnique)) {
+        // It may take multiple retracts because of masks and stuff.
+        nonUniqueLength = view.getIndex().retractRightOnly(noLongerUnique);
+    }
+    
     // Go back and retract one less (to a length one longer).
     FMDPosition barelyUnique = context;
     view.getIndex().retractRightOnly(barelyUnique, nonUniqueLength + 1);
