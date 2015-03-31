@@ -179,8 +179,7 @@ std::pair<bool, std::set<TextPosition>> ZipMappingScheme::exploreRetraction(
     bool triedRightExtend = false;
           
     
-    if(view.isUnique(task.left) && view.isAmbiguous(task.right) && 
-        task.rightContext < maxExtendThrough) {
+    if(view.isUnique(task.left) && task.rightContext < maxExtendThrough) {
         
         // We will try extending the left through the right.
         triedLeftExtend = true;
@@ -204,8 +203,9 @@ std::pair<bool, std::set<TextPosition>> ZipMappingScheme::exploreRetraction(
         }
         
         // If we don't succeed, we still need to check for set overlap.
-    } else if(view.isUnique(task.right) && view.isAmbiguous(task.left) && 
-        task.leftContext < maxExtendThrough) {
+    }
+    if(view.isUnique(task.right) && task.leftContext < maxExtendThrough) {
+        // TODO: Don't try this extension if we failed the other direction.
         
         // We will try extending the right through the left.
         triedRightExtend = true;
