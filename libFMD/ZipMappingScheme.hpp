@@ -51,7 +51,7 @@ public:
      * to tell if the left and right have any overlaps. If false, just stop
      * searching that DP branch but continue all the other branches.
      */
-    bool giveUpIfHard = true;
+    bool giveUpIfHard = false;
     
     /**
      * What is the minimum total context length to accept?
