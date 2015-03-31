@@ -49,21 +49,20 @@ public:
     /**
      * What is the minimum total context length to accept?
      */
-    size_t minContextLength = 20;
+    size_t minContextLength = 0;
     
     /**
      * What is the maximum number of BWT merged ranges we will check for a place
      * where left and right contexts will agree on, at each retraction step.
      */
-    size_t maxRangeCount = 10;
+    size_t maxRangeCount = (size_t) -1;
     
     /**
      * What is the maximum number of bases that we are willing to extend through
      * when trying to confirm if a context unique on one side is consistent with
      * the other?
-     * TODO: Make this work for more than just the very top level.
      */
-    size_t maxExtendThrough = 20;
+    size_t maxExtendThrough = (size_t) -1;
     
 protected:
 

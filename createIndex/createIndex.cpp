@@ -518,7 +518,13 @@ main(
         ("maxHammingDistance", boost::program_options::value<size_t>()
             ->default_value(0), 
             "Maximum *edit* distance from reference location")
-        ("unstable", "Allow unstable mapping for increased coverage");
+        ("unstable", "Allow unstable mapping for increased coverage")
+        ("maxRangeCount", boost::program_options::value<size_t>()
+            ->default_value((size_t) -1),
+            "Maximum number of merged ranges to visit in a mapping step")
+        ("maxExtendThrough", boost::program_options::value<size_t>()
+            ->default_value((size_t) -1),
+            "Maximum number of bases to try to extend through");
         
     // And set up our positional arguments
     boost::program_options::positional_options_description positionals;
@@ -656,6 +662,12 @@ main(
                 // what positions they are assigned when merging, but the view
                 // takes care of that.
                 ZipMappingScheme* scheme = new ZipMappingScheme(view);
+                
+                // Set the parameters from the arguments
+                scheme->minContextLength = options["context"].as<size_t>();
+                scheme->maxRangeCount = options["maxRangeCount"].as<size_t>();
+                scheme->maxExtendThrough =
+                    options["maxExtendThrough"].as<size_t>();
                     
                 return (MappingScheme*) scheme;
             } else {
