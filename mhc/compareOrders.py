@@ -186,10 +186,8 @@ def parse_args(args):
         formatter_class=argparse.RawDescriptionHelpFormatter)
     
     # General options
-    parser.add_argument("coverageFile", 
-        help="filename to save the coverage stats output to")
-    parser.add_argument("agreementFile",
-        help="filename to save the alignment agreement stats output to")
+    parser.add_argument("outDir", 
+        help="directory to fill with statistics files and hubs")
     parser.add_argument("fastas", nargs="+",
         help="FASTA files to index")
     parser.add_argument("--seed", default=random.getrandbits(256),
@@ -198,8 +196,6 @@ def parse_args(args):
         help="number of samples to take")
     parser.add_argument("--trueMaf", default=None,
         help="filename of a MAF to compare all generated MAFs against")
-    parser.add_argument("--truthFile", default=None,
-        help="filename to output comparison against the truth to")
         
     
     
@@ -222,14 +218,10 @@ def main(args):
     
     options = parse_args(args) # This holds the nicely-parsed options object
     
-    if options.trueMaf is not None and options.truthFile is None:
-        # Make sure they gave us a place to put it if they want a truth
-        # comparison.
-        raise Exception("--truthFile is required if --trueMaf is used.")
-        
     # Make a stack of jobs to run
     stack = jobTree.scriptTree.stack.Stack(StructureAssessmentTarget(
-        options.fastas, options.trueMaf, options.seed, options.outDir, options.samples))
+        options.fastas, options.trueMaf, options.seed, options.outDir,
+        options.samples))
     
     print "Starting stack"
     

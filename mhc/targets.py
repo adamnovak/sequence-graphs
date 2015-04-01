@@ -226,7 +226,7 @@ class SchemeUsingTarget(jobTree.scriptTree.target.Target):
                     extra_args.append(str(range_count))
                     
                     # Mention it in the scheme name
-                    scheme_name += "Range{}".format(hamming_max)
+                    scheme_name += "Range{}".format(range_count)
         
             # Yield the name with the args.
             yield (scheme_name, extra_args)
