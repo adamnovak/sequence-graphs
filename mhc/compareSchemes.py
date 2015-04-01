@@ -41,7 +41,7 @@ class SchemeAssessmentTarget(SchemeUsingTarget):
         
         The alignment statistics are just <precision>\t<recall> TSVs per scheme.
         
-        true_maf  may be None.
+        true_maf may be None.
         
         Runs each subsequent FASTA against the first in each scheme.
         

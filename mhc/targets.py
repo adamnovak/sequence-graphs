@@ -242,8 +242,6 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
     def __init__(self, fasta_list, seed, coverage_filename, alignment_filename,
         hal_filename=None, spectrum_filename=None, indel_filename=None,
         tandem_filename=None, c2h_filename=None, fasta_filename=None, 
-        left_context_filename=None, right_context_filename=None,
-        left_min_context_filename=None, right_min_context_filename=None,
         extra_args=[]):
         """
         Make a new Target for building a reference structure from the given
@@ -275,18 +273,6 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         
         If fasta_filename is specified, the FASTA that goes with the c2h file is
         saved there.
-        
-        If left_context_filename is specified, will save the left context
-        lengths used to map bases to the given wiggle file.
-        
-        If right_context_filename is specified, will save the right context
-        lengths used to map bases to the given wiggle file.
-        
-        If left_min_context_filename is specified, will save the minimum left
-        context lengths needed for uniqueness to the given wiggle file.
-        
-        If right_min_context_filename is specified, will save the minimum right
-        context lengths needed for uniqueness to the given wiggle file.
         
         If extra_args is specified, it should be a list of additional command-
         line arguments to createIndex, for specifying things like inexact
@@ -328,18 +314,6 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         
         # And the FASTA to go with it
         self.fasta_filename = fasta_filename
-        
-        # And the wiggle file for dumping left context lengths
-        self.left_context_filename = left_context_filename
-        
-        # And the wiggle file for dumping right context lengths
-        self.right_context_filename = right_context_filename
-        
-        # And the wiggle file for dumping left min context lengths
-        self.left_min_context_filename = left_min_context_filename
-        
-        # And the wiggle file for dumping right min context lengths
-        self.right_min_context_filename = right_min_context_filename
         
         # And the extra args
         self.extra_args = extra_args
@@ -397,26 +371,6 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
             # We want to keep the tandem duplication count.
             args.append("--tandemDuplications")
             args.append(self.tandem_filename)
-            
-        if self.left_context_filename is not None:
-            # We want to save left context lengths
-            args.append("--leftMaxWiggle")
-            args.append(self.left_context_filename)
-            
-        if self.right_context_filename is not None:
-            # We want to save right context lengths
-            args.append("--rightMaxWiggle")
-            args.append(self.right_context_filename)
-            
-        if self.left_min_context_filename is not None:
-            # We want to save left min context lengths
-            args.append("--leftMinWiggle")
-            args.append(self.left_min_context_filename)
-            
-        if self.right_min_context_filename is not None:
-            # We want to save right min context lengths
-            args.append("--rightMinWiggle")
-            args.append(self.right_min_context_filename)
             
         # Announce our command we're going to run
         self.logToMaster("Invoking {}".format(" ".join(args)))
