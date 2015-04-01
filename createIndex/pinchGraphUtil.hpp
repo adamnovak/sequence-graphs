@@ -7,6 +7,7 @@
 #include <utility>
 #include <vector>
 #include <string>
+#include <set>
 
 #include <FMDIndex.hpp>
 #include <TextPosition.hpp>
@@ -123,13 +124,17 @@ writeTopSegments(
  * threadNames gives the sequence name for each pinch graph thread, and
  * threadEvents gives the event name for each thread.
  *
+ * If eventsToKeep is not null, only outputs events with names in that set (plus
+ * the automatically added rootSeq).
+ *
  */
 size_t
 writeAlignment(
     stPinchThreadSet* threadSet, 
     std::vector<std::string> threadNames,
     std::vector<std::string> threadEvents,
-    const std::string& filename
+    const std::string& filename,
+    const std::set<std::string>* eventsToKeep = nullptr
 );
 
 /*

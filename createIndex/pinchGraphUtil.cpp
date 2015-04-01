@@ -814,7 +814,8 @@ writeAlignment(
     stPinchThreadSet* threadSet, 
     std::vector<std::string> threadNames,
     std::vector<std::string> threadEvents,
-    const std::string& filename
+    const std::string& filename,
+    const std::set<std::string>* eventsToKeep
 ) {
 
     // We're going to lay out the segments in our root sequence with some
@@ -895,6 +896,13 @@ writeAlignment(
         // Get the name number of the thread.
         size_t threadNumber = stPinchThread_getName(thread);
         
+        if(eventsToKeep != nullptr && !eventsToKeep->count(
+            threadEvents[threadNumber])) {
+            
+            // Skip this event since it's not on the list.
+            continue;
+        }
+        
         Log::info() << "Processing query thread " << threadNumber <<
             std::endl;
         
@@ -903,7 +911,7 @@ writeAlignment(
             threadNames[threadNumber] << "'\t0" << std::endl;        
         
         // Write the top segments for the thread. We arbitrarily declare the
-        // orientation in rootSeq to be that of the first segemtn in the block,
+        // orientation in rootSeq to be that of the first segemnt in the block,
         // so writeTopSegments works.
         writeTopSegments(c2h, stPinchThreadSet_getThread(threadSet,
             threadNumber));

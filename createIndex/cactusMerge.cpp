@@ -11,6 +11,10 @@
 #include <Fasta.hpp>
 #include <Log.hpp>
 
+#include <string>
+#include <vector>
+#include <set>
+
 /**
  * Represents a merge to be executed later after we build the pinch graph and
  * know how long all the threads are.
@@ -196,6 +200,11 @@ main(
     // Holds Merge structs to be executed later.
     std::vector<C2hMerge> merges;
     
+    // We're going to throw out all of the events that are old rootSeqs, and
+    // just keep the actual leaves. This holds the list of renamed event names
+    // we are keeping.
+    std::set<std::string> eventsToKeep;
+    
     for(size_t fileIndex = 0; fileIndex < c2hFiles.size(); fileIndex++) {
         // Scan through the c2h files to get the event, sequence, and length of
         // each thread, and to collect merges.
@@ -258,6 +267,11 @@ main(
                     }
                     eventName = renames[fileIndex][eventName];
                     
+                    if(!bottomFlag) {
+                        // Keep this event when we do our final output.
+                        eventsToKeep.insert(eventName);
+                    }
+                    
                     // And the sequence
                     renames[fileIndex][sequenceName] = sequenceName + 
                         suffixes[fileIndex];
@@ -274,9 +288,13 @@ main(
                     Log::info() << "Canonical name: " << eventName << "." << 
                         sequenceName << std::endl;
                     
+                } else {
+                    // If we are going to merge on it, we keep its name the same
+                    // and then later we just make one thread for that name. We
+                    // do definitely need it in the output though.
+                    eventsToKeep.insert(eventName);
                 }
-                // If we are going to merge on it, we keep its name the same and
-                // then later we just make one thread for that name.
+                
                 
                 // Save the names
                 eventNames.push_back(eventName);
@@ -449,7 +467,7 @@ main(
     
     // Write out a new c2h file, with a new rootSeq.
     size_t newRootLength = writeAlignment(threadSet, sequenceNames, eventNames, 
-        options["c2hOut"].as<std::string>());
+        options["c2hOut"].as<std::string>(), &eventsToKeep);
         
     // Clean up thread set.
     stPinchThreadSet_destruct(threadSet);
@@ -485,6 +503,12 @@ main(
             if(renames[fileIndex].count(record.first)) {
                 // Rename them if necessary
                 record.first = renames[fileIndex][record.first];
+            }
+            
+            if(!eventsToKeep.count(record.first)) {
+                // This event wasn't on the list of events to actually output,
+                // so don't output it.
+                continue;
             }
             
             if(!alreadyWritten.count(record.first)) {

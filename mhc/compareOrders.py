@@ -79,14 +79,6 @@ class StructureAssessmentTarget(SchemeUsingTarget):
         # min edit distance bound, max edit distance. For "zip" schemes we have
         # map_type, min context, max range count.
         return set([
-            # Natural with flat min thresholds
-            ("natural", 20, False, False, None, None),
-            ("natural", 50, False, False, None, None),
-            ("natural", 100, False, False, None, None),
-            ("natural", 150, False, False, None, None),
-            ("natural", 200, False, False, None, None),
-            # Do a 5-4-natural scheme with credit. 
-            ("natural", None, True, True, 5, 4),
             # Do zip with flat mins
             ("zip", 20, 100),
             ("zip", 50, 100),
@@ -217,6 +209,10 @@ def main(args):
     """
     
     options = parse_args(args) # This holds the nicely-parsed options object
+    
+    if __name__ == "__main__":
+        # Sure would be nice if Benedict could fix this.
+        from compareOrders import StructureAssessmentTarget
     
     # Make a stack of jobs to run
     stack = jobTree.scriptTree.stack.Stack(StructureAssessmentTarget(
