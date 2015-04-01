@@ -15,6 +15,117 @@ import sonLib.bioio
 
 from targets import *
 
+class StructureAssessmentTarget(SchemeUsingTarget):
+    """
+    A target that builds several reference structures, collates their index
+    vs. coverage results, and compares their MAF alignments.
+    
+    """
+    
+    def __init__(self, fasta_list, true_maf, seed, coverage_filename, 
+        agreement_filename, truth_filename, num_children):
+        """
+        Make a new Target for building a several reference structures from the
+        given FASTAs, and comparing against the given truth MAF, using the
+        specified RNG seed, and writing coverage statistics to the specified
+        file, and alignment agreement statistics to the other specicied file,
+        and a comparison against the true MAF to the other other specified file.
+        
+        The coverage statistics are, specifically, alignment coverage of a
+        genome vs. the order number at which the genome is added for all the
+        child targets, and they are saved in a <genome number>\t<coverage
+        fraction> TSV.
+        
+        The alignment statistics are just a <precision>\t<recall> TSV.
+        
+        TODO: This target is getting a bit unweildy and probably should be
+        broken up to use an output directory and a configuration object or
+        something.
+        
+        true_maf and truth_filename may be None, but if one is None then both
+        need to be None.
+        
+        """
+        
+        # Make the base Target. Ask for 2gb of memory since this is easy.
+        super(StructureAssessmentTarget, self).__init__(memory=2147483648)
+        
+        # Save the FASTAs
+        self.fasta_list = fasta_list
+        
+        # Save the random seed
+        self.seed = seed
+        
+        # Save the concatenated coverage stats file name to use
+        self.coverage_filename = coverage_filename
+        
+        # And the alignment agreement stats filename
+        self.agreement_filename = agreement_filename
+        
+        # Save the number of child targets to run
+        self.num_children = num_children
+        
+        # Save the filename of a MAF to compare all our MAFs against (or None)
+        self.true_maf = true_maf
+        
+        # And the filename to send the results of that comparison to (which also
+        # may be None)
+        self.truth_filename = truth_filename
+        
+        self.logToMaster(
+            "Creating StructureAssessmentTarget with seed {}".format(seed))
+        
+        
+    def run(self):
+        """
+        Send off all the child targets to do comparisons.
+        """
+        
+        self.logToMaster("Starting StructureAssessmentTarget")
+        
+        # Make a temp file for each of the children to write coverage stats to
+        stats_filenames = [sonLib.bioio.getTempFile(
+            rootDir=self.getGlobalTempDir()) for i in xrange(self.num_children)]
+            
+        # And another one to hold each child's MAF alignment
+        maf_filenames = [sonLib.bioio.getTempFile(
+            rootDir=self.getGlobalTempDir()) for i in xrange(self.num_children)]
+            
+        # Seed the RNG after sonLib does whatever it wants with temp file names
+        random.seed(self.seed)
+        
+        for stats_filename, maf_filename in zip(stats_filenames, maf_filenames):
+            # Make a child to produce this reference structure, giving it a
+            # 256-bit seed.
+            self.addChildTarget(ReferenceStructureTarget(self.fasta_list,
+                random.getrandbits(256), stats_filename, maf_filename, 
+                extra_args=["--coverage", "100"]))
+        
+        # We need a few different follow-on jobs.
+        followOns = []
+                
+        # Make a follow-on job to merge all the child coverage outputs and
+        # produce our coverage output file.
+        followOns.append(ConcatenateTarget(stats_filenames, 
+            self.coverage_filename))
+        
+        # But we also need a follow-on job to analyze all those alignments
+        # against each other.
+        followOns.append(AlignmentSetComparisonTarget(maf_filenames, 
+            random.getrandbits(256), self.agreement_filename))
+            
+        if self.true_maf is not None:
+            # We also need another target for comparing all these MAFs against
+            # the truth, which we have been given.
+            followOns.append(AlignmentTruthComparisonTarget(self.true_maf, 
+            maf_filenames, random.getrandbits(256), self.truth_filename))
+            
+            
+        # So we need to run both of those in parallel after this job
+        self.setFollowOnTarget(RunTarget(followOns))
+                
+        self.logToMaster("StructureAssessmentTarget Finished")
+
 def parse_args(args):
     """
     Takes in the command-line arguments list (args), and returns a nice argparse
