@@ -77,14 +77,18 @@ main(
             "List of FASTA files for the given c2h files")
         ("suffix", boost::program_options::value<std::vector<std::string>>(),
             "List of suffixes to add on to event names")
+        ("mergeOn", boost::program_options::value<std::string>()->required(), 
+            "An event on which to merge the files")
         ("c2hOut", boost::program_options::value<std::string>()->required(), 
             "File to save .c2h-format alignment in")
         ("fastaOut", boost::program_options::value<std::string>()->required(), 
             "File in which to save FASTA records for building HAL from .c2h");
         
         
+        
     // And set up our positional arguments
     boost::program_options::positional_options_description positionals;
+    positionals.add("mergeOn", 1);
     positionals.add("c2hOut", 1);
     positionals.add("fastaOut", 1);
     
@@ -112,7 +116,9 @@ main(
             return 0; 
         }
         
-        if(!options.count("c2h") || !options.count("fasta")) {
+        if(!options.count("mergeOn") || !options.count("c2h") ||
+            !options.count("fasta")) {
+            
             // We need both of these
             throw boost::program_options::error("Missing important arguments!");
         }
@@ -163,8 +169,8 @@ main(
         options["fasta"].as<std::vector<std::string>>());
     
     // This will hold all of the renames that have to happen for each file.
-    // These are generated when we go through the file by renaming top sequences
-    // with suffixes.
+    // These are generated when we go through the file by renaming top and
+    // bottom sequences with suffixes.
     std::vector<std::map<std::string, std::string>> renames;
     
     for(size_t i = 0; i < c2hFiles.size(); i++) {
@@ -172,7 +178,7 @@ main(
         renames.push_back(std::map<std::string, std::string>());
     }
     
-    // This will hold the event names for the two c2h files in order
+    // This will hold the event names for the c2h files in order
     std::vector<std::string> eventNames;
     
     // And this will hold the sequence names
@@ -184,8 +190,8 @@ main(
     // And this will hold the sequence lengths
     std::vector<size_t> sequenceLengths;
     
-    // This will hold the first bottom sequence for any event and sequence name
-    std::map<std::pair<std::string, std::string>, size_t> firstBottomSequence;
+    // This will hold the first sequence number for any event and sequence name
+    std::map<std::pair<std::string, std::string>, size_t> firstSequenceNumber;
     
     // Holds Merge structs to be executed later.
     std::vector<C2hMerge> merges;
@@ -235,21 +241,42 @@ main(
                     sequenceName << (bottomFlag ? " (bottom)" : " (top)") << 
                     std::endl;
                 
-                if(!bottomFlag) {
+                if(eventName != options["mergeOn"].as<std::string>()) {
+                    // We aren't merging on this sequence, so we may have to
+                    // apply a suffix.
+                
                     // We need to rename this event (possibly to the same thing)
                     renames[fileIndex][eventName] = eventName + 
                         suffixes[fileIndex];
+                        
+                    if(bottomFlag) {
+                        // All the bottom events (that aren't being merged
+                        // on) need to be renamed apart manually since the names
+                        // may be reused.
+                        renames[fileIndex][eventName] += "-" + 
+                            std::to_string(fileIndex);
+                    }
                     eventName = renames[fileIndex][eventName];
                     
                     // And the sequence
                     renames[fileIndex][sequenceName] = sequenceName + 
                         suffixes[fileIndex];
+                        
+                    if(bottomFlag) {
+                        // All the bottom sequences (that aren't being merged
+                        // on) need to be renamed apart manually since the names
+                        // may be reused.
+                        renames[fileIndex][sequenceName] += "-" + 
+                            std::to_string(fileIndex);
+                    }
                     sequenceName = renames[fileIndex][sequenceName];
                     
                     Log::info() << "Canonical name: " << eventName << "." << 
                         sequenceName << std::endl;
                     
                 }
+                // If we are going to merge on it, we keep its name the same and
+                // then later we just make one thread for that name.
                 
                 // Save the names
                 eventNames.push_back(eventName);
@@ -261,42 +288,35 @@ main(
                 // Initialize the total length to 0
                 sequenceLengths.push_back(0);
                 
-                if(bottomFlag) {
-                    // It's a bottom sequence and we have to worry about
-                    // merging.
                 
-                    auto namePair = std::make_pair(eventName, sequenceName);
-                    if(!firstBottomSequence.count(namePair)) {
-                        // This is the first time we have seen a bottom sequence
-                        // for this event and sequence name. Everything should
-                        // merge against this one thread and not make more
-                        // threads.
-                        
-                        // Later instances of this event and sequence name as a
-                        // bottom sequence should redirect here.
-                        firstBottomSequence[namePair] = isBottom.size() - 1;
-                        
-                        Log::info() << "This is the first time we have seen "
-                            "this bottom sequence." << std::endl;
-                    }
+                auto namePair = std::make_pair(eventName, sequenceName);
+                if(!firstSequenceNumber.count(namePair)) {
+                    // This is the first time we have seen a sequence
+                    // for this event and sequence name. Everything should
+                    // merge against this one thread and not make more
+                    // threads.
                     
-                    // Otherwise we will count up length and stuff as normal,
-                    // but not merge against this thread. We still need to look
-                    // at all the blocks so we can fugure out where on the first
-                    // thread we should merge when people ask for them.
+                    // If this is the mergeOn event, we'll only make this
+                    // once across all the files.
                     
+                    // Later instances of this event and sequence name should
+                    // redirect here.
+                    firstSequenceNumber[namePair] = sequenceNames.size() - 1;
+                    
+                    Log::info() << "This is the first time we have seen "
+                        "this sequence." << std::endl;
                 }
                 
             } else if(parts[0] == "a") {
                 // This is an alignment block
                 
-                if(isBottom.size() == 0) {
+                if(sequenceNames.size() == 0) {
                     throw std::runtime_error(
                         "Found alignmet block before sequence");
                 }
                 
                 // Which sequence are we working on?
-                size_t sequenceNumber = isBottom.size() - 1;
+                size_t sequenceNumber = sequenceNames.size() - 1;
                 
                 if(isBottom[sequenceNumber]) {
                     // Parse it as a bottom block: "a" name start length
@@ -315,7 +335,7 @@ main(
                     // against when we come get this block.
                     auto namePair = std::make_pair(eventNames[sequenceNumber], 
                         sequenceNames[sequenceNumber]);
-                    size_t mergeSequenceNumber = firstBottomSequence[namePair];
+                    size_t mergeSequenceNumber = firstSequenceNumber[namePair];
                     
                     // We need to associate the block name with the thread
                     // number for the sequence we want it to merge into, and the
@@ -353,10 +373,19 @@ main(
                         size_t blockName = std::stoll(parts[3]);
                         bool orientation = std::stoi(parts[4]);
                         
+                        // Get the sequence number that canonically represents
+                        // all sequences with this event/sequence name
+                        // combination.
+                        auto namePair = std::make_pair(
+                            eventNames[sequenceNumber], 
+                            sequenceNames[sequenceNumber]);
+                        size_t mergeSequenceNumber = firstSequenceNumber[
+                            namePair];
+                        
                         // Make a merge and populate it with everything we can
                         // get from this segment.
                         C2hMerge merge;
-                        merge.sequence1 = sequenceNumber;
+                        merge.sequence1 = mergeSequenceNumber;
                         merge.start1 = segmentStart;
                         merge.length = segmentLength;
                         // TODO: error-check length
@@ -388,14 +417,15 @@ main(
     // Make all the threads. Be 1-based internally since the serialization code
     // wants that.
     for(size_t i = 0; i < sequenceLengths.size(); i++) {
-        if(isBottom[i]) {
-            auto namePair = std::make_pair(eventNames[i], sequenceNames[i]);
-            if(firstBottomSequence[namePair] != i) {
-                // This bottom sequence is not the first; it is getting merged
-                // into another one. Don't make a thread for it.
-                continue;
-            }
+        
+        auto namePair = std::make_pair(eventNames[i], sequenceNames[i]);
+        if(firstSequenceNumber[namePair] != i) {
+            // This sequence is not the first; it is getting merged into another
+            // one that is the same length and structure and name (i.e. it
+            // appears in two files). Don't make a thread for it.
+            continue;
         }
+        
         
         // Make threads for all the top sequences and the first bottom sequence
         // for every event and sequence name pair.

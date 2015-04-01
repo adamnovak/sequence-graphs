@@ -142,7 +142,7 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
                     # Add an N for no credit
                     scheme_name += "N"
                     
-            elif map_type = "zip":
+            elif map_type == "zip":
                 # Unpack the parameters
                 map_type, min_context, range_count = plan_item
                 
@@ -646,9 +646,9 @@ class MafGeneCheckerTarget(jobTree.scriptTree.target.Target):
 class C2hMergeTarget(jobTree.scriptTree.target.Target):
     """
     A target that merges a list of c2h/FASTA pairs on a shared reference, where
-    each is a unary tree of the given reference and a genome from the given list
-    of genomes. The corresponding suffix from the list of suffixes is assigned
-    to each genome. Saves a merged c2h/fasta pair.
+    each is a binary tree of the given reference and some other genome, against
+    a root. The corresponding suffix from the list of suffixes is assigned to
+    each genome. Saves a merged c2h/fasta pair.
     
     """
     
@@ -689,7 +689,9 @@ class C2hMergeTarget(jobTree.scriptTree.target.Target):
             raise Exception("No alignments at all!")
             
         # Start preparing arguments
-        args = ["../createIndex/cactusMerge", self.merged_c2h, self.merged_fasta]
+        # TODO: Make genome to merge on specifiable!
+        args = ["../createIndex/cactusMerge", "refmhc", self.merged_c2h,
+            self.merged_fasta]
         
         for (c2h, fasta), suffix in itertools.izip(self.c2h_fasta_pairs,
             self.suffixes):
@@ -815,8 +817,9 @@ class HalTarget(jobTree.scriptTree.target.Target):
         
         self.logToMaster("Starting HalTarget")
         
-        # Compose the tree.      
-        tree = "(" + ",".join(self.genomes) + ")" + self.reference + ";"
+        # Compose the tree. We know we are using the fake root sequence
+        # alignment method.
+        tree = "(" + ",".join(self.genomes + [self.reference]) + ")rootSeq;"
                 
         # Make the HAL. Do it in memory to be faster.
         check_call(self, ["halAppendCactusSubtree", "--inMemory", self.c2h_file,

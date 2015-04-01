@@ -358,8 +358,8 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         
         # What tree should we use? Assume the genome names are the same as the
         # FASTA names without their extensions. Set up for a star tree rooted at
-        # genome 0.
-        tree = "(" + ",".join(genomes[1:]) + ")" + genomes[0] + ";"
+        # "rootSeq".
+        tree = "(" + ",".join(genomes) + ")rootSeq;"
         
         if self.hal_filename is None:
             # Where should we save it? ("" isn't a filename so this or is OK)
