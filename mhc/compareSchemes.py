@@ -62,6 +62,9 @@ class SchemeAssessmentTarget(SchemeUsingTarget):
         # Save the random seed
         self.seed = seed
         
+        # Make sure we have an RNG
+        self.rng = random.Random()
+        
         # Save the stats directory to populate
         self.stats_dir = stats_dir
         
@@ -247,7 +250,7 @@ class SchemeAssessmentTarget(SchemeUsingTarget):
             # Seed the RNG after sonLib does whatever it wants with temp file
             # names. Each scheme will get runs with the same seeds, but that is
             # probably OK.
-            random.seed(self.seed)
+            self.rng.seed(self.seed)
             
             for i, other_fasta in enumerate(self.fasta_list[1:]):
                 # For each other FASTA to compare against
@@ -266,7 +269,7 @@ class SchemeAssessmentTarget(SchemeUsingTarget):
                 # shuffles the non-reference ones it doesn't do anything. Also
                 # make sure to tell it to use the spectrum output file.
                 self.addChildTarget(ReferenceStructureTarget(
-                    [reference_fasta, other_fasta], random.getrandbits(256),
+                    [reference_fasta, other_fasta], self.rng.getrandbits(256),
                     coverage_filename, maf_filename,
                     spectrum_filename=spectrum_filename,
                     indel_filename=indel_filename,
@@ -361,7 +364,7 @@ class SchemeAssessmentTarget(SchemeUsingTarget):
                 # We also need another target for comparing all these MAFs
                 # against the truth, which we have been given.
                 followOns.append(AlignmentTruthComparisonTarget(self.true_maf, 
-                maf_filenames, random.getrandbits(256), 
+                maf_filenames, self.rng.getrandbits(256), 
                 self.stats_dir + "/truth." + scheme))
                 
             # Save the c2h and FASTA files we made along with the scheme and

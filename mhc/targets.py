@@ -291,6 +291,9 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         # Save the random seed
         self.seed = seed
         
+        # Make sure we have an RNG
+        self.rng = random.Random()
+        
         # Save the coverage file name to use
         self.coverage_filename = coverage_filename
         
@@ -331,7 +334,7 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         self.logToMaster("Running in {}".format(os.getcwd()))
         
         # Seed the RNG after sonLib does whatever it wants with temp file names
-        random.seed(self.seed)
+        self.rng.seed(self.seed)
             
         # Generate an order for the FASTAs
         # Make sure the first one stays first.
@@ -505,6 +508,9 @@ class AlignmentComparisonTarget(jobTree.scriptTree.target.Target):
         self.is_correct = is_correct
         self.bed = bed
         
+        # Make sure we have an RNG
+        self.rng = random.Random()
+        
         self.logToMaster("Creating AlignmentComparisonTarget")
         
         
@@ -519,11 +525,11 @@ class AlignmentComparisonTarget(jobTree.scriptTree.target.Target):
         xml_filename = sonLib.bioio.getTempFile(rootDir=self.getLocalTempDir())
         
         # Seed the RNG after sonLib does whatever it wants with temp file names
-        random.seed(self.seed)
+        self.rng.seed(self.seed)
         
         # Generate a seed for mafComparator that's a C-ish integer (not 256
         # bits)
-        seed = random.getrandbits(32)
+        seed = self.rng.getrandbits(32)
 
         # Set up the mafComparator arguments. Make sure to ask for an absurd
         # number of samples so we check everything.
@@ -593,6 +599,9 @@ class AlignmentSetComparisonTarget(jobTree.scriptTree.target.Target):
         self.seed = seed
         self.output_filename = output_filename
         
+        # Make sure we have an RNG
+        self.rng = random.Random()
+        
         self.logToMaster("Creating AlignmentSetComparisonTarget")
         
         
@@ -613,13 +622,13 @@ class AlignmentSetComparisonTarget(jobTree.scriptTree.target.Target):
             rootDir=self.getGlobalTempDir()) for p in pairs]
         
         # Seed the RNG after sonLib does whatever it wants with temp file names
-        random.seed(self.seed)
+        self.rng.seed(self.seed)
         
         for pair, comparison_filename in zip(pairs, comparison_filenames):
             # Make a child to compare these two MAF files and produce this
             # output file, giving it a 256-bit seed.
             self.addChildTarget(AlignmentComparisonTarget(pair[0], pair[1], 
-                random.getrandbits(256), comparison_filename))
+                self.rng.getrandbits(256), comparison_filename))
             
         # When we're done, concatenate all those comparison files together into
         # our output file.
@@ -652,6 +661,9 @@ class AlignmentTruthComparisonTarget(jobTree.scriptTree.target.Target):
         self.seed = seed
         self.output_filename = output_filename
         
+        # Make sure we have an RNG
+        self.rng = random.Random()
+        
         self.logToMaster("Creating AlignmentTruthComparisonTarget")
         
         
@@ -669,7 +681,7 @@ class AlignmentTruthComparisonTarget(jobTree.scriptTree.target.Target):
             rootDir=self.getGlobalTempDir()) for other in self.maf_filenames]
         
         # Seed the RNG after sonLib does whatever it wants with temp file names
-        random.seed(self.seed)
+        self.rng.seed(self.seed)
         
         for maf_filename, comparison_filename in zip(self.maf_filenames,
             comparison_filenames):
@@ -677,7 +689,7 @@ class AlignmentTruthComparisonTarget(jobTree.scriptTree.target.Target):
             # Make a child to compare this MAF against the truth, and produce
             # this output file, giving it a 256-bit seed.
             self.addChildTarget(AlignmentComparisonTarget(self.truth_maf, 
-                maf_filename, random.getrandbits(256), comparison_filename, 
+                maf_filename, self.rng.getrandbits(256), comparison_filename, 
                 is_correct=True))
             
         # When we're done, concatenate all those comparison files together into

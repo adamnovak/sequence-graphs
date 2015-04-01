@@ -53,6 +53,9 @@ class StructureAssessmentTarget(SchemeUsingTarget):
         # Save the random seed
         self.seed = seed
         
+        # Make sure we have an RNG
+        self.rng = random.Random()
+        
         # Save the stats directory
         self.stats_dir = stats_dir
         
@@ -127,9 +130,8 @@ class StructureAssessmentTarget(SchemeUsingTarget):
                 rootDir=self.getGlobalTempDir()) for i in xrange(
                 self.num_children)]
                 
-            # Seed the RNG after sonLib does whatever it wants with temp file
-            # names
-            random.seed(self.seed)
+            # Seed the RNG so we get the same orders with different schemes.
+            self.rng.seed(self.seed)
             
             for stats_filename, maf_filename in zip(stats_filenames,
                 maf_filenames):
@@ -137,7 +139,7 @@ class StructureAssessmentTarget(SchemeUsingTarget):
                 # Make a child to produce this reference structure, giving it a
                 # 256-bit seed.
                 self.addChildTarget(ReferenceStructureTarget(self.fasta_list,
-                    random.getrandbits(256), stats_filename, maf_filename, 
+                    self.rng.getrandbits(256), stats_filename, maf_filename, 
                     extra_args=extra_args))
             
             # We need a few different follow-on jobs.
@@ -151,13 +153,13 @@ class StructureAssessmentTarget(SchemeUsingTarget):
             # But we also need a follow-on job to analyze all those alignments
             # against each other.
             followOns.append(AlignmentSetComparisonTarget(maf_filenames, 
-                random.getrandbits(256), agreement_filename))
+                self.rng.getrandbits(256), agreement_filename))
                 
             if self.true_maf is not None:
                 # We also need another target for comparing all these MAFs
                 # against the truth, which we have been given.
                 followOns.append(AlignmentTruthComparisonTarget(self.true_maf, 
-                    maf_filenames, random.getrandbits(256), truth_filename))
+                    maf_filenames, self.rng.getrandbits(256), truth_filename))
             
             
         # So we need to run both of those in parallel after this job
