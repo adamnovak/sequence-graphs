@@ -707,8 +707,8 @@ writeTopSegments(
             stPinchSegment_getLength(segment);
         
         if(block != NULL) {
-            // Are we in the same orientation as the root?
-            // TODO: This assumes root is the first segment.
+            // Are we in the same orientation as the root? TODO: This assumes
+            // root is (or has the same orientation as) the first segment.
             bool orientation = 
                 (stPinchSegment_getBlockOrientation(segment) == 
                 stPinchSegment_getBlockOrientation(
@@ -808,6 +808,117 @@ writeAlignmentWithReference(
     // And we're done.
     c2h.close();
 }
+
+size_t
+writeAlignment(
+    stPinchThreadSet* threadSet, 
+    std::vector<std::string> threadNames,
+    std::vector<std::string> threadEvents,
+    const std::string& filename
+) {
+
+    // We're going to lay out the segments in our root sequence with some
+    // locality. We're going to scan through all threads, and put each new block
+    // as it is encountered. So we need a set of the encountered blocks.
+    std::unordered_set<stPinchBlock*> seen;
+    
+    // Open up the file to write.
+    std::ofstream c2h(filename.c_str());
+    
+    // First, make a hacked-up consensus reference sequence to be the root of
+    // the tree. It just has all the pinch blocks in some order.
+    
+    // Write the root sequence line. It is a bottom sequence since it has bottom
+    // segments.
+    c2h << "s\t'rootSeq'\t'rootSeq'\t1" << std::endl;
+    
+    // Keep track of the total root sequence space already used
+    size_t nextBlockStart = 0;
+    
+    // Make an iterator over pinch threads
+    stPinchThreadSetIt threadIterator = stPinchThreadSet_getIt(threadSet);
+    
+    // And a pointer to hold the current thread
+    stPinchThread* thread;
+    while((thread = stPinchThreadSetIt_getNext(&threadIterator)) != NULL) {
+        // For each pinch thread
+        
+        // Go through all its pinch segments in order. There's no iterator so we
+        // have to keep looking 3'
+        
+        // Get the first segment in the thread.
+        stPinchSegment* segment = stPinchThread_getFirst(thread);
+        while(segment != NULL) {
+        
+            stPinchBlock* block;
+            if((block = stPinchSegment_getBlock(segment)) != NULL) {
+                // Look at its block if it has one
+                
+                if(seen.count(block) == 0) {
+                    // This is a new block we haven't allocated a range for yet.
+                    
+                    // For each block, put a bottom segment. Just name the
+                    // segment after the block's address. We need block name
+                    // (number), start, and length.
+                    c2h << "a\t" << (uintptr_t)block << "\t" << 
+                        nextBlockStart << "\t" << 
+                        stPinchBlock_getLength(block) << std::endl;
+                        
+                    // Advance nextBlockStart.
+                    nextBlockStart += stPinchBlock_getLength(block);
+                    
+                    // Record that we have seen this block now.
+                    seen.insert(block);
+                }
+            }
+            
+            // Jump to the next 3' segment. This needs to return NULL if we go
+            // off the end.
+            segment = stPinchSegment_get3Prime(segment);
+        }
+        
+    }
+    
+    // We've done the blocks in rootSeq, now we need to do the top segments that
+    // attach to them.
+    
+    // Get an iterator over the thread set, since thread numbers may have gaps.
+    stPinchThreadSetIt iterator = stPinchThreadSet_getIt(threadSet);
+    
+    // This holds each thread we're going to look at.
+    while((thread = stPinchThreadSetIt_getNext(&iterator)) 
+        != NULL) {
+        
+        // Go through all the threads.
+        // TODO: assumes we hit them in increasing numerical order.
+    
+        // Get the name number of the thread.
+        size_t threadNumber = stPinchThread_getName(thread);
+        
+        Log::info() << "Processing query thread " << threadNumber <<
+            std::endl;
+        
+        // Write the top sequence header
+        c2h << "s\t'" << threadEvents[threadNumber] << "'\t'" << 
+            threadNames[threadNumber] << "'\t0" << std::endl;        
+        
+        // Write the top segments for the thread. We arbitrarily declare the
+        // orientation in rootSeq to be that of the first segemtn in the block,
+        // so writeTopSegments works.
+        writeTopSegments(c2h, stPinchThreadSet_getThread(threadSet,
+            threadNumber));
+        
+    }
+    
+    // Close up the finished file
+    c2h.close();
+    
+    // Return the total length of the made-up root sequence. Later we will
+    // probably need a FASTA with this many Ns in order to turn this c2h into a
+    // HAL file.
+    return nextBlockStart;
+}
+
 
 void
 writeAlignmentFasta(

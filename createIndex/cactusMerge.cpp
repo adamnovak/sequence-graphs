@@ -447,9 +447,9 @@ main(
             merge.orientation << std::endl;
     }
     
-    // Write out a new c2h file, with the 0th thread as the reference.
-    writeAlignmentWithReference(threadSet, sequenceNames, eventNames, 
-        options["c2hOut"].as<std::string>(), 0);
+    // Write out a new c2h file, with a new rootSeq.
+    size_t newRootLength = writeAlignment(threadSet, sequenceNames, eventNames, 
+        options["c2hOut"].as<std::string>());
         
     // Clean up thread set.
     stPinchThreadSet_destruct(threadSet);
@@ -458,6 +458,15 @@ main(
     
     // We'll do the FASTA output ourselves. Open the file.
     std::ofstream fastaOut(options["fastaOut"].as<std::string>());
+    
+    // Write the newly synthesized rootSeq. TODO: unify with writeAlignmentFasta
+    // by moving support for renames over there.
+    fastaOut << ">rootSeq" << std::endl;
+    for(size_t i = 0; i < newRootLength; i++) {
+        // Write an n for every base
+        fastaOut << "N";
+    }
+    fastaOut << std::endl;
     
     // This holds the IDs of all the sequences we already wrote. Only write
     // sequences if they aren't duplicates after renaming (which is how we

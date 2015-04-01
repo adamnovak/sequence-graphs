@@ -115,6 +115,24 @@ writeTopSegments(
 );
 
 /*
+ * Write the alignment represented by this pinch graph to the given file.
+ *
+ * Returns the total number of bases in the made-up root node used to tie the
+ * actual sequences together.
+ *
+ * threadNames gives the sequence name for each pinch graph thread, and
+ * threadEvents gives the event name for each thread.
+ *
+ */
+size_t
+writeAlignment(
+    stPinchThreadSet* threadSet, 
+    std::vector<std::string> threadNames,
+    std::vector<std::string> threadEvents,
+    const std::string& filename
+);
+
+/*
  * Write the alignment represented by this pinch graph alone as a star where the
  * given refrence thread is used as the root. Saves in c2h format, as
  * described above, to the given file.
