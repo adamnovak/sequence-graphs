@@ -110,7 +110,13 @@ class StructureAssessmentTarget(SchemeUsingTarget):
             # Where should we save the comparison to the truth's precision and
             # recall?
             truth_filename = "{}/truth.{}".format(self.stats_dir, scheme)
-        
+            
+            # Where should we put the spectrum data for rearrangement sizes?
+            spectrum_filename = "{}/spectrum.{}".format(self.stats_dir, scheme)
+            
+            # Where should we put the tandem duplication data?
+            tandem_filename = "{}/tandem.{}".format(self.stats_dir, scheme)
+            
             # Make a temp file for each of the children to write coverage stats
             # to
             stats_filenames = [sonLib.bioio.getTempFile(
@@ -122,17 +128,42 @@ class StructureAssessmentTarget(SchemeUsingTarget):
                 rootDir=self.getGlobalTempDir()) for i in xrange(
                 self.num_children)]
                 
+            # And we need the spectrum data from each run. 
+            spectrum_filenames = [sonLib.bioio.getTempFile(suffix=".spectrum",
+                rootDir=self.getGlobalTempDir()) for i in xrange(
+                self.num_children)]
+                
+            # And we need the tandem duplication data from each run. 
+            tandem_filenames = [sonLib.bioio.getTempFile(suffix=".tandem",
+                rootDir=self.getGlobalTempDir()) for i in xrange(
+                self.num_children)]
+                
             # Seed the RNG so we get the same orders with different schemes.
             self.rng.seed(self.seed)
             
-            for stats_filename, maf_filename in zip(stats_filenames,
-                maf_filenames):
+            # Keep track of which child is which within a scheme.
+            child_number = 0
+            
+            for (stats_filename, maf_filename, spectrum_data_filename, 
+                tandem_data_filename) in zip(stats_filenames, maf_filenames, 
+                spectrum_filenames, tandem_filenames):
+                
+                # Where should we put the HAL file? We're going to make one for
+                # every ordering we run, in every scheme.
+                hal_filename = "{}/{}.{}.hal".format(self.stats_dir,
+                    scheme, child_number)
                 
                 # Make a child to produce this reference structure, giving it a
                 # 256-bit seed.
                 self.addChildTarget(ReferenceStructureTarget(self.fasta_list,
-                    self.rng.getrandbits(256), stats_filename, maf_filename, 
+                    self.rng.getrandbits(256), stats_filename, maf_filename,
+                    spectrum_filename=spectrum_data_filename,
+                    tandem_filename=tandem_data_filename,
+                    hal_filename=hal_filename,
                     extra_args=extra_args))
+                    
+                # Next child for this scheme gets a different number.
+                child_number += 1
             
             # We need a few different follow-on jobs.
             followOns = []
@@ -141,6 +172,11 @@ class StructureAssessmentTarget(SchemeUsingTarget):
             # produce our coverage output file.
             followOns.append(ConcatenateTarget(stats_filenames, 
                 coverage_filename))
+                
+            # Make a follow-on job to merge all the child coverage outputs and
+            # produce our coverage output file.
+            followOns.append(ConcatenateTarget(spectrum_filenames, 
+                spectrum_filename))
             
             # But we also need a follow-on job to analyze all those alignments
             # against each other.

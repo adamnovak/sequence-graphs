@@ -144,23 +144,12 @@ class SchemeAssessmentTarget(SchemeUsingTarget):
         
         # We need a directory to save out tree of BED files under for making the
         # assembly hubs.
-        bed_root = sonLib.bioio.getTempDirectory(rootDir=self.getGlobalTempDir())
+        bed_root = sonLib.bioio.getTempDirectory(
+            rootDir=self.getGlobalTempDir())
         
         # We need to keep track of all the bed dirs added under that. This is a
         # set so we can register a directory each time we add a genome's track.
         bed_dirs = set()
-        
-        # We have a wiggle root, but we make sure to keep that in our output so
-        # the wiggles can be interrogated for context lengths.
-        wiggle_root = self.stats_dir + "/wiggles"
-        
-        # And all the wiggle dirs. This is a set so we can register a directory
-        # each time we add a genome's track, if we want to.
-        wiggle_dirs = set()
-        
-        # We'll keep track of our random state so we can seed without messing up
-        # temp filenames.
-        random_state = None
         
         # This will hold lists of MAF alignments, in FASTA pair order, by scheme
         # name.
@@ -182,11 +171,6 @@ class SchemeAssessmentTarget(SchemeUsingTarget):
 
             # Grab the reference FASTA (first in the list)
             reference_fasta = self.fasta_list[0]
-            
-            if random_state is not None:
-                # Pull out our unseeded random state so filenames on successive
-                # iterations don't conflict.
-                random.setstate(random_state)
             
             # Make a temp file for each of the children with this scheme to
             # write coverage stats to.
@@ -243,9 +227,6 @@ class SchemeAssessmentTarget(SchemeUsingTarget):
                 }
                 for _ in query_genomes
             ]
-            
-            # Save the RNG state before clobbering it with the seed.
-            random_state = random.getstate()
             
             # Seed the RNG after sonLib does whatever it wants with temp file
             # names. Each scheme will get runs with the same seeds, but that is
