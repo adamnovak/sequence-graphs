@@ -497,8 +497,9 @@ class AlignmentComparisonTarget(jobTree.scriptTree.target.Target):
         
         """
         
-        # Make the base Target. Ask for 2gb of memory since this is easy.
-        super(AlignmentComparisonTarget, self).__init__(memory=2147483648)
+        # Make the base Target. Ask for 40gb of memory since this can get
+        # difficult with big MAFs.
+        super(AlignmentComparisonTarget, self).__init__(memory=42949672960)
         
         # Save the parameters
         self.maf_a = maf_a
@@ -531,11 +532,12 @@ class AlignmentComparisonTarget(jobTree.scriptTree.target.Target):
         # bits)
         seed = self.rng.getrandbits(32)
 
-        # Set up the mafComparator arguments. Make sure to ask for an absurd
-        # number of samples so we check everything.
+        # Set up the mafComparator arguments. We sample only a subset of the
+        # columns, but still enough that we will probably get a good number of
+        # sig figs on coverage.
         args = ["mafComparator", "--maf1", self.maf_a, "--maf2",
             self.maf_b, "--out", xml_filename, "--seed", str(seed), "--samples",
-            "100000000"]
+            "1000000"]
         
         if(self.bed is not None):
             args.append("--dumpMismatches")

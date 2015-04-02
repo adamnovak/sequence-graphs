@@ -80,9 +80,8 @@ class StructureAssessmentTarget(SchemeUsingTarget):
         # map_type, min context, max range count.
         return set([
             # Do zip with flat mins
-            ("zip", 20, 100),
-            ("zip", 50, 100),
-            ("zip", 100, 100),
+            #("zip", 50, 100),
+            #("zip", 100, 100),
             ("zip", 150, 100),
             ("zip", 200, 100)
         ])
@@ -94,6 +93,10 @@ class StructureAssessmentTarget(SchemeUsingTarget):
         """
         
         self.logToMaster("Starting StructureAssessmentTarget")
+        
+        if not os.path.exists(self.stats_dir):
+            # Make our out directory exist
+            os.makedirs(self.stats_dir)
         
         for scheme, extra_args in self.generateSchemes():
          
