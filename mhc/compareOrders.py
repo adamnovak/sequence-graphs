@@ -97,6 +97,14 @@ class StructureAssessmentTarget(SchemeUsingTarget):
         if not os.path.exists(self.stats_dir):
             # Make our out directory exist
             os.makedirs(self.stats_dir)
+            
+        # We need a few different follow-on jobs, and we need them for all the
+        # schemes put together.
+        followOns = []
+            
+        # What genomes are we using? The first is the reference.
+        genomes = [os.path.splitext(os.path.basename(fasta))[0] for fasta in
+            self.fasta_list]
         
         for scheme, extra_args in self.generateSchemes():
          
@@ -119,6 +127,11 @@ class StructureAssessmentTarget(SchemeUsingTarget):
             
             # Where should we put the tandem duplication data?
             tandem_filename = "{}/tandem.{}".format(self.stats_dir, scheme)
+            
+            # Where should the reference coverage data go (coverage only vs. the
+            # reference)
+            reference_coverage_filename = "{}/refCoverage.{}".format(
+                self.stats_dir, scheme)
             
             # Make a temp file for each of the children to write coverage stats
             # to
@@ -168,9 +181,6 @@ class StructureAssessmentTarget(SchemeUsingTarget):
                 # Next child for this scheme gets a different number.
                 child_number += 1
             
-            # We need a few different follow-on jobs.
-            followOns = []
-                    
             # Make a follow-on job to merge all the child coverage outputs and
             # produce our coverage output file.
             followOns.append(ConcatenateTarget(stats_filenames, 
@@ -185,6 +195,13 @@ class StructureAssessmentTarget(SchemeUsingTarget):
             # against each other.
             followOns.append(AlignmentSetComparisonTarget(maf_filenames, 
                 self.rng.getrandbits(256), agreement_filename))
+                
+            self.logToMaster("Coverage for {}".format(scheme))
+                
+            # And we have one to get the coverage against the reference for all
+            # the genomes in all the MAFs
+            followOns.append(AlignmentSetCoverageTarget(maf_filenames,
+                genomes[0], genomes[1:], reference_coverage_filename))
                 
             if self.true_maf is not None:
                 # We also need another target for comparing all these MAFs

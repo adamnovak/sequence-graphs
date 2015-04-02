@@ -701,6 +701,141 @@ class AlignmentTruthComparisonTarget(jobTree.scriptTree.target.Target):
         
         self.logToMaster("AlignmentTruthComparisonTarget Finished")
         
+class AlignmentCoverageTarget(jobTree.scriptTree.target.Target):
+    """
+    A target that evaluates the coverage of each sequence in a MAF alignment
+    against a specified reference sequence.
+    
+    Uses mafPairCoverage from Dent's mafTools:
+    
+    <https://github.com/dentearl/mafTools/tree/master/mafPairCoverage>
+    
+    """
+    
+    def __init__(self, maf_filename, reference_sequence, other_sequences,
+        output_filename):
+        """
+        Calculate the coverage of each specified sequence in the given MAF
+        against the given reference sequence, and save the results to the given
+        output filename (one genome name\tcoverage portion pair per line).
+        
+        """
+        
+        # Make the base Target. Ask for 2gb of memory since this is easy.
+        super(AlignmentCoverageTarget, self).__init__(memory=2147483648)
+        
+        # Save the parameters
+        self.maf_filename = maf_filename
+        self.reference_sequence = reference_sequence
+        self.other_sequences = other_sequences
+        self.output_filename = output_filename
+        
+        self.logToMaster("Creating AlignmentCoverageTarget")
+        
+        
+    def run(self):
+        """
+        Evaluate the coverage of everything else against the reference, and save
+        the results.
+        
+        """
+        
+        self.logToMaster("Starting AlignmentCoverageTarget")
+        
+        # Make the file we will write to
+        out_file = tsv.TsvWriter(open(self.output_filename, "w"))
+        
+        for other_sequence in self.other_sequences:
+        
+            # Invoke mafCoverage and make sure the sequence we want the coverage
+            # of (other_sequence) is first.
+            process = subprocess.Popen(["mafPairCoverage", "--maf",
+                self.maf_filename, "--seq1", other_sequence, "--seq2", 
+                self.reference_sequence], stdout=subprocess.PIPE)
+                
+            for parts in tsv.TsvReader(process.stdout):
+                # For each TSV line it produces that isn't a comment
+                
+                # Parse the coverage column
+                coverage = float(parts[4])
+                
+                # We were only interested in the first line.
+                # TODO: manually next the iterator.
+                break
+                
+            # We are done with this process.
+            process.stdout.close()
+                
+            # Save the coverage of this sequence onto the the reference.
+            out_file.line(other_sequence, coverage)
+        
+        self.logToMaster("AlignmentCoverageTarget Finished")
+        
+class AlignmentSetCoverageTarget(jobTree.scriptTree.target.Target):
+    """
+    A target that evaluates the coverage of each sequence in a set of MAF
+    alignments against a specified reference sequence.
+    
+    Uses mafPairCoverage from Dent's mafTools:
+    
+    <https://github.com/dentearl/mafTools/tree/master/mafPairCoverage>
+    
+    """
+    
+    def __init__(self, maf_filenames, reference_sequence, other_sequences,
+        output_filename):
+        """
+        Calculate the coverage of each specified sequence in the given MAFs
+        against the given reference sequence, and save the results to the given
+        output filename (one genome name\tcoverage portion pair per line).
+        
+        """
+        
+        # Make the base Target. Ask for 2gb of memory since this is easy.
+        super(AlignmentSetCoverageTarget, self).__init__(memory=2147483648)
+        
+        # Save the parameters
+        self.maf_filenames = maf_filenames
+        self.reference_sequence = reference_sequence
+        self.other_sequences = other_sequences
+        self.output_filename = output_filename
+        
+        self.logToMaster("Creating AlignmentSetCoverageTarget")
+        
+        
+    def run(self):
+        """
+        Evaluate the coverage of everything else against the reference, and save
+        the results.
+        
+        """
+        
+        self.logToMaster("Starting AlignmentSetCoverageTarget")
+        
+        # What are the files we have to concatenate from all the individual
+        # MAFs?
+        output_filenames = []
+        
+        for maf_filename in self.maf_filenames:
+        
+            # Make a temp file to write the results for this MAF to.
+            output_filename = sonLib.bioio.getTempFile(
+                rootDir=self.getGlobalTempDir())
+        
+            output_filenames.append(output_filename)
+        
+            # Make a child for each MAF to evaluate
+            self.addChildTarget(AlignmentCoverageTarget(maf_filename,
+                self.reference_sequence, self.other_sequences,
+                output_filename))
+                
+        # When we're done, concatenate all those files together into our output
+        # file.
+        self.setFollowOnTarget(ConcatenateTarget(output_filenames,
+            self.output_filename))
+        
+        self.logToMaster("AlignmentSetCoverageTarget Finished")
+        
 class ConcatenateTarget(jobTree.scriptTree.target.Target):
     """
     A target that concatenates several files together.
