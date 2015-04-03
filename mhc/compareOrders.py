@@ -80,8 +80,7 @@ class StructureAssessmentTarget(SchemeUsingTarget):
         # map_type, min context, max range count.
         return set([
             # Do zip with flat mins
-            #("zip", 50, 100),
-            #("zip", 100, 100),
+            ("zip", 100, 100),
             ("zip", 150, 100),
             ("zip", 200, 100)
         ])
