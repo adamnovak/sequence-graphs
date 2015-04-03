@@ -132,6 +132,9 @@ class StructureAssessmentTarget(SchemeUsingTarget):
             # reference)
             reference_coverage_filename = "{}/refCoverage.{}".format(
                 self.stats_dir, scheme)
+                
+            # And we want the runtimes of all the schemes in seconds.
+            time_filename = "{}/runtime.{}".format(self.stats_dir, scheme)
             
             # Make a temp file for each of the children to write coverage stats
             # to
@@ -154,6 +157,13 @@ class StructureAssessmentTarget(SchemeUsingTarget):
                 rootDir=self.getGlobalTempDir()) for i in xrange(
                 self.num_children)]
                 
+            # Each reference structure will record the number of seconds it took
+            # to build in files in this list. TODO: convert the other filename
+            # list/concatenate target patterns to work like this now that the
+            # temp file names don't break the seeded RNG. TODO: Make
+            # ConcatenateTarget spit out input file names.
+            time_filenames = []
+                
             # Seed the RNG so we get the same orders with different schemes.
             self.rng.seed(self.seed)
             
@@ -169,13 +179,20 @@ class StructureAssessmentTarget(SchemeUsingTarget):
                 hal_filename = "{}/{}.{}.hal".format(self.stats_dir,
                     scheme, child_number)
                 
+                # Where should we record our runtime?
+                time_data_filename = sonLib.bioio.getTempFile(suffix=".time",
+                    rootDir=self.getGlobalTempDir())
+                time_filenames.append(time_data_filename)    
+                
+                
                 # Make a child to produce this reference structure, giving it a
-                # 256-bit seed.
+                # 256-bit seed. TODO: Make it so we can set fields not all at
+                # once in the constructor to wire up the data flow.
                 self.addChildTarget(ReferenceStructureTarget(self.fasta_list,
                     self.rng.getrandbits(256), stats_filename, maf_filename,
                     spectrum_filename=spectrum_data_filename,
                     tandem_filename=tandem_data_filename,
-                    hal_filename=hal_filename,
+                    hal_filename=hal_filename, time_filename=time_data_filename,
                     extra_args=extra_args))
                     
                 # Next child for this scheme gets a different number.
@@ -196,12 +213,13 @@ class StructureAssessmentTarget(SchemeUsingTarget):
             followOns.append(AlignmentSetComparisonTarget(maf_filenames, 
                 self.rng.getrandbits(256), agreement_filename))
                 
-            self.logToMaster("Coverage for {}".format(scheme))
-                
             # And we have one to get the coverage against the reference for all
             # the genomes in all the MAFs
             followOns.append(AlignmentSetCoverageTarget(maf_filenames,
                 genomes[0], genomes[1:], reference_coverage_filename))
+                
+            # Concatenate all the runtimes for this scheme together.
+            followOns.append(ConcatenateTarget(time_filenames, time_filename))
                 
             if self.true_maf is not None:
                 # We also need another target for comparing all these MAFs

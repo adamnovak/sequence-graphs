@@ -6,7 +6,7 @@ reference structures.
 """
 
 import argparse, sys, os, os.path, random, subprocess, shutil, itertools
-import datetime
+import datetime, time
 from xml.etree import ElementTree
 import tsv
 
@@ -241,8 +241,8 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
     
     def __init__(self, fasta_list, seed, coverage_filename, alignment_filename,
         hal_filename=None, spectrum_filename=None, indel_filename=None,
-        tandem_filename=None, c2h_filename=None, fasta_filename=None, 
-        extra_args=[]):
+        tandem_filename=None, c2h_filename=None, fasta_filename=None,
+        time_filename=None, extra_args=[]):
         """
         Make a new Target for building a reference structure from the given
         FASTAs, using the specified RNG seed, and writing coverage statistics to
@@ -273,6 +273,9 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         
         If fasta_filename is specified, the FASTA that goes with the c2h file is
         saved there.
+        
+        If time_filename is specified, writes the runtime of the job to that
+        file.
         
         If extra_args is specified, it should be a list of additional command-
         line arguments to createIndex, for specifying things like inexact
@@ -317,6 +320,9 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         
         # And the FASTA to go with it
         self.fasta_filename = fasta_filename
+        
+        # And the runtime file
+        self.time_filename = time_filename
         
         # And the extra args
         self.extra_args = extra_args
@@ -379,6 +385,9 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         self.logToMaster("Invoking {}".format(" ".join(args)))
         print("Invoking {}".format(" ".join(args)))
         
+        # Start the runtime timer
+        start_time = time.time()
+        
         # Make an index with the FASTAs in that order, so we can read all the
         # logging output. Make sure to send any errors through stdout as well.
         process = subprocess.Popen(args,
@@ -430,6 +439,19 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
             # If the indexing process died, complain.
             raise Exception("createIndex failed with code {}".format(
                 process.returncode))
+                
+        # Start the runtime timer
+        end_time = time.time()
+            
+        if self.time_filename is not None:
+        
+            self.logToMaster("Indexing took {} seconds".format(end_time -
+            start_time))
+            
+            # Log the elapsed time indexing to the file.
+            with open(self.time_filename, "w") as time_file:
+                time_file.write(str(end_time - start_time))
+                time_file.write("\n")
                 
         # Now build the HAL file
         
