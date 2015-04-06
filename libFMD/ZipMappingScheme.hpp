@@ -104,16 +104,23 @@ protected:
          */
         size_t rightContext;
         /**
-         * What TextPositions are known to be selected by lastLeft? Ignored for
-         * the root. These are going to have their strands backwards to the
-         * actual positions that correspond to the searched *left* context.
-         */         
-        std::set<TextPosition> lastLeftPositions;
+         * How many bases were searched on the left before the last retraction?
+         */
+        size_t lastLeftContext;
         /**
-         * What TextPositions are known to be selected by lastRight? Ignored for
-         * the root.
-         */  
-        std::set<TextPosition> lastRightPositions;
+         * How many bases were searched on the right before the last retraction?
+         */
+        size_t lastRightContext;
+        /**
+         * Each DPTask keeps a reference back to the shared map linking left
+         * context length to the set of positions selected on the left.
+         */
+        std::map<size_t, std::set<TextPosition>>& leftContextToPositions;
+        /**
+         * Each DPTask keeps a reference back to the shared map linking right
+         * context length to the set of positions selected on the right.
+         */
+        std::map<size_t, std::set<TextPosition>>& rightContextToPositions;
         /**
          * Has this DPTask only ever been retracted right since the root?
          */
@@ -128,17 +135,19 @@ protected:
         /**
          * This is the correct way to read the set of TextPositions that this
          * DPTask's parent had selected on the left.
+         * May never be called on a root task.
          */
         inline const std::set<TextPosition>& getLastLeftPositions() const {
-            return lastLeftPositions;
+            return leftContextToPositions.at(lastLeftContext);
         }
         
         /**
          * This is the correct way to read the set of TextPositions that this
          * DPTask's parent had selected on the right.
+         * May never be called on a root task.
          */
         inline const std::set<TextPosition>& getLastRightPositions() const {
-            return lastRightPositions;
+            return rightContextToPositions.at(lastRightContext);
         }
         
         /**
@@ -147,7 +156,7 @@ protected:
          */
         inline void setLeftPositions(std::set<TextPosition>&& leftPositions) {
             
-            lastLeftPositions = std::move(leftPositions);
+            leftContextToPositions[leftContext] = std::move(leftPositions);
         }
         
         /**
@@ -156,7 +165,7 @@ protected:
          */
         inline void setRightPositions(std::set<TextPosition>&& rightPositions) {
             
-            lastRightPositions = std::move(rightPositions);
+            rightContextToPositions[rightContext] = std::move(rightPositions);
         }
         
         /**
@@ -164,11 +173,15 @@ protected:
          * retracted).
          */
         inline DPTask(const FMDPosition& initialLeft, size_t initialLeftContext,
-            const FMDPosition& initialRight, size_t initialRightContext): 
+            std::map<size_t, std::set<TextPosition>>& leftContextToPositions, 
+            const FMDPosition& initialRight, size_t initialRightContext,
+            std::map<size_t, std::set<TextPosition>>& rightContextToPositions): 
             left(initialLeft), right(initialRight), lastLeft(left), 
-            lastRight(right), leftContext(initialLeftContext), 
-            rightContext(initialRightContext), isRightEdge(true),
-            setsValid(true) {
+            lastRight(right), leftContextToPositions(leftContextToPositions), 
+            rightContextToPositions(rightContextToPositions),
+            leftContext(initialLeftContext), rightContext(initialRightContext),
+            lastLeftContext((size_t) -1), lastRightContext((size_t) -1),
+            isRightEdge(true), setsValid(true) {
                 
             // lastLeftPositions and lastRightPositions will be ignored since
             // this is the root.
@@ -187,12 +200,14 @@ protected:
             if(isRight) {
                 // Save history
                 retracted.lastRight = retracted.right;
+                retracted.lastRightContext = retracted.rightContext;
                 // Retract the right context.
                 retracted.rightContext = index.retractRightOnly(
                     retracted.right);
             } else {
                 // Save history
                 retracted.lastLeft = retracted.left;
+                retracted.lastLeftContext = retracted.leftContext;
                 // Retract the left context (still on its local right).
                 retracted.leftContext = index.retractRightOnly(
                     retracted.left);

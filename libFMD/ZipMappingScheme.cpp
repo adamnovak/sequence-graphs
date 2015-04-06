@@ -456,9 +456,15 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
     // and only considering retracting on the right on the very edge of the
     // space (i.e. if the left is still full-length).
     
+    // We need to keep track of all the left retraction sets.
+    std::map<size_t, std::set<TextPosition>> leftContextToPositions;
+    // And the right ones
+    std::map<size_t, std::set<TextPosition>> rightContextToPositions;
+    
     // Make a queue of DP tasks, and put in the root task.
-    std::queue<DPTask> taskQueue({DPTask(left, patternLengthLeft, right,
-        patternLengthRight)});
+    std::queue<DPTask> taskQueue({DPTask(left, patternLengthLeft,
+        leftContextToPositions, right, patternLengthRight, 
+        rightContextToPositions)});
         
     // Make a map of the minimum r we will ever have to explore for any l this
     // size or smaller. We can use lower_bound for the lookups so we only have
