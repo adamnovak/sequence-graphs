@@ -174,6 +174,50 @@ protected:
     }; 
 
     /**
+     * Represents a table of the FMDPositions and sets of selected TextPositions
+     * after different retractions.
+     */
+    class RetractionSetTable {
+    public:
+        /**
+         * Make a new table by setting the search results at the given distance.
+         * The number of TextPositions selected by this result will be
+         * estimated, and if it is not too high they will be enumerated and used
+         * to start the DP. If there are too many selected ranges, the table
+         * will be initialized to complain in that vein when anyone asks for the
+         * selected TextPositions.
+         */
+        RetractionSetTable(const FMDPosition& longestSearch,
+            size_t searchLength, const FMDIndexView& view);
+            
+        
+            
+        /**
+         * Represents an entry in the retraction DP array. Holds the FMDPosition
+         * to which the search has been retracted, the length down to which it
+         * has been retracted, the TextPositions that have been newly selected
+         * in the retraction, and the TextPositions which have been selected
+         * overall. TODO: this last set causes some duplication and should be
+         * made just a stack of the other sets somehow.
+         */
+        struct Entry {
+            FMDPosition retraction;
+            size_t contextLength;
+            size_t previousLength;
+            std::set<TextPosition> newlySelected;
+            std::set<TextPosition> allSelected;
+        }
+        
+        /**
+         * This holds a map from remaining context length to the Entry
+         * describing a retraction to that length. It ought to be queried with
+         * lower_bound, to find the entry with a context as long as or longer
+         * than
+         */
+        std::map<size_t, Entry>;
+    };
+
+    /**
      * Use the inchworm algorithm to find the longest right context present in
      * the reference for each base in the query. Results are in the same order
      * as the characters in the string, and consist of an FMDPosition of search
