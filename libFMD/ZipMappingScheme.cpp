@@ -293,8 +293,8 @@ std::pair<bool, std::set<TextPosition>> ZipMappingScheme::exploreRetraction(
                     task.right);
                 // We pull our old already-known results from the task. TODO:
                 // Can we move the set here?
-                oldResults = task.lastRightPositions;
-                opposingResults = task.lastLeftPositions;
+                oldResults = task.getLastRightPositions();
+                opposingResults = task.getLastLeftPositions();
             }
             
         } else {
@@ -314,8 +314,8 @@ std::pair<bool, std::set<TextPosition>> ZipMappingScheme::exploreRetraction(
                 newResults = view.getNewTextPositions(task.lastLeft, task.left);
                 // We pull our old already-known results from the task. TODO:
                 // Can we move the set here?
-                oldResults = task.lastLeftPositions;
-                opposingResults = task.lastRightPositions;
+                oldResults = task.getLastLeftPositions();
+                opposingResults = task.getLastRightPositions();
             }
         }
     
@@ -391,22 +391,18 @@ std::pair<bool, std::set<TextPosition>> ZipMappingScheme::exploreRetraction(
         if(task.left == task.lastLeft) {
             // We didn't retract on the left. We can use this code path to fill
             // in the sets for roots and right retractions.
-            toRetract.lastLeftPositions = opposingResults;
+            toRetract.setLeftPositions(std::move(opposingResults));
             // The old results have now been updated to include the new results
-            toRetract.lastRightPositions = oldResults;
+            toRetract.setRightPositions(std::move(oldResults));
         } else {
             // We did retract on the left, flip these around.
-            toRetract.lastLeftPositions = oldResults;
-            toRetract.lastRightPositions = opposingResults;
+            toRetract.setLeftPositions(std::move(oldResults));
+            toRetract.setRightPositions(std::move(opposingResults));
         }
     } else {
         // The sets for this next task won't be valid, since we can't (or in the
         // past couldn't) afford to update them.
         toRetract.setsValid = false;
-        
-        // Clear them out to avoid copying later. TODO: do this earlier somehow?
-        toRetract.lastLeftPositions.clear();
-        toRetract.lastRightPositions.clear();
     }
     
     if(task.leftContext > 1 && (canTouchResults || triedRightExtend)) {
