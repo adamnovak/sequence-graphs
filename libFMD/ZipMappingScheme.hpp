@@ -370,12 +370,12 @@ protected:
     
     /**
      * Explore all retractions of the two FMDPositions. Return either an empty
-     * set (if no explored retraction finds overlapping positions between the
-     * two sides), a set with one element (if we find exactly one such
-     * overlap), or a set with two (or more) elements (if we find multiple
-     * overlaps).
+     * Mapping (if no explored retraction finds overlapping positions between
+     * the two sides), a Mapping with its TextPosition and context lengths set
+     * (if we find exactly one such overlap), or a n empty Mapping (if we find
+     * multiple overlaps).
      */
-    std::set<TextPosition> exploreRetractions(const FMDPosition& left,
+    Mapping exploreRetractions(const FMDPosition& left,
         size_t patternLengthLeft, const FMDPosition& right,
         size_t patternLengthRight, const std::string& query,
         size_t queryBase) const;    

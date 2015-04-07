@@ -144,26 +144,24 @@ void ZipMappingScheme::map(const std::string& query,
         // Go look at these two contexts in opposite directions, and all their
         // (reasonable to think about) retractions, and see whether this base
         // belongs to 0, 1, or multiple TextPositions.
-        std::set<TextPosition> intersection = exploreRetractions(
+        Mapping mapping = exploreRetractions(
             leftContexts[i].first, leftContexts[i].second,
             rightContexts[i].first, rightContexts[i].second, query, i);
         
         // TODO: If we can't find anything, try retracting a few bases on one or
         // both sides until we get a shared result.
         
-        if(intersection.size() == 1) {
+        if(mapping.isMapped()) {
             // We map! Call the callback with the only text position.
-            Log::debug() << "Index " << i << " maps." << std::endl;
-            mappings.push_back(Mapping(*(intersection.begin())));
-        } else if(intersection.size() > 1) {
-            // Too many results
-            Log::debug() << "Index " << i << " is ambiguous." << std::endl;
-            mappings.push_back(Mapping());
+            Log::debug() << "Index " << i << " maps on " << 
+                mapping.getLeftMaxContext() << " left and " << 
+                mapping.getRightMaxContext() << " right context" << std::endl;
         } else {
-            // Too few results
-            Log::debug() << "Index " << i << " not in reference." << std::endl;
-            mappings.push_back(Mapping());
-        }
+            // Too few results until we retracted back to too many
+            Log::debug() << "Index " << i << " is not mapped." << std::endl;
+       }
+       // Save the mapping
+       mappings.push_back(mapping);
         
     }
     
@@ -185,8 +183,8 @@ void ZipMappingScheme::map(const std::string& query,
         
         // What range of bases are within our left and right MUMs? TODO:
         // substitute range actually used to map on instead?
-        size_t rangeStart = i - leftContexts[i].second + 1;
-        size_t rangeEnd = i + rightContexts[i].second - 1; // Inclusive
+        size_t rangeStart = i - mapping.getLeftMaxContext() + 1;
+        size_t rangeEnd = i + mapping.getRightMaxContext() - 1; // Inclusive
         
         // Scan left and right to find the one-sided MUSes we overlap.
         for(size_t j = rangeStart; j <= rangeEnd; j++) {
@@ -517,7 +515,7 @@ std::pair<bool, std::set<TextPosition>> ZipMappingScheme::exploreRetraction(
         
 }
 
-std::set<TextPosition> ZipMappingScheme::exploreRetractions(
+Mapping ZipMappingScheme::exploreRetractions(
     const FMDPosition& left, size_t patternLengthLeft, const FMDPosition& right,
     size_t patternLengthRight, const std::string& query,
     size_t queryBase) const {
@@ -525,7 +523,13 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
     // List the unique TextPosition we found, if we found one. Holds more than
     // one TextPosition (though not necessarily all of them) if we're ambiguous,
     // and none if we have no results. Holds TextPositions for right contexts.
-    std::set<TextPosition> toReturn;
+    std::set<TextPosition> found;
+    
+    // What are the max left and right contexts that were used to map the base
+    // anywhere? Note that they may not be part of the same string that maps the
+    // base there, but they would have to be if we accounted for crossover.
+    size_t maxLeftContext = 0;
+    size_t maxRightContext = 0;
 
     // Make a DP table for this base. TODO: make DPTable remember the extra
     // parameters.
@@ -582,18 +586,39 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
         
     while(table.taskQueue.size() > 0) {
     
-        if(!needToTest(table.taskQueue.front())) {
+        // Grab the task in the table
+        const DPTable::DPTask& task = table.taskQueue.front();
+    
+        if(!needToTest(task)) {
             // Skip queued tasks that have becomne redundant.
             table.taskQueue.pop();
             continue;
         }
     
+        // Grab the left and right retraction entries.
+        // TODO: Stop repeating this code somehow.
+        const DPTable::SideRetractionEntry& left = table.getRetraction(false,
+            task.leftIndex, view, maxRangeCount);
+        const DPTable::SideRetractionEntry& right = table.getRetraction(true,
+            task.rightIndex, view, maxRangeCount);
+            
+        // Which we needed to pull out the context lengths on which we may be
+        // mapping.
+        size_t leftContext = left.contextLength;
+        size_t rightContext = right.contextLength;
+        
+        // Which we in turn need to calculate the max left and right context
+        // lengths observed for the base.
+        maxLeftContext = std::max(maxLeftContext, leftContext);
+        maxRightContext = std::max(maxRightContext, rightContext);
+    
         // Run the first task in the queue, possibly adding more, and getting
         // some results.
-        auto flagAndSet = exploreRetraction(table.taskQueue.front(), table, 
+        auto flagAndSet = exploreRetraction(task, table, 
             query, queryBase);
             
-        // Drop taht task we just did.
+        // Drop that task we just did. We can't use task anymore now, or left or
+        // right.
         table.taskQueue.pop();
         
         if(!flagAndSet.first) {
@@ -603,8 +628,8 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
                 // We have to abort mapping.
                 Log::debug() << "Aborting mapping base " << queryBase <<
                     " because it is too hard." << std::endl;
-                // Return an empty set.
-                return std::set<TextPosition>();
+                // Return an empty mapping.
+                return Mapping();
             } else {
                 Log::debug() << "Ignoring hard task" << std::endl;
             }
@@ -612,14 +637,14 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
         
         for(auto position : flagAndSet.second) {
             // Put in all the places we found matchings to to.
-            toReturn.insert(position);
+            found.insert(position);
         }
         
-        if(toReturn.size() > 1) {
+        if(found.size() > 1) {
             // We're already ambiguous. Short circuit.
             Log::debug() << "Already ambiguous, not retracting any more" <<
                 std::endl;
-            return toReturn;
+            return Mapping();
         }
         
         if(!useRetraction) {
@@ -630,12 +655,17 @@ std::set<TextPosition> ZipMappingScheme::exploreRetractions(
         
     }
     
-    Log::debug() << "Found " << toReturn.size() << " locations" << std::endl;
-    
-    // If we get here, we've finished all the DP jobs. Return all the
-    // TextPositions we found where they were the unique overlap at some place
-    // we explored in the DP table.
-    return toReturn;
-
+    Log::debug() << "Found " << found.size() << " locations" << std::endl;
+    Log::debug() << "Used" << maxLeftContext << ", " << maxRightContext <<
+        " context" << std::endl;
+        
+    if(found.size() == 1) {
+        // We mapped to one place, on these contexts.
+        return Mapping(*(found.begin()), maxLeftContext, maxRightContext);
+    } else {
+        // We mapped to nowhere, because we're ambiguous. TODO: log
+        // ambiguousness.
+        return Mapping();
+    }
 } 
 
