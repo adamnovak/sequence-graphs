@@ -101,6 +101,14 @@ class StructureAssessmentTarget(SchemeUsingTarget):
         if not os.path.exists(self.stats_dir):
             # Make our out directory exist
             os.makedirs(self.stats_dir)
+          
+        if not os.path.exists(self.stats_dir + "/hals"):
+            # And our directory for HALs
+            os.makedirs(self.stats_dir + "/hals")
+            
+        if not os.path.exists(self.stats_dir + "/mapStats"):
+            # And our directory for mapping scheme stats
+            os.makedirs(self.stats_dir + "/mapStats")
             
         # We need a few different follow-on jobs, and we need them for all the
         # schemes put together.
@@ -180,8 +188,14 @@ class StructureAssessmentTarget(SchemeUsingTarget):
                 
                 # Where should we put the HAL file? We're going to make one for
                 # every ordering we run, in every scheme.
-                hal_filename = "{}/{}.{}.hal".format(self.stats_dir,
+                hal_filename = "{}/hals/{}.{}.hal".format(self.stats_dir,
                     scheme, child_number)
+                
+                # Where should we put the mapping scheme stats? We collect this
+                # for every ordering and scheme too. TODO: Collate with a
+                # summing target somehow across orderings.
+                map_stats_filename = "{}/mapStats/{}.{}.tsv".format(
+                    self.stats_dir, scheme, child_number)
                 
                 # Where should we record our runtime?
                 time_data_filename = sonLib.bioio.getTempFile(suffix=".time",
@@ -197,6 +211,7 @@ class StructureAssessmentTarget(SchemeUsingTarget):
                     spectrum_filename=spectrum_data_filename,
                     tandem_filename=tandem_data_filename,
                     hal_filename=hal_filename, time_filename=time_data_filename,
+                    map_stats_filename=map_stats_filename,
                     extra_args=extra_args))
                     
                 # Next child for this scheme gets a different number.

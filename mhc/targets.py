@@ -242,7 +242,7 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
     def __init__(self, fasta_list, seed, coverage_filename, alignment_filename,
         hal_filename=None, spectrum_filename=None, indel_filename=None,
         tandem_filename=None, c2h_filename=None, fasta_filename=None,
-        time_filename=None, extra_args=[]):
+        time_filename=None, map_stats_filename=None, extra_args=[]):
         """
         Make a new Target for building a reference structure from the given
         FASTAs, using the specified RNG seed, and writing coverage statistics to
@@ -276,6 +276,9 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         
         If time_filename is specified, writes the runtime of the job to that
         file.
+        
+        If map_stats_filename is specified, sends mapping-scheme-specific stats
+        to the given file.
         
         If extra_args is specified, it should be a list of additional command-
         line arguments to createIndex, for specifying things like inexact
@@ -323,6 +326,9 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
         
         # And the runtime file
         self.time_filename = time_filename
+        
+        # And the mapping scheme spacific stats file
+        self.map_stats_filename = map_stats_filename
         
         # And the extra args
         self.extra_args = extra_args
@@ -380,6 +386,11 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
             # We want to keep the tandem duplication count.
             args.append("--tandemDuplications")
             args.append(self.tandem_filename)
+            
+        if self.map_stats_filename is not None:
+            # We want to keep the mapping scheme specific stats.
+            args.append("--mapStats")
+            args.append(self.map_stats_filename)
             
         # Announce our command we're going to run
         self.logToMaster("Invoking {}".format(" ".join(args)))
