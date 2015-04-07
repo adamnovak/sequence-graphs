@@ -281,11 +281,14 @@ void saveLevelIndex(
  * 
  * Takes a factory function that can allocate new MappingSchemes for an index
  * and the ranges and mask bitvectors.
+ *
+ * If passed a StatTracker, will add in stats from every MappingScheme.
  */
 stPinchThreadSet*
 mergeGreedy(
     const FMDIndex& index,
-    std::function<MappingScheme*(const FMDIndexView&)> mappingSchemeFactory
+    std::function<MappingScheme*(const FMDIndexView&)> mappingSchemeFactory,
+    StatTracker* stats = nullptr
 ) {
 
     Log::info() << "Creating initial pinch thread set" << std::endl;
@@ -371,6 +374,12 @@ mergeGreedy(
         
         // Join any trivial boundaries.
         stPinchThreadSet_joinTrivialBoundaries(threadSet);
+        
+        if(stats != nullptr) {
+            Log::info() << "Copying over stats after merge" << std::endl;
+            // Save stats if applicable
+            *(stats) += mappingScheme->getStats();
+        }
         
         // Delete the mapping scheme, so we can delete the stuff it uses
         delete mappingScheme;
@@ -486,6 +495,8 @@ main(
         ("nontrivialRearrangements", 
             boost::program_options::value<std::string>(), 
             "File in which to dump nontrivial rearrangements")
+        ("mapStats", boost::program_options::value<std::string>(),
+            "File in which to save the mapping stats from merging all levels")
         ("sampleRate", boost::program_options::value<unsigned int>()
             ->default_value(64), 
             "Set the suffix array sample rate to use")
@@ -626,6 +637,9 @@ main(
     // We want to time the merge code.
     Timer* mergeTimer = new Timer("Merging");
     
+    // We want to know the stats that the MappingScheme(s) make while we merge
+    StatTracker stats;
+    
     // We want to flag whether we want mismatches
     
     if(mergeScheme == "greedy") {
@@ -676,7 +690,7 @@ main(
                 throw std::runtime_error("Invalid mapping scheme: " +
                     options["mapType"].as<std::string>());
             }
-        });
+        }, &stats);
     } else {
         // Complain that's not a real merge scheme. TODO: Can we make the
         // options parser parse an enum or something instead of this?
@@ -764,6 +778,14 @@ main(
     
     // Get rid of the index itself. Invalidates the index reference.
     delete indexPointer;
+
+    if(options.count("mapStats")) {
+        // We should save the mapping scheme stats (combined) to a file.
+        Log::output() << "Saving stats to " <<
+            options["mapStats"].as<std::string>() << std::endl;
+            
+        stats.save(options["mapStats"].as<std::string>());
+    }
 
     Log::output() << "Final memory usage:" << std::endl;
     logMemory();

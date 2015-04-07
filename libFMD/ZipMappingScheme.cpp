@@ -228,8 +228,10 @@ void ZipMappingScheme::map(const std::string& query,
             Log::debug() <<
                 "Dropping mapping due to having too few unique strings." <<
                 std::endl;
+            stats.add("filterFail", 1);
         } else {
             // Report all the mappings that pass.
+            stats.add("filterPass", 1);
             callback(i, mappings[i].getLocation());
         }
         
@@ -242,6 +244,7 @@ bool ZipMappingScheme::canExtendThrough(FMDPosition context,
     
     Log::debug() << "Trying to extend " << context << " through " << 
         opposingQuery.size() << " opposing context" << std::endl;
+    stats.add("extendThroughAttampts", 1);
         
     // We're going to retract it until it's no longer unique, then go
     // back and retract it one less.
@@ -269,17 +272,21 @@ bool ZipMappingScheme::canExtendThrough(FMDPosition context,
         view.getIndex().extendLeftOnly(barelyUnique, opposingQuery[i]);
     }
     
-    if(view.isEmpty(barelyUnique)) {
+    if(!view.isEmpty(barelyUnique)) {
+        // We extended through!
+        stats.add("extendThroughSuccesses", 1);
+        return true;
+    } else {
+        // We didn't get any results upon extending through
         Log::debug() << "Extension failed" << std::endl;
+        return false;
     }
-    
-    // Let the caller know whether we got all the way through (in which case the
-    // LR context exists) or not.
-    return !view.isEmpty(barelyUnique);
 }
 
 size_t ZipMappingScheme::selectActivities(
     std::vector<std::pair<size_t, size_t>> ranges) const {
+    
+    stats.add("activitySelectionRuns", 1);
     
     // First we have to sort the ranges by end, ascending.
     std::sort(ranges.begin(), ranges.end(), [](std::pair<size_t, size_t> a,
@@ -309,6 +316,8 @@ size_t ZipMappingScheme::selectActivities(
             
             nextFree = range.second + 1;
             found++;
+            
+            stats.add("activitiesSelected", 1);
         }
     }
 
@@ -520,6 +529,8 @@ Mapping ZipMappingScheme::exploreRetractions(
     size_t patternLengthRight, const std::string& query,
     size_t queryBase) const {
 
+    stats.add("basesAttempted", 1);
+
     // List the unique TextPosition we found, if we found one. Holds more than
     // one TextPosition (though not necessarily all of them) if we're ambiguous,
     // and none if we have no results. Holds TextPositions for right contexts.
@@ -577,6 +588,9 @@ Mapping ZipMappingScheme::exploreRetractions(
                 (*minRightIterator).first << ", " <<
                 (*minRightIterator).second << std::endl;
             
+            // Note that there was a covered retraction.
+            stats.add("retractionCovered", 1);
+            
             return false;
         }
         
@@ -623,6 +637,7 @@ Mapping ZipMappingScheme::exploreRetractions(
         
         if(!flagAndSet.first) {
             // We encountered something too hard to do.
+            stats.add("tooHardRetraction", 1);
             
             if(giveUpIfHard) {
                 // We have to abort mapping.
@@ -644,6 +659,7 @@ Mapping ZipMappingScheme::exploreRetractions(
             // We're already ambiguous. Short circuit.
             Log::debug() << "Already ambiguous, not retracting any more" <<
                 std::endl;
+            stats.add("ambiguous", 1);
             return Mapping();
         }
         
@@ -661,10 +677,12 @@ Mapping ZipMappingScheme::exploreRetractions(
         
     if(found.size() == 1) {
         // We mapped to one place, on these contexts.
+        stats.add("unambiguous", 1);
         return Mapping(*(found.begin()), maxLeftContext, maxRightContext);
     } else {
         // We mapped to nowhere, because we're ambiguous. TODO: log
         // ambiguousness.
+        stats.add("ambiguous", 1);
         return Mapping();
     }
 } 
