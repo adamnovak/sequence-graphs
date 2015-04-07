@@ -320,7 +320,7 @@ class AlignerAssessmentTarget(jobTree.scriptTree.target.Target):
                 # match run unless we can get a lower bound on its Hamming
                 # distance from all other reference locations that is at least
                 # this high.
-                extra_args.append("--minHammingBound")
+                extra_args.append("--minEditBound")
                 extra_args.append(str(hamming_bound))
                 
                 # Mention it in the scheme name
@@ -329,7 +329,7 @@ class AlignerAssessmentTarget(jobTree.scriptTree.target.Target):
             if hamming_max is not None:
                 # For the natural mapping scheme, allow this many mismatches in
                 # maximal unique match runs.
-                extra_args.append("--maxHammingDistance")
+                extra_args.append("--maxEditDistance")
                 extra_args.append(str(hamming_max))
                 
                 # Mention it in the scheme name

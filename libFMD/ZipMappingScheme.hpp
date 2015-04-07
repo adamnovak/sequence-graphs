@@ -77,7 +77,7 @@ public:
      * overlapping, and restricted to the range of bases used to map the base in
      * question.
      */
-    size_t minUniqueStrings = 5;
+    size_t minUniqueStrings = 0;
     
 protected:
     

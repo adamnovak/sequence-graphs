@@ -191,7 +191,7 @@ main(
             "FASTA contining a single reference sequence to map to")
         ("outputFile", boost::program_options::value<std::string>(),
             "File to save context lengths to, one per line")
-        ("minHammingBound", boost::program_options::value<size_t>()
+        ("minEditBound", boost::program_options::value<size_t>()
             ->default_value(0), 
             "Minimum edit distance lower bound on a maximum unique match");
             
@@ -252,7 +252,7 @@ main(
     // If we get here, we have the right arguments. Parse them.
     
     // How many min matches do we need in a run
-    size_t minHammingBound = options["minHammingBound"].as<size_t>();
+    size_t minHammingBound = options["minEditBound"].as<size_t>();
     
     // This holds the directory for the reference structure to build.
     std::string indexDirectory(options["indexDirectory"].as<std::string>());

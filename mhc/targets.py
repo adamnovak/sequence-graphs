@@ -161,8 +161,8 @@ class SchemeUsingTarget(jobTree.scriptTree.target.Target):
             
             if map_type == "natural":
                 # Unpack the parameters.
-                map_type, min_context, credit, mismatch, hamming_bound, \
-                    hamming_max = plan_item
+                map_type, min_context, credit, mismatch, edit_bound, \
+                    edit_max = plan_item
                     
                 
                 
@@ -181,7 +181,7 @@ class SchemeUsingTarget(jobTree.scriptTree.target.Target):
                     
             elif map_type == "zip":
                 # Unpack the parameters
-                map_type, min_context, range_count = plan_item
+                map_type, min_context, edit_bound, range_count = plan_item
                 
             # Handle mapping types
             scheme_name += map_type
@@ -196,27 +196,27 @@ class SchemeUsingTarget(jobTree.scriptTree.target.Target):
                 # Include min conext in the name if in use
                 scheme_name += "Min{}".format(min_context)
                 
-            if map_type == "natural":
-            
-                if hamming_bound is not None:
+            if edit_bound is not None:
                     # For the natural mapping scheme, don't map on a maximum
                     # unique match run unless we can get a lower bound on its
-                    # Hamming distance from all other reference locations that
+                    # edit distance from all other reference locations that
                     # is at least this high.
-                    extra_args.append("--minHammingBound")
-                    extra_args.append(str(hamming_bound))
+                    extra_args.append("--minEditBound")
+                    extra_args.append(str(edit_bound))
                     
                     # Mention it in the scheme name
-                    scheme_name += "Ham{}".format(hamming_bound)
-                    
+                    scheme_name += "Ed{}".format(edit_bound)
+                
+            if map_type == "natural":
+            
                 if hamming_max is not None:
                     # For the natural mapping scheme, allow this many mismatches
                     # in maximal unique match runs.
-                    extra_args.append("--maxHammingDistance")
-                    extra_args.append(str(hamming_max))
+                    extra_args.append("--maxEditDistance")
+                    extra_args.append(str(edit_max))
                     
                     # Mention it in the scheme name
-                    scheme_name += "Mis{}".format(hamming_max)
+                    scheme_name += "Mis{}".format(edit_max)
                     
             if map_type == "zip":
                 

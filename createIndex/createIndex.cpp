@@ -512,10 +512,10 @@ main(
         ("ignoreMatchesBelow", boost::program_options::value<size_t>()
             ->default_value(0), 
             "Length below which to ignore maximal unique matches")
-        ("minHammingBound", boost::program_options::value<size_t>()
+        ("minEditBound", boost::program_options::value<size_t>()
             ->default_value(0), 
             "Minimum *edit* distance lower bound on a maximum unique match")
-        ("maxHammingDistance", boost::program_options::value<size_t>()
+        ("maxEditDistance", boost::program_options::value<size_t>()
             ->default_value(0), 
             "Maximum *edit* distance from reference location")
         ("unstable", "Allow unstable mapping for increased coverage")
@@ -650,9 +650,9 @@ main(
                 scheme->ignoreMatchesBelow = options[
                     "ignoreMatchesBelow"].as<size_t>();
                 scheme->minHammingBound = options[
-                    "minHammingBound"].as<size_t>();
+                    "minEditBound"].as<size_t>();
                 scheme->maxHammingDistance = options[
-                    "maxHammingDistance"].as<size_t>();
+                    "maxEditDistance"].as<size_t>();
                 scheme->unstable = options.count("unstable");
                 
                 return (MappingScheme*) scheme;
@@ -668,6 +668,7 @@ main(
                 scheme->maxRangeCount = options["maxRangeCount"].as<size_t>();
                 scheme->maxExtendThrough =
                     options["maxExtendThrough"].as<size_t>();
+                scheme->minUniqueStrings = options["minEditBound"].as<size_t>();
                     
                 return (MappingScheme*) scheme;
             } else {

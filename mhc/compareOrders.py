@@ -79,10 +79,15 @@ class StructureAssessmentTarget(SchemeUsingTarget):
         # min edit distance bound, max edit distance. For "zip" schemes we have
         # map_type, min context, max range count.
         return set([
-            # Do zip with flat mins
-            ("zip", 100, 100),
-            ("zip", 150, 100),
-            ("zip", 200, 100)
+            # Do varying edit counts
+            ("zip", 100, 0, 100),
+            ("zip", 100, 5, 100),
+            ("zip", 100, 10, 100),
+            ("zip", 100, 15, 100),
+            ("zip", 50, 0, 100),
+            ("zip", 50, 5, 100),
+            ("zip", 50, 10, 100),
+            ("zip", 50, 15, 100)
         ])
         
         
