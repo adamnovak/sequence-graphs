@@ -72,9 +72,10 @@ public:
     size_t maxExtendThrough = (size_t) 100;
     
     /**
-     * How many unique strings are required to be present near a base for that
-     * base to map? TODO: these sould be non-overlapping, and restricted to the
-     * range of bases used to map the base in question.
+     * How many unique non-overlapping one-sided MUSes need to be in the one-
+     * sided MUMs of a base for that base to map? TODO: these sould be non-
+     * overlapping, and restricted to the range of bases used to map the base in
+     * question.
      */
     size_t minUniqueStrings = 5;
     
@@ -340,6 +341,16 @@ protected:
      */
     bool canExtendThrough(FMDPosition context,
         const std::string& opposingQuery) const;
+        
+    /**
+     * Do the "Activity Selection Problem". Given a vector of [start, end]
+     * ranges, find the maximum number of them that you can select without any
+     * of the selected ranges overlapping.
+     *
+     * The input ranges may or may not be sorted. The minimum start value is 0.
+     */
+    size_t selectActivities(
+        std::vector<std::pair<size_t, size_t>> ranges) const;
     
     /**
      * Evaluate the retraction represented by the given DPTask (which may be

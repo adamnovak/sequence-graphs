@@ -92,11 +92,19 @@ void ZipMappingScheme::map(const std::string& query,
         size_t minUniqueLength = (size_t) -1;
         
         while(view.isUnique(position)) {
-            minUniqueLength = length;
+            // Retract to a point where we may not be unique
             length = view.getIndex().retractRightOnly(position);
+            // We know we are unique at 1 more character than that
+            minUniqueLength = length + 1;
         }
         
         minUniqueLeftContexts.push_back(minUniqueLength);
+        
+        Log::trace() << "Min left context " <<
+            minUniqueLeftContexts.size() - 1 << " is " << minUniqueLength <<
+            " vs " << length << " selecting " <<
+            view.getTextPositions(position).size() << std::endl;
+        
     }
     
     for(const auto& rangeAndLength : rightContexts) {
@@ -110,8 +118,10 @@ void ZipMappingScheme::map(const std::string& query,
         size_t minUniqueLength = (size_t) -1;
         
         while(view.isUnique(position)) {
-            minUniqueLength = length;
+            // Retract to a point where we may not be unique
             length = view.getIndex().retractRightOnly(position);
+            // We know we are unique at 1 more character than that
+            minUniqueLength = length + 1;
         }
         
         minUniqueRightContexts.push_back(minUniqueLength);
@@ -168,13 +178,15 @@ void ZipMappingScheme::map(const std::string& query,
             continue;
         }
         
+        // We're going to find all the one-sided minimal unique matches
+        // contained in our maximal match, and put them in this, and then do
+        // activity selection to count how many are non-overlapping.
+        std::vector<std::pair<size_t, size_t>> uniqueContexts;
+        
         // What range of bases are within our left and right MUMs? TODO:
-        // substitute range actually used to map on instead.
+        // substitute range actually used to map on instead?
         size_t rangeStart = i - leftContexts[i].second + 1;
         size_t rangeEnd = i + rightContexts[i].second - 1; // Inclusive
-        
-        // Total up the total unique strings found. TODO: require non-overlap.
-        size_t uniqueStringsFound = 0;
         
         // Scan left and right to find the one-sided MUSes we overlap.
         for(size_t j = rangeStart; j <= rangeEnd; j++) {
@@ -184,7 +196,11 @@ void ZipMappingScheme::map(const std::string& query,
                 // If it has a left context
                 if(j - minUniqueLeftContexts[j] + 1 >= rangeStart) {
                     // And that left context is contained in our range
-                    uniqueStringsFound++;
+                
+                    // Save this one-sided MUS
+                    uniqueContexts.emplace_back(
+                        j - minUniqueLeftContexts[j] + 1, j);
+                
                 }
             }
             
@@ -192,25 +208,32 @@ void ZipMappingScheme::map(const std::string& query,
                 // If it has a right context
                 if(j + minUniqueRightContexts[j] - 1 <= rangeEnd) {
                     // And that right context is contained in our range
-                    uniqueStringsFound++;
+                    
+                    // Save this one-sided MUS
+                    uniqueContexts.emplace_back(j,
+                        j + minUniqueRightContexts[j] - 1);
                 }
             }
         }
         
         Log::debug() << "Query position " << i << " contains " << 
-            uniqueStringsFound << " unique strings in its range from " <<
+            uniqueContexts.size() << " unique strings in its range from " <<
             rangeStart << " to " << rangeEnd << std::endl;
+            
+        // Do activity selection
+        size_t nonOverlapping = selectActivities(uniqueContexts);
         
-        if(uniqueStringsFound < minUniqueStrings) {
+        Log::debug() << nonOverlapping << "/" << uniqueContexts.size() <<
+            " are nonoverlapping" << std::endl;
+        
+        if(nonOverlapping < minUniqueStrings) {
             Log::debug() <<
                 "Dropping mapping due to having too few unique strings." <<
                 std::endl;
+        } else {
+            // Report all the mappings that pass.
+            callback(i, mappings[i].getLocation());
         }
-        
-        // Count them and see if there are enough.
-        
-        // Report all the mappings that pass.
-        callback(i, mappings[i].getLocation());
         
     }
     
@@ -255,6 +278,43 @@ bool ZipMappingScheme::canExtendThrough(FMDPosition context,
     // Let the caller know whether we got all the way through (in which case the
     // LR context exists) or not.
     return !view.isEmpty(barelyUnique);
+}
+
+size_t ZipMappingScheme::selectActivities(
+    std::vector<std::pair<size_t, size_t>> ranges) const {
+    
+    // First we have to sort the ranges by end, ascending.
+    std::sort(ranges.begin(), ranges.end(), [](std::pair<size_t, size_t> a,
+        std::pair<size_t, size_t> b) -> bool {
+        
+        // We'll give true if the first range ends before the second.
+        // We also return true if there's a tie but a starts first.
+        return (a.second < b.second) || (a.second == b.second &&
+            a.first < b.first);
+        
+    });
+    
+    // How many non-overlapping things have we found?
+    size_t found = 0;
+    // What's the minimum start time we can accept?
+    size_t nextFree = 0;
+    
+    for(const auto& range : ranges) {
+        Log::trace() << "Have " << range.first << " - " << range.second <<
+            std::endl;
+        // For each range (starting with those that end soonest)...
+        if(range.first >= nextFree) {
+            // Take it if it starts late enough
+            
+            Log::trace() << "Taking " << range.first << " - " << range.second <<
+                std::endl;
+            
+            nextFree = range.second + 1;
+            found++;
+        }
+    }
+
+    return found;
 }
 
 std::pair<bool, std::set<TextPosition>> ZipMappingScheme::exploreRetraction(
