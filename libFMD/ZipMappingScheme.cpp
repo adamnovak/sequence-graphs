@@ -77,6 +77,51 @@ void ZipMappingScheme::map(const std::string& query,
     auto leftContexts = findRightContexts(reverseComplement(query));
     std::reverse(leftContexts.begin(), leftContexts.end());
     
+    // Create vectors of the minimum unique left and right context lengths, or
+    // (size_t) -1 if no such lenght exists.
+    std::vector<size_t> minUniqueLeftContexts;
+    std::vector<size_t> minUniqueRightContexts;
+    
+    for(const auto& rangeAndLength : leftContexts) {
+        // Find the min unique lengths for the left contexts.
+        
+        FMDPosition position = rangeAndLength.first;
+        size_t length = rangeAndLength.second;
+        
+        // What's the min unique length for this base? We haven't found any yet.
+        size_t minUniqueLength = (size_t) -1;
+        
+        while(view.isUnique(position)) {
+            minUniqueLength = length;
+            length = view.getIndex().retractRightOnly(position);
+        }
+        
+        minUniqueLeftContexts.push_back(minUniqueLength);
+    }
+    
+    for(const auto& rangeAndLength : rightContexts) {
+        // And again for the right contexts. TODO: make a function to not repeat
+        // all this code.
+        
+        FMDPosition position = rangeAndLength.first;
+        size_t length = rangeAndLength.second;
+        
+        // What's the min unique length for this base? We haven't found any yet.
+        size_t minUniqueLength = (size_t) -1;
+        
+        while(view.isUnique(position)) {
+            minUniqueLength = length;
+            length = view.getIndex().retractRightOnly(position);
+        }
+        
+        minUniqueRightContexts.push_back(minUniqueLength);
+    }
+    
+    // We're going to store up all the potential mappings, and then filter them
+    // down. This stores true and the mapped-to TextPosition if a base would map
+    // before filtering, and false and an undefined TextPosition otherwise.
+    std::vector<Mapping> mappings;
+    
     // For each pair, figure out if the forward and reverse FMDPositions select
     // one single consistent TextPosition.
     for(size_t i = 0; i < query.size(); i++) {
@@ -99,19 +144,75 @@ void ZipMappingScheme::map(const std::string& query,
         if(intersection.size() == 1) {
             // We map! Call the callback with the only text position.
             Log::debug() << "Index " << i << " maps." << std::endl;
-            callback(i, *(intersection.begin()));
+            mappings.push_back(Mapping(*(intersection.begin())));
         } else if(intersection.size() > 1) {
             // Too many results
             Log::debug() << "Index " << i << " is ambiguous." << std::endl;
+            mappings.push_back(Mapping());
         } else {
             // Too few results
             Log::debug() << "Index " << i << " not in reference." << std::endl;
+            mappings.push_back(Mapping());
         }
         
     }
     
-    // Now we have gone through every position in the query and found the text
-    // positions it matches for both forward and reverse complement.
+    for(size_t i = 0; i < mappings.size(); i++) {
+        // Now we have to filter the mappings
+        
+        // Grab the mapping for this query index.
+        const Mapping& mapping = mappings[i];
+        
+        if(!mapping.isMapped()) {
+            // Skip unmapped query bases
+            continue;
+        }
+        
+        // What range of bases are within our left and right MUMs? TODO:
+        // substitute range actually used to map on instead.
+        size_t rangeStart = i - leftContexts[i].second + 1;
+        size_t rangeEnd = i + rightContexts[i].second - 1; // Inclusive
+        
+        // Total up the total unique strings found. TODO: require non-overlap.
+        size_t uniqueStringsFound = 0;
+        
+        // Scan left and right to find the one-sided MUSes we overlap.
+        for(size_t j = rangeStart; j <= rangeEnd; j++) {
+            // For every base in the range
+            
+            if(minUniqueLeftContexts[j] != (size_t) -1) {
+                // If it has a left context
+                if(j - minUniqueLeftContexts[j] + 1 >= rangeStart) {
+                    // And that left context is contained in our range
+                    uniqueStringsFound++;
+                }
+            }
+            
+            if(minUniqueRightContexts[j] != (size_t) -1) {
+                // If it has a right context
+                if(j + minUniqueRightContexts[j] - 1 <= rangeEnd) {
+                    // And that right context is contained in our range
+                    uniqueStringsFound++;
+                }
+            }
+        }
+        
+        Log::debug() << "Query position " << i << " contains " << 
+            uniqueStringsFound << " unique strings in its range from " <<
+            rangeStart << " to " << rangeEnd << std::endl;
+        
+        if(uniqueStringsFound < minUniqueStrings) {
+            Log::debug() <<
+                "Dropping mapping due to having too few unique strings." <<
+                std::endl;
+        }
+        
+        // Count them and see if there are enough.
+        
+        // Report all the mappings that pass.
+        callback(i, mappings[i].getLocation());
+        
+    }
     
 }
 

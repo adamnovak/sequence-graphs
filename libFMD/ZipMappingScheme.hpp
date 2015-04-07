@@ -71,6 +71,13 @@ public:
      */
     size_t maxExtendThrough = (size_t) 100;
     
+    /**
+     * How many unique strings are required to be present near a base for that
+     * base to map? TODO: these sould be non-overlapping, and restricted to the
+     * range of bases used to map the base in question.
+     */
+    size_t minUniqueStrings = 5;
+    
 protected:
     
     /**
