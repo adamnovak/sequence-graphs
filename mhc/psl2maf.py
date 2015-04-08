@@ -42,7 +42,7 @@ def parse_args(args):
     parser.add_argument("--referenceOffset", type=int, default=0,
         help="offset all reference coordinates by the given amount")
     parser.add_argument("--referenceSequence", type=str, default=None,
-        help="override reference sequence nemae with this one")
+        help="override reference sequence name with this one")
     parser.add_argument("--noMismatch", action="store_true",
         help="only align bases which match")
     
