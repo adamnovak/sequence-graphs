@@ -400,7 +400,6 @@ def main(args):
                             
                         if fragment.hit_strand == -1:
                             # We meant to get the other strand.
-                            # TODO: Properly support this!
                             hitFragment = hitFragment.reverse_complement()
                         
                         # Make sure we got the right number of bases.
@@ -416,7 +415,6 @@ def main(args):
                             
                         if fragment.query_strand == -1:
                             # We meant to get the other strand
-                            # TODO: Properly support this!
                             queryFragment = queryFragment.reverse_complement()
                             
                         # Make sure we got the right number of bases.

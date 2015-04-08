@@ -305,7 +305,7 @@ def main(args):
     # this a function or make this use an import or somehow de-uglify it.
     subprocess.check_call([psl2maf, "--maf", 
         options.region + "/GRCAlignment.maf", "--referenceOffset", 
-        str(-ref_start) + 1, "--referenceSequence", "ref", "--noMismatch",
+        str(-ref_start + 1), "--referenceSequence", "ref", "--noMismatch",
         "--psls"] + glob.glob(options.region + "/*.psl") + ["--fastas"] + 
         glob.glob(options.region + "/*.fa"))
         
