@@ -110,6 +110,9 @@ def gapMismatches(alignment):
     print("{}/{} bases gapped due to mismatch".format(mismatches_gapped,
         bases_checked))
         
+    if bases_checked < 100:
+        print alignment
+        
     # Make the records into a proper MSA and return it.
     return Align.MultipleSeqAlignment(seqRecords)
             
@@ -396,7 +399,7 @@ def main(args):
                         hitFragment = hitSeqRecord[fragment.hit_start:
                             fragment.hit_end]
                             
-                        if fragment.hit_strand == "-":
+                        if fragment.hit_strand == -1:
                             # We meant to get the other strand.
                             # TODO: Properly support this!
                             hitFragment = hitFragment.reverse_complement()
@@ -412,7 +415,7 @@ def main(args):
                         queryFragment = querySeqRecord[fragment.query_start:
                             fragment.query_end]
                             
-                        if fragment.query_strand == "-":
+                        if fragment.query_strand == -1:
                             # We meant to get the other strand
                             # TODO: Properly support this!
                             queryFragment = queryFragment.reverse_complement()
@@ -429,6 +432,8 @@ def main(args):
                         # Get the MultipleSeqAlignment which the fragment then
                         # creates.
                         alignment = fragment.aln
+                        
+                        print fragment
                         
                         if options.noMismatch:
                             # We only want to have match operations in our
