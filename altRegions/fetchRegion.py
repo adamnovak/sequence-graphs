@@ -49,6 +49,20 @@ def parse_args(args):
         
     return parser.parse_args(args)
 
+def urlOpenTsv(url):
+    """
+    Open a TSV URL and loop through the lines as lists.
+    
+    """
+    
+    try:
+        reader = tsv.TsvReader(urllib2.urlopen(url))
+    except urllib2.URLError as err:
+        print("Could not open " + url)
+        raise err
+        
+    return reader
+
 def getRegionInfo(region_name, assembly_root):
     """
     Go download the genomic_region_definitions.txt from the specified assembly,
@@ -57,9 +71,7 @@ def getRegionInfo(region_name, assembly_root):
     """
     
     # Open the region definitions
-    for parts in tsv.TsvReader(urllib2.urlopen(assembly_root +
-        "/genomic_region_definitions.txt")):
-        
+    for parts in urlOpenTsv(assembly_root + "/genomic_regions_definitions.txt"):
         # For every region in the list
         
         if parts[0] == region_name:
@@ -78,8 +90,7 @@ def getRegionSequences(region_name, assembly_root):
     """
     
     # Open the alt locus placement file
-    for parts in tsv.TsvReader(urllib2.urlopen(assembly_root +
-        "/all_alt_scaffold_placement.txt")):
+    for parts in urlOpenTsv(assembly_root + "/all_alt_scaffold_placement.txt"):
         # For every alt locus...
         
         if parts[7] == region_name:
@@ -99,13 +110,23 @@ def getGINumber(grc_id):
     """
     
     # First just search the ID as a search term.
-    search_results = Entrez.read(Entrez.esearch("nuccore", term="GL000209.2"))
+    search_results = Entrez.read(Entrez.esearch("nucleotide", term=grc_id))
+    
+    if len(search_results["IdList"]) > 1:
+        # We should only get one result. If we have many, we might be looking at
+        # the wrong one.
+        print(search_results)
+        raise RuntimeError("Too many results!")
+    
     # Grab the handle thingy for the first search result
-    first_handle = Entrez.read(Entrez.epost("nuccore",
+    first_handle = Entrez.read(Entrez.epost("nucleotide",
         id=search_results["IdList"][0]))
+        
     # Actually download that record
-    record = Entrez.read(Entrez.esummary(db="nuccore",
-        webenv=first_handle["WebEnv"], query_key=first_handle["QueryKey"]))
+    record = Entrez.read(Entrez.esummary(db="nucleotide",
+        webenv=first_handle["WebEnv"], query_key=first_handle["QueryKey"]))[0]
+        
+    print("{} = {}".format(grc_id, record["Gi"]))
         
     # Return the GI number. TODO: should this be the ID instead because of how
     # we use it next? Are they ever different?
@@ -120,12 +141,14 @@ def getSequence(gi_id, start=None, end=None):
     """
     
     if start is None:
-        # Go fetch the whole record
-        fetch_handle = Entrez.efetch(db="nucleotide", id=gi_id, rettype="fasta")
+        # Go fetch the whole record. We need to make the ID a str or the API
+        # client freaks out.
+        fetch_handle = Entrez.efetch(db="nucleotide", id=str(gi_id),
+            rettype="fasta")
     else:
         # Just fetch part of it
-        fetch_handle = Entrez.efetch(db="nucleotide", id=gi_id, rettype="fasta",
-            seq_start=start, seq_end=end)
+        fetch_handle = Entrez.efetch(db="nucleotide", id=str(gi_id),
+            rettype="fasta", seq_start=start, seq_end=end)
     
     # Load up the FASTA record
     record = SeqIO.read(fetch_handle, "fasta")
@@ -153,8 +176,9 @@ def main(args):
         options.assembly_url)
         
     # Make our output directory
-    os.makedirs(options.region)
-    
+    if not os.path.exists(options.region):
+        os.makedirs(options.region)
+        
     # Get the reference's GI
     ref_gi = getGINumber(ref_acc)
     
@@ -185,9 +209,6 @@ def main(args):
         # Write it to <region>/GI<number>.fa
         SeqIO.write([alt_seq], open("{}/GI{}.fa".format(options.region, alt_gi),
             "w"), "fasta")
-        
             
-            
-
 if __name__ == "__main__" :
     sys.exit(main(sys.argv))
