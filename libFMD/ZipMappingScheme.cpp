@@ -89,6 +89,10 @@ std::vector<size_t> ZipMappingScheme::createUniqueContextIndex(
             minUniqueLength = length + 1;
         }
         
+        if(minUniqueLength == 0) {
+            throw std::runtime_error("Too much retracting!");
+        }
+        
         minUniqueLeftContexts.push_back(minUniqueLength);
         
         Log::trace() << "Min left context " <<
@@ -122,19 +126,27 @@ std::vector<size_t> ZipMappingScheme::createUniqueContextIndex(
     // one-sided MUSes
     std::vector<std::pair<size_t, size_t>> uniqueContexts;
     
-    for(size_t i = 0; i <= minUniqueLeftContexts.size(); i++) {
+    for(size_t i = 0; i < minUniqueLeftContexts.size(); i++) {
         // For every base
         
         if(minUniqueLeftContexts[i] != (size_t) -1) {
             // If it has a left context,  Save this one-sided MUS
             uniqueContexts.emplace_back(
                 i - minUniqueLeftContexts[i] + 1, i);
+      
+            if(minUniqueLeftContexts[i] == 0) {
+                throw std::runtime_error("Left context runs backwards!");
+            }
         }
         
         if(minUniqueRightContexts[i] != (size_t) -1) {
             // If it has a right context, save this one-sided MUS
             uniqueContexts.emplace_back(i,
                 i + minUniqueRightContexts[i] - 1);
+                
+            if(minUniqueRightContexts[i] == 0) {
+                throw std::runtime_error("Right context runs backwards!");
+            }
         }
     }
     
@@ -238,9 +250,10 @@ size_t ZipMappingScheme::selectActivitiesIndexed(size_t start, size_t end,
 
     Log::info() << "Starting at " << position << std::endl;
     
-    while(found < threshold) {
+    while(found < threshold && position < index.size()) {
         // Look for activities until we find enough. A threshold of (size_t) -1
-        // wil have us look forever.
+        // wil have us look forever. Also make sure we don't sneak out of the
+        // index with that +1 later.
     
         // Jump to the end of the next activity we want to do.
         position = index[position];
