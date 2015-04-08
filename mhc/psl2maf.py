@@ -197,8 +197,11 @@ def mergeMSAs(msa1, msa2):
         else:
             # Neither has a gap. They both have real characters.
             
-            # Make sure the characters match.
-            assert(msa1[0, msa1Pos] == msa2[0, msa2Pos])
+            if(msa1[0, msa1Pos] != msa2[0, msa2Pos]):
+                print msa1
+                print msa2
+                raise RuntimeError("{} in reference 1 does not match {} "
+                    "in reference 2".format(msa1[0, msa1Pos], msa2[0, msa2Pos])) 
             
             for i, character in enumerate(msa1[:, msa1Pos]):
                 # Copy all the characters from msa1's column
@@ -332,6 +335,16 @@ def main(args):
                     # How much padding do we need in each sequence?
                     queryPaddingNeeded = queryStart - hitMSAQueryPos
                     hitPaddingNeeded = hitStart - hitMSAHitPos
+                    
+                    if queryPaddingNeeded < 0:
+                        # We can only add characters when padding
+                        raise RuntimeError("Want to pad query by {} which is "
+                            "impossible".format(queryPaddingNeeded))
+                            
+                    if hitPaddingNeeded < 0:
+                        # We can only add characters when padding
+                        raise RuntimeError("Want to pad hit by {} which is "
+                            "impossible".format(hitPaddingNeeded))
                     
                     # Grab the sequence from the query to go opposite the
                     # hit gap
