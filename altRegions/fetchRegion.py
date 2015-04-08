@@ -233,6 +233,18 @@ def main(args):
     # Grab the reference sequence
     ref_seq = get_sequence(ref_gi, ref_start, ref_end)
     
+    print("Got {}bp for a {}bp reference".format(len(ref_seq),
+        ref_end - ref_start))
+        
+        
+    if len(ref_seq) > ref_end - ref_start:
+        # Clip it down if it's too long. Assuming we have the correct sort of
+        # coordinates, and that we got served the data starting at the correct
+        # offset.
+        ref_seq = ref_seq[0:ref_end - ref_start]
+    elif len(ref_seq) < ref_end - ref_start:
+        raise RuntimeError("Didn't get enough sequence from the API!")
+    
     # Change it to be just called "ref"
     ref_seq.id = "ref"
     
