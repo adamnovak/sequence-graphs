@@ -351,6 +351,29 @@ protected:
      */
     size_t selectActivities(
         std::vector<std::pair<size_t, size_t>> ranges) const;
+        
+    /**
+     * Given the left and right contexts, finds the shortest unique left and
+     * right contexts, and produces an index that can be used to easily find the
+     * number of non-overlapping such intervals contained in any range. The
+     * index stores, for every query base, the end position of the soonest-
+     * ending unique context that starts at or after that base. By looking up
+     * your range start, going to 1 later than that position, doing the lookup
+     * again, and so on, you can do activity selection fairly easily.
+     */
+    std::vector<size_t> createUniqueContextIndex(
+        const std::vector<std::pair<FMDPosition, size_t>>& leftContexts,
+        const std::vector<std::pair<FMDPosition, size_t>>& rightContexts) const;
+    
+    /**
+     * Do activity selection using an index from createUniqueContextIndex. Given
+     * the start and end positions of a range (inclusive), and an index, finds
+     * the maximum number of non-overlapping activities (i.e. unique contexts)
+     * that can fit in the range. If threshold is specified, finds that number
+     * or the threshold, whichever is smaller.
+     */
+    size_t selectActivitiesIndexed(size_t start, size_t end,
+        std::vector<size_t> index, size_t threshold = (size_t) -1) const;
     
     /**
      * Evaluate the retraction represented by the given DPTask (which may be

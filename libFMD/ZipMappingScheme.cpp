@@ -64,18 +64,9 @@ std::vector<std::pair<FMDPosition, size_t>> ZipMappingScheme::findRightContexts(
     return toReturn;
 }
 
-void ZipMappingScheme::map(const std::string& query,
-    std::function<void(size_t, TextPosition)> callback) const {
-    
-    // Get the right contexts
-    Log::info() << "Looking for right contexts" << std::endl;
-    auto rightContexts = findRightContexts(query);
-    
-    // And the left contexts (which is the reverse of the contexts for the
-    // reverse complement.
-    Log::info() << "Looking for left contexts" << std::endl;
-    auto leftContexts = findRightContexts(reverseComplement(query));
-    std::reverse(leftContexts.begin(), leftContexts.end());
+std::vector<size_t> ZipMappingScheme::createUniqueContextIndex(
+    const std::vector<std::pair<FMDPosition, size_t>>& leftContexts,
+    const std::vector<std::pair<FMDPosition, size_t>>& rightContexts) const {
     
     // Create vectors of the minimum unique left and right context lengths, or
     // (size_t) -1 if no such lenght exists.
@@ -127,6 +118,173 @@ void ZipMappingScheme::map(const std::string& query,
         minUniqueRightContexts.push_back(minUniqueLength);
     }
     
+    // Now we're going to make a sorted list of (start, end) pairs for these
+    // one-sided MUSes
+    std::vector<std::pair<size_t, size_t>> uniqueContexts;
+    
+    for(size_t i = 0; i <= minUniqueLeftContexts.size(); i++) {
+        // For every base
+        
+        if(minUniqueLeftContexts[i] != (size_t) -1) {
+            // If it has a left context,  Save this one-sided MUS
+            uniqueContexts.emplace_back(
+                i - minUniqueLeftContexts[i] + 1, i);
+        }
+        
+        if(minUniqueRightContexts[i] != (size_t) -1) {
+            // If it has a right context, save this one-sided MUS
+            uniqueContexts.emplace_back(i,
+                i + minUniqueRightContexts[i] - 1);
+        }
+    }
+    
+    // The "first" range is the one that ends earliest.
+    auto order = ([](std::pair<size_t, size_t> a, 
+        std::pair<size_t, size_t> b) -> bool {
+        
+        // We'll give true if the first range ends before the second.
+        // We also return true if there's a tie but a starts first.
+        return (a.second < b.second) || (a.second == b.second &&
+            a.first < b.first);
+        
+    });
+    
+    // Sort the unique contexts by start, descending, so we can pop stuff off
+    // the front when we reach its start position.
+    std::sort(uniqueContexts.begin(), uniqueContexts.end(),
+        [](std::pair<size_t, size_t> a, std::pair<size_t, size_t> b) -> bool {
+            // Define a total ordering
+            return (a.first > b.first) || (a.first == b.first &&
+                a.second > b.second);
+    });
+    
+    // Go through the unique contexts from right to left, and save for each base
+    // the end position of the earliest-ending unique context that starts at or
+    // after it.
+    std::vector<size_t> endOfBestActivity(leftContexts.size());
+    
+    // We're going to iterate through the unique contexts in order of decreasing
+    // start index.
+    auto nextActivity = uniqueContexts.begin();
+    
+    // We'll keep an iterator to the one that starts here or to the right and
+    // ends soonest, but for now that's nothing.
+    auto bestActivity = uniqueContexts.end();
+    
+    // We go from right to left. We have a current best (i.e. earliest-ending)
+    // interval. When we reach the start point of an interval, we see if that
+    // interval ends before our current best one. If so we replace the best
+    // interval. If not we keep it and ignore the new interval.
+    
+    for(size_t i = leftContexts.size() - 1; i != (size_t) -1; i--) {
+        // For each base from right to left
+        
+        while(nextActivity != uniqueContexts.end() && 
+            (*nextActivity).first >= i) {
+            // For every activity starting at or after here
+            
+            Log::info() << "Considering activity " << (*nextActivity).first <<
+                "-" << (*nextActivity).second << " which starts at or after " <<
+                i << std::endl;
+            
+            // This activity starts here or later
+            if(bestActivity == uniqueContexts.end() ||
+                (*nextActivity).second < (*bestActivity).second) {
+                
+                // This is a sooner-ending activity than any we have so far.
+                // Take it.
+                bestActivity = nextActivity;
+                
+                Log::info() << "It is the soonest ending" << std::endl;
+                
+            }
+            // We accepted or rejected this activity, so go on to the next
+            // lefter one to consider.
+            ++nextActivity;
+        }
+        
+        // Now bestActivity points to the soonest-ending activity that starts
+        // here or later.
+        if(bestActivity == uniqueContexts.end()) {
+            // There is no such activity. Use (size_t) -1 as a no-such-value
+            // value.
+            endOfBestActivity[i] = (size_t) -1;
+            
+            Log::info() << "No soonest ending activity starting at or after " <<
+                i << std::endl;
+        } else {
+            // We found such an activity, so record its endpoint. We can go one
+            // right from there and look up the end of the non-overlapping
+            // activity that we would chain with.
+            endOfBestActivity[i] = (*bestActivity).second;
+            
+            Log::info() << "Soonest ending activity starting at or after " <<
+                i << " ends at " << endOfBestActivity[i] << std::endl;
+        }
+    }
+    
+    // Giev back the index vector we made, which simplifies activity selection
+    // problems immensely.
+    return endOfBestActivity;
+}
+
+size_t ZipMappingScheme::selectActivitiesIndexed(size_t start, size_t end,
+    std::vector<size_t> index, size_t threshold) const {
+    
+    // What base are we at?
+    size_t position = start;
+    // How many non-overlapping things have we found?
+    size_t found = 0;
+
+    Log::info() << "Starting at " << position << std::endl;
+    
+    while(found < threshold) {
+        // Look for activities until we find enough. A threshold of (size_t) -1
+        // wil have us look forever.
+    
+        // Jump to the end of the next activity we want to do.
+        position = index[position];
+        
+        Log::info() << "Activity ends at " << position << std::endl;
+        
+        if(position > end) {
+            // This activity runs too long and we can't do it. This also handles
+            // (size_t) -1, the no-more-activities value, which is larger than
+            // any other size_t.
+            break;
+        }
+        
+        // Otherwise we found an activity that we can do.
+        found++;
+        
+        // Look for activities that start after this one ends.
+        position++;
+    }
+    
+    // Say how many activities were found.
+    return found;
+}
+
+void ZipMappingScheme::map(const std::string& query,
+    std::function<void(size_t, TextPosition)> callback) const {
+    
+    // Get the right contexts
+    Log::info() << "Looking for right contexts" << std::endl;
+    auto rightContexts = findRightContexts(query);
+    
+    // And the left contexts (which is the reverse of the contexts for the
+    // reverse complement.
+    Log::info() << "Looking for left contexts" << std::endl;
+    auto leftContexts = findRightContexts(reverseComplement(query));
+    std::reverse(leftContexts.begin(), leftContexts.end());
+    
+    // This is going to hold, for each query base, the endpoint of the soonest-
+    // ending minimally unique context that starts at or after that base.
+    Log::info() << "Creating unique context index" << std::endl;
+    auto uniqueContextIndex = createUniqueContextIndex(leftContexts,
+        rightContexts);
+    
+    
     // We're going to store up all the potential mappings, and then filter them
     // down. This stores true and the mapped-to TextPosition if a base would map
     // before filtering, and false and an undefined TextPosition otherwise.
@@ -176,53 +334,16 @@ void ZipMappingScheme::map(const std::string& query,
             continue;
         }
         
-        // We're going to find all the one-sided minimal unique matches
-        // contained in our maximal match, and put them in this, and then do
-        // activity selection to count how many are non-overlapping.
-        std::vector<std::pair<size_t, size_t>> uniqueContexts;
-        
-        // What range of bases are within our left and right MUMs? TODO:
-        // substitute range actually used to map on instead?
+        // What range of bases are within our left and right MUMs?
         size_t rangeStart = i - mapping.getLeftMaxContext() + 1;
         size_t rangeEnd = i + mapping.getRightMaxContext() - 1; // Inclusive
         
-        // Scan left and right to find the one-sided MUSes we overlap.
-        for(size_t j = rangeStart; j <= rangeEnd; j++) {
-            // For every base in the range
-            
-            if(minUniqueLeftContexts[j] != (size_t) -1) {
-                // If it has a left context
-                if(j - minUniqueLeftContexts[j] + 1 >= rangeStart) {
-                    // And that left context is contained in our range
-                
-                    // Save this one-sided MUS
-                    uniqueContexts.emplace_back(
-                        j - minUniqueLeftContexts[j] + 1, j);
-                
-                }
-            }
-            
-            if(minUniqueRightContexts[j] != (size_t) -1) {
-                // If it has a right context
-                if(j + minUniqueRightContexts[j] - 1 <= rangeEnd) {
-                    // And that right context is contained in our range
-                    
-                    // Save this one-sided MUS
-                    uniqueContexts.emplace_back(j,
-                        j + minUniqueRightContexts[j] - 1);
-                }
-            }
-        }
-        
-        Log::debug() << "Query position " << i << " contains " << 
-            uniqueContexts.size() << " unique strings in its range from " <<
-            rangeStart << " to " << rangeEnd << std::endl;
-            
         // Do activity selection
-        size_t nonOverlapping = selectActivities(uniqueContexts);
-        
-        Log::debug() << nonOverlapping << "/" << uniqueContexts.size() <<
-            " are nonoverlapping" << std::endl;
+        size_t nonOverlapping = selectActivitiesIndexed(rangeStart, rangeEnd,
+            uniqueContextIndex, minUniqueStrings);
+            
+        Log::info() << "Found " << nonOverlapping << "/" << minUniqueStrings <<
+            " necessary non-overlapping minimal unique contexts" << std::endl;
         
         if(nonOverlapping < minUniqueStrings) {
             Log::debug() <<
