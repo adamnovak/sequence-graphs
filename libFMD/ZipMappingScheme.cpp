@@ -195,7 +195,7 @@ std::vector<size_t> ZipMappingScheme::createUniqueContextIndex(
             (*nextActivity).first >= i) {
             // For every activity starting at or after here
             
-            Log::info() << "Considering activity " << (*nextActivity).first <<
+            Log::trace() << "Considering activity " << (*nextActivity).first <<
                 "-" << (*nextActivity).second << " which starts at or after " <<
                 i << std::endl;
             
@@ -207,7 +207,7 @@ std::vector<size_t> ZipMappingScheme::createUniqueContextIndex(
                 // Take it.
                 bestActivity = nextActivity;
                 
-                Log::info() << "It is the soonest ending" << std::endl;
+                Log::trace() << "It is the soonest ending" << std::endl;
                 
             }
             // We accepted or rejected this activity, so go on to the next
@@ -222,7 +222,7 @@ std::vector<size_t> ZipMappingScheme::createUniqueContextIndex(
             // value.
             endOfBestActivity[i] = (size_t) -1;
             
-            Log::info() << "No soonest ending activity starting at or after " <<
+            Log::trace() << "No soonest ending activity starting at or after " <<
                 i << std::endl;
         } else {
             // We found such an activity, so record its endpoint. We can go one
@@ -230,7 +230,7 @@ std::vector<size_t> ZipMappingScheme::createUniqueContextIndex(
             // activity that we would chain with.
             endOfBestActivity[i] = (*bestActivity).second;
             
-            Log::info() << "Soonest ending activity starting at or after " <<
+            Log::trace() << "Soonest ending activity starting at or after " <<
                 i << " ends at " << endOfBestActivity[i] << std::endl;
         }
     }
@@ -248,7 +248,7 @@ size_t ZipMappingScheme::selectActivitiesIndexed(size_t start, size_t end,
     // How many non-overlapping things have we found?
     size_t found = 0;
 
-    Log::info() << "Starting at " << position << std::endl;
+    Log::trace() << "Starting at " << position << std::endl;
     
     while(found < threshold && position < index.size()) {
         // Look for activities until we find enough. A threshold of (size_t) -1
@@ -258,7 +258,7 @@ size_t ZipMappingScheme::selectActivitiesIndexed(size_t start, size_t end,
         // Jump to the end of the next activity we want to do.
         position = index[position];
         
-        Log::info() << "Activity ends at " << position << std::endl;
+        Log::trace() << "Activity ends at " << position << std::endl;
         
         if(position > end) {
             // This activity runs too long and we can't do it. This also handles
@@ -293,7 +293,7 @@ void ZipMappingScheme::map(const std::string& query,
     
     // This is going to hold, for each query base, the endpoint of the soonest-
     // ending minimally unique context that starts at or after that base.
-    Log::info() << "Creating unique context index" << std::endl;
+    Log::debug() << "Creating unique context index" << std::endl;
     auto uniqueContextIndex = createUniqueContextIndex(leftContexts,
         rightContexts);
     
@@ -355,7 +355,7 @@ void ZipMappingScheme::map(const std::string& query,
         size_t nonOverlapping = selectActivitiesIndexed(rangeStart, rangeEnd,
             uniqueContextIndex, minUniqueStrings);
             
-        Log::info() << "Found " << nonOverlapping << "/" << minUniqueStrings <<
+        Log::debug() << "Found " << nonOverlapping << "/" << minUniqueStrings <<
             " necessary non-overlapping minimal unique contexts" << std::endl;
         
         if(nonOverlapping < minUniqueStrings) {
