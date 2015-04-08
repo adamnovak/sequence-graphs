@@ -65,6 +65,12 @@ def gapMismatches(alignment):
     gappedReference = []
     gappedQuery = []
     
+    # How many mismatches did we gap?
+    mismatches_gapped = 0
+    # How many aligned bases did we check?
+    bases_checked = 0
+    
+    
     # Where are we in the alignment? 
     for column in xrange(len(alignment[0])):
         # Just go through all the columns in the alignment's reference.
@@ -72,6 +78,8 @@ def gapMismatches(alignment):
         # Pull out the reference and query characters at this position.
         refChar = alignment[0, column]
         queryChar = alignment[1, column]
+        
+        bases_checked += 1
         
         if "-" in [refChar, queryChar] or refChar == queryChar:
             # We have a gap or a match. Pass it through to bioth sequences.
@@ -85,6 +93,8 @@ def gapMismatches(alignment):
             gappedReference.append(refChar)
             gappedQuery.append("-")
             
+            mismatches_gapped += 1
+            
     # Now we need to manufacture the MultipleSeqAlignment to return from these
     # lists of characters.
 
@@ -95,6 +105,10 @@ def gapMismatches(alignment):
     # appropriate name.
     seqRecords = [SeqRecord(Seq("".join(alignedList)), name) 
         for alignedList, name in zip([gappedReference, gappedQuery], seqNames)]
+        
+    # If this gets too high, it means we have a bad offset somewhere.
+    print("{}/{} bases gapped due to mismatch".format(mismatches_gapped,
+        bases_checked))
         
     # Make the records into a proper MSA and return it.
     return Align.MultipleSeqAlignment(seqRecords)
@@ -398,13 +412,16 @@ def main(args):
                         queryFragment = querySeqRecord[fragment.query_start:
                             fragment.query_end]
                             
-                        # Make sure we got the right number of bases.
-                        assert(len(queryFragment) == fragment.query_span)
-                            
                         if fragment.query_strand == "-":
                             # We meant to get the other strand
                             # TODO: Properly support this!
                             queryFragment = queryFragment.reverse_complement()
+                            
+                        # Make sure we got the right number of bases.
+                        if len(queryFragment) != fragment.query_span:
+                            raise RuntimeError("Query fragment has {} bases "
+                                "instead of {}".format(len(queryFragment),
+                                fragment.query_span))
                             
                         # Put it in
                         fragment.query = queryFragment

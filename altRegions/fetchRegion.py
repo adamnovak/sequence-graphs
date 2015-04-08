@@ -300,11 +300,12 @@ def main(args):
     # Go call psl2maf, moving the reference stuff over to "ref" and shifting it
     # back so that the first base we clipped out of the reference is 0,
     # splitting apart mismatches, and making sure to use all the PSLs and MAFs
-    # in our output directory. TODO: Make this a function or make this use an
-    # import or somehow de-uglify it.
+    # in our output directory. We make sure to add 1 to the reference start in
+    # the offset, because some basedness-conversion needs to happen. TODO: Make
+    # this a function or make this use an import or somehow de-uglify it.
     subprocess.check_call([psl2maf, "--maf", 
         options.region + "/GRCAlignment.maf", "--referenceOffset", 
-        str(-ref_start), "--referenceSequence", "ref", "--noMismatch",
+        str(-ref_start) + 1, "--referenceSequence", "ref", "--noMismatch",
         "--psls"] + glob.glob(options.region + "/*.psl") + ["--fastas"] + 
         glob.glob(options.region + "/*.fa"))
         
