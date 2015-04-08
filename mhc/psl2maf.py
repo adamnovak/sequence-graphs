@@ -334,6 +334,11 @@ def main(args):
                     # Pad with some gapped sequence to the right position in
                     # each to accept the new alignment.
                     
+                    print("Query should go from {} to {}".format(hitMSAQueryPos,
+                        queryStart))
+                    print("Hit should go from {} to {}".format(hitMSAHitPos,
+                        hitStart))
+                    
                     # How much padding do we need in each sequence?
                     queryPaddingNeeded = queryStart - hitMSAQueryPos
                     hitPaddingNeeded = hitStart - hitMSAHitPos
@@ -399,6 +404,10 @@ def main(args):
                 
                 for hsp in hit:
                     # For every HSP (high-scoring pair) in the hit
+                    
+                    print("Starting a new HSP")
+                    
+                    print(hsp)
                     
                     for fragment in hsp:
                         # For every HSP fragment in the HSP (actual alignment
