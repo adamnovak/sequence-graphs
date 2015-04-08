@@ -105,13 +105,12 @@ def gapMismatches(alignment):
     # appropriate name.
     seqRecords = [SeqRecord(Seq("".join(alignedList)), name) 
         for alignedList, name in zip([gappedReference, gappedQuery], seqNames)]
-        
-    # If this gets too high, it means we have a bad offset somewhere.
-    print("{}/{} bases gapped due to mismatch".format(mismatches_gapped,
-        bases_checked))
-        
-    if bases_checked < 100:
-        print alignment
+    
+    if float(mismatches_gapped) / bases_checked > 0.5 and bases_checked > 100:    
+        # If this gets too high, it means we have a bad offset somewhere. Yell
+        # at the user.
+        print("WARNING: {}/{} bases gapped due to mismatch".format(
+            mismatches_gapped, bases_checked))
         
     # Make the records into a proper MSA and return it.
     return Align.MultipleSeqAlignment(seqRecords)
@@ -432,8 +431,6 @@ def main(args):
                         # Get the MultipleSeqAlignment which the fragment then
                         # creates.
                         alignment = fragment.aln
-                        
-                        print fragment
                         
                         if options.noMismatch:
                             # We only want to have match operations in our
