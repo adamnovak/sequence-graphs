@@ -268,6 +268,8 @@ def main(args):
     totalMSA = None
         
     for psl in options.psls:
+        print("Processing {}".format(psl))
+    
         # For each PSL we want in out MAF
         for result in SearchIO.parse(psl, "blat-psl"):
             # Parse the PSL and go through the results
@@ -454,8 +456,9 @@ def main(args):
                         # place in each sequence will be automatically added.
                         appendMSA(alignment, fragment.hit_start,
                             fragment.query_start)
-                            
+                
                 # Pad out the MSA with the unaligned sequence in each sequence
+                print("Padding out to full length")
                 appendMSA(None, len(hitSeqRecord), len(querySeqRecord))
                 print(hitMSA)
                         
