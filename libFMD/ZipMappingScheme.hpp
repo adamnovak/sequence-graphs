@@ -373,7 +373,7 @@ protected:
      * or the threshold, whichever is smaller.
      */
     size_t selectActivitiesIndexed(size_t start, size_t end,
-        std::vector<size_t> index, size_t threshold = (size_t) -1) const;
+        const std::vector<size_t>& index, size_t threshold = (size_t) -1) const;
     
     /**
      * Evaluate the retraction represented by the given DPTask (which may be

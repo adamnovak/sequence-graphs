@@ -34,11 +34,6 @@ public:
     Mapping(TextPosition location, size_t leftContext, size_t rightContext);
     
     /**
-     * Make a no-context mapping to a range number.
-     */
-    Mapping(int64_t range);
-    
-    /**
      * Provide equality comparison for testing.
      */
     bool operator==(const Mapping& other) const;
@@ -63,31 +58,10 @@ public:
     }
     
     /**
-     * What range number is this mapping to?
-     */
-    int64_t getRange() const {
-        return range;    
-    }
-    
-    /**
      * Is this Mapping actually mapped?
      */
     inline bool isMapped() const {
         return is_mapped;
-    }
-    
-    /**
-     * Return how much left context was required to become unique.
-     */
-    inline size_t getLeftMinContext() const {
-        return leftMinContext;
-    }
-    
-    /**
-     * Return how much right context was required to become unique.
-     */
-    inline size_t getRightMinContext() const {
-        return rightMinContext;
     }
     
     /**
@@ -104,15 +78,6 @@ public:
      */
     inline size_t getRightMaxContext() const {
         return rightMaxContext; 
-    }
-    
-    /**
-     * Set the min contexts used to be come unique.
-     */
-    inline void setMinContext(size_t left, size_t right) {
-        leftMinContext = left;
-        rightMinContext = right;
-        
     }
     
     /**
@@ -133,7 +98,6 @@ public:
             TextPosition newLocation = location;
             newLocation.flip(contigLength);
             Mapping flipped(newLocation);
-            flipped.setMinContext(rightMinContext, leftMinContext);
             flipped.setMaxContext(rightMaxContext, leftMaxContext);
             return flipped;
         } else {
@@ -148,13 +112,9 @@ public:
     int64_t range;
     // Is the above actually filled in?
     bool is_mapped;
-    // How much left context did it take to become unique?
-    size_t leftMinContext;    
-    // And how far could we go?
+    // And how far could we go on the left?
     size_t leftMaxContext;
-    // How much right context did it take to become unique?
-    size_t rightMinContext;
-    // And how far could we go?
+    // And how far could we go on the right?
     size_t rightMaxContext;
 };
 

@@ -8,7 +8,7 @@
 set -e
 
 # Where should we look for input and save output?
-DIR="${0}"
+DIR="${1}"
 
 if [ ! -d "${DIR}" ]; then
     # We got a directory that isn't real

@@ -241,15 +241,13 @@ std::vector<size_t> ZipMappingScheme::createUniqueContextIndex(
 }
 
 size_t ZipMappingScheme::selectActivitiesIndexed(size_t start, size_t end,
-    std::vector<size_t> index, size_t threshold) const {
+    const std::vector<size_t>& index, size_t threshold) const {
     
     // What base are we at?
     size_t position = start;
     // How many non-overlapping things have we found?
     size_t found = 0;
 
-    Log::trace() << "Starting at " << position << std::endl;
-    
     while(found < threshold && position < index.size()) {
         // Look for activities until we find enough. A threshold of (size_t) -1
         // wil have us look forever. Also make sure we don't sneak out of the
@@ -257,8 +255,6 @@ size_t ZipMappingScheme::selectActivitiesIndexed(size_t start, size_t end,
     
         // Jump to the end of the next activity we want to do.
         position = index[position];
-        
-        Log::trace() << "Activity ends at " << position << std::endl;
         
         if(position > end) {
             // This activity runs too long and we can't do it. This also handles
@@ -282,21 +278,28 @@ void ZipMappingScheme::map(const std::string& query,
     std::function<void(size_t, TextPosition)> callback) const {
     
     // Get the right contexts
-    Log::info() << "Looking for right contexts" << std::endl;
+    Log::info() << "Looking for right contexts..." << std::endl << std::flush;
     auto rightContexts = findRightContexts(query);
     
     // And the left contexts (which is the reverse of the contexts for the
     // reverse complement.
-    Log::info() << "Looking for left contexts" << std::endl;
-    auto leftContexts = findRightContexts(reverseComplement(query));
+    Log::info() << "Flipping query..." << std::endl << std::flush;
+    std::string complement = reverseComplement(query);
+    
+    Log::info() << "Looking for left contexts..." << std::endl << std::flush;
+    auto leftContexts = findRightContexts(complement);
+    
+    Log::info() << "Re-ordering..." << std::endl << std::flush;
     std::reverse(leftContexts.begin(), leftContexts.end());
     
     // This is going to hold, for each query base, the endpoint of the soonest-
     // ending minimally unique context that starts at or after that base.
-    Log::debug() << "Creating unique context index" << std::endl;
+    Log::debug() << "Creating unique context index" << std::endl << std::flush;
     auto uniqueContextIndex = createUniqueContextIndex(leftContexts,
         rightContexts);
     
+    
+    Log::info() << "Exploring retractions..." << std::endl;
     
     // We're going to store up all the potential mappings, and then filter them
     // down. This stores true and the mapped-to TextPosition if a base would map
@@ -323,7 +326,7 @@ void ZipMappingScheme::map(const std::string& query,
         // both sides until we get a shared result.
         
         if(mapping.isMapped()) {
-            // We map! Call the callback with the only text position.
+            // We map!
             Log::debug() << "Index " << i << " maps on " << 
                 mapping.getLeftMaxContext() << " left and " << 
                 mapping.getRightMaxContext() << " right context" << std::endl;
@@ -336,6 +339,11 @@ void ZipMappingScheme::map(const std::string& query,
         
     }
     
+    Log::info() << "Applying filter..." << std::endl << std::flush;
+    
+    // We're going to filter everything first and then do the callbacks.
+    std::vector<Mapping> filtered;
+    
     for(size_t i = 0; i < mappings.size(); i++) {
         // Now we have to filter the mappings
         
@@ -344,6 +352,7 @@ void ZipMappingScheme::map(const std::string& query,
         
         if(!mapping.isMapped()) {
             // Skip unmapped query bases
+            filtered.push_back(mapping);
             continue;
         }
         
@@ -355,20 +364,27 @@ void ZipMappingScheme::map(const std::string& query,
         size_t nonOverlapping = selectActivitiesIndexed(rangeStart, rangeEnd,
             uniqueContextIndex, minUniqueStrings);
             
-        Log::debug() << "Found " << nonOverlapping << "/" << minUniqueStrings <<
-            " necessary non-overlapping minimal unique contexts" << std::endl;
-        
         if(nonOverlapping < minUniqueStrings) {
             Log::debug() <<
                 "Dropping mapping due to having too few unique strings." <<
                 std::endl;
+            // Report a non-mapping Mapping
             stats.add("filterFail", 1);
+            filtered.push_back(Mapping());
         } else {
             // Report all the mappings that pass.
             stats.add("filterPass", 1);
-            callback(i, mappings[i].getLocation());
+            filtered.push_back(mapping);
         }
         
+    }
+    
+    Log::info() << "Sending callbacks..." << std::endl << std::flush;
+    for(size_t i = 0; i < filtered.size(); i++) {
+        if(filtered[i].isMapped()) {
+            // Send a callback for everything that passed the filter.
+            callback(i, filtered[i].getLocation());
+        }
     }
     
 }
