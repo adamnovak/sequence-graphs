@@ -10,7 +10,7 @@
 #include <boost/range/adaptor/reversed.hpp>
 
 std::vector<std::pair<FMDPosition, size_t>> ZipMappingScheme::findRightContexts(
-    const std::string& query) const {
+    const std::string& query, bool reverse) const {
  
     // This will hold the right context of every position.
     std::vector<std::pair<FMDPosition, size_t>> toReturn(query.size());
@@ -55,8 +55,10 @@ std::vector<std::pair<FMDPosition, size_t>> ZipMappingScheme::findRightContexts(
         Log::trace() << "Index " << i << " has " << query[i] << " + " << 
             patternLength - 1 << " selecting " << results << std::endl;
         
-        // Save the search results.
-        toReturn[i] = std::make_pair(results, patternLength);
+        // Save the search results to the appropriate location, depending on if
+        // we want to reverse the results or not.
+        toReturn[reverse ? toReturn.size() - i - 1 : i] = std::make_pair(
+            results, patternLength);
     }
 
     // Now we have inchwormed all the way from right to left, retracting only
@@ -279,18 +281,15 @@ void ZipMappingScheme::map(const std::string& query,
     
     // Get the right contexts
     Log::info() << "Looking for right contexts..." << std::endl << std::flush;
-    auto rightContexts = findRightContexts(query);
+    auto rightContexts = findRightContexts(query, false);
     
     // And the left contexts (which is the reverse of the contexts for the
-    // reverse complement.
+    // reverse complement, which we can produce in backwards order already).
     Log::info() << "Flipping query..." << std::endl << std::flush;
     std::string complement = reverseComplement(query);
     
     Log::info() << "Looking for left contexts..." << std::endl << std::flush;
-    auto leftContexts = findRightContexts(complement);
-    
-    Log::info() << "Re-ordering..." << std::endl << std::flush;
-    std::reverse(leftContexts.begin(), leftContexts.end());
+    auto leftContexts = findRightContexts(complement, true);
     
     // This is going to hold, for each query base, the endpoint of the soonest-
     // ending minimally unique context that starts at or after that base.

@@ -329,9 +329,11 @@ protected:
      * the reference for each base in the query. Results are in the same order
      * as the characters in the string, and consist of an FMDPosition of search
      * results and a context length.
+     *
+     * If reverse is true, outputs results in its vector in reverse order.
      */
     std::vector<std::pair<FMDPosition, size_t>> findRightContexts(
-        const std::string& query) const;
+        const std::string& query, bool reverse = false) const;
         
     /**
      * Returns true if the given unique search result can be extended through
