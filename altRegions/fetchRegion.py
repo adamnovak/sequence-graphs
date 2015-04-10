@@ -41,7 +41,7 @@ def parse_args(args):
             "GCA_000001405.17_GRCh38.p2_assembly_structure"),
         help="URL for the assembly, containing genomic_region_definitions.txt")
     parser.add_argument("--email", default="anovak@soe.ucsc.edu",
-        help="E-mail address to report to Ensembl")
+        help="E-mail address to report to Entrez")
 
     # The command line arguments start with the program name, which we don't
     # want to treat as an argument for argparse. So we remove it.
@@ -208,7 +208,7 @@ def main(args):
     
     options = parse_args(args) # This holds the nicely-parsed options object
     
-    # Set Ensembl e-mail
+    # Set Entrez e-mail
     Entrez.email = options.email
     
     # Go get the region of the reference we're talking about
