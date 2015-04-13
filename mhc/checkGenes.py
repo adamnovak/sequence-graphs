@@ -91,58 +91,50 @@ def parse_bed(stream):
         yield (line[0], int(line[1]), int(line[2]), line[3], 
             1 if line[5] == "+" else -1)
 
-def get_mappings_from_maf(maf_stream):
+def get_columns_from_maf(maf_stream):
     """
     Given a stream of MAF data between two or more contigs, yield individual
-    base mappings from the alignment.
+    columns from the alignment (for columns that specify alignment).
     
-    Each mappings is a tuple of (reference contig, reference base, query contig,
-    query base, is backwards).
+    Each column is a list of tuples of (reference contig, reference base,
+    is reverse).
     """
     
     for alignment in AlignIO.parse(maf_stream, "maf"):
-        records = list(alignment)
-        
-        if len(records) < 2:
+        if len(alignment) < 2:
             # We don't have two sequences aligned here.
             continue
-        
-        for record1, record2 in itertools.combinations(records, 2):
-            # For each pair of records which may induce mappings...
             
-            if record1.id == record2.id:
-                # Skip self alignments
-                continue
+        for column in xrange(len(alignment[0])):
+            # For every column, pull out the bases
+            column_bases = alignment[:, column]
             
-            # Where are we on the first sequence?
-            index1 = record1.annotations["start"]
-            # What direction do we go in?
-            delta1 = record1.annotations["strand"]
+            # What per-base tuples will we have?
+            column_tuples = []
             
-            # Where are we on the second sequence?
-            index2 = record2.annotations["start"]
-            # What direction do we go in?
-            delta2 = record2.annotations["strand"]
-            
-            for char1, char2 in itertools.izip(record1, record2):
-                if char1 != "-" and char2 != "-":
-                    # This is an aligned character. Yield a base mapping. We
-                    # only yield each mapping in one direction.
-                    yield (record1.id, index1, record2.id, index2,
-                        (delta1 != delta2))
-                        
-                if char1 != "-":
-                    # Advance in record 1
-                    index1 += delta1
-                if char2 != "-":
-                    # Advance in record 2
-                    index2 += delta2
+            for base, record in itertools.izip(column_bases, alignment):
+                # For each record in the alignment
+                if base == "-":
+                    # Skip stuff that isn't actually aligned here
+                    continue
+                    
+                start_index = record.annotations["start"]
+                delta = record.annotations["strand"]
+                
+                # Put this base in the column, with true for the reverse strand
+                # and false for the forward strand as an orientation.
+                column_tuples.append((record.id, start_index + column * delta,
+                    delta == -1))
+                    
+            if len(column_tuples) > 1:
+                # Send out the column data if there's a real alignment
+                yield column_tuples                    
 
-def classify_mappings(mappings, genes):
+def classify_mappings(columns, genes):
     """
-    Given a source of (contig, base, other contig, other base, orientation)
-    mappings, and a soucre of (contig, start, end, gene name, strand number)
-    genes, yield a (class, gene, other gene, mapping) tuple for each mapping.
+    Given a source of lists of (contig, base, orientation) columns, and a soucre
+    of (contig, start, end, gene name, strand number) genes, yield a (class,
+    gene, other gene) tuple for each class that each column belongs to.
     
     """
     
@@ -154,72 +146,67 @@ def classify_mappings(mappings, genes):
         # Put the gene in under the given interval
         geneTrees[contig].insert(start, end, (gene, strand))
         
-    for mapping in mappings:
-        # Look at each mapping
+    for column in columns:
+        # Look at each column
         
-        if len(mapping) == 5:
+        # Keep track of how many time each gene appears
+        gene_counts = collections.Counter()
         
-            # Unpack the mapping
-            contig1, base1, contig2, base2, orientation = mapping
+        # Get the gene, orientation pairs for each record in the column
+        gene_sets = [set((x, strand) for x in geneTrees[contig].find(base, base))
+            for contig, base, strand in column]
+        
+        for gene_set in gene_sets:
+            # Then total over all the sets of gene, orientation pairs
+            for gene in gene_set:
+                # Count each gene, orientation pair
+                gene_counts[gene] += 1
+        
+        
+        if len(gene_counts) == 0:
+            # No genes found. Try the next column
+            yield ("background", None, None)
+            continue
             
-            # Pull the name, strand tuples for both ends
-            genes1 = set(geneTrees[contig1].find(base1, base1))
-            genes2 = set(geneTrees[contig2].find(base2, base2))
+        # Look at the most common gene/orientation pair and its count
+        top_gene, top_count = gene_counts.most_common(1)[0]
+        
+        if top_count > 1:
+            # Two or more things have this gene in this orientation, so we have
+            # an ortholog mapping.
+            yield ("ortholog", top_gene[0], top_gene[0])
             
-            if orientation:
-                # This is a backwads mapping, so flip orientations on one of the
-                # sets
-                genes2 = {(name, -strand) for name, strand in genes2}
+        if top_count == len(column):
+            # This gene in this orientation appears appear in every aligned
+            # record.
+            continue
             
-            # What gene names should we use to describe this mapping, if any?
+        # Otherwise there's some record it doesn't appear in. Either a paralog
+        # mapping or a mapping to no gene (or a mapping to the same gene in
+        # reverse, which we treat as a paralog mapping).
             
-            # TODO: How many times do genes with different names actually
-            # overlap? I bet never.
+        for gene_set in gene_sets:
+            # So let's look for a record it isn't in
             
-            # Make a set of all the contig1 gene names.
-            gene_names1 = {name for name, _ in genes1}
-            # Make a set of all the contig2 gene names.
-            gene_names2 = {name for name, _ in genes2}
+            if top_gene not in gene_set and len(gene_set) > 0:
+                # We found a gene set without the most common gene/orientation
+                # pair but with some other gene/orientation pair.
+                
+                # Say there's a paralog mapping between the most common gene and
+                # this gene. If their names are the same, their orientations
+                # must differ.
+                yield ("paralog", top_gene[0], list(gene_set)[0][0])
+                break
+                
+        
+        for gene_set in gene_sets:
+            # Let's go again but this time find the first empty gene set.
             
-            if(len(genes1 & genes2)) > 0:
-                # At least one shared gene exists in the right orientation to
-                # explain this mapping.
-                
-                # Grab a plausible gene name.
-                gene_name = next(iter(genes1 & genes2))[0]
-                
-                yield "ortholog", gene_name, gene_name, mapping
-            elif len(genes1) == 0 and len(genes2) > 0:
-                # We mapped a gene to somewhere where there is no gene
-                
-                # Grab a plausible gene name.
-                gene_name = next(iter(gene_names2))
-                
-                yield "unannotated", gene_name, None, mapping
-            
-            elif len(genes1) > 0 and len(genes2) > 0:
-                # We mapped a gene to a place where there are genes, but not the
-                # right gene in the right orientation
-                
-                # Grab a plausible gene name from.
-                gene_from = next(iter(gene_names2))
-                
-                # And where it could be mapped to
-                gene_to = next(iter(gene_names1))
-                
-                yield "paralog", gene_from, gene_to, mapping
-            elif len(genes1) > 0 and len(genes2) == 0:
-                # We mapped a non-gene to somewhere where there are genes
-                
-                # What's a plausible gene name we could be going to?
-                gene_to = next(iter(gene_names1))
-                
-                yield "unannotated", None, gene_to, mapping
-            else:
-                # We mapped a non-gene to somewhere where there are no genes.
-                yield "background", None, None, mapping
-                
-            # OK that's all the cases for mapped bases.
+            if len(gene_set) == 0:
+                # We found a gene set with no genes at all. Say we align
+                # this most common gene to a place with no genes.
+                yield ("unannotated", top_gene[0], None)
+                break
             
 def check_genes(maf_filename, genes_filenames):
     """
@@ -233,27 +220,23 @@ def check_genes(maf_filename, genes_filenames):
     genes = itertools.chain.from_iterable([parse_bed(open(bed)) 
         for bed in genes_filenames])
     
-    # Get all the mappings. Mappings are tuples in the form (reference, 
-    # offset, query, offset, query read name, is backwards). In a maf the
-    # query read name is just the query name.
-    mappings = get_mappings_from_maf(maf_filename)
+    # Get the column iterator, which yields lists of (contig, base, orientation)
+    # tuples.
+    columns = get_columns_from_maf(maf_filename)
     
-    # Classify each mapping in light of the genes, tagging it with a
-    # classiication, and the genes it is from and to (which may be None).
-    classified = classify_mappings(mappings, genes)
+    # Classify each column in light of the genes, spitting out classes and gene
+    # name pairs.
+    classified = classify_mappings(columns, genes)
     
     # This will count up the instances of each class
     class_counts = collections.Counter()
     
     gene_sets = collections.defaultdict(set)
         
-    for classification, gene1, gene2, mapping in classified:
-        # For each classified mapping
+    for classification, gene1, gene2 in classified:
+        # For each classification
         
-        # We have two positions and an orientatin in the mapping.
-        contig1, base1, contig2, base2, orientation = mapping
-        
-        # Record it in its class for its gene pair (which may be Nones)
+        # Count it
         class_counts[classification] += 1
         
         # Record the involved genes
