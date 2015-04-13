@@ -5,7 +5,21 @@ of gene annotations.
 
 Writes a file of <category>\t<count> TSV lines categorizing all the mappings.
 
-TODO: document categories.
+Mapping categories:
+
+"ortholog": when two positions in genes with the same name are mapped together.
+
+"paralog": when two positions in two genes with different names are mapped
+together.
+
+"unannotated": when a position that is in a gene and a position that is not are
+mapped together.
+
+"background": when two positions, neither of which is in a gene, are mapped
+together.
+
+All the pairwise mappings described by the MAF are counted and classified, so a
+MAF column with n non-gap characters will produce n choose 2 mappings.
 
 """
 
@@ -43,33 +57,10 @@ def parse_args(args):
         formatter_class=argparse.RawDescriptionHelpFormatter)
     
     # General options
-    parser.add_argument("--maf", type=argparse.FileType("r"), 
+    parser.add_argument("maf", type=argparse.FileType("r"), 
         help="MAF file of two genomes to read")
-    parser.add_argument("--tsv", type=argparse.FileType("r"),
-        help="TSV file of mappings of reads to load")
     parser.add_argument("--beds", nargs="+", required=True,
         help=".bed file(s) of genes on the genomes in the MAF")
-    parser.add_argument("--gene2wrongBed", type=argparse.FileType("w"),
-        default=None,
-        help=".bed for mappings to the wrong gene")
-    parser.add_argument("--gene2geneBed", type=argparse.FileType("w"),
-        default=None,
-        help=".bed file for mappings to the right gene")
-    parser.add_argument("--non2geneBed", type=argparse.FileType("w"),
-        default=None,
-        help=".bed file for mappings of non-genes to genes")
-    parser.add_argument("--gene2nonBed", type=argparse.FileType("w"),
-        default=None,
-        help=".bed file for mappings of genes to non-genes")
-    parser.add_argument("--non2nonBed", type=argparse.FileType("w"),
-        default=None,
-        help=".bed file for mappings of non-genes to non-genes")
-    parser.add_argument("--gene2unmappedBed", type=argparse.FileType("w"),
-        default=None,
-        help=".bed file for unmapped positions in genes")
-    parser.add_argument("--non2unmappedBed", type=argparse.FileType("w"),
-        default=None,
-        help=".bed file for unmapped positions in non-genes")
     parser.add_argument("--classCounts", type=argparse.FileType("w"),
         default=sys.stdout,
         help="output file to save mapping class counts to")
@@ -102,14 +93,11 @@ def parse_bed(stream):
 
 def get_mappings_from_maf(maf_stream):
     """
-    Given a stream of MAF data between a single reference contig and a single
-    query contig, yield individual base mappings from the alignment.
+    Given a stream of MAF data between two or more contigs, yield individual
+    base mappings from the alignment.
     
     Each mappings is a tuple of (reference contig, reference base, query contig,
-    query base, query read name, is backwards).
-    
-    The query read name is just the query contig name in a MAF.
-    
+    query base, is backwards).
     """
     
     for alignment in AlignIO.parse(maf_stream, "maf"):
@@ -119,34 +107,12 @@ def get_mappings_from_maf(maf_stream):
             # We don't have two sequences aligned here.
             continue
         
-        # Guess the reference and query
-        reference = records[0].id
-        query = None
-        for record in records:
-            if record.id != reference:
-                query = record.id
-                break
-        if query is None:
-            # We have multiple records but no query. This might happen if we
-            # turned things around on purpose, but for now we should fail.
-            raise Exception("Could not find query in {} records".format(
-                len(records)))
-            
-        # This will hold alignment records arranged by the contig they belong
-        # to.
-        records_by_contig = collections.defaultdict(list)
-        
-        for record in records:
-            # Save it to the right list
-            records_by_contig[record.id].append(record)
-            
-            if record.id not in (reference, query):
-                # Complain if we get something not from the reference or query.
-                raise Exception("Extra record: {}".format(record.id))
-            
-        for record1, record2 in itertools.product(records_by_contig[reference],
-            records_by_contig[query]):
+        for record1, record2 in itertools.combinations(records, 2):
             # For each pair of records which may induce mappings...
+            
+            if record1.id == record2.id:
+                # Skip self alignments
+                continue
             
             # Where are we on the first sequence?
             index1 = record1.annotations["start"]
@@ -160,8 +126,9 @@ def get_mappings_from_maf(maf_stream):
             
             for char1, char2 in itertools.izip(record1, record2):
                 if char1 != "-" and char2 != "-":
-                    # This is an aligned character. Yield a base mapping.
-                    yield (reference, index1, query, index2, query,
+                    # This is an aligned character. Yield a base mapping. We
+                    # only yield each mapping in one direction.
+                    yield (record1.id, index1, record2.id, index2,
                         (delta1 != delta2))
                         
                 if char1 != "-":
@@ -170,77 +137,12 @@ def get_mappings_from_maf(maf_stream):
                 if char2 != "-":
                     # Advance in record 2
                     index2 += delta2
-                    
-def get_mappings_from_tsv(tsv_stream):
-    """
-    Given a TSV stream of read mappings like
-    <reference>\t<position>\t<query>\t<position>\t<isBackwards>
-    (or <query>\t<position> for unmapped bases), where the query name is of the
-    form <actual query contig>:<start>-<end>, parse out and yield mappings
-    between the actual full query sequence and the reference.
-    
-    Mappings are of the form (reference, position, query, position, query read
-    name, is backwards), where query is the query contig name, and query read
-    name is the query:start-end name of the read on which the mapping came from.
-    
-    Unmapped positions come out as tuples of the form (query, position, query
-    read name)
-    
-    """
-    
-    for parts in tsv.TsvReader(tsv_stream):
-        if len(parts) == 5:
-            # This base is mapped
-    
-            # Parse out everything
-            # What is the reference we're aligned to?
-            reference_name = parts[0]
-            # Where on it are we?
-            reference_position = int(parts[1])
-            # What is the query we're aligning?
-            query = parts[2]
-            # Where on it are we?
-            query_position = int(parts[3])
-            # Are we aligned to the reverse strand?
-            is_backwards = bool(int(parts[4]))
-            
-            # Parse the query name more
-            query_parts = query.split(":")
-            # What is the name of the orifginal un-split query sequence?
-            query_name = query_parts[0]
-            query_parts = query_parts[1].split("-")
-            # Where on it did this sequence start?
-            query_offset = int(query_parts[0])
-            
-            # Assemble a mapping of the original query sequence and yield it.
-            yield (reference_name, reference_position, query_name, 
-                query_position + query_offset, query, is_backwards)
-        elif len(parts) == 2:
-            # This base is unmapped
-            # Parse out everything
-            # What query holds the base?
-            query = parts[0]
-            # Where on it are we?
-            query_position = int(parts[1])
-            
-            # Parse the query name more
-            query_parts = query.split(":")
-            # What is the name of the orifginal un-split query sequence?
-            query_name = query_parts[0]
-            query_parts = query_parts[1].split("-")
-            # Where on it did this sequence start?
-            query_offset = int(query_parts[0])
-            
-            yield (query_name, query_position + query_offset, query)
-            
 
 def classify_mappings(mappings, genes):
     """
-    Given a source of (contig, base, other contig, other base, query read label,
-    orientation) or (other contig, other base, query read label) mappings (in
-    reference, query order), and a soucre of (contig, start, end, gene name,
-    strand number) genes, yield a (class, fromGene, toGene, mapping) tuple for
-    each mapping.
+    Given a source of (contig, base, other contig, other base, orientation)
+    mappings, and a soucre of (contig, start, end, gene name, strand number)
+    genes, yield a (class, gene, other gene, mapping) tuple for each mapping.
     
     """
     
@@ -255,10 +157,10 @@ def classify_mappings(mappings, genes):
     for mapping in mappings:
         # Look at each mapping
         
-        if len(mapping) == 6:
+        if len(mapping) == 5:
         
             # Unpack the mapping
-            contig1, base1, contig2, base2, query_read, orientation = mapping
+            contig1, base1, contig2, base2, orientation = mapping
             
             # Pull the name, strand tuples for both ends
             genes1 = set(geneTrees[contig1].find(base1, base1))
@@ -269,19 +171,14 @@ def classify_mappings(mappings, genes):
                 # sets
                 genes2 = {(name, -strand) for name, strand in genes2}
             
-            # Reference was first, so we want to see if the genes we were
-            # supposed to have in the query were recapitulated in the right
-            # orientation in the reference.
-            
-            # What gene names from the query should we use to describe this
-            # mapping, if any?
+            # What gene names should we use to describe this mapping, if any?
             
             # TODO: How many times do genes with different names actually
             # overlap? I bet never.
             
-            # Make a set of all the reference gene names.
+            # Make a set of all the contig1 gene names.
             gene_names1 = {name for name, _ in genes1}
-            # Make a set of all the query gene names.
+            # Make a set of all the contig2 gene names.
             gene_names2 = {name for name, _ in genes2}
             
             if(len(genes1 & genes2)) > 0:
@@ -291,14 +188,14 @@ def classify_mappings(mappings, genes):
                 # Grab a plausible gene name.
                 gene_name = next(iter(genes1 & genes2))[0]
                 
-                yield "gene2gene", gene_name, gene_name, mapping
+                yield "ortholog", gene_name, gene_name, mapping
             elif len(genes1) == 0 and len(genes2) > 0:
                 # We mapped a gene to somewhere where there is no gene
                 
                 # Grab a plausible gene name.
                 gene_name = next(iter(gene_names2))
                 
-                yield "gene2non", gene_name, None, mapping
+                yield "unannotated", gene_name, None, mapping
             
             elif len(genes1) > 0 and len(genes2) > 0:
                 # We mapped a gene to a place where there are genes, but not the
@@ -310,39 +207,65 @@ def classify_mappings(mappings, genes):
                 # And where it could be mapped to
                 gene_to = next(iter(gene_names1))
                 
-                yield "gene2wrong", gene_from, gene_to, mapping
+                yield "paralog", gene_from, gene_to, mapping
             elif len(genes1) > 0 and len(genes2) == 0:
                 # We mapped a non-gene to somewhere where there are genes
                 
                 # What's a plausible gene name we could be going to?
                 gene_to = next(iter(gene_names1))
                 
-                yield "non2gene", None, gene_to, mapping
+                yield "unannotated", None, gene_to, mapping
             else:
                 # We mapped a non-gene to somewhere where there are no genes.
-                yield "non2non", None, None, mapping
+                yield "background", None, None, mapping
                 
             # OK that's all the cases for mapped bases.
             
-        elif len(mapping) == 3:
-            # Unpack the mapping (numbered 2 for consistency with above)
-            contig2, base2, query_read = mapping
+def check_genes(maf_filename, genes_filenames):
+    """
+    Given a MAF filename, and a list of BED filenames holding genes, return a
+    Counter from class name to count of mappings in that class, and a
+    defaultdict from class to a set of gene names involved in each.
+    
+    """
+    
+    # Load all the BEDs, and concatenate them
+    genes = itertools.chain.from_iterable([parse_bed(open(bed)) 
+        for bed in genes_filenames])
+    
+    # Get all the mappings. Mappings are tuples in the form (reference, 
+    # offset, query, offset, query read name, is backwards). In a maf the
+    # query read name is just the query name.
+    mappings = get_mappings_from_maf(maf_filename)
+    
+    # Classify each mapping in light of the genes, tagging it with a
+    # classiication, and the genes it is from and to (which may be None).
+    classified = classify_mappings(mappings, genes)
+    
+    # This will count up the instances of each class
+    class_counts = collections.Counter()
+    
+    gene_sets = collections.defaultdict(set)
+        
+    for classification, gene1, gene2, mapping in classified:
+        # For each classified mapping
+        
+        # We have two positions and an orientatin in the mapping.
+        contig1, base1, contig2, base2, orientation = mapping
+        
+        # Record it in its class for its gene pair (which may be Nones)
+        class_counts[classification] += 1
+        
+        # Record the involved genes
+        if gene1 is not None:
+            gene_sets[classification].add(gene1)
+        if gene2 is not None:
+            gene_sets[classification].add(gene2)
             
-            # Pull a set of name, strand pairs for this position
-            genes2 = set(geneTrees[contig2].find(base2, base2))
-            
-            # Pull out just the names
-            gene_names = [name for name, _ in genes2]
-            
-            # Grab a plausible gene name if we have one.
-            gene_name = gene_names[0] if len(gene_names) > 0 else None
-            
-            if gene_name is None:
-                # No gene was here.
-                yield "non2unmapped", None, None, mapping
-            else:
-                # There was a gene here. Report it.
-                yield "gene2unmapped", gene_name, None, mapping
+        
+    # Return the counts and the gene sets
+    return class_counts, gene_sets
+    
             
 
 def main(args):
@@ -354,142 +277,22 @@ def main(args):
     
     options = parse_args(args) # This holds the nicely-parsed options object
     
-    # Make a dict from class to BED output stream, or None
-    class_beds = collections.defaultdict(lambda: None)
+    # This will count up the instances of each class, and the genes involved in
+    # each class
+    class_counts, gene_sets = check_genes(options.maf, options.beds)
     
-    # Populate it with TSV writers for the streams from the options
-    # TODO: this is awkward and needs a map-over-option like Scala.
-    class_beds["gene2wrong"] = tsv.TsvWriter(options.gene2wrongBed) \
-        if options.gene2wrongBed is not None else None
-    class_beds["gene2gene"] = tsv.TsvWriter(options.gene2geneBed) \
-        if options.gene2geneBed is not None else None
-    class_beds["gene2non"] = tsv.TsvWriter(options.gene2nonBed) \
-        if options.gene2nonBed is not None else None
-    class_beds["gene2unmapped"] = tsv.TsvWriter(options.gene2unmappedBed) \
-        if options.gene2unmappedBed is not None else None
-    class_beds["non2gene"] = tsv.TsvWriter(options.non2geneBed) \
-        if options.non2geneBed is not None else None
-    class_beds["non2non"] = tsv.TsvWriter(options.non2nonBed) \
-        if options.non2nonBed is not None else None
-    class_beds["non2unmapped"] = tsv.TsvWriter(options.non2unmappedBed) \
-        if options.non2unmappedBed is not None else None
-    
-    # Make a writer for gene set output
-    gene_set_writer = tsv.TsvWriter(options.geneSets)
-    
-    # Load all the BEDs, and concatenate them
-    genes = itertools.chain.from_iterable([parse_bed(open(bed)) 
-        for bed in options.beds])
-    
-    if options.maf is not None:
-        # Get all the mappings. Mappings are tuples in the form (reference, 
-        # offset, query, offset, query read name, is backwards). In a maf the
-        # query read name is just the query name.
-        mappings = get_mappings_from_maf(options.maf)
-    elif options.tsv is not None:
-        # Get all the mappings by re-assembling reads mapped in a TSV
-        mappings = get_mappings_from_tsv(options.tsv)
-    else:
-        # TODO make argparse check this
-        raise Exception("No mappings provided")
-        
-    
-    # Classify each mapping in light of the genes, tagging it with a
-    # classiication, and the genes it is from and to (which may be None).
-    classified = classify_mappings(mappings, genes)
-    
-    # This will count up the instances of each class, by source and destination
-    # gene.
-    class_counts = collections.defaultdict(lambda: collections.defaultdict(
-        collections.Counter))
-    
-    # This maps from classification, source gene, and gene mapped to to genome
-    # set that has that mapping.
-    gene_sets = collections.defaultdict(lambda: collections.defaultdict(
-        lambda: collections.defaultdict(set)))
-    
-    # This set keeps track of the names of the query reads in which we have
-    # observed any mappings.
-    mapped_queries = set()
-    
-    # We also want the total queries
-    total_queries = set()
-    
-    for classification, gene_from, gene_to, mapping in classified:
-        # For each classified mapping
-        
-        # Unpack the mapping
-        if len(mapping) == 6:
-            # We have query and reference positions
-            _, _, contig2, base2, query_read, _ = mapping
-            
-            # Note that we had a mapping in this query read
-            mapped_queries.add(query_read)
-        elif len(mapping) == 3:
-            # We only have the query position
-            contig2, base2, query_read = mapping
-            
-        # Record that this read existed
-        total_queries.add(query_read)
-            
-        # Record it in its class for its gene pair (which may be Nones)
-        class_counts[classification][gene_from][gene_to] += 1
-        
-        if class_beds[classification] is not None:
-            # We want to write a BED of this class.
-            
-            # Dump a BED record in query coordinates, named after the gene we
-            # mapped to.
-            class_beds[classification].line(contig2, base2, base2 + 1,
-                gene_to)
-                
-        # Note that this mapped genome has some bases mapping from this one gene
-        # to this other gene (either of which may be None).
-        gene_sets[classification][gene_from][gene_to].add(contig2)
-        
-        
-    
-    for classification, count_by_source in class_counts.iteritems():
+    for classification, count in class_counts.iteritems():
         # For each class
         
-        # Sum over all the gene pairs
-        total = 0
-        for count_by_destination in count_by_source.itervalues():
-            # Over all from genes
-            for count in count_by_destination.itervalues():
-                # And over all to genes
-                total += count
-        
         # Dump a TSV of base counts (over all gene pairs) by classification
-        options.classCounts.write("{}\t{}\n".format(classification, total))
+        options.classCounts.write("{}\t{}\n".format(classification, count))
         
-    # Add in a fake class for total query contigs mapped
-    options.classCounts.write("!queriesMapped\t{}\n".format(len(
-        mapped_queries)))
-    # And in total
-    options.classCounts.write("!queriesTotal\t{}\n".format(len(total_queries)))
-        
-    for classification, gene_mappings in gene_sets.iteritems():
-        # For each set of query genes with mappings in a class
-        
-        for gene, other_genes in gene_mappings.iteritems():
-            # For each gene, and the other genes it was observed mapping to...
-            
-            for other_gene, genome_set in other_genes.iteritems():
-                # For each other gene it was mapped to, and the genomes in which
-                # that mapping appeared...
-                
-                # How many mappings in this category between these genes were
-                # there?
-                mapping_count = class_counts[classification][gene][other_gene]
-                
-                # Save the mapping, and the count and genome list. You can just
-                # sum up all the mapping counts for a source gene, and break
-                # them down reasonably by classification, since each read base
-                # gets counted exactly once.
-                gene_set_writer.line(classification, gene, other_gene,
-                    mapping_count, ",".join(sorted(genome_set)))
-                
+    for classification, genes in gene_sets.iteritems():
+        # For each class
+        for gene in genes:
+            # For each gene, say it has some mappings in the class.
+            options.geneSets.write("{}\t{}\n".format(classification, gene))
+    
 
 if __name__ == "__main__" :
     sys.exit(main(sys.argv))

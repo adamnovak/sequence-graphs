@@ -6,7 +6,7 @@ and metrics.
 """
 
 import argparse, sys, os, os.path, random, subprocess, shutil, itertools
-import collections, csv
+import collections, csv, tempfile
 
 import doctest, pprint
 
@@ -19,8 +19,6 @@ from Bio.SeqRecord import SeqRecord
 # We need yet another comprehensive bio library in Python since BioPython hasn't
 # got interval trees.
 from bx.intervals import IntervalTree
-
-
 
 def parse_args(args):
     """
@@ -43,6 +41,8 @@ def parse_args(args):
     # General options
     parser.add_argument("hal",
         help="HAL file to evaluate")
+    parser.add_argument("--beds", nargs="*",
+        help=".bed file(s) of genes on the genomes in the HAL")
     
     # The command line arguments start with the program name, which we don't
     # want to treat as an argument for argparse. So we remove it.
@@ -135,7 +135,26 @@ def metric_halstats(hal_filename):
     
     # Return the results
     return parsed
-
+    
+def hal2maf(hal_filename):
+    """
+    Convert the HAL at the given filename to a MAF in a temporary file. Returns
+    the name of the temp file, which must be deleted by the caller.
+    
+    hal2maf must be installed and on the PATH.
+    
+    """
+    
+    # Make a temporary file
+    handle, maf_filename = tempfile.mkstemp()
+    os.close(handle)
+    
+    # Run the conversion
+    subprocess.check_call(["hal2maf", hal_filename, maf_filename])
+    
+    # Return the filename of the MAF
+    return maf_filename
+    
 def main(args):
     """
     Parses command line arguments and do the work of the program.
@@ -152,9 +171,21 @@ def main(args):
     # Print the halStats output
     pprint.pprint(metric_halstats(options.hal))
     
-    
-    
-                
+    if options.beds is not None:
+
+        # We want to do the checkGenes stuff, so we need a MAF
+        maf_filename = hal2maf(options.hal)
+        
+        import checkGenes
+        class_counts, gene_sets = checkGenes.check_genes(maf_filename,
+            options.beds)
+            
+        # Clean up the MAF
+        os.unlink(maf_filename)
+        
+        # Print the output
+        pprint.pprint(class_counts)
+        pprint.pprint(gene_sets)
 
 if __name__ == "__main__" :
     sys.exit(main(sys.argv))
