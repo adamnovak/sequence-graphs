@@ -8,6 +8,8 @@ and metrics.
 import argparse, sys, os, os.path, random, subprocess, shutil, itertools
 import collections, csv
 
+import doctest, pprint
+
 import tsv
 
 from Bio import AlignIO, SeqIO, Align
@@ -48,13 +50,68 @@ def parse_args(args):
         
     return parser.parse_args(args)
     
-def metric_halstats(hal_filename):
+def parse_halstats_output(stream):
     """
-    A metric that runs halStats on the given HAL, and returns the results.
+    Parse the output of halStats on a HAL file, from the given iterable.
     
     Returns a list of dicts from halStats column header (GenomeName,
     NumChildren, Length, NumSequences, NumTopSegments, NumBottomSegments) to
     string or int value as appropriate.
+    
+    >>> lines = ["hal v2.1",
+    ... "(GI568335879,ref)rootSeq;",
+    ... "",
+    ... "GenomeName, NumChildren, Length, NumSequences, NumTopSegments, "
+    ... "NumBottomSegments",
+    ... "rootSeq, 10, 5524595, 1, 0, 67141",
+    ... "GI568335879, 0, 4672374, 1, 25067, 0",
+    ... "ref, 0, 4970457, 1, 49220, 0",
+    ... ""]
+    >>> parsed = list(parse_halstats_output(lines))
+    >>> len(parsed)
+    3
+    >>> parsed[1]["GenomeName"]
+    'GI568335879'
+    >>> parsed[0]["Length"]
+    5524595
+
+    """
+    
+    # Get a reader and skip the first 3 lines
+    reader = csv.reader(stream)
+    for i in xrange(3):
+        next(reader)
+        
+    # Read the table header
+    header = [x.strip() for x in next(reader)]
+    
+    for data in reader:
+        if len(data) == 0:
+            # We finished the table
+            break
+        
+        elif len(data) != len(header):
+            raise RuntimeError("Got {} fields for {} columns".format(len(data),
+                len(header)))
+                
+        # Drop all the whitespace
+        data = [x.strip() for x in data]
+            
+        # We'll fill in a dict with all the type-auto-detected values for each
+        # column. We convert to int if a field is all digits (which is fine
+        # since nothing will be negative).
+        record = dict(zip(header, [int(x) if x.isdigit() else x for x in data]))
+            
+        # Yield each record as we parse it
+        yield record
+        
+    
+    
+def metric_halstats(hal_filename):
+    """
+    A metric that runs halStats on the given HAL, and returns the results.
+    
+    
     
     The halStats program must be on the PATH.
     
@@ -66,38 +123,17 @@ def metric_halstats(hal_filename):
     # Open the process
     process = subprocess.Popen(args, stdout=subprocess.PIPE)
         
-    # Get a reader and skip the first 3 lines
-    reader = csv.reader(process.stdout)
-    for i in xrange(2):
-        next(reader)
-        
-    # Read the table header
-    header = next(reader)
-    
-    # This is the list of dicts we will populate
-    records = []
-        
-    for data in csv.reader(process.stdout):
-        if len(data) == 0:
-            # We finished the table
-            break
-        
-        elif len(data) != len(header):
-            raise RuntimeError("Table width mismatch!")
+    # Parse the results
+    parsed = list(parse_halstats_output(process.stdout))
             
-        # We'll fill in a dict with all the type-auto-detected values for each
-        # column. We convert to int if a field is all digits (which is fine
-        # since nothing will be negative).
-        record = dict(zip(header, [int(x) if x.isdigit() else x for x in data]))
-            
-        # Put it in the list
-        records.append(record)
-        
     if process.wait() != 0:
         raise RuntimeError("halStats failed")
             
     # We are done with this process.
     process.stdout.close()
+    
+    # Return the results
+    return parsed
 
 def main(args):
     """
@@ -105,6 +141,10 @@ def main(args):
     "args" specifies the program arguments, with args[0] being the executable
     name. The return value should be used as the program's exit code.
     """
+    
+    if len(args) == 2 and args[1] == "--test":
+        # Run the tests
+        return doctest.testmod(optionflags=doctest.NORMALIZE_WHITESPACE)
     
     options = parse_args(args) # This holds the nicely-parsed options object
     
