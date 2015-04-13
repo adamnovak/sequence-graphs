@@ -58,7 +58,8 @@ def parse_halstats_output(stream):
     NumChildren, Length, NumSequences, NumTopSegments, NumBottomSegments) to
     string or int value as appropriate.
     
-    >>> lines = ["hal v2.1",
+    >>> lines = ["",
+    ... "hal v2.1",
     ... "(GI568335879,ref)rootSeq;",
     ... "",
     ... "GenomeName, NumChildren, Length, NumSequences, NumTopSegments, "
@@ -77,13 +78,17 @@ def parse_halstats_output(stream):
 
     """
     
-    # Get a reader and skip the first 3 lines
+    # Get a reader and skip the first 4 lines
     reader = csv.reader(stream)
-    for i in xrange(3):
-        next(reader)
+    for i in xrange(4):
+       next(reader)
         
-    # Read the table header
-    header = [x.strip() for x in next(reader)]
+    # Read the table header with the field names, which is the next nonempty
+    # line.
+    header = next(reader)
+    
+    # Throw out whitespace
+    header = [x.strip() for x in header]
     
     for data in reader:
         if len(data) == 0:
@@ -105,13 +110,9 @@ def parse_halstats_output(stream):
         # Yield each record as we parse it
         yield record
         
-    
-    
 def metric_halstats(hal_filename):
     """
     A metric that runs halStats on the given HAL, and returns the results.
-    
-    
     
     The halStats program must be on the PATH.
     
@@ -147,6 +148,11 @@ def main(args):
         return doctest.testmod(optionflags=doctest.NORMALIZE_WHITESPACE)
     
     options = parse_args(args) # This holds the nicely-parsed options object
+    
+    # Print the halStats output
+    pprint.pprint(metric_halstats(options.hal))
+    
+    
     
                 
 
