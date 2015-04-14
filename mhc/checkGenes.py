@@ -249,7 +249,7 @@ def check_genes(maf_filename, genes_filenames):
     # This will count up the instances of each class
     class_counts = collections.Counter()
     
-    # Tjis will contain sets of genes with any columns in each class
+    # This will contain sets of genes with any columns in each class
     gene_sets = collections.defaultdict(set)
     
     # This will contain sets of gene pairs aligned together
