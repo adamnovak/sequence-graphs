@@ -100,17 +100,13 @@ def get_region_sequences(region_name, assembly_root):
             # Give its sequence ID/accession with version (column 3) and the
             # assembly unit name
             yield parts[3], parts[0]
-    
-    
-    
-def get_gi_number(grc_id):
+
+def get_record_by_grc(grc_id):
     """
-    Given a GRC-style (genbank) ID with version, like "CM000663.2" or
-    "GL383549.1" or "KI270832.1", get the GI number associated with that ID from
-    Entrez.
+    Given a GRC ID, return the Entrez nucleotide DocSum record.
     
     """
-    
+
     # First just search the ID as a search term.
     search_results = Entrez.read(Entrez.esearch("nucleotide", term=grc_id))
     
@@ -127,6 +123,65 @@ def get_gi_number(grc_id):
     # Actually download that record
     record = Entrez.read(Entrez.esummary(db="nucleotide",
         webenv=first_handle["WebEnv"], query_key=first_handle["QueryKey"]))[0]
+        
+    # Return it
+    return record
+    
+def get_ucsc_name(grc_id, alt_parent_grc_id=None):
+    """
+    Given a GRC-style (genbank) ID with version, like "CM000663.2" or
+    "GL383549.1" or "KI270832.1", get the UCSC name for that sequence, like
+    "chr6_GL000252v2_alt".
+    
+    If the sequence is an alt, the GRC id of its parent chromosome must be
+    specified.
+    
+    """
+    
+    if alt_parent_grc_id is None:
+        # Simple case; it's a primary chromosome.
+        
+        # Fetch the record
+        record = get_record_by_grc(grc_id)
+        
+        # Parse out all the "extra" fields
+        extra_parts = record["Extra"].split("|")
+        
+        # Find the "gnl" key
+        gnl_index = extra_parts.index("gnl")
+        
+        # The chromosome number/letter is two fields later.
+        chromosome_character = extra_parts[gnl_index + 2]
+        
+        # Make it chrThat
+        ucsc_name = "chr{}".format(chromosome_character)
+        
+    else:
+        # We do have a parent. Get its UCSC name.
+        parent_name = get_ucsc_name(alt_parent_grc_id)
+        
+        # Convert from .2 or whatever to v2 or whatever
+        name_middle = grc_id.replace(".", "v")
+        
+        # Put them in the name pattern template to generate the name
+        ucsc_name = "{}_{}_alt".format(parent_name, name_middle)
+        
+    # Report the result
+    print("{} is {} at UCSC".format(grc_id, ucsc_name))
+    return ucsc_name
+        
+        
+    
+def get_gi_number(grc_id):
+    """
+    Given a GRC-style (genbank) ID with version, like "CM000663.2" or
+    "GL383549.1" or "KI270832.1", get the GI number associated with that ID from
+    Entrez.
+    
+    """
+    
+    # Go fetch the record
+    record = get_record_by_grc(grc_id)
         
     print("{} = {}".format(grc_id, record["Gi"]))
         
@@ -197,7 +252,82 @@ def download_gff3(ref_acc, alt_acc, alt_unit, assembly_root, out_filename):
         # Copy everything to the output file as in
         # <http://stackoverflow.com/a/5397438/402891>
         shutil.copyfileobj(in_stream, out_stream)
+        
+def get_genes(grc_id, out_name, start=0, end=None, alt_parent_grc_id=None,
+    db="hg38"):
+    """
+    Given a GRC ID (like "CM000663.2"), the name of the contig on which to
+    report the genes, optional start and end coordinates (0-based) and the GRC
+    ID of the parent chromosome if it is an alt, yield BED lines for all the
+    genes in the specified region.
     
+    If start is specified, coordinates will be given relative to that position.
+    
+    Assumes "hgsql" is installed and configured and available on the PATH.
+    
+    Uses the hg38 database unless told otherwise.
+    
+    All inputs must be trusted and not permitted to contain SQL injection.
+    
+    """
+    
+    # Get the name to look up in the database.
+    query_contig = get_ucsc_name(grc_id, alt_parent_grc_id)
+    
+    # Spec out the query. TODO: Can I not say the database name constantly?
+    query_parts = ["SELECT \"", out_name, "\", ", db, ".knownGene.txStart - ", 
+        start, ", ", db, ".knownGene.txEnd - ", start, ", ", db, 
+        ".kgXref.geneSymbol, 0, ", db, ".knownGene.strand FROM ", db, 
+        ".knownGene LEFT OUTER JOIN ", db, ".kgXref ON ", db, 
+        ".knownGene.name = ", db, ".kgXref.kgID WHERE ", db, 
+        ".knownGene.txStart != ", db, ".knownGene.cdsStart AND ", db, 
+        ".knownGene.chrom = \"", query_contig, "\" AND ", db, 
+        ".knownGene.txStart >= ", start]
+    
+    if end is not None:
+        # Require the end criterion to be met too.
+        query_parts += [" AND ", db, ".knownGene.txEnd < ", end]
+    
+    # Finish off the query.
+    query_parts.append(";")
+    
+    # Put together the whole query.
+    query = "".join([str(part) for part in query_parts])
+    
+    # Build the hgsql command line
+    args = ["hgsql", "-e",  query]
+    
+    # Open the process
+    process = subprocess.Popen(args, stdout=subprocess.PIPE)
+        
+    for line in itertools.islice(process.stdout, 1, None):
+        # For all lines except the first, yield them because they are BED lines.
+        yield line
+            
+    if process.wait() != 0:
+        raise RuntimeError("hgsql")
+            
+    # We are done with this process.
+    process.stdout.close()
+    
+def open_gene_bed(region, sequence_id):
+    """
+    Given the region name and the sequence ID ("ref" or "GI<whatever>") for a
+    sequence, give back an output file object to which a BED of the genes in
+    that sequence may be written.
+    
+    """
+    
+    # Each bed goes in a folder named after its sequence, so hal2assemblyHub can
+    # use it.
+    bed_dir = "{}/genes/{}".format(region, sequence_id)
+    
+    if not os.path.exists(bed_dir):
+        # Make sure we have a place to put the genes
+        os.makedirs(bed_dir)
+    
+    # Open a bed file in there for writing and return it.
+    return open(bed_dir + "/genes.bed", "w")
     
 def main(args):
     """
@@ -255,6 +385,18 @@ def main(args):
     # Write a chromosome size entry for the reference by its accession
     acc_chrom_sizes.line(ref_acc, get_length(ref_gi))
     
+    print("Writing genes for ref")
+    
+    # Make a BED to put reference genes in
+    ref_bed = open_gene_bed(options.region, "ref") 
+    
+    for line in get_genes(ref_acc, "ref", ref_start, ref_end):
+        # Write all the BED lines for the appropriate region of the reference to
+        # that file.
+        ref_bed.write(line)
+        
+    ref_bed.close()
+    
     for alt_acc, alt_unit in get_region_sequences(options.region,
         options.assembly_url):
         # For every alt in the region
@@ -300,6 +442,18 @@ def main(args):
         # Edit the output to point to the GI instead of the accession
         subprocess.check_call(["sed", "-i", "s/{}/GI{}/g".format(alt_acc,
             alt_gi), alt_psl])
+            
+        print("Writing genes for GI{}".format(alt_gi))
+    
+        # Make a BED to put alt genes in
+        alt_bed = open_gene_bed(options.region, "GI{}".format(alt_gi)) 
+        
+        for line in get_genes(alt_acc, "GI{}".format(alt_gi),
+            alt_parent_grc_id=ref_acc):
+            # Write all the BED lines for the alt to the file
+            alt_bed.write(line)
+            
+        alt_bed.close()
        
     # Now we need to do psl2maf, complete with globbing.
             
