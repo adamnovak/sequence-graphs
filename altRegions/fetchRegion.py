@@ -210,7 +210,7 @@ def get_length(gi_id):
 def get_sequence(gi_id, start=None, end=None):
     """
     Get a sequence by numerical GI number, optionally with start and end
-    parameters (in 0-based (?) coordinates from the left). If start is
+    parameters (in 1-based coordinates from the left). If start is
     specified, end must also be specified.
     
     """
@@ -253,11 +253,11 @@ def download_gff3(ref_acc, alt_acc, alt_unit, assembly_root, out_filename):
         # <http://stackoverflow.com/a/5397438/402891>
         shutil.copyfileobj(in_stream, out_stream)
         
-def get_genes(grc_id, out_name, start=0, end=None, alt_parent_grc_id=None,
+def get_genes(grc_id, out_name, start=1, end=None, alt_parent_grc_id=None,
     db="hg38"):
     """
     Given a GRC ID (like "CM000663.2"), the name of the contig on which to
-    report the genes, optional start and end coordinates (0-based) and the GRC
+    report the genes, optional start and end coordinates (1-based) and the GRC
     ID of the parent chromosome if it is an alt, yield BED lines for all the
     genes in the specified region.
     
@@ -270,6 +270,9 @@ def get_genes(grc_id, out_name, start=0, end=None, alt_parent_grc_id=None,
     All inputs must be trusted and not permitted to contain SQL injection.
     
     """
+    
+    # Convert to 0-based not-end-inclusive coordinates.
+    start -= 1
     
     # Get the name to look up in the database.
     query_contig = get_ucsc_name(grc_id, alt_parent_grc_id)
@@ -341,7 +344,8 @@ def main(args):
     # Set Entrez e-mail
     Entrez.email = options.email
     
-    # Go get the region of the reference we're talking about
+    # Go get the region of the reference we're talking about. Starts and ends
+    # are 1-based.
     ref_acc, ref_start, ref_end = get_region_info(options.region,
         options.assembly_url)
         
@@ -357,21 +361,21 @@ def main(args):
     # Get the reference's GI
     ref_gi = get_gi_number(ref_acc)
     
-    print("Reference for {} is GI{}:{}-{}".format(options.region, ref_gi,
-        ref_start, ref_end))
+    print("Reference for {} is GI{}:{}-{} 1-based".format(options.region,
+        ref_gi, ref_start, ref_end))
     
     # Grab the reference sequence
     ref_seq = get_sequence(ref_gi, ref_start, ref_end)
     
     print("Got {}bp for a {}bp reference".format(len(ref_seq),
-        ref_end - ref_start))
+        ref_end - ref_start + 1))
         
         
-    if len(ref_seq) > ref_end - ref_start:
+    if len(ref_seq) > ref_end - ref_start + 1:
         # Clip it down if it's too long. Assuming we have the correct sort of
         # coordinates, and that we got served the data starting at the correct
         # offset.
-        ref_seq = ref_seq[0:ref_end - ref_start]
+        ref_seq = ref_seq[0:ref_end - ref_start + 1]
     elif len(ref_seq) < ref_end - ref_start:
         raise RuntimeError("Didn't get enough sequence from the API!")
     
