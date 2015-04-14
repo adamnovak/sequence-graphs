@@ -118,6 +118,11 @@ def get_columns_from_maf(maf_stream):
                     # Skip stuff that isn't actually aligned here
                     continue
                     
+                if record.id == "rootSeq":
+                    # This record is fake. TODO: decide how to configure this
+                    # sanely.
+                    continue
+                    
                 start_index = record.annotations["start"]
                 delta = record.annotations["strand"]
                 
@@ -143,7 +148,7 @@ def classify_mappings(columns, genes):
     geneTrees = collections.defaultdict(IntervalTree)
     
     for contig, start, end, gene, strand in genes:
-        # Put the gene in under the given interval
+        # Put the gene in under the given interval, with strands 1 and -1.
         geneTrees[contig].insert(start, end, (gene, strand))
         
     for column in columns:
@@ -153,9 +158,21 @@ def classify_mappings(columns, genes):
         gene_counts = collections.Counter()
         
         # Get the gene, orientation pairs for each record in the column
-        gene_sets = [set((x, strand) for x in geneTrees[contig].find(base, base))
-            for contig, base, strand in column]
+        gene_sets = []
         
+        for contig, base, strand in column:
+            # For each position in the column, see what genes in what
+            # orientations are there.
+            genes_found = geneTrees[contig].find(base, base)
+            
+            # Put them in the opposite direction if we need to based on the
+            # strand of the position we mapped to.
+            genes_found = {(name, orientation if not strand else -orientation)
+                for name, orientation in genes_found}
+        
+            # Save the set of gene, strand pairs.
+            gene_sets.append(genes_found)
+                    
         for gene_set in gene_sets:
             # Then total over all the sets of gene, orientation pairs
             for gene in gene_set:
@@ -211,8 +228,9 @@ def classify_mappings(columns, genes):
 def check_genes(maf_filename, genes_filenames):
     """
     Given a MAF filename, and a list of BED filenames holding genes, return a
-    Counter from class name to count of mappings in that class, and a
-    defaultdict from class to a set of gene names involved in each.
+    Counter from class name to count of mappings in that class, a defaultdict
+    from class to a set of gene names involved in each, and a set of gene name
+    pairs that align together.
     
     """
     
@@ -231,7 +249,11 @@ def check_genes(maf_filename, genes_filenames):
     # This will count up the instances of each class
     class_counts = collections.Counter()
     
+    # Tjis will contain sets of genes with any columns in each class
     gene_sets = collections.defaultdict(set)
+    
+    # This will contain sets of gene pairs aligned together
+    gene_pairs = set()
         
     for classification, gene1, gene2 in classified:
         # For each classification
@@ -245,9 +267,17 @@ def check_genes(maf_filename, genes_filenames):
         if gene2 is not None:
             gene_sets[classification].add(gene2)
             
+        if gene1 > gene2:
+            # Make sure genes are sorted.
+            gene1, gene2 = gene2, gene1
+            
+        if (gene1, gene2) not in gene_pairs:
+            print("{} aligns to {}".format(gene1, gene2))
+            gene_pairs.add((gene1, gene2))
+            
         
-    # Return the counts and the gene sets
-    return class_counts, gene_sets
+    # Return the counts and the gene sets and the confusion pairs
+    return class_counts, gene_sets, gene_pairs
     
             
 

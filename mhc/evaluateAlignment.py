@@ -177,8 +177,8 @@ def main(args):
         maf_filename = hal2maf(options.hal)
         
         import checkGenes
-        class_counts, gene_sets = checkGenes.check_genes(maf_filename,
-            options.beds)
+        class_counts, gene_sets, gene_pairs = checkGenes.check_genes(
+            maf_filename, options.beds)
             
         # Clean up the MAF
         os.unlink(maf_filename)
@@ -186,6 +186,7 @@ def main(args):
         # Print the output
         pprint.pprint(class_counts)
         pprint.pprint(gene_sets)
+        pprint.pprint(gene_pairs)
 
 if __name__ == "__main__" :
     sys.exit(main(sys.argv))
