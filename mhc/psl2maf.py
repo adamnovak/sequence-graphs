@@ -6,6 +6,8 @@ sequence, and the alignment to that reference is used to induce the multiple
 alignment (i.e. nothing in the other sequences will align except as mediated by
 alignment to the reference).
 
+TODO: sanke_case this file.
+
 """
 
 import argparse, sys, os, os.path, random, subprocess, shutil, itertools
@@ -35,7 +37,8 @@ def parse_args(args):
     # General options
     parser.add_argument("--psls", nargs="+", required=True, 
         help="PSL file(s) to convert")
-    parser.add_argument("--maf", type=argparse.FileType("w"), 
+    parser.add_argument("--maf", type=argparse.FileType("w"),
+        default=sys.stdout,
         help="MAF file to save output to")
     parser.add_argument("--fastas", nargs="+", required=True,
         help=".fasta file(s) to obtain sequence from")
@@ -264,8 +267,8 @@ def main(args):
         
         raise ValueError("No sequence {} in any FASTA".format(name))
     
-    # Make a multiple alignment that will align all the sequences.
-    totalMSA = None
+    # We're going to put all the MSAs in here.
+    allMSAs = []
         
     for psl in options.psls:
         print("Processing {}".format(psl))
@@ -296,111 +299,6 @@ def main(args):
                 hitID = hit.id
                 hitSeqRecord = getSequence(hitID)
                 
-                # This is going to hold an MSA that we append onto
-                global hitMSA
-                hitMSA = None
-                # Where does the alignment end in the query sequence?
-                global hitMSAQueryPos
-                hitMSAQueryPos = 0
-                # And in the hit sequence?
-                global hitMSAHitPos
-                hitMSAHitPos = 0
-
-                def appendMSA(newMSA, hitStart, queryStart):
-                    """
-                    Adjoin a new MultipleSeqAlignment, which starts at the given
-                    index in the hit and the other given index in the query, to
-                    the right of the current one for the hit, padding with
-                    gapped/unaligned sequence if necessary.
-                    
-                    The MSA must have the hit first and the query second. If the
-                    MSA is None, the alignment is padded out to the given
-                    lengths in each sequence.
-                    
-                    Indexes are assumed to be on whatever strand would make them
-                    go up as new MSAs are added.
-                    
-                    TODO: Handle reverse strand right. It's not really possible
-                    in MultipleSeqAlignment.
-                    
-                    """
-                    
-                    # TODO: This needs to be in some sort of positioned-partial-
-                    # alignment object.
-                    global hitMSA
-                    global hitMSAQueryPos
-                    global hitMSAHitPos
-                    
-                    # Pad with some gapped sequence to the right position in
-                    # each to accept the new alignment.
-                    
-                    print("Query should go from {} to {}".format(hitMSAQueryPos,
-                        queryStart))
-                    print("Hit should go from {} to {}".format(hitMSAHitPos,
-                        hitStart))
-                    
-                    # How much padding do we need in each sequence?
-                    queryPaddingNeeded = queryStart - hitMSAQueryPos
-                    hitPaddingNeeded = hitStart - hitMSAHitPos
-                    
-                    if queryPaddingNeeded < 0:
-                        # We can only add characters when padding
-                        raise RuntimeError("Want to pad query by {} which is "
-                            "impossible".format(queryPaddingNeeded))
-                            
-                    if hitPaddingNeeded < 0:
-                        # We can only add characters when padding
-                        raise RuntimeError("Want to pad hit by {} which is "
-                            "impossible".format(hitPaddingNeeded))
-                    
-                    # Grab the sequence from the query to go opposite the
-                    # hit gap
-                    queryActualSequence = querySeqRecord[hitMSAQueryPos:
-                        queryStart]
-                        
-                    # Grab the sequence from the hit to go opposite the
-                    # query gap
-                    hitActualSequence = hitSeqRecord[hitMSAHitPos:hitStart]
-                    
-                    # Make the padding alignment from those sequences,
-                    # adding in the gaps.
-                    paddingAlignment = Align.MultipleSeqAlignment([
-                        queryActualSequence + "-" * hitPaddingNeeded, 
-                        "-" * queryPaddingNeeded + hitActualSequence])
-                    
-                    if hitMSA is None:
-                        # We're just starting. Start with the padding alignment.
-                        hitMSA = paddingAlignment
-                    else:
-                        # Add in the padding alignment
-                        hitMSA += paddingAlignment
-                        
-                    if newMSA is None:
-                        # Just pad out to the given lengths.
-                        hitMSAHitPos = hitStart
-                        hitMSAQueryPos = queryStart
-                    else:
-                        # Add in the new alignment we actually wanted to add.
-                        hitMSA += newMSA
-                        
-                        # Update the indicators of where we're up to. Don't
-                        # count gaps that were in the hits themselves.
-                        hitMSAHitPos = hitStart + len([char for char in 
-                            newMSA[0] if char != "-"])
-                        hitMSAQueryPos = queryStart + len([char for char in 
-                            newMSA[1] if char != "-"])
-                    
-                    if  queryPaddingNeeded > 0 or hitPaddingNeeded > 0:
-                        print("Padding {} in query and {} in hit".format(
-                            queryPaddingNeeded, hitPaddingNeeded))
-                        
-                        print("Now at {} in hit and {} in query".format(
-                            hitMSAHitPos, hitMSAQueryPos))
-                        
-                    
-                        
-                        
-                        
                 
                 for hsp in hit:
                     # For every HSP (high-scoring pair) in the hit
@@ -429,6 +327,15 @@ def main(args):
                         # Make sure we got the right number of bases.
                         assert(len(hitFragment) == fragment.hit_span)
                         
+                        # Annotate the hit (alt) with strand, start, size, and
+                        # srcSize, as MafIO uses
+                        hitFragment.annotations = {
+                            "strand": fragment.hit_strand,
+                            "size": fragment.hit_span,
+                            "start": fragment.hit_start,
+                            "srcSize": len(hitSeqRecord)
+                        }
+                        
                         # Put it in.
                         fragment.hit = hitFragment
                         
@@ -446,13 +353,26 @@ def main(args):
                             raise RuntimeError("Query fragment has {} bases "
                                 "instead of {}".format(len(queryFragment),
                                 fragment.query_span))
+                                
+                        # Annotate the query (ref) with strand, start, size, and
+                        # srcSize, as MafIO uses
+                        queryFragment.annotations = {
+                            "strand": fragment.query_strand,
+                            "size": fragment.query_span,
+                            "start": fragment.query_start,
+                            "srcSize": len(querySeqRecord)
+                        }
                             
                         # Put it in
                         fragment.query = queryFragment
                         
                         # Get the MultipleSeqAlignment which the fragment then
-                        # creates.
+                        # creates. Query (ref) is first.
                         alignment = fragment.aln
+
+                        print(alignment)
+                        print(alignment[0].annotations)
+                        print(alignment[1].annotations)
                         
                         if options.noMismatch:
                             # We only want to have match operations in our
@@ -460,41 +380,11 @@ def main(args):
                             # gap them apart.
                             alignment = gapMismatches(alignment)
                             
-                        # Stick that onto the end of our growing MSA for this
-                        # hit. Padding to align this alignment to the right
-                        # place in each sequence will be automatically added.
-                        appendMSA(alignment, fragment.hit_start,
-                            fragment.query_start)
-                
-                # Pad out the MSA with the unaligned sequence in each sequence
-                print("Padding out to full length")
-                appendMSA(None, len(hitSeqRecord), len(querySeqRecord))
-                print(hitMSA)
-                        
-                # Now we have completed an MSA for just this hit
-                # Merge it into the master MSA keying on the reference.
-                totalMSA = mergeMSAs(totalMSA, hitMSA)
+                        # Save the alignment so we can stick them all in one MAF
+                        allMSAs.append(alignment)
     
-    for record in totalMSA:
-        # Annotate each sequence with a "srcSize" that matches its size in the
-        # database. This is necessary for valid MAF output.
-        
-        # What is the name of this aligned record?
-        recordName = record.id
-        
-        # And what is the size of that sequence in the database?
-        recordSize = len(getSequence(recordName))
-        
-        print("Alignment component {} comes from sequence of size {}"
-            .format(recordName, recordSize))
-            
-        # Apply the annotation
-        record.annotations["srcSize"] = recordSize
-                
-    print(totalMSA)
-                
-    # Save the multiple alignment as a MAF.
-    AlignIO.write(totalMSA, options.maf, "maf")
+    # Save all the alignments in one MAF.
+    AlignIO.write(allMSAs, options.maf, "maf")
             
 
 if __name__ == "__main__" :
