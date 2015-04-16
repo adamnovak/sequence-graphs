@@ -473,11 +473,15 @@ def main(args):
     # in our output directory. We make sure to add 1 to the reference start in
     # the offset, because some basedness-conversion needs to happen. TODO: Make
     # this a function or make this use an import or somehow de-uglify it.
-    subprocess.check_call([psl2maf, "--maf", 
+    args = ([psl2maf, "--maf", 
         options.region + "/GRCAlignment.maf", "--referenceOffset", 
         str(-ref_start + 1), "--referenceSequence", "ref", "--noMismatch",
         "--psls"] + glob.glob(options.region + "/*.psl") + ["--fastas"] + 
         glob.glob(options.region + "/*.fa"))
+        
+    print("Calling: {}".format(" ".join(args)))
+        
+    subprocess.check_call(args)
         
         
             

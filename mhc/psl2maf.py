@@ -109,6 +109,10 @@ def gapMismatches(alignment):
     seqRecords = [SeqRecord(Seq("".join(alignedList)), name) 
         for alignedList, name in zip([gappedReference, gappedQuery], seqNames)]
     
+    for i in xrange(len(seqRecords)):
+        # Se tannotations on all the new records
+        seqRecords[i].annotations = alignment[i].annotations
+    
     if float(mismatches_gapped) / bases_checked > 0.5 and bases_checked > 100:    
         # If this gets too high, it means we have a bad offset somewhere. Yell
         # at the user.
@@ -277,8 +281,6 @@ def main(args):
         for result in SearchIO.parse(psl, "blat-psl"):
             # Parse the PSL and go through the results
             
-            print result
-            
             for hit in result:
                 # For every hit in the result
                 
@@ -304,8 +306,6 @@ def main(args):
                     # For every HSP (high-scoring pair) in the hit
                     
                     print("Starting a new HSP")
-                    
-                    print(hsp)
                     
                     for fragment in hsp:
                         # For every HSP fragment in the HSP (actual alignment
@@ -370,9 +370,9 @@ def main(args):
                         # creates. Query (ref) is first.
                         alignment = fragment.aln
 
-                        print(alignment)
-                        print(alignment[0].annotations)
-                        print(alignment[1].annotations)
+                        #print(alignment)
+                        #print(alignment[0].annotations)
+                        #print(alignment[1].annotations)
                         
                         if options.noMismatch:
                             # We only want to have match operations in our
