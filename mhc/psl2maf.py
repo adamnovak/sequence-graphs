@@ -296,6 +296,10 @@ def mergeMSAs(msa1, msa2, full_ref):
     
     """
     
+    print("Called to merge MSAs")
+    print(msa1)
+    print(msa2)
+    
     if msa1 is None:
         # No merging to do.
         return msa2
@@ -317,11 +321,14 @@ def mergeMSAs(msa1, msa2, full_ref):
         # flip them.
         msa1, msa2 = msa2, msa1
         
-    print("Zipping {}bp and {}bp reference alignments".format(
-        msa1[0].annotations["size"], msa2[0].annotations["size"]))
+    print("Zipping {}bp/{} sequence and {}bp/{} sequence  reference "
+        "alignments".format(msa1[0].annotations["size"], len(msa1),
+        msa2[0].annotations["size"], len(msa2)))
         
     # Make sure we are joining on the right sequence.
     assert(msa1[0].id == msa2[0].id)
+        
+    print("Merging")
         
     print(msa1)
     print(msa1[0].annotations)
@@ -512,6 +519,9 @@ def mergeMSAs(msa1, msa2, full_ref):
     for i in xrange(len(msa1), len(msa1) + len(msa2) - 1):
         # Copy over annotations from MSA2
         merged[i].annotations.update(msa2[i - len(msa1)].annotations)
+        
+    # Give back the merged MSA
+    return merged
                 
 def main(args):
     """
@@ -686,6 +696,11 @@ def main(args):
                     # Now adjoin the HSP into the overall combined MSA.
                     combined_msa = mergeMSAs(combined_msa, hsp_msa,
                         getSequence(hsp_msa[0].id))
+                        
+                    print("Finished HSP, have MSA:")
+                    print(combined_msa)
+    
+    print("Writing output")
     
     # Save all the alignments in one MAF. TODO: Don't save two copies like this.
     AlignIO.write(allMSAs + [combined_msa], options.maf, "maf")
