@@ -261,6 +261,9 @@ def reverse_msa(msa):
     for i in xrange(len(to_return)):
         # Fix up the annotations on each sequence
         
+        # Start with the original annotations
+        to_return[i].annotations.update(msa[i].annotations)
+        
         # We need to flip the strand
         to_return[i].annotations["strand"] = -msa[i].annotations["strand"]
         
@@ -268,7 +271,8 @@ def reverse_msa(msa):
         to_return[i].annotations["start"] = (msa[i].annotations["srcSize"] - 
             msa[i].annotations["start"] - msa[i].annotations["size"])
             
-        # The id, size, and srcSize stay the same.
+        # Set the id
+        to_return[i].id = msa[i].id
         
     # We finished it.
     return to_return
@@ -300,12 +304,6 @@ def mergeMSAs(msa1, msa2, full_ref):
         # No merging to do this way either.
         return msa1
         
-    # Make sure we are joining on the right sequence.
-    assert(msa1[0].id == msa2[0].id)
-        
-    print("Zipping {}bp and {}bp reference alignments".format(
-        msa1[0].annotations["size"], msa2[0].annotations["size"]))
-        
     if msa1[0].annotations["strand"] == -1:
         # MSA 1 needs to be on the + strand of the reference
         msa1 = reverse_msa(msa1)
@@ -314,10 +312,21 @@ def mergeMSAs(msa1, msa2, full_ref):
         # MSA 2 also needs to be on the + strand of the reference
         msa2 = reverse_msa(msa2)
         
-    if msa2[0].annotations["start"] < msa1.annotations["start"]:
+    if msa2[0].annotations["start"] < msa1[0].annotations["start"]:
         # msa2 starts before msa1. We want msa1 to start first, so we need to
         # flip them.
         msa1, msa2 = msa2, msa1
+        
+    print("Zipping {}bp and {}bp reference alignments".format(
+        msa1[0].annotations["size"], msa2[0].annotations["size"]))
+        
+    # Make sure we are joining on the right sequence.
+    assert(msa1[0].id == msa2[0].id)
+        
+    print(msa1)
+    print(msa1[0].annotations)
+    print(msa2)
+    print(msa2[0].annotations)
         
     # Compute the offset: number of extra reference columns that msa2 needs in
     # front of it. This will always be positive or 0.
@@ -516,14 +525,21 @@ def main(args):
     # Load all the FASTAs, indexed
     fastaDicts = [SeqIO.index(fasta, "fasta") for fasta in options.fastas]
     
+    # Cache sequences from getSequence. Will waste memory but save disk IO.
+    cache = {}
+    
     def getSequence(name):
         """
         Get a sequence by ID from the first FASTA that has it.
         """
         
+        if cache.has_key(name):
+            return cache[name]
+        
         for fastaDict in fastaDicts:
             if fastaDict.has_key(name):
-                return fastaDict[name]
+                cache[name] = fastaDict[name]
+                return cache[name]
         
         raise ValueError("No sequence {} in any FASTA".format(name))
     
@@ -653,10 +669,6 @@ def main(args):
                         # creates. Query (ref) is first.
                         alignment = fragment.aln
 
-                        #print(alignment)
-                        #print(alignment[0].annotations)
-                        #print(alignment[1].annotations)
-                        
                         if options.noMismatch:
                             # We only want to have match operations in our
                             # alignment. If two bases don't match, we need to
@@ -674,14 +686,6 @@ def main(args):
                     # Now adjoin the HSP into the overall combined MSA.
                     combined_msa = mergeMSAs(combined_msa, hsp_msa,
                         getSequence(hsp_msa[0].id))
-    
-    # Now we will zip all the MSAs together
-    combined_msa = None
-    
-    for msa in allMSAs:
-        # Merge in each MSA, making sure to say where extra reference bases can
-        # be gotten if needed.
-        combined_msa = mergeMSAs(combined_msa, msa, getSequence(msa[0].id))
     
     # Save all the alignments in one MAF. TODO: Don't save two copies like this.
     AlignIO.write(allMSAs + [combined_msa], options.maf, "maf")
