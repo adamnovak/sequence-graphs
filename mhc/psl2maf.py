@@ -6,7 +6,7 @@ sequence, and the alignment to that reference is used to induce the multiple
 alignment (i.e. nothing in the other sequences will align except as mediated by
 alignment to the reference).
 
-TODO: sanke_case this file.
+TODO: snake_case this file.
 
 """
 
@@ -122,14 +122,171 @@ def gapMismatches(alignment):
     # Make the records into a proper MSA and return it.
     return Align.MultipleSeqAlignment(seqRecords)
             
+def smart_adjoin(msa1, msa2, sequence_source):
+    """
+    Given two Multiple Sequence Alignments (MSAs) on the same source sequences,
+    with correct annotations, concatenate them together, with the intervening
+    sequences unaligned.
     
+    Either MSA may be None, in which case the other is returned.
     
-def mergeMSAs(msa1, msa2):
+    Requires a function that, when passed a sequence ID, returns the SeqRecord
+    for the full sequence.
+    
+    Requires that there be a valid way to attach the two sequences together
+    (i.e. the same sequence doesn't run in different directions in the two
+    blocks).
+    
+    Raises a RuntimeError if the two MSAs cannot be adjoined.
+    
+    """
+    
+    if msa1 is None:
+        # Nothing plus something equals that thing.
+        return msa2
+        
+    if msa2 is None:
+        # Nothing plus something equals that thing.
+        return msa1
+        
+    print("Adjoining {}bp and {}bp reference alignments".format(
+        msa1[0].annotations["size"], msa2[0].annotations["size"]))
+    
+    for seq1, seq2 in itertools.izip(msa1, msa2):
+        # Check all the sequences
+        
+        if seq1.annotations["strand"] != seq2.annotations["strand"]:
+            # These alignments are to opposite reference strands and cannot be
+            # adjoined.
+            raise RuntimeError("Can't adjoin alignments on opposite strands")
+            
+    if msa2[0].annotations["start"] < msa1[0].annotations["start"]:
+        # Whatever strand we're on for the first sequence, alignment 2 needs to
+        # happen first.
+        msa2, msa1 = msa1, msa2
+        
+    # We're going to get the sequence needed to go from the end of MSA1 to the
+    # start of MSA2.
+    intervening_sequences = []
+    
+    for seq1, seq2 in itertools.izip(msa1, msa2):
+        # For each pair of sequence pieces, we need the sequence from #1 to #2,
+        # on the appropriate strand.
+        
+        # Where does the intervening sequence start along the strand in
+        # question? Remember MAF coordinates are 0-based.
+        intervening_start = seq1.annotations["start"] + seq1.annotations["size"]
+        
+        # And where does it end? (1 past the end)
+        intervening_end = seq2.annotations["start"]
+        
+        if intervening_end < intervening_start:
+            # We're always going up in strand-local coordinates.
+            raise RuntimeError("Sequence is trying to go backwards!")
+        
+        if seq1.annotations["strand"] == -1:
+            # Convert to the correct strand.
+            
+            intervening_start = seq1.annotations["srcSize"] - intervening_start
+            intervening_end = seq1.annotations["srcSize"] - intervening_end
+            
+            intervening_start, intervening_end = (intervening_end, 
+                intervening_start)
+            
+        # Go get and clip out the intervening sequence.    
+        intervening_sequence = sequence_source(seq1.id)[
+            intervening_start:intervening_end]
+            
+        if seq1.annotations["strand"] == -1:
+            # Make sure it is on the correct strand
+            intervening_sequence = intervening_sequence.reverse_complement()
+            
+        # Put the clipped-out, correctly-oriented unaligned sequence in the
+        # list.
+        intervening_sequences.append(intervening_sequence)
+        
+    # We'll tack these additional alignments onto msa1
+    to_return = msa1
+        
+    for i in xrange(len(intervening_sequences)):
+        # Now for each intervening sequence, I need an MSA consisting of that
+        # sequence in its correct row and gaps in all the other rows.
+        
+        # Make all the rows for this bit of unaligned sequence, as SeqRecords.
+        alignment_rows = [SeqRecord(Seq("-" * len(intervening_sequences[i])))
+            if j != i else intervening_sequences[i]
+            for j in xrange(len(intervening_sequences))]
+            
+        # Make them into an alignment and stick it on
+        to_return = to_return + Align.MultipleSeqAlignment(alignment_rows)
+
+    # Now stick on msa2
+    to_return = to_return + msa2
+    
+    for i in xrange(len(to_return)):
+        # Do the annotations for each record in the alignment
+        
+        # Set the ID
+        to_return[i].id = msa1[i].id
+        
+        # Start with the annotations from msa1, so start is correct
+        to_return[i].annotations.update(msa1[i].annotations)
+        
+        # Compute the actual sequence length that outght to be used here.
+        to_return[i].annotations["size"] = (msa2[i].annotations["start"] + 
+            msa2[i].annotations["size"] - msa1[i].annotations["start"])
+            
+        # Make sure size is correct correct.
+        assert(len(str(to_return[i].seq).replace("-","")) == 
+            to_return[i].annotations["size"])
+    
+    # Give back the final adjoined alignment
+    return to_return
+        
+def reverse_msa(msa):
+    """
+    Given a MultipleSeqAlignment with MAF annotations, reverse-complement it,
+    correcting the annotations.
+    
+    TODO: Test to make sure two of this changes nothing.
+    
+    """
+    
+    print("Reversing {}bp reference MSA".format(msa[0].annotations["size"]))
+    
+    # Make an alignment with all the sequences reversed.
+    to_return = Align.MultipleSeqAlignment((record.reverse_complement() 
+        for record in msa))
+        
+    for i in xrange(len(to_return)):
+        # Fix up the annotations on each sequence
+        
+        # We need to flip the strand
+        to_return[i].annotations["strand"] = -msa[i].annotations["strand"]
+        
+        # And count the start from the other end.
+        to_return[i].annotations["start"] = (msa[i].annotations["srcSize"] - 
+            msa[i].annotations["start"] - msa[i].annotations["size"])
+            
+        # The id, size, and srcSize stay the same.
+        
+    # We finished it.
+    return to_return
+        
+
+    
+def mergeMSAs(msa1, msa2, full_ref):
     """
     Given two MultipleSeqAlignment objects sharing a first (reference) sequence,
     merge them on the reference. Returns a MultipleSeqAlignment containing all
     the sequences from each alignment, in the alignment induced by the shared
     reference sequence.
+    
+    Also needs access to the full reference SeqRecord in case it needs bases to
+    fill in a gap.
+    
+    The first sequence may actually be only a subrange in either MSA, and either
+    MSA may be on either strand of it.
     
     Either MSA may be None, in which case the other MSA is returned.
     
@@ -142,17 +299,84 @@ def mergeMSAs(msa1, msa2):
     if msa2 is None:
         # No merging to do this way either.
         return msa1
+        
+    # Make sure we are joining on the right sequence.
+    assert(msa1[0].id == msa2[0].id)
+        
+    print("Zipping {}bp and {}bp reference alignments".format(
+        msa1[0].annotations["size"], msa2[0].annotations["size"]))
+        
+    if msa1[0].annotations["strand"] == -1:
+        # MSA 1 needs to be on the + strand of the reference
+        msa1 = reverse_msa(msa1)
+        
+    if msa2[0].annotations["strand"] == -1:
+        # MSA 2 also needs to be on the + strand of the reference
+        msa2 = reverse_msa(msa2)
+        
+    if msa2[0].annotations["start"] < msa1.annotations["start"]:
+        # msa2 starts before msa1. We want msa1 to start first, so we need to
+        # flip them.
+        msa1, msa2 = msa2, msa1
+        
+    # Compute the offset: number of extra reference columns that msa2 needs in
+    # front of it. This will always be positive or 0.
+    msa2_leading_offset = (msa2[0].annotations["start"] - 
+        msa1[0].annotations["start"])
+    
+    print("{}bp between left and right alignments".format(msa2_leading_offset))
+        
+    # It would be nice if we could shortcut by adjoining compatible alignments,
+    # but the IDs wouldn't match up at all.
     
     # Make lists for each sequence we are going to build: those in msa1, and
     # then those in msa2 (except the duplicate reference).
     merged = [list() for i in xrange(len(msa1) + len(msa2) - 1)]
     
-    # Start at the beginning in each alignment
+    # Start at the beginning of both alignments.
     msa1Pos = 0
     msa2Pos = 0
     
     # How many reference characters have been used?
     refChars = 0
+    
+    while refChars < msa2_leading_offset and msa1Pos < len(msa1[0]):
+        # Until we're to the point that MSA 2 might have anything to say, we
+        # just copy MSA 1.
+        
+        for i, character in enumerate(msa1[:, msa1Pos]):
+            # For each character in the first alignment in this column
+            
+            # Put that character as the character for the appropriate
+            # sequence.
+            merged[i].append(character)
+            
+        for i in xrange(len(msa1), len(msa1) + len(msa2) - 1):
+            # For each of the alignment rows that come from msa2, put a gap.
+            merged[i].append("-")
+            
+        
+        if msa1[0, msa1Pos] != "-":
+            # We consumed a reference character.
+            refChars += 1
+            
+        # We used some of MSA1
+        msa1Pos += 1
+        
+    while refChars < msa2_leading_offset:
+        # We have a gap between the first MSA and the second, and we need to
+        # fill it with reference sequence.
+        
+        # We know we are refChars after the beginning of the first reference, so
+        # we use that to know what base to put here.
+        merged[0].append(full_ref[msa1[0].annotations["start"] + refChars])
+        
+        for i in xrange(1, len(msa1) + len(msa2) - 1):
+            # And gap out all the other sequences.
+            merged[i].append("-")
+            
+        # We consumed (or made up) a reference character
+        refChars += 1
     
     while msa1Pos < len(msa1[0]) and msa2Pos < len(msa2[0]):
         # Until we hit the end of both sequences
@@ -231,6 +455,24 @@ def mergeMSAs(msa1, msa2):
             # Make sure we aren't dropping characters anywhere.
             assert(len(otherMerged) == len(merged[0]))
             
+    while msa2Pos < len(msa2[0]):
+        # MAS1 finished first and now we have to finish up with the tail end of
+        # MSA2
+        
+        for i in xrange(len(msa1)):
+            # For the reference and all the sequences in msa1, add gaps
+            merged[i].append("-")
+       
+        for i, character in zip(xrange(len(msa1),
+            len(msa1) + len(msa2) - 1), msa2[1:, msa2Pos]):
+            
+            # For each of the alignment rows that come from msa2, put the
+            # character from that row.
+            merged[i].append(character)
+            
+        # Advance in msa2, until we finish it.
+        msa2Pos += 1
+            
     # Now we have finished populating these aligned lists. We need to make a
     # MultipleSeqAlignment from them.
     
@@ -245,8 +487,22 @@ def mergeMSAs(msa1, msa2):
     seqRecords = [SeqRecord(Seq("".join(alignedList)), name) 
         for alignedList, name in zip(merged, seqNames)]
         
-    # Make the records into a proper MSA and return it.
-    return Align.MultipleSeqAlignment(seqRecords)
+    # Make the records into a proper MSA
+    merged = Align.MultipleSeqAlignment(seqRecords)
+    
+    # Do the annotations for the reference
+    merged[0].annotations.update(msa1[0].annotations)
+    # Calculate the total reference bases used.
+    merged[0].annotations["size"] = (msa2[0].annotations["start"] + 
+        msa2[0].annotations["size"] - msa1[0].annotations["start"])
+    
+    for i in xrange(1, len(msa1)):
+        # Copy over annotations from MSA1
+        merged[i].annotations.update(msa1[i].annotations)
+        
+    for i in xrange(len(msa1), len(msa1) + len(msa2) - 1):
+        # Copy over annotations from MSA2
+        merged[i].annotations.update(msa2[i - len(msa1)].annotations)
                 
 def main(args):
     """
@@ -273,6 +529,9 @@ def main(args):
     
     # We're going to put all the MSAs in here.
     allMSAs = []
+    
+    # And zipt hem together here
+    combined_msa = None
         
     for psl in options.psls:
         print("Processing {}".format(psl))
@@ -301,9 +560,13 @@ def main(args):
                 hitID = hit.id
                 hitSeqRecord = getSequence(hitID)
                 
-                
                 for hsp in hit:
-                    # For every HSP (high-scoring pair) in the hit
+                    # For every HSP (high-scoring pair) in the hit (which
+                    # corresponds to a PSL line, and will be on a consistent
+                    # strand)
+                    
+                    # Let's make an MSA describing the entire HSP.
+                    hsp_msa = None
                     
                     print("Starting a new HSP")
                     
@@ -327,12 +590,22 @@ def main(args):
                         # Make sure we got the right number of bases.
                         assert(len(hitFragment) == fragment.hit_span)
                         
+                        # Work out the start on the appropriate strand
+                        if fragment.hit_strand == 1:
+                            # On the forward strand we can use the normal start
+                            hit_start = fragment.hit_start
+                        else:
+                            # We have to calculate the start index on the
+                            # reverse strand. Do it for 0-based coordinates.
+                            hit_start = (len(hitSeqRecord) - 
+                                fragment.hit_start - fragment.hit_span)
+                        
                         # Annotate the hit (alt) with strand, start, size, and
                         # srcSize, as MafIO uses
                         hitFragment.annotations = {
                             "strand": fragment.hit_strand,
                             "size": fragment.hit_span,
-                            "start": fragment.hit_start,
+                            "start": hit_start,
                             "srcSize": len(hitSeqRecord)
                         }
                         
@@ -353,13 +626,23 @@ def main(args):
                             raise RuntimeError("Query fragment has {} bases "
                                 "instead of {}".format(len(queryFragment),
                                 fragment.query_span))
+                            
+                        # Work out the start on the appropriate strand
+                        if fragment.query_strand == 1:
+                            # On the forward strand we can use the normal start
+                            query_start = fragment.query_start
+                        else:
+                            # We have to calculate the start index on the
+                            # reverse strand. Do it for 0-based coordinates.
+                            query_start = (len(querySeqRecord) - 
+                                fragment.query_start - fragment.query_span)
                                 
                         # Annotate the query (ref) with strand, start, size, and
                         # srcSize, as MafIO uses
                         queryFragment.annotations = {
                             "strand": fragment.query_strand,
                             "size": fragment.query_span,
-                            "start": fragment.query_start,
+                            "start": query_start,
                             "srcSize": len(querySeqRecord)
                         }
                             
@@ -380,11 +663,28 @@ def main(args):
                             # gap them apart.
                             alignment = gapMismatches(alignment)
                             
-                        # Save the alignment so we can stick them all in one MAF
-                        allMSAs.append(alignment)
+                        # Add in the alignment for this hit to its MSA, doing
+                        # whatever reordering is needed to make it work.
+                        hsp_msa = smart_adjoin(hsp_msa, alignment, getSequence)
+                        
+                        
+                    # Save the HSP MSA for debugging
+                    allMSAs.append(hsp_msa)
+                        
+                    # Now adjoin the HSP into the overall combined MSA.
+                    combined_msa = mergeMSAs(combined_msa, hsp_msa,
+                        getSequence(hsp_msa[0].id))
     
-    # Save all the alignments in one MAF.
-    AlignIO.write(allMSAs, options.maf, "maf")
+    # Now we will zip all the MSAs together
+    combined_msa = None
+    
+    for msa in allMSAs:
+        # Merge in each MSA, making sure to say where extra reference bases can
+        # be gotten if needed.
+        combined_msa = mergeMSAs(combined_msa, msa, getSequence(msa[0].id))
+    
+    # Save all the alignments in one MAF. TODO: Don't save two copies like this.
+    AlignIO.write(allMSAs + [combined_msa], options.maf, "maf")
             
 
 if __name__ == "__main__" :
