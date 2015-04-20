@@ -597,9 +597,10 @@ def main(args):
     name. The return value should be used as the program's exit code.
     """
     
-    logging.basicConfig(level=logging.DEBUG)
     
     if len(args) == 2 and args[1] == "--test":
+        # Turn on debug logging
+        logging.basicConfig(level=logging.DEBUG)
         # Run the tests
         return doctest.testmod(optionflags=doctest.NORMALIZE_WHITESPACE)
         
@@ -629,10 +630,7 @@ def main(args):
         
         raise ValueError("No sequence {} in any FASTA".format(name))
     
-    # We're going to put all the MSAs in here.
-    allMSAs = []
-    
-    # And zipt hem together here
+    # And zip them together here
     combined_msa = None
         
     for psl in options.psls:
@@ -765,10 +763,6 @@ def main(args):
                         # whatever reordering is needed to make it work.
                         hsp_msa = smart_adjoin(hsp_msa, alignment, getSequence)
                         
-                        
-                    # Save the HSP MSA for debugging
-                    allMSAs.append(hsp_msa)
-                        
                     # Now adjoin the HSP into the overall combined MSA.
                     combined_msa = mergeMSAs(combined_msa, hsp_msa,
                         getSequence(hsp_msa[0].id))
@@ -778,8 +772,8 @@ def main(args):
     
     logging.info("Writing output")
     
-    # Save all the alignments in one MAF. TODO: Don't save two copies like this.
-    AlignIO.write(allMSAs + [combined_msa], options.maf, "maf")
+    # Save all the alignments in one MAF.
+    AlignIO.write(combined_msa, options.maf, "maf")
             
 
 if __name__ == "__main__" :
