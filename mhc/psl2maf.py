@@ -122,6 +122,50 @@ def gapMismatches(alignment):
         
     # Make the records into a proper MSA and return it.
     return Align.MultipleSeqAlignment(seqRecords)
+    
+def tree_reduce(items, operator, default_value=None):
+    """
+    Reduce the items in the given list using the given binary function. Unlike
+    the normal Python reduce, which reduces by a fold from the left, this reduce
+    reduces in a tree. This means that if the operation is, say, a list
+    concatenation, the reduction will be more efficient than if it were done in
+    a left to right order, as each input element will only be copied log(n)
+    times, instead of n for the leftmost element in a normal reduce.
+    
+    If items is empty, the given default_value is returned.
+    
+    """
+    
+    if len(items) == 0:
+        # Base case for an empty list
+        return None
+    elif len(items) == 1:
+        # Base case for a one-item list
+        return items[0]
+    else:
+        # We have two or more items (and will never have to deal with 0)
+        
+        # Where is the middle? Do integer division.
+        middle = len(items) / 2
+        
+        # Figure out the answers on the left and the right
+        left_answer = tree_reduce(items[0:middle], operator)
+        right_answer = tree_reduce(items[middle:], operator)
+        
+        logging.info("Merging:")
+        logging.info(left_answer)
+        logging.info("And:")
+        logging.info(right_answer)
+        
+        # Recurse down both sides, do the operator to combine them, and return.
+        to_return = operator(left_answer, right_answer)
+        
+        logging.info("Yields:")
+        logging.info(to_return)
+        
+        return to_return
+            
+        
             
 def smart_adjoin(msa1, msa2, sequence_source):
     """
@@ -679,8 +723,8 @@ def main(args):
         
         raise ValueError("No sequence {} in any FASTA".format(name))
     
-    # And zip them together here
-    combined_msa = None
+    # Save them all here
+    all_msas = []
         
     for psl in options.psls:
         logging.debug("Processing {}".format(psl))
@@ -812,12 +856,17 @@ def main(args):
                         # whatever reordering is needed to make it work.
                         hsp_msa = smart_adjoin(hsp_msa, alignment, getSequence)
                         
-                    # Now adjoin the HSP into the overall combined MSA.
-                    combined_msa = mergeMSAs(combined_msa, hsp_msa,
-                        getSequence(hsp_msa[0].id))
+                    # Save the HSP MSA
+                    all_msas.append(hsp_msa)
                         
-                    logging.info("Finished HSP, have MSA:")
-                    logging.info(combined_msa)
+                    logging.info("Produced MSA:")
+                    logging.info(hsp_msa)
+                    
+    logging.info("Merging MSAs...")
+                    
+    # Now merge all the MSAs together with a tree reduce.
+    combined_msa = tree_reduce(all_msas, lambda a, b: mergeMSAs(a, b,
+        getSequence(a[0].id)))
     
     logging.info("Writing output")
     
