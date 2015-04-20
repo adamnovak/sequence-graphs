@@ -249,7 +249,36 @@ def reverse_msa(msa):
     Given a MultipleSeqAlignment with MAF annotations, reverse-complement it,
     correcting the annotations.
     
-    TODO: Test to make sure two of this changes nothing.
+    >>> ref1 = SeqRecord(Seq("AT-ATATAT"), "first")
+    >>> ref1.annotations = {"strand": 1, "start": 0, "size": 8, "srcSize": 18}
+    >>> alt1 = SeqRecord(Seq("ATAATATAT"), "second")
+    >>> alt1.annotations = {"strand": -1, "start": 0, "size": 9, "srcSize": 9}
+    >>> msa1 = Align.MultipleSeqAlignment([ref1, alt1])
+    >>> rev = reverse_msa(msa1)
+    
+    >>> print(msa1)
+    Alphabet() alignment with 2 rows and 9 columns
+    AT-ATATAT first
+    ATAATATAT second
+    >>> print(rev)
+    Alphabet() alignment with 2 rows and 9 columns
+    ATATAT-AT first
+    ATATATTAT second
+    >>> pprint.pprint(rev[0].annotations)
+    {'size': 8, 'srcSize': 18, 'start': 10, 'strand': -1}
+    >>> pprint.pprint(rev[1].annotations)
+    {'size': 9, 'srcSize': 9, 'start': 0, 'strand': 1}
+    
+    >>> rev2 = reverse_msa(rev)
+    >>> print(rev2)
+    Alphabet() alignment with 2 rows and 9 columns
+    AT-ATATAT first
+    ATAATATAT second
+    >>> pprint.pprint(rev2[0].annotations)
+    {'size': 8, 'srcSize': 18, 'start': 0, 'strand': 1}
+    >>> pprint.pprint(rev2[1].annotations)
+    {'size': 9, 'srcSize': 9, 'start': 0, 'strand': -1}
+    
     
     """
     
@@ -302,7 +331,7 @@ def mergeMSAs(msa1, msa2, full_ref):
     >>> ref1.annotations = {"strand": 1, "start": 0, "size": 8, "srcSize": 18}
     >>> alt1 = SeqRecord(Seq("ATAATATAT"), "second")
     >>> alt1.annotations = {"strand": -1, "start": 0, "size": 9, "srcSize": 9}
-    >>> ref2 = SeqRecord(Seq("ATAT--ATAT"), "first")
+    >>> ref2 = SeqRecord(Seq("ATATATAT--"), "first")
     >>> ref2.annotations = {"strand": -1, "start": 0, "size": 8, "srcSize": 18}
     >>> alt2 = SeqRecord(Seq("ATATGG--AT"), "third")
     >>> alt2.annotations = {"strand": 1, "start": 0, "size": 8, "srcSize": 8}
@@ -312,13 +341,13 @@ def mergeMSAs(msa1, msa2, full_ref):
     >>> merged = mergeMSAs(msa1, msa2, ref)
     >>> print(merged)
     Alphabet() alignment with 3 rows and 21 columns
-    AT-ATATATGCATAT--ATAT first
+    AT-ATATATGC--ATATATAT first
     ATAATATAT------------ second
     -----------AT--CCATAT third
     >>> pprint.pprint(merged[0].annotations)
     {'size': 18, 'srcSize': 18, 'start': 0, 'strand': 1}
     >>> pprint.pprint(merged[1].annotations)
-    {'size': 9, 'srcSize': 9, 'start': 0, 'strand': 1}
+    {'size': 9, 'srcSize': 9, 'start': 0, 'strand': -1}
     >>> pprint.pprint(merged[2].annotations)
     {'size': 8, 'srcSize': 8, 'start': 0, 'strand': -1}
     
@@ -555,8 +584,8 @@ def mergeMSAs(msa1, msa2, full_ref):
         merged[i].annotations.update(msa1[i].annotations)
         
     for i in xrange(len(msa1), len(msa1) + len(msa2) - 1):
-        # Copy over annotations from MSA2
-        merged[i].annotations.update(msa2[i - len(msa1)].annotations)
+        # Copy over annotations from MSA2, starting after the reference.
+        merged[i].annotations.update(msa2[i - len(msa1) + 1].annotations)
         
     # Give back the merged MSA
     return merged
