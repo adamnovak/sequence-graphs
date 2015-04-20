@@ -351,13 +351,33 @@ def mergeMSAs(msa1, msa2, full_ref):
     >>> pprint.pprint(merged[2].annotations)
     {'size': 8, 'srcSize': 8, 'start': 0, 'strand': -1}
     
+    
+    >>> ref3 = SeqRecord(Seq("ATGCAT"), "first")
+    >>> ref3.annotations = {"strand": 1, "start": 6, "size": 6, "srcSize": 18}
+    >>> alt3 = SeqRecord(Seq("ATCCAT"), "fourth")
+    >>> alt3.annotations = {"strand": 1, "start": 5, "size": 6, "srcSize": 15}
+    >>> msa3 = Align.MultipleSeqAlignment([ref3, alt3])
+    
+    >>> merged2 = mergeMSAs(merged, msa3, ref)
+    >>> print(merged2)
+    Alphabet() alignment with 4 rows and 21 columns
+    AT-ATATATGC--ATATATAT first
+    ATAATATAT------------ second
+    -----------AT--CCATAT third
+    -------ATCC--AT------ fourth
+    >>> pprint.pprint(merged2[0].annotations)
+    {'size': 18, 'srcSize': 18, 'start': 0, 'strand': 1}
+    >>> pprint.pprint(merged2[1].annotations)
+    {'size': 9, 'srcSize': 9, 'start': 0, 'strand': -1}
+    >>> pprint.pprint(merged2[2].annotations)
+    {'size': 8, 'srcSize': 8, 'start': 0, 'strand': -1}
+    >>> pprint.pprint(merged2[3].annotations)
+    {'size': 6, 'srcSize': 15, 'start': 5, 'strand': 1}
+    
+    
 
     
     """
-    
-    logging.debug("Called to merge MSAs")
-    logging.debug(msa1)
-    logging.debug(msa2)
     
     if msa1 is None:
         # No merging to do.
@@ -533,10 +553,33 @@ def mergeMSAs(msa1, msa2, full_ref):
             # Make sure we aren't dropping characters anywhere.
             assert(len(otherMerged) == len(merged[0]))
            
-    logging.debug("At {}/{} of msa2".format(msa2Pos, len(msa2[0])))
+    logging.debug("At {}/{} of msa2, {}/{} of msa1".format(msa2Pos,
+        len(msa2[0]), msa1Pos, len(msa1[0])))
+        
+    # By here, we must have finished one of the MSAs. Only one can have anything
+    # left.
+    assert(msa1Pos == len(msa1[0]) or msa2Pos == len(msa2[0]))
+            
+    while msa1Pos < len(msa1[0]):
+        # MSA2 finished first and now we have to finish up with the tail end of
+        # MSA1
+        
+        for i, character in enumerate(msa1[:, msa1Pos]):
+            # For each character in the first alignment in this column
+            
+            # Put that character as the character for the appropriate
+            # sequence.
+            merged[i].append(character)
+            
+        for i in xrange(len(msa1), len(msa1) + len(msa2) - 1):
+            # For each of the alignment rows that come from msa2, put a gap.
+            merged[i].append("-")
+            
+        # Advance in msa1, until we finish it.
+        msa1Pos += 1
             
     while msa2Pos < len(msa2[0]):
-        # MAS1 finished first and now we have to finish up with the tail end of
+        # MSA1 finished first and now we have to finish up with the tail end of
         # MSA2
         
         # For the reference, put whatever it has in MSA2
@@ -555,7 +598,7 @@ def mergeMSAs(msa1, msa2, full_ref):
             
         # Advance in msa2, until we finish it.
         msa2Pos += 1
-            
+        
     # Now we have finished populating these aligned lists. We need to make a
     # MultipleSeqAlignment from them.
     
@@ -575,9 +618,11 @@ def mergeMSAs(msa1, msa2, full_ref):
     
     # Do the annotations for the reference
     merged[0].annotations.update(msa1[0].annotations)
-    # Calculate the total reference bases used.
-    merged[0].annotations["size"] = (msa2[0].annotations["start"] + 
-        msa2[0].annotations["size"] - msa1[0].annotations["start"])
+    # Calculate the total reference bases used. It will be the distance between
+    # the rightmost alignment end and the start of msa1, along the reference.
+    merged[0].annotations["size"] = (max(msa2[0].annotations["start"] + 
+        msa2[0].annotations["size"], msa1[0].annotations["start"] +
+        msa1[0].annotations["size"]) - msa1[0].annotations["start"])
     
     for i in xrange(1, len(msa1)):
         # Copy over annotations from MSA1
@@ -586,6 +631,10 @@ def mergeMSAs(msa1, msa2, full_ref):
     for i in xrange(len(msa1), len(msa1) + len(msa2) - 1):
         # Copy over annotations from MSA2, starting after the reference.
         merged[i].annotations.update(msa2[i - len(msa1) + 1].annotations)
+        
+    # The merged result reverence needs to be longer than the input references.
+    #assert(len(merged[0]) >= len(msa1[0]))
+    #assert(len(merged[0]) >= len(msa2[0]))
         
     # Give back the merged MSA
     return merged

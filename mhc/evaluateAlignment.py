@@ -6,7 +6,7 @@ and metrics.
 """
 
 import argparse, sys, os, os.path, random, subprocess, shutil, itertools
-import collections, csv, tempfile
+import collections, csv, tempfile, xml.etree
 
 import doctest, pprint
 
@@ -41,6 +41,8 @@ def parse_args(args):
     # General options
     parser.add_argument("hal",
         help="HAL file to evaluate")
+    parser.add_argument("--truth",
+        help=".maf file of a true alignment for precision and recall")
     parser.add_argument("--beds", nargs="*",
         help=".bed file(s) of genes on the genomes in the HAL")
     
@@ -155,6 +157,64 @@ def hal2maf(hal_filename):
     # Return the filename of the MAF
     return maf_filename
     
+def parse_mafcomparator_output(stream):
+    """
+    Given a stream of XML output from mafComparator, between a truth MAF and a
+    MAF under test (in that order), parse the XML and produce a (precision,
+    recall) tuple.
+    
+    """
+    
+    # Parse the XML output
+    tree = xml.etree.ElementTree.parse(stream)
+    
+    # Grab the nodes with the aggregate results for each comparison direction
+    stats = tree.findall(
+        "./homologyTests/aggregateResults/all")
+        
+    # Grab and parse the averages. There should be two.
+    averages = [float(stat.attrib["average"]) for stat in stats]
+    
+    # Return them in precision, recall order. First we put portion of MAF under
+    # test represented in truth (precision), then portion of truth represented
+    # in MAF under test (recall).
+    return (averages[1], averages[0])    
+
+def metric_mafcomparator(maf_filename, maf_truth):
+    """
+    Run mafComparator to compare the given MAF against the given truth MAF.
+    
+    Returns a precision, recall tuple.
+    
+    """
+
+    # Make a temporary file
+    # Make a temporary file
+    handle, xml_filename = tempfile.mkstemp()
+    os.close(handle)
+    
+
+    # Set up the mafComparator arguments. We sample only a subset of the
+    # columns, but still enough that we will probably get a good number of
+    # sig figs on coverage.
+    args = ["mafComparator", "--maf1", self.maf_a, "--maf2",
+        self.maf_b, "--out", xml_filename, "--seed", str(seed), "--samples",
+        "1000000"]
+    
+    # Run mafComparator and generate the output XML
+    subprocess.check_call(args)
+    
+    # Read the output and get precision and recall
+    stats = parse_mafcomparator_output(open(xml_filename))
+    
+    # Delete the temporary file
+    os.unlink(xml_filename)
+    
+    # Return the precision and recall
+    return stats
+    
+    
+    
 def main(args):
     """
     Parses command line arguments and do the work of the program.
@@ -171,22 +231,34 @@ def main(args):
     # Print the halStats output
     pprint.pprint(metric_halstats(options.hal))
     
-    if options.beds is not None:
-
-        # We want to do the checkGenes stuff, so we need a MAF
+    if options.beds is not None or options.truth is not None:
+        # We need a MAF for checkGenes and for the precision/recall
+        # calculations.
         maf_filename = hal2maf(options.hal)
+    
+    if options.beds is not None:
         
+        # We're going to check the alignment agains the genes
         import checkGenes
         class_counts, gene_sets, gene_pairs = checkGenes.check_genes(
             maf_filename, options.beds)
             
-        # Clean up the MAF
-        os.unlink(maf_filename)
-        
         # Print the output
         pprint.pprint(class_counts)
         pprint.pprint(gene_sets)
         pprint.pprint(gene_pairs)
+        
+    if options.truth is not None:
+    
+        # We're going to get precision and recall against the truth.
+        precision, recall = metric_mafcomparator(maf_filename, options.truth)
+
+        # TODO: Output better        
+        pprint.pprint(precision, recall)
+        
+    if options.beds is not None or options.truth is not None:
+        # Clean up the MAF
+        os.unlink(maf_filename)
 
 if __name__ == "__main__" :
     sys.exit(main(sys.argv))
