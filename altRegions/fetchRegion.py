@@ -6,7 +6,7 @@ region (like "LRC_KIR" or "MHC") by name.
 """
 
 import argparse, sys, os, os.path, random, subprocess, shutil, itertools
-import collections, urllib2, shutil, subprocess, glob
+import collections, urllib2, shutil, subprocess, glob, doctest
 
 import tsv
 
@@ -338,6 +338,10 @@ def main(args):
     "args" specifies the program arguments, with args[0] being the executable
     name. The return value should be used as the program's exit code.
     """
+    
+    if len(args) == 2 and args[1] == "--test":
+        # Run the tests
+        return doctest.testmod(optionflags=doctest.NORMALIZE_WHITESPACE)
     
     options = parse_args(args) # This holds the nicely-parsed options object
     

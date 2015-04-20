@@ -11,6 +11,7 @@ TODO: snake_case this file.
 """
 
 import argparse, sys, os, os.path, random, subprocess, shutil, itertools
+import doctest, logging, pprint
 
 from Bio import SearchIO, AlignIO, SeqIO, Align
 from Bio.Seq import Seq
@@ -116,7 +117,7 @@ def gapMismatches(alignment):
     if float(mismatches_gapped) / bases_checked > 0.5 and bases_checked > 100:    
         # If this gets too high, it means we have a bad offset somewhere. Yell
         # at the user.
-        print("WARNING: {}/{} bases gapped due to mismatch".format(
+        logging.warning("{}/{} bases gapped due to mismatch".format(
             mismatches_gapped, bases_checked))
         
     # Make the records into a proper MSA and return it.
@@ -149,7 +150,7 @@ def smart_adjoin(msa1, msa2, sequence_source):
         # Nothing plus something equals that thing.
         return msa1
         
-    print("Adjoining {}bp and {}bp reference alignments".format(
+    logging.debug("Adjoining {}bp and {}bp reference alignments".format(
         msa1[0].annotations["size"], msa2[0].annotations["size"]))
     
     for seq1, seq2 in itertools.izip(msa1, msa2):
@@ -252,7 +253,8 @@ def reverse_msa(msa):
     
     """
     
-    print("Reversing {}bp reference MSA".format(msa[0].annotations["size"]))
+    logging.debug("Reversing {}bp reference MSA".format(
+        msa[0].annotations["size"]))
     
     # Make an alignment with all the sequences reversed.
     to_return = Align.MultipleSeqAlignment((record.reverse_complement() 
@@ -294,11 +296,39 @@ def mergeMSAs(msa1, msa2, full_ref):
     
     Either MSA may be None, in which case the other MSA is returned.
     
+    >>> ref = SeqRecord(Seq("ATATATATGCATATATAT"), "first")
+    >>> ref.annotations = {"strand": 1, "start": 0, "size": 18, "srcSize": 18}
+    >>> ref1 = SeqRecord(Seq("AT-ATATAT"), "first")
+    >>> ref1.annotations = {"strand": 1, "start": 0, "size": 8, "srcSize": 18}
+    >>> alt1 = SeqRecord(Seq("ATAATATAT"), "second")
+    >>> alt1.annotations = {"strand": -1, "start": 0, "size": 9, "srcSize": 9}
+    >>> ref2 = SeqRecord(Seq("ATAT--ATAT"), "first")
+    >>> ref2.annotations = {"strand": -1, "start": 0, "size": 8, "srcSize": 18}
+    >>> alt2 = SeqRecord(Seq("ATATGG--AT"), "third")
+    >>> alt2.annotations = {"strand": 1, "start": 0, "size": 8, "srcSize": 8}
+    
+    >>> msa1 = Align.MultipleSeqAlignment([ref1, alt1])
+    >>> msa2 = Align.MultipleSeqAlignment([ref2, alt2])
+    >>> merged = mergeMSAs(msa1, msa2, ref)
+    >>> print(merged)
+    Alphabet() alignment with 3 rows and 21 columns
+    AT-ATATATGCATAT--ATAT first
+    ATAATATAT------------ second
+    -----------AT--CCATAT third
+    >>> pprint.pprint(merged[0].annotations)
+    {'size': 18, 'srcSize': 18, 'start': 0, 'strand': 1}
+    >>> pprint.pprint(merged[1].annotations)
+    {'size': 9, 'srcSize': 9, 'start': 0, 'strand': 1}
+    >>> pprint.pprint(merged[2].annotations)
+    {'size': 8, 'srcSize': 8, 'start': 0, 'strand': -1}
+    
+
+    
     """
     
-    print("Called to merge MSAs")
-    print(msa1)
-    print(msa2)
+    logging.debug("Called to merge MSAs")
+    logging.debug(msa1)
+    logging.debug(msa2)
     
     if msa1 is None:
         # No merging to do.
@@ -321,26 +351,27 @@ def mergeMSAs(msa1, msa2, full_ref):
         # flip them.
         msa1, msa2 = msa2, msa1
         
-    print("Zipping {}bp/{} sequence and {}bp/{} sequence  reference "
+    logging.debug("Zipping {}bp/{} sequence and {}bp/{} sequence  reference "
         "alignments".format(msa1[0].annotations["size"], len(msa1),
         msa2[0].annotations["size"], len(msa2)))
         
     # Make sure we are joining on the right sequence.
     assert(msa1[0].id == msa2[0].id)
         
-    print("Merging")
+    logging.debug("Merging")
         
-    print(msa1)
-    print(msa1[0].annotations)
-    print(msa2)
-    print(msa2[0].annotations)
+    logging.debug(msa1)
+    logging.debug(msa1[0].annotations)
+    logging.debug(msa2)
+    logging.debug(msa2[0].annotations)
         
     # Compute the offset: number of extra reference columns that msa2 needs in
     # front of it. This will always be positive or 0.
     msa2_leading_offset = (msa2[0].annotations["start"] - 
         msa1[0].annotations["start"])
     
-    print("{}bp between left and right alignments".format(msa2_leading_offset))
+    logging.debug("{}bp between left and right alignment starts".format(
+        msa2_leading_offset))
         
     # It would be nice if we could shortcut by adjoining compatible alignments,
     # but the IDs wouldn't match up at all.
@@ -379,6 +410,8 @@ def mergeMSAs(msa1, msa2, full_ref):
         # We used some of MSA1
         msa1Pos += 1
         
+    logging.debug("Used {}/{} offset".format(refChars, msa2_leading_offset))
+        
     while refChars < msa2_leading_offset:
         # We have a gap between the first MSA and the second, and we need to
         # fill it with reference sequence.
@@ -398,8 +431,8 @@ def mergeMSAs(msa1, msa2, full_ref):
         # Until we hit the end of both sequences
         
         if refChars % 10000 == 0:
-            print("Now at {} in alignment 1, {} in alignment 2, {} in reference"
-                .format(msa1Pos, msa2Pos, refChars))
+            logging.debug("Now at {} in alignment 1, {} in alignment 2, {} in "
+                "reference".format(msa1Pos, msa2Pos, refChars))
         
         if(msa1[0, msa1Pos] == "-"):
             # We have a gap in the first reference. Put this column from the
@@ -445,8 +478,8 @@ def mergeMSAs(msa1, msa2, full_ref):
             # Neither has a gap. They both have real characters.
             
             if(msa1[0, msa1Pos] != msa2[0, msa2Pos]):
-                print msa1
-                print msa2
+                logging.error(msa1)
+                logging.error(msa2)
                 raise RuntimeError("{} in reference 1 does not match {} "
                     "in reference 2".format(msa1[0, msa1Pos], msa2[0, msa2Pos])) 
             
@@ -470,13 +503,18 @@ def mergeMSAs(msa1, msa2, full_ref):
         for otherMerged in merged[1:]:
             # Make sure we aren't dropping characters anywhere.
             assert(len(otherMerged) == len(merged[0]))
+           
+    logging.debug("At {}/{} of msa2".format(msa2Pos, len(msa2[0])))
             
     while msa2Pos < len(msa2[0]):
         # MAS1 finished first and now we have to finish up with the tail end of
         # MSA2
         
-        for i in xrange(len(msa1)):
-            # For the reference and all the sequences in msa1, add gaps
+        # For the reference, put whatever it has in MSA2
+        merged[0].append(msa2[0][msa2Pos])
+        
+        for i in xrange(1, len(msa1)):
+            # For all the sequences in msa1, add gaps
             merged[i].append("-")
        
         for i, character in zip(xrange(len(msa1),
@@ -530,6 +568,15 @@ def main(args):
     name. The return value should be used as the program's exit code.
     """
     
+    logging.basicConfig(level=logging.DEBUG)
+    
+    if len(args) == 2 and args[1] == "--test":
+        # Run the tests
+        return doctest.testmod(optionflags=doctest.NORMALIZE_WHITESPACE)
+        
+    # Set up logging
+    logging.basicConfig(level=logging.INFO)
+    
     options = parse_args(args) # This holds the nicely-parsed options object
     
     # Load all the FASTAs, indexed
@@ -560,7 +607,7 @@ def main(args):
     combined_msa = None
         
     for psl in options.psls:
-        print("Processing {}".format(psl))
+        logging.debug("Processing {}".format(psl))
     
         # For each PSL we want in out MAF
         for result in SearchIO.parse(psl, "blat-psl"):
@@ -594,7 +641,7 @@ def main(args):
                     # Let's make an MSA describing the entire HSP.
                     hsp_msa = None
                     
-                    print("Starting a new HSP")
+                    logging.info("Starting a new HSP")
                     
                     for fragment in hsp:
                         # For every HSP fragment in the HSP (actual alignment
@@ -697,10 +744,10 @@ def main(args):
                     combined_msa = mergeMSAs(combined_msa, hsp_msa,
                         getSequence(hsp_msa[0].id))
                         
-                    print("Finished HSP, have MSA:")
-                    print(combined_msa)
+                    logging.info("Finished HSP, have MSA:")
+                    logging.info(combined_msa)
     
-    print("Writing output")
+    logging.info("Writing output")
     
     # Save all the alignments in one MAF. TODO: Don't save two copies like this.
     AlignIO.write(allMSAs + [combined_msa], options.maf, "maf")
