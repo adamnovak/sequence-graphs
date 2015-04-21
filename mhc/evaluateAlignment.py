@@ -48,7 +48,7 @@ def parse_args(args):
         
     return parser.parse_args(args)
     
-def parse_halstats_output(stream):
+def parse_halstats_stats(stream):
     """
     Parse the output of halStats on a HAL file, from the given iterable.
     
@@ -66,7 +66,7 @@ def parse_halstats_output(stream):
     ... "GI568335879, 0, 4672374, 1, 25067, 0",
     ... "ref, 0, 4970457, 1, 49220, 0",
     ... ""]
-    >>> parsed = list(parse_halstats_output(lines))
+    >>> parsed = list(parse_halstats_stats(lines))
     >>> len(parsed)
     3
     >>> parsed[1]["GenomeName"]
@@ -108,9 +108,10 @@ def parse_halstats_output(stream):
         # Yield each record as we parse it
         yield record
         
-def metric_halstats(hal_filename):
+def get_halstats_stats(hal_filename):
     """
-    A metric that runs halStats on the given HAL, and returns the results.
+    Go get the halStats results, and return a list of dicts of stats, one per
+    genome in the HAL.
     
     The halStats program must be on the PATH.
     
@@ -123,7 +124,7 @@ def metric_halstats(hal_filename):
     process = subprocess.Popen(args, stdout=subprocess.PIPE)
         
     # Parse the results
-    parsed = list(parse_halstats_output(process.stdout))
+    stats_list = list(parse_halstats_stats(process.stdout))
             
     if process.wait() != 0:
         raise RuntimeError("halStats failed")
@@ -131,8 +132,155 @@ def metric_halstats(hal_filename):
     # We are done with this process.
     process.stdout.close()
     
+    return stats_list
+    
+def parse_halstats_coverage(stream):
+    """
+    Parse the output of halStats --coverage on a HAL file, from the given
+    iterable.
+    
+    Returns a dict from alignment partner name to total number of bases in that
+    alignment partner covered (i.e. the sum of the at least once, at least
+    twice, at least thrice, etc. numbers.)
+    
+    >>> lines = [
+    ... "Genome, # of sites mapping at least once, twice, thrice, ...",
+    ... "ref, 81189, 11, 5",
+    ... "GI262359905, 81187, 22, 3, 1",
+    ... "GI528476558, 81007, 1"]
+    >>> pprint.pprint(parse_halstats_coverage(lines))
+    {'GI262359905': 81213, 'GI528476558': 81008, 'ref': 81205}
+    
+    """
+    
+    # Get a reader and skip the first line
+    reader = csv.reader(stream)
+    for i in xrange(1):
+       next(reader)
+        
+    # This is the dict we will populate
+    to_return = {}
+        
+    for data in reader:
+        if len(data) == 0:
+            # We finished the table
+            break
+        
+        
+        # Drop all the whitespace
+        data = [x.strip() for x in data]
+            
+        # Sum up all the numbers in the row and save them under the contents of
+        # the first column.
+        to_return[data[0]] = sum([int(x) for x in data[1:]])
+    
+    # Return the populated dict
+    return to_return
+    
+def get_halstats_coverage(hal_filename, genome):
+    """
+    Get the number of bases that each other genome has aligned to the given
+    genome in the given HAL file.
+    
+    The halStats program must be on the PATH.
+    
+    """
+    
+    # First we need to get the coverage
+    args = ["halStats", hal_filename, "--coverage", genome]
+
+    # Open the process
+    process = subprocess.Popen(args, stdout=subprocess.PIPE)
+    
+    # Keep the dict from name to total columns shared with the reference.
+    coverage_dict = parse_halstats_coverage(process.stdout)
+            
+    if process.wait() != 0:
+        raise RuntimeError("halStats --coverage failed")
+        
+    return coverage_dict
+    
+def parse_halstats_basecomp(stream):
+    r"""
+    Parse the output of halStats --baseComp on a HAL file and a genomne, from
+    the given iterable.
+    
+    Returns the total fraction of the genome tested that is not Ns, clamped to
+    1.
+    
+    >>> lines = ["0.290273\t0.220496\t0.208913\t0.280317"]
+    >>> print(parse_halstats_basecomp(lines))
+    0.999999
+    
+    >>> lines = ["0.290273\t0.220496\t0.208913\t0.280319"]
+    >>> print(parse_halstats_basecomp(lines))
+    1.0
+    
+    """
+    
+    # Grab the first (only) line
+    line = next(iter(stream))
+    
+    # Split it by tabs, parse the numbers, sum up, and min with 1.
+    return min(1.0, sum([float(x) for x in line.split("\t")]))
+    
+def get_halstats_basecomp(hal_filename, genome):
+    """
+    Get the portion of the given genome that is not N in the given HAL, clamped
+    to 1.
+    
+    """
+    
+    # First we need to write the args.
+    args = ["halStats", hal_filename, "--baseComp", "{},1".format(genome)]
+
+    # Open the process
+    process = subprocess.Popen(args, stdout=subprocess.PIPE)
+    
+    # Parse out the portion that is not N.
+    non_n = parse_halstats_basecomp(process.stdout)
+            
+    if process.wait() != 0:
+        raise RuntimeError("halStats --baseComp failed")
+        
+    return non_n
+
+        
+def metric_halstats(hal_filename, reference_id="ref"):
+    """
+    A metric that runs halStats on the given HAL, and returns the results.
+    
+    Results include coverage against the genome specified by reference_id, but
+    ignoring bases in each other genome that are N and thus cannot be aligned.
+    
+    The halStats program must be on the PATH.
+    
+    """
+    
+    # Get the list of dicts of per-genome stats.
+    status_list = get_halstats_stats(hal_filename)
+    
+    # Get the dict from genome name to total columns shared with the reference.
+    coverage_dict = get_halstats_coverage(hal_filename, reference_id)
+            
+    for entry in status_list:
+        # For each genome, we want the coverage against the reference.
+        
+        # Grab the genome name
+        genome_name = entry["GenomeName"]
+        
+        # Figure out how much of it is not Ns
+        non_n = get_halstats_basecomp(hal_filename, genome_name)
+        
+        # How many bases are eligible?
+        eligible = float(entry["Length"] * non_n)
+    
+        # Compute and save the coverage for each entry, by dividing bases
+        # aligned by bases eligible.
+        entry["Coverage"] = coverage_dict[genome_name] / eligible
+            
     # Return the results
-    return parsed
+    return status_list
     
 def hal2maf(hal_filename):
     """
