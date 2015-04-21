@@ -992,3 +992,179 @@ writeAlignmentFasta(
     fasta.close();
 
 }
+
+void
+writeLastGraph(
+    stPinchThreadSet* threadSet,
+    const std::string& filename
+) {
+
+    // Work out the node count. Each block will count as a node, as will each
+    // segment not in a block.
+    
+    // So we need to log seen blocks
+    std::set<stPinchBlock*> seenBlocks;
+    
+    // And we need to count up free segments.
+    size_t freeSegments = 0;
+    
+    // Grab a segment iterator.
+    stPinchThreadSetSegmentIt segments = stPinchThreadSet_getSegmentIt(
+        threadSet);
+        
+    for(stPinchSegment* segment = stPinchThreadSetSegmentIt_getNext(&segments);
+        segment != nullptr;
+        segment = stPinchThreadSetSegmentIt_getNext(&segments)) {
+        
+        // For each segment...
+        
+        // Get the block it belongs to.
+        stPinchBlock* block = stPinchSegment_getBlock(segment);
+        
+        if(block == nullptr) {
+            // It's a free segment
+            freeSegments++;
+        } else {
+            // Put it in the set of seen blocks, to deduplicate it.
+            seenBlocks.insert(block);
+        }
+    }
+    
+    // Open the LastGraph output file to write
+    std::ofstream lastGraph(filename.c_str());
+    
+    // Write the header: that many nodes, no sequences, and k=0?
+    lastGraph << freeSegments + seenBlocks.size() << "\t" << 0 << "\t" << 0 <<
+        std::endl;
+    
+    // Write each block and each single segment as a node, named with some ID.
+
+    // We need signed IDs for these poitners.
+    std::map<void*, int64_t> blockSegmentIds;
+    
+    // Start scanning the threadset again
+    segments = stPinchThreadSet_getSegmentIt(threadSet);
+        
+    for(stPinchSegment* segment = stPinchThreadSetSegmentIt_getNext(&segments);
+        segment != nullptr;
+        segment = stPinchThreadSetSegmentIt_getNext(&segments)) {
+        
+        // For each segment...
+        
+        // Get the block it belongs to.
+        stPinchBlock* block = stPinchSegment_getBlock(segment);
+        
+        // What ID will we assign if we need one?
+        int64_t assignedId = blockSegmentIds.size() + 1;
+        
+        if(block == nullptr) {
+            // It's a free segment. We can't have seen it before. Assign it an
+            // ID. Make sure the IDs are nonzero.
+            blockSegmentIds.emplace((void*) segment, assignedId);
+        } else {
+            // It's a block
+            
+            if(blockSegmentIds.count((void*) block)) {
+                // And we have seen it before,
+                continue;
+            }
+            
+            // This block has no assigned ID yet, assign one.
+            blockSegmentIds.emplace((void*) block, assignedId);
+        }
+        
+        // If we get here, this is a novel thing, so mention it. Give "NODE",
+        // ID, length, and number of columns covered.
+        lastGraph << "NODE\t" << assignedId << "\t" << 
+            stPinchSegment_getLength(segment) << "\t" << 
+            (block == nullptr ? 0 : stPinchSegment_getLength(segment)) << 
+            std::endl;
+            
+        for(int i = 0; i < 2; i++) {
+            // TODO: give the forward and reverse kmer-corrected sequences. For
+            // now give two lines of Ns.
+            for(size_t j = 0; j < stPinchSegment_getLength(segment); j++) {
+                // One N per base in the segment/block
+                lastGraph << "N";
+            }
+            lastGraph << std::endl;
+        }
+        
+    }
+    
+    // Write each edge between blocks as an arc.
+    
+    // We're going to traverse each thread and add all the edges we don't have
+    // yet. For segments that's easy because we only see each once. But for
+    // block to block edges we need to remember what we have said. So for
+    // simplicity we'll just remember all of them.
+    std::set<std::pair<int64_t, int64_t>> observedEdges;
+    
+    // So go look at all the threads.
+    stPinchThreadSetIt threads = stPinchThreadSet_getIt(threadSet);
+
+    for(stPinchThread* thread = stPinchThreadSetIt_getNext(&threads);
+        thread != nullptr; thread = stPinchThreadSetIt_getNext(&threads)) {
+        
+        // For each thread in the set, we need to look at all the segments.
+        
+        // Start with the first.
+        for(stPinchSegment* leftSegment = stPinchThread_getFirst(thread);
+            leftSegment != nullptr; leftSegment = stPinchSegment_get3Prime(
+            leftSegment)) {
+            // For every segment
+            
+            // Look right
+            stPinchSegment* rightSegment = stPinchSegment_get3Prime(
+                leftSegment);
+            
+            if(rightSegment == nullptr) {
+                // We're done!
+                break;
+            }
+            
+            // Get the left and right blocks (or nullptr for each) and block
+            // orientations (defaulting to false).
+            stPinchBlock* leftBlock = stPinchSegment_getBlock(leftSegment);
+            stPinchBlock* rightBlock = stPinchSegment_getBlock(rightSegment);
+            bool leftOrientation = (leftBlock != nullptr) &&
+                stPinchSegment_getBlockOrientation(leftSegment);
+            bool rightOrientation = (rightBlock != nullptr) &&
+                stPinchSegment_getBlockOrientation(rightSegment);
+                
+            // Get the IDs for the left and right things, with appropriate signs
+            int64_t leftId = leftBlock ? blockSegmentIds[(void*) leftBlock] : 
+                blockSegmentIds[(void*) leftSegment];
+            if(leftOrientation) {
+                leftId = -leftId;
+            }
+            int64_t rightId = rightBlock ? blockSegmentIds[(void*) rightBlock] : 
+                blockSegmentIds[(void*) rightSegment];
+            if(rightOrientation) {
+                rightId = -rightId;
+            }
+            
+            // Make the edge we want to put
+            std::pair<int64_t, int64_t> edge({leftId, rightId});
+            
+            // And the RC of that edge, in case that was encountered first.
+            std::pair<int64_t, int64_t> rcEdge({-rightId, -leftId});
+            
+            if(observedEdges.count(edge) || observedEdges.count(rcEdge)) {
+                // We already did this edge, just skip it.
+                continue;
+            }
+            
+            // Write the edge
+            lastGraph << "ARC\t" << edge.first << "\t" << edge.second <<
+                std::endl;
+            
+            // Remember we did that
+            observedEdges.insert(edge);
+                
+        }
+
+        
+    }
+
+}

@@ -176,4 +176,18 @@ writeAlignmentFasta(
     std::string filename
 );
 
+/**
+ * Write the given pinch graph in (badly non-standard) LastGraph format,
+ * intended for import by Bandage.
+ *
+ * Takes the thread set, and a file to save to.
+ *
+ * TODO: needs a way to get the sequence bases.
+ */
+void
+writeLastGraph(
+    stPinchThreadSet* threadSet,
+    const std::string& filename
+);
+
 #endif
