@@ -16,10 +16,6 @@ from Bio import AlignIO, SeqIO, Align
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
-# We need yet another comprehensive bio library in Python since BioPython hasn't
-# got interval trees.
-from bx.intervals import IntervalTree
-
 def parse_args(args):
     """
     Takes in the command-line arguments list (args), and returns a nice argparse
@@ -197,8 +193,10 @@ def metric_mafcomparator(maf_filename, maf_truth):
     # Set up the mafComparator arguments. We sample only a subset of the
     # columns, but still enough that we will probably get a good number of
     # sig figs on coverage.
-    args = ["mafComparator", "--maf1", self.maf_a, "--maf2",
-        self.maf_b, "--out", xml_filename, "--seed", str(seed), "--samples",
+    
+    # Use a hardcoded seed for consistency
+    args = ["mafComparator", "--maf1", maf_truth, "--maf2",
+        maf_filename, "--out", xml_filename, "--seed", "1", "--samples",
         "1000000"]
     
     # Run mafComparator and generate the output XML
@@ -254,7 +252,7 @@ def main(args):
         precision, recall = metric_mafcomparator(maf_filename, options.truth)
 
         # TODO: Output better        
-        pprint.pprint(precision, recall)
+        print(precision, recall)
         
     if options.beds is not None or options.truth is not None:
         # Clean up the MAF

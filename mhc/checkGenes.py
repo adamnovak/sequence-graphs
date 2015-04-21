@@ -272,7 +272,6 @@ def check_genes(maf_filename, genes_filenames):
             gene1, gene2 = gene2, gene1
             
         if (gene1, gene2) not in gene_pairs:
-            print("{} aligns to {}".format(gene1, gene2))
             gene_pairs.add((gene1, gene2))
             
         
