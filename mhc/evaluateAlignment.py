@@ -171,8 +171,8 @@ def parse_halstats_coverage(stream):
         data = [x.strip() for x in data]
             
         # Sum up all the numbers in the row and save them under the contents of
-        # the first column.
-        to_return[data[0]] = sum([int(x) for x in data[1:]])
+        # the first column. These numbers may be big enough to need exponents.
+        to_return[data[0]] = sum([float(x) for x in data[1:]])
     
     # Return the populated dict
     return to_return
@@ -269,11 +269,21 @@ def metric_halstats(hal_filename, reference_id="ref"):
         # Grab the genome name
         genome_name = entry["GenomeName"]
         
+        if not coverage_dict.has_key(genome_name):
+            # This is probably the root sequence and didn't get a covrage for
+            # some reason. At any rate, the root sequence would be all Ns
+            continue
+        
         # Figure out how much of it is not Ns
         non_n = get_halstats_basecomp(hal_filename, genome_name)
         
         # How many bases are eligible?
         eligible = float(entry["Length"] * non_n)
+        
+        if eligible == 0:
+            # No coverage is defined
+            entry["Coverage"] = float("NaN")
+            continue
     
         # Compute and save the coverage for each entry, by dividing bases
         # aligned by bases eligible.
