@@ -999,6 +999,8 @@ writeLastGraph(
     const std::string& filename
 ) {
 
+    Log::info() << "Saving LastGraph to " << filename << std::endl;
+
     // Work out the node count. Each block will count as a node, as will each
     // segment not in a block.
     
@@ -1033,9 +1035,11 @@ writeLastGraph(
     // Open the LastGraph output file to write
     std::ofstream lastGraph(filename.c_str());
     
-    // Write the header: that many nodes, no sequences, and k=0?
+    // Write the header: that many nodes, no sequences, and k=0. And also an
+    // extra number field that Bandages wants, to convince it we have the right
+    // format.
     lastGraph << freeSegments + seenBlocks.size() << "\t" << 0 << "\t" << 0 <<
-        std::endl;
+        "\t" << 0 << std::endl;
     
     // Write each block and each single segment as a node, named with some ID.
 
@@ -1074,11 +1078,12 @@ writeLastGraph(
         }
         
         // If we get here, this is a novel thing, so mention it. Give "NODE",
-        // ID, length, and number of columns covered.
+        // ID, length, and a coverage which is the total bases in the whole
+        // block/segment.
         lastGraph << "NODE\t" << assignedId << "\t" << 
             stPinchSegment_getLength(segment) << "\t" << 
-            (block == nullptr ? 0 : stPinchSegment_getLength(segment)) << 
-            std::endl;
+            stPinchSegment_getLength(segment) * (block == nullptr ? 1 : 
+            stPinchBlock_getDegree(block)) << std::endl;
             
         for(int i = 0; i < 2; i++) {
             // TODO: give the forward and reverse kmer-corrected sequences. For
@@ -1166,5 +1171,8 @@ writeLastGraph(
 
         
     }
+    
+    // Close the file.
+    lastGraph.close();
 
 }

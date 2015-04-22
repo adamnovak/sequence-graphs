@@ -17,7 +17,7 @@ if [ ! -d "${DIR}" ]; then
 fi
 
 # Make the graph
-./createIndex/createIndex "${DIR}/index" --mapType zip --context 25 --minEditBound 5 "${DIR}/ref.fa" "${DIR}"/GI*.fa --alignment "${DIR}/graph.c2h" --alignmentFasta "${DIR}/graph.fa" --mapStats "${DIR}/stats.txt"
+./createIndex/createIndex "${DIR}/index" --mapType zip --context 25 --minEditBound 5 "${DIR}/ref.fa" "${DIR}"/GI*.fa --alignment "${DIR}/graph.c2h" --alignmentFasta "${DIR}/graph.fa" --mapStats "${DIR}/stats.txt" --lastGraph "${DIR}/graph.lastgraph"
 
 # Make the tree
 TREE="($(ls ${DIR}/GI*.fa | xargs -n 1 basename | tr '\n' ',' | sed 's/.fa//g')ref)rootSeq;"

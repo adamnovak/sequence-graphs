@@ -484,6 +484,8 @@ main(
             "File to save .c2h-format alignment in")
         ("alignmentFasta", boost::program_options::value<std::string>(), 
             "File in which to save FASTA records for building HAL from .c2h")
+        ("lastGraph", boost::program_options::value<std::string>(),
+            "File in which to dump the merged graph in LastGraph format")
         ("degrees", boost::program_options::value<std::string>(), 
             "File in which to save degrees of pinch graph nodes")
         ("spectrum", boost::program_options::value<std::string>(), 
@@ -722,6 +724,12 @@ main(
                 options["alignmentFasta"].as<std::string>());
         }
         
+    }
+    
+    if(options.count("lastGraph")) {
+        // Save in as good an approximation of LastGraph format as we can get at
+        // the moment.
+        writeLastGraph(threadSet, options["lastGraph"].as<std::string>());
     }
     
     // Make an IDSource to produce IDs not already claimed by contigs.
