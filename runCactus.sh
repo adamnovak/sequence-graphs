@@ -56,6 +56,6 @@ for REGION in SMA MHC LRC_KIR; do
         printf "${BASE_NAME} ${FASTA_FILE}\n" >>${STAR_FILENAME}
     done
 
-    /cluster/home/hickey/genomes/progressiveCactus/bin/runProgressiveCactus.sh --batchSystem parasol --bigBatchSystem singleMachine --defaultMemory 8589934593 --bigMemoryThreshold 8589934592 --bigMaxMemory 893353197568 --bigMaxCpus 25 --maxThreads 25 --parasolCommand='/cluster/home/jcarmstr/bin/parasol -host=ku' --retryCount 3 ${STAR_FILENAME} ${WORK_DIR} ${HAL} --logInfo
+    /hive/users/anovak/build/progressiveCactus/bin/runProgressiveCactus.sh --batchSystem parasol --bigBatchSystem singleMachine --defaultMemory 8589934593 --bigMemoryThreshold 8589934592 --bigMaxMemory 893353197568 --bigMaxCpus 25 --maxThreads 25 --parasolCommand='/cluster/home/jcarmstr/bin/parasol -host=ku' --retryCount 3 ${STAR_FILENAME} ${WORK_DIR} ${HAL} --logInfo
 
 done
