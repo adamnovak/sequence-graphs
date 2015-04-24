@@ -270,7 +270,7 @@ def metric_halstats(hal_filename, reference_id="ref"):
         genome_name = entry["GenomeName"]
         
         if not coverage_dict.has_key(genome_name):
-            # This is probably the root sequence and didn't get a covrage for
+            # This is probably the root sequence and didn't get a coverage for
             # some reason. At any rate, the root sequence would be all Ns
             continue
         
