@@ -38,9 +38,15 @@ def parse_args(args):
     parser.add_argument("hal",
         help="HAL file to evaluate")
     parser.add_argument("--truth",
-        help=".maf file of a true alignment for precision and recall")
+        help="MAF file of a true alignment for precision and recall")
     parser.add_argument("--beds", nargs="*",
-        help=".bed file(s) of genes on the genomes in the HAL")
+        help="BED file(s) of genes on the genomes in the HAL")
+    parser.add_argument("--coverage_file", type=argparse.FileType("w"),
+        default = sys.stdout,
+        help="file to save average coverage vs. the reference in (one number)")
+    parser.add_argument("--precision_recall_file", type=argparse.FileType("w"),
+        default = sys.stdout,
+        help="TSV file to save precision and recall in (two numbers)")
     
     # The command line arguments start with the program name, which we don't
     # want to treat as an argument for argparse. So we remove it.
@@ -134,22 +140,21 @@ def get_halstats_stats(hal_filename):
     
     return stats_list
     
-def parse_halstats_coverage(stream):
+def parse_halstats_coverage(stream, reference_id):
     """
     Parse the output of halStats --coverage on a HAL file, from the given
     iterable.
     
-    Returns a dict from alignment partner name to total number of bases in that
-    alignment partner covered (i.e. the sum of the at least once, at least
-    twice, at least thrice, etc. numbers.)
+    Returns the number of bases that are mapped at least once against the genome
+    with the reference_id.
     
     >>> lines = [
     ... "Genome, # of sites mapping at least once, twice, thrice, ...",
     ... "ref, 81189, 11, 5",
     ... "GI262359905, 81187, 22, 3, 1",
     ... "GI528476558, 81007, 1"]
-    >>> pprint.pprint(parse_halstats_coverage(lines))
-    {'GI262359905': 81213, 'GI528476558': 81008, 'ref': 81205}
+    >>> print(parse_halstats_coverage(lines))
+    81189
     
     """
     
@@ -157,9 +162,6 @@ def parse_halstats_coverage(stream):
     reader = csv.reader(stream)
     for i in xrange(1):
        next(reader)
-        
-    # This is the dict we will populate
-    to_return = {}
         
     for data in reader:
         if len(data) == 0:
@@ -170,35 +172,45 @@ def parse_halstats_coverage(stream):
         # Drop all the whitespace
         data = [x.strip() for x in data]
             
-        # Sum up all the numbers in the row and save them under the contents of
-        # the first column. These numbers may be big enough to need exponents.
-        to_return[data[0]] = sum([float(x) for x in data[1:]])
+        if data[0] == reference_id:
+            if len(data) > 1:
+                # We have some bases aligned
+                return float(data[1])
+            else:
+                # We had no bases aligned
+                return 0.0
     
-    # Return the populated dict
-    return to_return
-    
-def get_halstats_coverage(hal_filename, genome):
+def get_halstats_coverage(hal_filename, other_genomes, reference_id):
     """
-    Get the number of bases that each other genome has aligned to the given
-    genome in the given HAL file.
+    Get the number of bases that each other genome in the other_genomes list has
+    aligned to the reference_id genome in the given HAL file.
     
     The halStats program must be on the PATH.
     
     """
     
-    # First we need to get the coverage
-    args = ["halStats", hal_filename, "--coverage", genome]
-
-    # Open the process
-    process = subprocess.Popen(args, stdout=subprocess.PIPE)
+    # This will be a dict from genome ID to coverage
+    to_return = {}
     
-    # Keep the dict from name to total columns shared with the reference.
-    coverage_dict = parse_halstats_coverage(process.stdout)
-            
-    if process.wait() != 0:
-        raise RuntimeError("halStats --coverage failed")
+    for other_genome in other_genomes:
+    
+        # First we need to get the coverage
+        args = ["halStats", hal_filename, "--coverage", other_genome]
+
+        # Open the process
+        process = subprocess.Popen(args, stdout=subprocess.PIPE)
         
-    return coverage_dict
+        # Get the number of bases of the other genome that are aligned to
+        # anywhere (or any set of more than one place) in the reference genome.
+        coverage = parse_halstats_coverage(process.stdout, reference_id)
+                
+        if process.wait() != 0:
+            raise RuntimeError("halStats --coverage failed")
+            
+        # Save the result
+        to_return[other_genome] = coverage
+        
+    return to_return
     
 def parse_halstats_basecomp(stream):
     r"""
@@ -260,8 +272,16 @@ def metric_halstats(hal_filename, reference_id="ref"):
     # Get the list of dicts of per-genome stats.
     status_list = get_halstats_stats(hal_filename)
     
-    # Get the dict from genome name to total columns shared with the reference.
-    coverage_dict = get_halstats_coverage(hal_filename, reference_id)
+    # Throw out non-leaves
+    status_list = [entry for entry in status_list if entry["NumChildren"] == 0]
+    
+    # Grab all the genome names
+    genome_names = [entry["GenomeName"] for entry in status_list]
+    
+    # Get the dict from genome name to total bases from that genome aligned to
+    # the reference at all.
+    coverage_dict = get_halstats_coverage(hal_filename, genome_names,
+        reference_id)
             
     for entry in status_list:
         # For each genome, we want the coverage against the reference.
@@ -384,8 +404,22 @@ def main(args):
     
     options = parse_args(args) # This holds the nicely-parsed options object
     
+    # Get the halStats output, annotated with coverage
+    halstats_list = metric_halstats(options.hal)
+    
     # Print the halStats output
-    pprint.pprint(metric_halstats(options.hal))
+    pprint.pprint(halstats_list)
+    
+    # Get the coverages vs ref for everything but ref
+    coverages = [entry["Coverage"] for entry in halstats_list if
+        entry["GenomeName"] != "ref"]
+    
+    # Compute the average coverage
+    average_coverage = sum(coverages) / float(len(coverages))
+    
+    # Save it
+    TsvWriter(options.coverage_file).line(average_coverage)
+    
     
     if options.beds is not None or options.truth is not None:
         # We need a MAF for checkGenes and for the precision/recall
@@ -411,6 +445,9 @@ def main(args):
 
         # TODO: Output better        
         print(precision, recall)
+        
+        # Save them
+        TsvWriter(options.precision_recall_file).line(precision, recall)
         
     if options.beds is not None or options.truth is not None:
         # Clean up the MAF
