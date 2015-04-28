@@ -50,12 +50,14 @@ for REGION in SMA MHC LRC_KIR; do
     printf ");\n\n" >>${STAR_FILENAME}
     
     for FASTA_FILE in ${FASTA_FILES}; do
+        # Put each FASTA for its genome in the table at the bottom
         FILE_NAME="${FASTA_FILE##*/}"
         BASE_NAME="${FILE_NAME%.*}"
         
         printf "${BASE_NAME} ${FASTA_FILE}\n" >>${STAR_FILENAME}
     done
 
+    # Actually run Cactus. TODO: depends on loads of other stuff on our cluster.
     /hive/users/anovak/build/progressiveCactus/bin/runProgressiveCactus.sh --batchSystem parasol --bigBatchSystem singleMachine --defaultMemory 8589934593 --bigMemoryThreshold 8589934592 --bigMaxMemory 893353197568 --bigMaxCpus 25 --maxThreads 25 --parasolCommand='/cluster/home/jcarmstr/bin/parasol -host=ku' --retryCount 3 ${STAR_FILENAME} ${WORK_DIR} ${HAL} --logDebug
 
 done

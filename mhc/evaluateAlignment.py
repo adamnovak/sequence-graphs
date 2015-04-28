@@ -8,6 +8,10 @@ and metrics.
 import argparse, sys, os, os.path, random, subprocess, shutil, itertools
 import collections, csv, tempfile, xml.etree
 
+# Get a Pool that doesn't make us marshall stuff back and forth. See
+# <http://chriskiehl.com/article/parallelism-in-one-line/>
+from multiprocessing.dummy import Pool as ThreadPool 
+
 import doctest, pprint
 
 import tsv
@@ -53,6 +57,15 @@ def parse_args(args):
     args = args[1:]
         
     return parser.parse_args(args)
+    
+def in_parallel(*args):
+    """
+    Given a list of no-argument functions, execute them in parallel and return
+    their results in a list.
+    """
+    
+    # Execute each in a thread and return them all.
+    return ThreadPool(len(args)).map(lambda x: x(), args)
     
 def parse_halstats_stats(stream):
     """
@@ -189,12 +202,10 @@ def get_halstats_coverage(hal_filename, other_genomes, reference_id):
     
     """
     
-    # This will be a dict from genome ID to coverage
-    to_return = {}
+    print("Getting mapping counts")
     
-    for other_genome in other_genomes:
-    
-        # First we need to get the coverage
+    def get_coverage_for_genome(other_genome):
+        # Set up the arguments
         args = ["halStats", hal_filename, "--coverage", other_genome]
 
         # Open the process
@@ -207,10 +218,14 @@ def get_halstats_coverage(hal_filename, other_genomes, reference_id):
         if process.wait() != 0:
             raise RuntimeError("halStats --coverage failed")
             
-        # Save the result
-        to_return[other_genome] = coverage
-        
-    return to_return
+        # Give back the coverage (in columns)
+        return coverage
+    
+    # Get all the coverages in order, and in parallel.
+    coverages = ThreadPool(len(other_genomes)).map(get_coverage_for_genome, 
+        other_genomes) 
+    
+    return dict(itertools.izip(other_genomes, coverages))
     
 def parse_halstats_basecomp(stream):
     r"""
@@ -236,26 +251,37 @@ def parse_halstats_basecomp(stream):
     # Split it by tabs, parse the numbers, sum up, and min with 1.
     return min(1.0, sum([float(x) for x in line.split("\t")]))
     
-def get_halstats_basecomp(hal_filename, genome):
+def get_halstats_basecomps(hal_filename, genomes):
     """
-    Get the portion of the given genome that is not N in the given HAL, clamped
-    to 1.
+    Get a dict from genome name to the portion of the given genome that is not N
+    in the given HAL, clamped to 1.
     
     """
     
-    # First we need to write the args.
-    args = ["halStats", hal_filename, "--baseComp", "{},1".format(genome)]
+    print("Getting N counts")
+    
+    def get_basecomp_for_genome(genome):
+        # First we need to write the args.
+        args = ["halStats", hal_filename, "--baseComp", "{},1".format(genome)]
 
-    # Open the process
-    process = subprocess.Popen(args, stdout=subprocess.PIPE)
-    
-    # Parse out the portion that is not N.
-    non_n = parse_halstats_basecomp(process.stdout)
-            
-    if process.wait() != 0:
-        raise RuntimeError("halStats --baseComp failed")
+        # Open the process
+        process = subprocess.Popen(args, stdout=subprocess.PIPE)
         
-    return non_n
+        # Parse out the portion that is not N.
+        non_n = parse_halstats_basecomp(process.stdout)
+                
+        if process.wait() != 0:
+            raise RuntimeError("halStats --baseComp failed")
+            
+        return non_n
+    
+    # Get all the base compositions in order, and in parallel.
+    basecomps = ThreadPool(len(genomes)).map(get_basecomp_for_genome, genomes) 
+    
+    # Make the dict we are supposed to return and return it.
+    return dict(itertools.izip(genomes, basecomps))
+    
+    
 
         
 def metric_halstats(hal_filename, reference_id="ref"):
@@ -279,10 +305,11 @@ def metric_halstats(hal_filename, reference_id="ref"):
     genome_names = [entry["GenomeName"] for entry in status_list]
     
     # Get the dict from genome name to total bases from that genome aligned to
-    # the reference at all.
-    coverage_dict = get_halstats_coverage(hal_filename, genome_names,
-        reference_id)
-            
+    # the reference at all, and the dict of N compositions, in parallel.
+    coverage_dict, basecomp_dict = in_parallel(
+        lambda: get_halstats_coverage(hal_filename, genome_names, reference_id),
+        lambda: get_halstats_basecomps(hal_filename, genome_names))
+        
     for entry in status_list:
         # For each genome, we want the coverage against the reference.
         
@@ -295,7 +322,7 @@ def metric_halstats(hal_filename, reference_id="ref"):
             continue
         
         # Figure out how much of it is not Ns
-        non_n = get_halstats_basecomp(hal_filename, genome_name)
+        non_n = basecomp_dict[genome_name]
         
         # How many bases are eligible?
         eligible = float(entry["Length"] * non_n)
@@ -418,7 +445,7 @@ def main(args):
     average_coverage = sum(coverages) / float(len(coverages))
     
     # Save it
-    TsvWriter(options.coverage_file).line(average_coverage)
+    tsv.TsvWriter(options.coverage_file).line(average_coverage)
     
     
     if options.beds is not None or options.truth is not None:
@@ -447,7 +474,7 @@ def main(args):
         print(precision, recall)
         
         # Save them
-        TsvWriter(options.precision_recall_file).line(precision, recall)
+        tsv.TsvWriter(options.precision_recall_file).line(precision, recall)
         
     if options.beds is not None or options.truth is not None:
         # Clean up the MAF
