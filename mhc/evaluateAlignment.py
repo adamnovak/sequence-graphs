@@ -51,6 +51,11 @@ def parse_args(args):
     parser.add_argument("--precision_recall_file", type=argparse.FileType("w"),
         default = sys.stdout,
         help="TSV file to save precision and recall in (two numbers)")
+    parser.add_argument("--gene_category_file", type=argparse.FileType("w"),
+        default = sys.stdout,
+        help="file to save categories and counts for genes in")
+    parser.add_argument("--tag", nargs="*", default=[],
+        help="extra columns to tag all result TSV lines with at the front")
     
     # The command line arguments start with the program name, which we don't
     # want to treat as an argument for argparse. So we remove it.
@@ -361,8 +366,8 @@ def hal2maf(hal_filename):
 def parse_mafcomparator_output(stream):
     """
     Given a stream of XML output from mafComparator, between a truth MAF and a
-    MAF under test (in that order), parse the XML and produce a (precision,
-    recall) tuple.
+    MAF under test (in that order), parse the XML and produce a list of
+    (precision, recall) tuples.
     
     """
     
@@ -376,16 +381,18 @@ def parse_mafcomparator_output(stream):
     # Grab and parse the averages. There should be two.
     averages = [float(stat.attrib["average"]) for stat in stats]
     
+    # TODO: try all the sequence pairs. For now just return the overall stats.
+    
     # Return them in precision, recall order. First we put portion of MAF under
     # test represented in truth (precision), then portion of truth represented
     # in MAF under test (recall).
-    return (averages[1], averages[0])    
+    return [(averages[1], averages[0])]    
 
 def metric_mafcomparator(maf_filename, maf_truth):
     """
     Run mafComparator to compare the given MAF against the given truth MAF.
     
-    Returns a precision, recall tuple.
+    Returns a list of precision, recall tuples.
     
     """
 
@@ -441,11 +448,10 @@ def main(args):
     coverages = [entry["Coverage"] for entry in halstats_list if
         entry["GenomeName"] != "ref"]
     
-    # Compute the average coverage
-    average_coverage = sum(coverages) / float(len(coverages))
-    
-    # Save it
-    tsv.TsvWriter(options.coverage_file).line(average_coverage)
+    for coverage in coverages:
+        # Save all the coverages
+        tsv.TsvWriter(options.coverage_file).list_line(options.tag +
+            [coverage])
     
     
     if options.beds is not None or options.truth is not None:
@@ -460,6 +466,10 @@ def main(args):
         class_counts, gene_sets, gene_pairs = checkGenes.check_genes(
             maf_filename, options.beds)
             
+        for classification, count in class_counts.iteritems():
+            tsv.TsvWriter(options.gene_category_file).list_line(options.tag +
+                [classification, count])
+            
         # Print the output
         pprint.pprint(class_counts)
         pprint.pprint(gene_sets)
@@ -468,13 +478,17 @@ def main(args):
     if options.truth is not None:
     
         # We're going to get precision and recall against the truth.
-        precision, recall = metric_mafcomparator(maf_filename, options.truth)
+        pr_tuples = metric_mafcomparator(maf_filename, options.truth)
 
-        # TODO: Output better        
-        print(precision, recall)
-        
-        # Save them
-        tsv.TsvWriter(options.precision_recall_file).line(precision, recall)
+        for precision, recall in pr_tuples:
+            # Output each PR pair
+
+            # TODO: Output better        
+            print(precision, recall)
+            
+            # Save them
+            tsv.TsvWriter(options.precision_recall_file).list_line(options.tag +
+                [precision, recall])
         
     if options.beds is not None or options.truth is not None:
         # Clean up the MAF

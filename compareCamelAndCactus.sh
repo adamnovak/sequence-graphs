@@ -35,20 +35,24 @@ function mkdtemp()
 # We will keep series-labeled PR and coverage data here
 MAIN_PR="precisionRecall.tsv"
 MAIN_COVERAGE="coverage.tsv"
+MAIN_GENES="geneCategories.tsv"
 
 # Clear them out
 rm -f ${MAIN_PR}
 rm -f ${MAIN_COVERAGE}
+rm -f ${MAIN_GENES}
 
-# Make directories for our single-line files
+# Make directories for our individual files
 PR_DIR=`mkdtemp`
 COVERAGE_DIR=`mkdtemp`
+GENES_DIR=`mkdtemp`
 
 for REGION in ${REGIONS}
 do
     # We will use these files to hold the direct output of evaluateAlignment.
     TEMP_PR="${PR_DIR}/${REGION}.Camel"
     TEMP_COVERAGE="${COVERAGE_DIR}/${REGION}.Camel"
+    TEMP_GENES="${GENES_DIR}/${REGION}.Camel"
     
     # Get results for Camel
     mhc/evaluateAlignment.py \
@@ -56,12 +60,15 @@ do
         --truth altRegions/${REGION}/GRCAlignment.maf \
         --beds altRegions/${REGION}/genes/*/*.bed \
         --coverage_file ${TEMP_COVERAGE} \
-        --precision_recall_file ${TEMP_PR} &
+        --precision_recall_file ${TEMP_PR} \
+        --gene_category_file ${TEMP_GENES} \
+        --tag Camel ${REGION} &
         
     # Set up to start Cactus instead
     
     TEMP_PR="${PR_DIR}/${REGION}.Cactus"
     TEMP_COVERAGE="${COVERAGE_DIR}/${REGION}.Cactus"
+    TEMP_GENES="${GENES_DIR}/${REGION}.Cactus"
     
     # Get results for Cactus
     mhc/evaluateAlignment.py \
@@ -69,27 +76,40 @@ do
         --truth altRegions/${REGION}/GRCAlignment.maf \
         --beds altRegions/${REGION}/genes/*/*.bed \
         --coverage_file ${TEMP_COVERAGE} \
-        --precision_recall_file ${TEMP_PR} &
+        --precision_recall_file ${TEMP_PR} \
+        --gene_category_file ${TEMP_GENES} \
+        --tag Cactus ${REGION} &
         
 done
 
 # Wait for all the evaluations to run
 wait
 
-# Tag the coverages by generator and save them
-cat ${COVERAGE_DIR}/*.Camel | sed 's/^/Camel\t/' >> ${MAIN_COVERAGE}
-cat ${COVERAGE_DIR}/*.Cactus | sed 's/^/Cactus\t/' >> ${MAIN_COVERAGE}
+for REGION in ${REGIONS}
+do
 
-# Do the same for the precision/recall data
-cat ${PR_DIR}/*.Camel | sed 's/^/Camel\t/' >> ${MAIN_PR}
-cat ${PR_DIR}/*.Cactus | sed 's/^/Cactus\t/' >> ${MAIN_PR}
+    # Tag the coverages by generator and region and save them
+    cat ${COVERAGE_DIR}/${REGION}.Camel >> ${MAIN_COVERAGE}
+    cat ${COVERAGE_DIR}/${REGION}.Cactus >> ${MAIN_COVERAGE}
+
+    # Do the same for the precision/recall data
+    cat ${PR_DIR}/${REGION}.Camel >> ${MAIN_PR}
+    cat ${PR_DIR}/${REGION}.Cactus >> ${MAIN_PR}
+    
+    # And the genes
+    cat ${GENES_DIR}/${REGION}.Camel >> ${MAIN_GENES}
+    cat ${GENES_DIR}/${REGION}.Cactus >> ${MAIN_GENES}
+    
+done
+    
 
 # Clean up carefuylly, without the possibility of an rm -Rf ""
 rm ${COVERAGE_DIR}/*.Camel ${COVERAGE_DIR}/*.Cactus 
 rmdir ${COVERAGE_DIR}
 rm ${PR_DIR}/*.Camel ${PR_DIR}/*.Cactus
 rmdir ${PR_DIR}
-
+rm ${GENES_DIR}/*.Camel ${GENES_DIR}/*.Cactus
+rmdir ${GENES_DIR}
 
 
 
