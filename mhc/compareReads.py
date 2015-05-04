@@ -377,6 +377,55 @@ class AlignerAssessmentTarget(jobTree.scriptTree.target.Target):
             # Map reads with each scheme in parallel
             with queuer.subtask("parallel", "mapAllSchemes"):
             
+                # We need a serial subtask for Lastz: do all the mappings,
+                # then merge them.
+                with queuer.subtask("serial", "mapConcatLastz"):
+                
+                    # Do all the mappings and check all the genes.
+                    with queuer.subtask("parallel", "mapAllGenomes"):
+                        
+                        # This holds the checkGenes class counts files from each
+                        # genome mapped
+                        class_count_files = []
+                        
+                        # This holds the gene set files
+                        gene_set_files = []
+                            
+                        for reads in read_files:
+                            # Make a file to save the BWA mappings from this set
+                            # of reads in
+                            lastz_mappings = queuer.tempfile()
+                                
+                            # We need to Lastz map and check genes in serial.
+                            with queuer.subtask("serial", "mapThenCheck"):
+                                
+                                # Make a target to do the mapping
+                                queuer.append(LastzTarget(self.fasta_list[0],
+                                    reads, lastz_mappings))
+                                
+                                # Make a file to put the class counts in
+                                class_count_file = queuer.tempfile()
+                                class_count_files.append(class_count_file)
+                                
+                                # Make a file to put the gene sets in
+                                gene_set_file = queuer.tempfile()
+                                gene_set_files.append(gene_set_file)
+                                
+                                # And one to do the gene checking
+                                queuer.append(TsvGeneCheckerTarget(lastz_mappings,
+                                    self.gene_beds, class_count_file,
+                                    gene_set_file))
+                                    
+                    # Now we need to merge the checkGenes output TSVs
+                    with queuer.subtask("parallel", "concat"):
+                        # Concatenate the class counts
+                        queuer.append(ConcatenateTarget(class_count_files, 
+                            self.out_dir + "/Lastz.counts"))
+                        # And the gene set files
+                        queuer.append(ConcatenateTarget(gene_set_files, 
+                            self.out_dir + "/Lastz.genes"))
+                        
+            
                 # And we need a serial subtask for BWA: do all the mappings,
                 # then merge them.
                 with queuer.subtask("serial", "mapConcatBWA"):
@@ -771,6 +820,74 @@ class BWATarget(jobTree.scriptTree.target.Target):
         check_call(self, args)
             
         self.logToMaster("BWATarget Finished")
+        
+class LastzTarget(jobTree.scriptTree.target.Target):
+    """
+    A target that maps the reads in a FASTA to another FASTA, using LASTZ.
+    
+    """
+    
+    def __init__(self, reference, query, mappings_out, min_quality=None):
+        """
+        Make a target that maps the query to the reference, using LASTZ. Saves a
+        TSV of mappings in mappings_out. Can optionally enforce a minimum
+        mapping quality.
+        
+        """
+        
+        # Make the base Target. Ask for 8gb of memory since this is kinda hard.
+        super(LastzTarget, self).__init__(memory=8589934592)
+        
+        # Save everything
+        self.reference = reference
+        self.query = query
+        self.mappings_out = mappings_out
+        self.min_quality = min_quality
+        
+        self.logToMaster("Creating LastzTarget")
+        
+   
+    def run(self):
+        """
+        Map the reads.
+        """
+        
+        self.logToMaster("Starting LastzTarget")
+        
+        # TODO: we're assuming the reference is indexed. Check and complain to
+        # the user if it isn't.
+        
+        # Get a SAM file to save as, temporarily.
+        sam_file = sonLib.bioio.getTempFile(suffix=".sam",
+            rootDir=self.getLocalTempDir())
+        
+        # Prepare the subprocess arguments
+        args = ["lastz", self.reference, self.query, "--format=sam"]
+        
+        # Say we're going to do it
+        self.logToMaster("Invoking {}".format(" ".join(args)))
+        print("Invoking {}".format(" ".join(args)))
+        
+        # Start BWA
+        process = subprocess.Popen(args, stdout=open(sam_file, "w"))
+            
+        if(process.wait() != 0):
+            # If the Lastz process died, complain.
+            raise Exception("Lastz failed with code {}".format(
+                process.returncode))
+                
+        # Now we need to make the TSV output our parent expects.
+        args = ["./sam2tsv.py", "--samIn", sam_file, "--tsvOut", 
+            self.mappings_out, "--reference", self.reference]
+            
+        if self.min_quality:
+            # Send the min mapping quality along
+            args.append("--minQuality")
+            args.append(str(self.min_quality))
+            
+        check_call(self, args)
+            
+        self.logToMaster("LastzTarget Finished")
         
 class TsvGeneCheckerTarget(jobTree.scriptTree.target.Target):
     """

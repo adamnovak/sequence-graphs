@@ -89,46 +89,23 @@ class SchemeAssessmentTarget(jobTree.scriptTree.target.Target):
             (True, True, False, 150, None, None, None, None, None, "natural"),
             (True, True, False, 200, None, None, None, None, None, "natural"),
             (True, True, False, 250, None, None, None, None, None, "natural"),
-            # Exact credit (tolerating 1 mismatch) with Hamming bound, but no
-            # mismatches.
-            (True, True, False, None, None, None, None, 1, None, "natural"),
-            (True, True, False, None, None, None, None, 2, None, "natural"),
-            (True, True, False, None, None, None, None, 3, None, "natural"),
-            (True, True, False, None, None, None, None, 4, None, "natural"),
-            (True, True, False, None, None, None, None, 5, None, "natural"),
-            (True, True, False, None, None, None, None, 6, None, "natural"),
-            # Exact credit (tolerating 1 mismatch) with Hamming bound and
-            # Hamming distance allowance (i.e. mismatches again). Scheme under
-            # test.
-            (True, True, False, None, None, None, None, 6, 1, "natural"),
-            (True, True, False, None, None, None, None, 6, 2, "natural"),
-            (True, True, False, None, None, None, None, 6, 3, "natural"),
-            (True, True, False, None, None, None, None, 6, 4, "natural"),
-            (True, True, False, None, None, None, None, 6, 5, "natural"),
             # Lower Hamming bounds: 5
             (True, True, False, None, None, None, None, 5, 1, "natural"),
             (True, True, False, None, None, None, None, 5, 2, "natural"),
             (True, True, False, None, None, None, None, 5, 3, "natural"),
             (True, True, False, None, None, None, None, 5, 4, "natural"),
-            # Same with weak stability, for testing stability
-            (True, True, True, None, None, None, None, 5, 1, "natural"),
-            (True, True, True, None, None, None, None, 5, 2, "natural"),
-            (True, True, True, None, None, None, None, 5, 3, "natural"),
-            (True, True, True, None, None, None, None, 5, 4, "natural"),
-            # Lower Hamming bounds: 4
-            (True, True, False, None, None, None, None, 4, 1, "natural"),
-            (True, True, False, None, None, None, None, 4, 2, "natural"),
-            (True, True, False, None, None, None, None, 4, 3, "natural"),
-            # Lower Hamming bounds: 3
-            (True, True, False, None, None, None, None, 3, 1, "natural"),
-            (True, True, False, None, None, None, None, 3, 2, "natural"),
-            # Lower Hamming bounds: 2
-            (True, True, False, None, None, None, None, 2, 1, "natural"),
-            # 5 with no credit.
-            (True, False, False, None, None, None, None, 5, 1, "natural"),
-            (True, False, False, None, None, None, None, 5, 2, "natural"),
-            (True, False, False, None, None, None, None, 5, 3, "natural"),
-            (True, False, False, None, None, None, None, 5, 4, "natural"),
+            # LR scheme with mult context
+            (True, True, False, None, None, 1.5, None, None, None, "LR"),
+            (True, True, False, None, None, 2.0, None, None, None, "LR"),
+            (True, True, False, None, None, 2.5, None, None, None, "LR"),
+            (True, True, False, None, None, 3.0, None, None, None, "LR"),
+            (True, True, False, None, None, 3.5, None, None, None, "LR"),
+            (True, True, False, None, None, 4.0, None, None, None, "LR"),
+            # LR scheme with add context
+            (True, True, False, None, 50, None, None, None, None, "LR"),
+            (True, True, False, None, 100, None, None, None, None, "LR"),
+            (True, True, False, None, 150, None, None, None, None, "LR"),
+            (True, True, False, None, 200, None, None, None, None, "LR")
         ])
             
 
