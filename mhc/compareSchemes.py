@@ -84,7 +84,7 @@ class SchemeAssessmentTarget(SchemeUsingTarget):
         # Plan out all the schemes. They all start with map_type. For "natural"
         # schemes, we have map_type, min context, credit, mismatches for credit,
         # min edit distance bound, max edit distance. For "zip" schemes we have
-        # map_type, min context, max range count.
+        # map_type, min context, max range count, min edit distance.
         return set([
             # Natural with flat min thresholds
             ("natural", 20, False, False, None, None),
@@ -94,12 +94,18 @@ class SchemeAssessmentTarget(SchemeUsingTarget):
             ("natural", 200, False, False, None, None),
             # Do a 5-4-natural scheme with credit. 
             ("natural", None, True, True, 5, 4),
-            # Do zip with flat mins
-            ("zip", 20, 100),
-            ("zip", 50, 100),
-            ("zip", 100, 100),
-            ("zip", 150, 100),
-            ("zip", 200, 100)
+            # Do zip with min edit distance
+            ("zip", 20, 100, 0),
+            ("zip", 20, 100, 1),
+            ("zip", 20, 100, 2),
+            ("zip", 20, 100, 3),
+            ("zip", 20, 100, 4),
+            ("zip", 20, 100, 5),
+            ("zip", 20, 100, 6),
+            ("zip", 20, 100, 7),
+            ("zip", 20, 100, 8),
+            ("zip", 20, 100, 9),
+            ("zip", 20, 100, 10)
         ])
 
     def run(self):
@@ -268,42 +274,14 @@ class SchemeAssessmentTarget(SchemeUsingTarget):
             # make all that.
             checkgenes_targets = []
             
-            for maf, counts, genes, bed_dict in itertools.izip(maf_filenames, 
-                checkgenes_count_filenames, checkgenes_gene_filenames,
-                checkgenes_bed_filename_dicts):
+            for maf, counts, genes in itertools.izip(maf_filenames, 
+                checkgenes_count_filenames, checkgenes_gene_filenames):
                 # For each set of parameters we need to run checkGenes on...
                 
                 # Make the target, and pass our global set of input gene BEDs.
                 checkgenes_targets.append(MafGeneCheckerTarget(maf, gene_beds, 
-                    counts, genes, bed_dict)) 
+                    counts, genes)) 
                     
-            # Then for each BED that comes out of one of these checkGenes
-            # targets, we need to BedSplitTarget it to rename the genome to
-            # include the scheme, and to organize it in a proper bedDir for
-            # passing to hal2assemblyHub.
-            
-            # This holds all the targets to do that
-            bed_split_targets = []
-            
-            for query_genome, bed_dict in itertools.izip(query_genomes, 
-                checkgenes_bed_filename_dicts):
-                # For each genome and its corresponding set of BED files
-                
-                for classification, bed_file in bed_dict.iteritems():
-                    # For each classification, we need a BedSplitTarget to split
-                    # its BED and put it under the right bedDir for that
-                    # classifications (so all the classifications become their
-                    # own tracks). Make sure to re-name the query genome
-                    # according to the scheme. TODO: Unify with the main suffix
-                    # logic below.
-                    bed_split_targets.append(BedSplitTarget(bed_file, 
-                        [query_genome], bed_root + "/" + classification, 
-                        genome_names=[query_genome + scheme]))
-                        
-                    # Make sure that the directory we are putting this bed in gets used
-                    bed_dirs.add(bed_root + "/" + classification)
-                
-            
             # Check each MAF against all the genes, and then concatenate the
             # answers for this scheme.
             track_targets.append(SequenceTarget([
@@ -315,10 +293,7 @@ class SchemeAssessmentTarget(SchemeUsingTarget):
                         self.stats_dir + "/checkgenes." + scheme),
                     # Concatenate the gene-with-mappings-in-category sets
                     ConcatenateTarget(checkgenes_gene_filenames, 
-                        self.stats_dir + "/checkgenes-genesets." + scheme),
-                    # Do all the BED splitting so we can have BED tracks on our
-                    # hub
-                    RunTarget(bed_split_targets)
+                        self.stats_dir + "/checkgenes-genesets." + scheme)
                 ])
             ]))
                 

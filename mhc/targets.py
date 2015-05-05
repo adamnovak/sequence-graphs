@@ -209,7 +209,7 @@ class SchemeUsingTarget(jobTree.scriptTree.target.Target):
                 
             if map_type == "natural":
             
-                if hamming_max is not None:
+                if edit_max is not None:
                     # For the natural mapping scheme, allow this many mismatches
                     # in maximal unique match runs.
                     extra_args.append("--maxEditDistance")
@@ -919,16 +919,13 @@ class MafGeneCheckerTarget(jobTree.scriptTree.target.Target):
     """
     
     def __init__(self, maf_file, gene_bed_files, class_count_file, 
-        gene_set_file, class_beds):
+        gene_set_file):
         """
         Reads the maf_file and the genes from the gene_bed_files list.
         Classifies every mapping in the alignment. Saves class counts to
         class_count_file ans a <class>\t<count> TSV. Saves genes with any
         mappings of each class in them to gene_set_file as a <class>\t<gene
         name> TSV.
-        
-        For each classification to BED filename mapping in class_beds, saves a
-        BED file of mapped locations that are placed in that class.
         
         """
         
@@ -940,7 +937,6 @@ class MafGeneCheckerTarget(jobTree.scriptTree.target.Target):
         self.gene_bed_files = gene_bed_files
         self.class_count_file = class_count_file
         self.gene_set_file = gene_set_file
-        self.class_beds = class_beds
         
         self.logToMaster("Creating MafGeneCheckerTarget")
         
@@ -953,16 +949,10 @@ class MafGeneCheckerTarget(jobTree.scriptTree.target.Target):
         self.logToMaster("Starting MafGeneCheckerTarget")
         
         # Prepare arguments
-        args = (["./checkGenes.py", "--maf", self.maf_file, "--beds"] + 
+        args = (["./checkGenes.py", self.maf_file, "--beds"] + 
             self.gene_bed_files + ["--classCounts", self.class_count_file,
             "--geneSets", self.gene_set_file])
             
-        for classification, bed_file in self.class_beds.iteritems():
-            # We need to pass each mapping in this dict along. Since the options
-            # are predictably named, we generate them.
-            args.append("--" + classification + "Bed")
-            args.append(bed_file)
-        
         # Make the call
         check_call(self, args)
         
