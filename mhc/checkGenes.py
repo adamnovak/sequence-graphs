@@ -204,8 +204,8 @@ def get_mappings_from_tsv(tsv_stream):
             # Are we aligned to the reverse strand?
             is_backwards = bool(int(parts[4]))
             
-            # Parse the query name more
-            query_parts = query.split(":")
+            # Parse the query name more, according to the format in shred.py
+            query_parts = query.split("!")
             # What is the name of the orifginal un-split query sequence?
             query_name = query_parts[0]
             query_parts = query_parts[1].split("-")
@@ -223,8 +223,8 @@ def get_mappings_from_tsv(tsv_stream):
             # Where on it are we?
             query_position = int(parts[1])
             
-            # Parse the query name more
-            query_parts = query.split(":")
+            # Parse the query name more, according to the format in shred.py
+            query_parts = query.split("!")
             # What is the name of the orifginal un-split query sequence?
             query_name = query_parts[0]
             query_parts = query_parts[1].split("-")

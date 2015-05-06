@@ -80,8 +80,10 @@ def shred(records_in, size, spacing, mismatch_rate=0):
                 
             # Subset out the part we want to use as a read
             read = input_record[start_pos:start_pos + size]
-            # Add the coordinates to the read's FASTA ID
-            read.id += ":{}-{}".format(start_pos, start_pos + size)
+            # Add the coordinates to the read's FASTA ID. We don't use a colon
+            # like normal because lastz will break the FASTA ID at the colon and
+            # ruin everything.
+            read.id += "!{}-{}".format(start_pos, start_pos + size)
             read.description = ""
             
             if("N" not in str(read.seq)):

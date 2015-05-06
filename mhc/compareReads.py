@@ -827,11 +827,10 @@ class LastzTarget(jobTree.scriptTree.target.Target):
     
     """
     
-    def __init__(self, reference, query, mappings_out, min_quality=None):
+    def __init__(self, reference, query, mappings_out, min_score=16000):
         """
         Make a target that maps the query to the reference, using LASTZ. Saves a
-        TSV of mappings in mappings_out. Can optionally enforce a minimum
-        mapping quality.
+        TSV of mappings in mappings_out. Can enforce a minimum score.
         
         """
         
@@ -842,7 +841,7 @@ class LastzTarget(jobTree.scriptTree.target.Target):
         self.reference = reference
         self.query = query
         self.mappings_out = mappings_out
-        self.min_quality = min_quality
+        self.min_score = min_score
         
         self.logToMaster("Creating LastzTarget")
         
@@ -864,6 +863,10 @@ class LastzTarget(jobTree.scriptTree.target.Target):
         # Prepare the subprocess arguments
         args = ["lastz", self.reference, self.query, "--format=sam"]
         
+        if self.min_score is not None:
+            # Don't take alignments with scores worse than this.
+            args.append("--gappedthresh={}".format(self.min_score))
+        
         # Say we're going to do it
         self.logToMaster("Invoking {}".format(" ".join(args)))
         print("Invoking {}".format(" ".join(args)))
@@ -879,11 +882,6 @@ class LastzTarget(jobTree.scriptTree.target.Target):
         # Now we need to make the TSV output our parent expects.
         args = ["./sam2tsv.py", "--samIn", sam_file, "--tsvOut", 
             self.mappings_out, "--reference", self.reference]
-            
-        if self.min_quality:
-            # Send the min mapping quality along
-            args.append("--minQuality")
-            args.append(str(self.min_quality))
             
         check_call(self, args)
             
