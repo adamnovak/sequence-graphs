@@ -827,7 +827,7 @@ class LastzTarget(jobTree.scriptTree.target.Target):
     
     """
     
-    def __init__(self, reference, query, mappings_out, min_score=16000):
+    def __init__(self, reference, query, mappings_out, min_score=17500):
         """
         Make a target that maps the query to the reference, using LASTZ. Saves a
         TSV of mappings in mappings_out. Can enforce a minimum score.

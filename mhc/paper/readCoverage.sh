@@ -114,13 +114,19 @@ LABEL_OPTS+=("--category_labels" \
     '$\alpha^\prime=3, \beta^\prime=2$'
     '$\alpha^\prime=5, \beta^\prime=4$')
     
+# Do LASTZ as a group
+GROUPING_OPTS+=("--grouping" "LASTZ")
+CATEGORY_OPTS+=("--categories" "Lastz")
+LABEL_OPTS+=("--category_labels" "LASTZ")
+
+    
 boxplot.py "${TSV}" \
     --x_label "Scheme Parameters" \
     --y_label "$(printf 'Portion of Bases\\Mapped to Reference')" \
     --title "$(printf 'Read Coverage vs.\nMapping Scheme')" \
     "${GROUPING_OPTS[@]}" "${CATEGORY_OPTS[@]}" "${LABEL_OPTS[@]}" \
     --no_legend \
-    --grouping_colors 'k' 'y' 'b' 'r' \
+    --grouping_colors 'k' 'y' 'b' 'r' 'g' \
     --x_sideways \
     --no_n \
     --max 1.01 \
