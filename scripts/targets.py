@@ -659,16 +659,20 @@ class AlignmentSetComparisonTarget(jobTree.scriptTree.target.Target):
         # Seed the RNG after sonLib does whatever it wants with temp file names
         self.rng.seed(self.seed)
         
+        # These are all the targets we need to run in parallel.
+        children = []
+        
         for pair, comparison_filename in zip(pairs, comparison_filenames):
             # Make a child to compare these two MAF files and produce this
             # output file, giving it a 256-bit seed.
-            self.addChildTarget(AlignmentComparisonTarget(pair[0], pair[1], 
+            children.append(AlignmentComparisonTarget(pair[0], pair[1], 
                 self.rng.getrandbits(256), comparison_filename))
             
-        # When we're done, concatenate all those comparison files together into
-        # our output file.
-        self.setFollowOnTarget(ConcatenateTarget(comparison_filenames,
-            self.output_filename))
+        # Run all those children, and then concatenate the results.
+        self.addChildTarget(SequenceTarget([RunTarget(children),
+            ConcatenateTarget(comparison_filenames, self.output_filename)])) 
+            
+        # Leave our follow-on target free for usage by our parent.
         
         self.logToMaster("AlignmentSetComparisonTarget Finished")
         
@@ -718,19 +722,22 @@ class AlignmentTruthComparisonTarget(jobTree.scriptTree.target.Target):
         # Seed the RNG after sonLib does whatever it wants with temp file names
         self.rng.seed(self.seed)
         
+        # Hold the children we need to run in parallel
+        children = []
+        
         for maf_filename, comparison_filename in zip(self.maf_filenames,
             comparison_filenames):
             
             # Make a child to compare this MAF against the truth, and produce
             # this output file, giving it a 256-bit seed.
-            self.addChildTarget(AlignmentComparisonTarget(self.truth_maf, 
+            children.append(AlignmentComparisonTarget(self.truth_maf, 
                 maf_filename, self.rng.getrandbits(256), comparison_filename, 
                 is_correct=True))
             
         # When we're done, concatenate all those comparison files together into
-        # our output file.
-        self.setFollowOnTarget(ConcatenateTarget(comparison_filenames,
-            self.output_filename))
+        # our output file. Leave the follow-on target free.
+        self.addChildTarget(SequenceTarget([RunTarget(children),
+            ConcatenateTarget(comparison_filenames, self.output_filename)]))
         
         self.logToMaster("AlignmentTruthComparisonTarget Finished")
         
@@ -849,6 +856,9 @@ class AlignmentSetCoverageTarget(jobTree.scriptTree.target.Target):
         # MAFs?
         output_filenames = []
         
+        # These are the children we have to run in parallel.
+        children = []
+        
         for maf_filename in self.maf_filenames:
         
             # Make a temp file to write the results for this MAF to.
@@ -858,14 +868,14 @@ class AlignmentSetCoverageTarget(jobTree.scriptTree.target.Target):
             output_filenames.append(output_filename)
         
             # Make a child for each MAF to evaluate
-            self.addChildTarget(AlignmentCoverageTarget(maf_filename,
+            children.append(AlignmentCoverageTarget(maf_filename,
                 self.reference_sequence, self.other_sequences,
                 output_filename))
                 
         # When we're done, concatenate all those files together into our output
-        # file.
-        self.setFollowOnTarget(ConcatenateTarget(output_filenames,
-            self.output_filename))
+        # file. Leave the follow-on target free.
+        self.addChildTarget(SequenceTarget([RunTarget(children),
+            ConcatenateTarget(output_filenames, self.output_filename)]))
         
         self.logToMaster("AlignmentSetCoverageTarget Finished")
         
