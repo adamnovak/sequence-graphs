@@ -41,6 +41,9 @@ class GraphGenerationTarget(SchemeUsingTarget):
         
         """
         
+        # Make the base Target. Ask for 2gb of memory since this is easy.
+        super(GraphGenerationTarget, self).__init__(memory=2147483648)
+        
         # Save arguments
         self.region_dir = region_dir
         self.output_dir = output_dir
@@ -177,6 +180,9 @@ class MultiRegionTarget(jobTree.scriptTree.target.Target):
         Output will be placed in the given output directory.
         
         """
+        
+        # Make the base Target. Ask for 2gb of memory since this is easy.
+        super(MultiRegionTarget, self).__init__(memory=2147483648)
         
         # Save arguments
         self.region_dirs = region_dirs
