@@ -94,7 +94,7 @@ class GraphGenerationTarget(SchemeUsingTarget):
             
         # Get the list of FASTAs
         fastas = []
-        for fasta in glob.glob(self.input_dir + "/*.fa"):
+        for fasta in glob.glob(self.region_dir + "/*.fa"):
             # We'll stick in each FASTA one at a time.
             
             if os.path.basename(fasta) == "ref.fa":
@@ -110,12 +110,64 @@ class GraphGenerationTarget(SchemeUsingTarget):
             # assessment.
             self.addChildTarget(ReferenceStructureTarget(fastas,
                 self.rng.getrandbits(256),
-                "{}/coverage.{}.tsv".format(self.out_dir, scheme), 
-                "{}/{}.maf".format(self.out_dir, scheme),
-                hal_filename="{}/{}.hal".format(self.out_dir, scheme),
+                "{}/coverage.{}.tsv".format(self.output_dir, scheme), 
+                "{}/{}.maf".format(self.output_dir, scheme),
+                hal_filename="{}/{}.hal".format(self.output_dir, scheme),
                 extra_args=extra_args))
                 
             # TODO: run an evaluation too to get e.g. precision and recall.
+        
+        self.logToMaster("{} finished".format(self.__class__.__name__))
+
+class MultiRegionTarget(jobTree.scriptTree.target.Target):
+    """
+    A target that runs GraphGenerationTargets on several regions.
+    
+    """
+    
+    def __init__(self, region_dirs, output_dir, seed=0):
+        """
+        Make a new target for makign graphs for each of the given directories.
+        
+        Output will be placed in the given output directory.
+        
+        """
+        
+        # Save arguments
+        self.region_dirs = region_dirs
+        self.output_dir = output_dir
+        self.seed = seed
+        
+        # Make sure we have an RNG
+        self.rng = random.Random()
+        
+        self.logToMaster("Creating {}".format(self.__class__.__name__))
+        
+   
+    def run(self):
+        """
+        Set up all the child targets for the different regions.
+        
+        """
+        
+        self.logToMaster("Starting {}".format(self.__class__.__name__))
+        
+        # Seed the RNG.
+        self.rng.seed(self.seed)
+        
+        if not os.path.exists(self.output_dir):
+            # Make our out directory exist
+            os.makedirs(self.output_dir)
+            
+        for region_dir in self.region_dirs:
+            # For every region, get just its name
+            region_name = os.path.basename(region_dir)
+            
+            # Make all the graph types for that region, with per-region output
+            # dirs.
+            self.addChildTarget(GraphGenerationTarget(region_dir, 
+                self.output_dir + "/" + region_name,
+                seed=self.rng.getrandbits(256)))
         
         self.logToMaster("{} finished".format(self.__class__.__name__))
 
@@ -153,7 +205,7 @@ def parse_args(args):
     args = args[1:]
         
     return parser.parse_args(args)
-        
+    
 def main(args):
     """
     Parses command line arguments and do the work of the program.
@@ -170,12 +222,11 @@ def main(args):
     # Make sure we've given everything an absolute module name.
     # Don't try to import * because that's illegal.
     if __name__ == "__main__":
-        from compareGraphs import GraphGenerationTarget
+        from compareGraphs import GraphGenerationTarget, MultiRegionTarget
         
-    # Make a stack of jobs to run
-    stack = jobTree.scriptTree.stack.Stack(SchemeAssessmentTarget(
-        options.fastas, options.trueMaf, options.geneBedDir, options.seed,
-        options.outDir, options.outDir + "/hubs"))
+    # Make a stack of jobs to run, starting with all our arguments.
+    stack = jobTree.scriptTree.stack.Stack(MultiRegionTarget(options.in_dirs,
+        options.out_dir, options.seed))
     
     print "Starting stack"
     
