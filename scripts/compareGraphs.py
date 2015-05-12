@@ -10,7 +10,7 @@ Takes a list of region directories, with the following structure:
 <region>/ref.fa (optional, used first)
 <region>/<genome>.fa
 <region>/genes (optional, used for gene ortholog/paralog stats)
-<region>/genes/<genome>.bed
+<region>/genes/<genome>/<whatever>.bed
 <region>/<something>.maf (optional, used as true alignment)
 
 
@@ -103,19 +103,64 @@ class GraphGenerationTarget(SchemeUsingTarget):
             else:
                 # Otherwise just stick it on the end.
                 fastas.append(fasta)
+                
+        # Look for true MAFs
+        true_mafs = glob.glob(self.region_dir + "/*.maf")
+        # Save the one we get, or None
+        true_maf = None if len(true_mafs) == 0 else true_mafs[0]
+        
+        # Get all the gene beds. If there are no genes this will be empty.
+        gene_beds = glob.glob(self.region_dir + "/genes/*/*.bed")
             
         for scheme, extra_args in self.generateSchemes():
+            # We need to try each parameter set.
+            
+            # We'll run a sequence of targets for each scheme in the region:
+            # make the graph, and compute per-graph statistics.
+            sequence = []
+            
+            # Pre-calculate some intermediate file names
+            maf_filename = "{}/{}.maf".format(self.output_dir, scheme)
+            hal_filename="{}/{}.hal".format(self.output_dir, scheme)
+            
             # We're going to make a ReferenceStructure for each scheme. This
             # will generate HAL and MAF files, and an itnernal coverage
             # assessment.
-            self.addChildTarget(ReferenceStructureTarget(fastas,
+            sequence.append(ReferenceStructureTarget(fastas,
                 self.rng.getrandbits(256),
                 "{}/coverage.{}.tsv".format(self.output_dir, scheme), 
-                "{}/{}.maf".format(self.output_dir, scheme),
-                hal_filename="{}/{}.hal".format(self.output_dir, scheme),
+                maf_filename,
+                hal_filename=hal_filename,
                 extra_args=extra_args))
                 
-            # TODO: run an evaluation too to get e.g. precision and recall.
+            # We'll make a bunch of evaluations to run in parallel
+            evaluations = []
+                
+            if true_maf is not None:
+                # We'll do a comparison against the true MAF
+                evaluations.append(AlignmentTruthComparisonTarget(true_maf, 
+                    [maf_filename], self.rng.getrandbits(256), 
+                    "{}/truth.{}".format(self.output_dir, scheme)))
+                    
+            if len(gene_beds) > 0:
+                # We'll do a gene-based evaluation.
+                evaluations.append(MafGeneCheckerTarget(maf_filename, 
+                    gene_beds, "{}/checkgenes.{}".format(self.output_dir,
+                    scheme), "{}/checkgenes-genesets.{}".format(self.output_dir,
+                    scheme)))
+                    
+            # TODO: Add a halStats evaluation, copying from
+            # evaluateAlignment.py.
+            
+            # TODO: Set this up to be able to work with Cactus.
+                    
+            if len(evaluations) > 0:
+                # If we have any evaluations to do, do them in parallel after we
+                # make the graph.
+                sequence.append(RunTarget(evaluations))
+            
+            # Run the graph generation and any evaluations as a child.
+            self.addChildTarget(SequenceTarget(sequence))
         
         self.logToMaster("{} finished".format(self.__class__.__name__))
 
