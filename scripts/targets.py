@@ -1005,7 +1005,7 @@ class MafGeneCheckerTarget(jobTree.scriptTree.target.Target):
         self.logToMaster("Starting MafGeneCheckerTarget")
         
         # Prepare arguments
-        args = (["./checkGenes.py", self.maf_file, "--beds"] + 
+        args = (["scripts/checkGenes.py", self.maf_file, "--beds"] + 
             self.gene_bed_files + ["--classCounts", self.class_count_file,
             "--geneSets", self.gene_set_file])
             
