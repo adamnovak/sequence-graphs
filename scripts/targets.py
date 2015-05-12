@@ -6,7 +6,7 @@ reference structures.
 """
 
 import argparse, sys, os, os.path, random, subprocess, shutil, itertools
-import datetime, time
+import datetime, time, inspect
 from xml.etree import ElementTree
 import tsv
 
@@ -22,6 +22,52 @@ def check_call(target, args):
     sys.stdout.flush()
     target.logToMaster("Calling: {}".format(" ".join(args)))
     return subprocess.check_call(args)
+    
+class AutobindTarget(jobTree.scriptTree.target.Target):
+    """
+    A target that can automatically save all its constructor arguments as member
+    variables. Avoids repeated self.whatever=whatever code in __init__, since
+    most of the time in a target constructor we just want the variables in run
+    anyway.
+    
+    Based on <http://stackoverflow.com/q/15484120/402891> and
+    <http://stackoverflow.com/a/15484172/402891>.
+    
+    TODO: This badly upsets PyLint, so don't use it.
+    
+    """
+    
+    def __init__(self, *args, **kwargs):
+        """
+        Forward all the init arguments on to the base constructor.
+        
+        """
+        # See <http://stackoverflow.com/a/6535962/402891>
+        super(AutobindTarget, self).__init__(*args, **kwargs)
+        
+    def autobind(self, init_vars):
+        """
+        Should be called from the constructor of a child class that wants this
+        feature. Looks at the arguments passed to __init__ and autosaves them.
+        
+        Takes the value of the vars() builtin inside __init__:
+        
+        self.autobind(vars())
+        
+        """
+        
+        # What are the constructor arg names (besides self)?
+        arg_names = inspect.getargspec(self.__init__).args[1:]
+        
+        for arg_name in arg_names:
+            # For each argument other than the first (self) in the
+            # constructor...
+            
+            # Save it under its name in the constructed object.
+            setattr(self, arg_name, init_vars[arg_name])
+        
+        
+    
 
 class RunTarget(jobTree.scriptTree.target.Target):
     """
