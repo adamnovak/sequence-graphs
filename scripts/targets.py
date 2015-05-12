@@ -414,7 +414,7 @@ class ReferenceStructureTarget(jobTree.scriptTree.target.Target):
             rootDir=self.getLocalTempDir())
         
         # Put together the arguments to invoke
-        args = ["../createIndex/createIndex", "--scheme", "greedy", 
+        args = ["createIndex/createIndex", "--scheme", "greedy", 
             "--alignment", c2h_filename, "--alignmentFasta", fasta_filename, 
             index_dir] + self.fasta_list + self.extra_args
             
@@ -1061,7 +1061,7 @@ class C2hMergeTarget(jobTree.scriptTree.target.Target):
             
         # Start preparing arguments
         # TODO: Make genome to merge on specifiable!
-        args = ["../createIndex/cactusMerge", "refmhc", self.merged_c2h,
+        args = ["createIndex/cactusMerge", "refmhc", self.merged_c2h,
             self.merged_fasta]
         
         for (c2h, fasta), suffix in itertools.izip(self.c2h_fasta_pairs,
