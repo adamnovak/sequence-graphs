@@ -84,7 +84,7 @@ class SchemeAssessmentTarget(SchemeUsingTarget):
         # Plan out all the schemes. They all start with map_type. For "natural"
         # schemes, we have map_type, min context, credit, mismatches for credit,
         # min edit distance bound, max edit distance. For "zip" schemes we have
-        # map_type, min context, max range count, min edit distance.
+        # map_type, min context, min edit distance, max range count.
         return set([
             # Natural with flat min thresholds
             ("natural", 20, False, False, None, None),
@@ -95,17 +95,17 @@ class SchemeAssessmentTarget(SchemeUsingTarget):
             # Do a 5-4-natural scheme with credit. 
             ("natural", None, True, True, 5, 4),
             # Do zip with min edit distance
-            ("zip", 20, 100, 0),
-            ("zip", 20, 100, 1),
-            ("zip", 20, 100, 2),
-            ("zip", 20, 100, 3),
-            ("zip", 20, 100, 4),
-            ("zip", 20, 100, 5),
-            ("zip", 20, 100, 6),
-            ("zip", 20, 100, 7),
-            ("zip", 20, 100, 8),
-            ("zip", 20, 100, 9),
-            ("zip", 20, 100, 10)
+            ("zip", 20, 0, 100),
+            ("zip", 20, 1, 100),
+            ("zip", 20, 2, 100),
+            ("zip", 20, 3, 100),
+            ("zip", 20, 4, 100),
+            ("zip", 20, 5, 100),
+            ("zip", 20, 6, 100),
+            ("zip", 20, 7, 100),
+            ("zip", 20, 8, 100),
+            ("zip", 20, 9, 100),
+            ("zip", 20, 10, 100)
         ])
 
     def run(self):

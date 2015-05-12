@@ -290,8 +290,8 @@ def main(args):
     options = parse_args(args) # This holds the nicely-parsed options object
     
     # This will count up the instances of each class, and the genes involved in
-    # each class
-    class_counts, gene_sets = check_genes(options.maf, options.beds)
+    # each class, and the confusion pairs (which we don't use yet).
+    class_counts, gene_sets, gene_pairs = check_genes(options.maf, options.beds)
     
     for classification, count in class_counts.iteritems():
         # For each class
