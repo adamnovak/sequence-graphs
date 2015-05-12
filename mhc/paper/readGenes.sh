@@ -92,7 +92,7 @@ LABEL_OPTS+=("--category_labels" \
 # Do LASTZ as a group
 GROUPING_OPTS+=("--grouping" "LASTZ")
 CATEGORY_OPTS+=("--categories" "Lastz")
-LABEL_OPTS+=("--category_labels" "LASTZ")
+LABEL_OPTS+=("--category_labels" "$(printf 'LASTZ\nscore$\\geq$17,500')")
     
 boxplot.py "${TSV}" \
     --x_label "Scheme Parameters" \

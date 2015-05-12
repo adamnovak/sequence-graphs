@@ -117,12 +117,12 @@ LABEL_OPTS+=("--category_labels" \
 # Do LASTZ as a group
 GROUPING_OPTS+=("--grouping" "LASTZ")
 CATEGORY_OPTS+=("--categories" "Lastz")
-LABEL_OPTS+=("--category_labels" "LASTZ")
+LABEL_OPTS+=("--category_labels" "$(printf 'LASTZ\nscore$\\geq$17,500')")
 
     
 boxplot.py "${TSV}" \
     --x_label "Scheme Parameters" \
-    --y_label "$(printf 'Portion of Bases\\Mapped to Reference')" \
+    --y_label "$(printf 'Portion of Bases\nMapped to Reference')" \
     --title "$(printf 'Read Coverage vs.\nMapping Scheme')" \
     "${GROUPING_OPTS[@]}" "${CATEGORY_OPTS[@]}" "${LABEL_OPTS[@]}" \
     --no_legend \
