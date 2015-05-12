@@ -55,7 +55,7 @@ do
     TEMP_GENES="${GENES_DIR}/${REGION}.Camel"
     
     # Get results for Camel
-    mhc/evaluateAlignment.py \
+    scripts/evaluateAlignment.py \
         `camelFilename ${REGION}` \
         --truth altRegions/${REGION}/GRCAlignment.maf \
         --beds altRegions/${REGION}/genes/*/*.bed \
@@ -71,7 +71,7 @@ do
     TEMP_GENES="${GENES_DIR}/${REGION}.Cactus"
     
     # Get results for Cactus
-    mhc/evaluateAlignment.py \
+    scripts/evaluateAlignment.py \
         `cactusFilename ${REGION}` \
         --truth altRegions/${REGION}/GRCAlignment.maf \
         --beds altRegions/${REGION}/genes/*/*.bed \
