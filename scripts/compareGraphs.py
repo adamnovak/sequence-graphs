@@ -67,17 +67,11 @@ class GraphGenerationTarget(SchemeUsingTarget):
         # map_type, min context, min edit distance, max range count.
         return set([
             # Do zip with min edit distance
-            ("zip", 20, 0, 100),
             ("zip", 20, 1, 100),
             ("zip", 20, 2, 100),
             ("zip", 20, 3, 100),
             ("zip", 20, 4, 100),
-            ("zip", 20, 5, 100),
-            ("zip", 20, 6, 100),
-            ("zip", 20, 7, 100),
-            ("zip", 20, 8, 100),
-            ("zip", 20, 9, 100),
-            ("zip", 20, 10, 100)
+            ("zip", 20, 5, 100)
         ])
         
     def run(self):
@@ -131,7 +125,7 @@ class GraphGenerationTarget(SchemeUsingTarget):
             # assessment.
             sequence.append(ReferenceStructureTarget(fastas,
                 self.rng.getrandbits(256),
-                "{}/coverage.{}.tsv".format(self.output_dir, scheme), 
+                "{}/coverage.{}".format(self.output_dir, scheme), 
                 maf_filename,
                 hal_filename=hal_filename,
                 extra_args=extra_args))

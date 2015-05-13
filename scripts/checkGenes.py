@@ -154,6 +154,11 @@ def classify_mappings(columns, genes):
     for column in columns:
         # Look at each column
         
+        # We're going to send through a total count along with all the category
+        # memberships. Each column may be a member of each of the other
+        # categories at most once.
+        yield ("total_columns", None, None)
+        
         # Keep track of how many time each gene appears
         gene_counts = collections.Counter()
         
@@ -184,6 +189,9 @@ def classify_mappings(columns, genes):
             # No genes found. Try the next column
             yield ("background", None, None)
             continue
+        else:
+            # Report how many columns have genes
+            yield ("gene_columns", None, None)
             
         # Look at the most common gene/orientation pair and its count
         top_gene, top_count = gene_counts.most_common(1)[0]
