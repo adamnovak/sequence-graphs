@@ -76,8 +76,9 @@ void CreditStrategy::applyCreditBetween(const std::string& query,
     breadthFirstSearch(query, rightAnchor, toUpdate[rightAnchor].getLocation(), 
         unmappedRegionSize, [&](size_t index, TextPosition mappedTo) {
         
-        // Save every mapping as coming from the right-side search.
-        rightMappings[index] = Mapping(mappedTo);
+        // Save every mapping as coming from the right-side search. Make sure to
+        // convert from global to bubble-local coordinates.
+        rightMappings[index - (leftAnchor + 1)] = Mapping(mappedTo);
     
     });
     
@@ -100,7 +101,8 @@ void CreditStrategy::applyCreditBetween(const std::string& query,
         mappedTo.flip(view.getIndex().getContigLength(
             mappedTo.getContigNumber()));
         
-        // Save every mapping as coming from the left-side search.
+        // Save every mapping as coming from the left-side search. Make sure to
+        // convert from global to bubble-local coordinates.
         leftMappings[index - (leftAnchor + 1)] = Mapping(mappedTo);
     
     });
@@ -138,13 +140,19 @@ void CreditStrategy::breadthFirstSearch(const std::string& query,
     for(auto range : ranges) {
         // Each range gets expanded into its covering FMDPosition.
         startPositions.push_back(view.getRangeByNumber(range));
+        
+        Log::debug() << "Got range " << view.getRangeByNumber(range) <<
+            " as #" << range << std::endl;
     }
 
     // Make the FMDPositionGroup holding them all
     FMDPositionGroup search(view, startPositions);
     
+    Log::trace() << "Applying credit from " << queryStart - 1 << " to " << 
+        queryStart - maxDepth << std::endl;
+    
     for(size_t queryIndex = queryStart - 1; 
-        (queryIndex < queryStart - maxDepth) && 
+        (queryIndex >= queryStart - maxDepth) && 
         (queryIndex != (size_t) -1) && !search.isEmpty(); 
         queryIndex--) {
         

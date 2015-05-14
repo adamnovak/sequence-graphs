@@ -331,9 +331,6 @@ std::vector<size_t> FMDIndexView::getNewRangeNumbers(
 std::vector<size_t> FMDIndexView::textPositionToRanges(
     const TextPosition& textPosition) const {
         
-    Log::debug() << "Searching " << invertedPositions.size() <<
-        " inverted position entries" << std::endl;
-        
     // Find the bounding iterators of the range of range numbers belonging to
     // this position.
     auto bounds = invertedPositions.equal_range(textPosition);

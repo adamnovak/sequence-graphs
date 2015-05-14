@@ -161,7 +161,7 @@ public:
                 // Find the TextPosition for the selected BWT position.
                 auto pos = getIndex().locate(bwtIndex);
                 
-                Log::debug() << "Range " << rangeNumber <<
+                Log::trace() << "Range " << rangeNumber <<
                     " is TextPosition " << pos << std::endl;
                 return pos;
             }

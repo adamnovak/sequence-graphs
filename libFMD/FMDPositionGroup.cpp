@@ -72,10 +72,18 @@ void FMDPositionGroup::extendGreedy(char correctCharacter,
             }
             
         }
+        
+        Log::debug() << "Extended with all but " << correctCharacter <<
+            std::endl;
+        
+    } else {
+        Log::debug() << "Extended with " << correctCharacter << std::endl;
     }
     
     // Replace our FMDPositions with the new extended ones.
     positions = std::move(nonemptyExtensions);
+    
+    Log::debug() << "Have " << positions.size() << " ranges" << std::endl;
 
 }
 
