@@ -197,6 +197,9 @@ def parse_halstats_coverage(stream, reference_id):
             else:
                 # We had no bases aligned
                 return 0.0
+                
+    raise RuntimeError("Could not find coverage against {}".format(
+        reference_id))
     
 def get_halstats_coverage(hal_filename, other_genomes, reference_id):
     """
