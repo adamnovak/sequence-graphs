@@ -1,6 +1,7 @@
 #include "CreditStrategy.hpp"
 
 #include "util.hpp"
+#include "Log.hpp"
 
 CreditStrategy::CreditStrategy(const FMDIndexView& view): view(view) {
     // Nothing to do!
@@ -13,19 +14,33 @@ void CreditStrategy::applyCredit(const std::string& query,
     // bordering runs of unmapped positions.
     
     // What is the last mapped position you saw?
-    size_t leftAnchor = 0;
+    size_t leftAnchor = (size_t) -1;
     
     // Was the last position you looked at mapped?
     bool lastWasMapped = true;
     
     for(size_t i = 0; i < toUpdate.size(); i++) {
+        // Look at every base and observe where we change from mapped to
+        // unmapped or visa versa.
+        
+        Log::debug() << "Checking position " << i << " (mapped: " <<
+            toUpdate[i].isMapped() << ", last: " << lastWasMapped << ")" <<
+            std::endl;
+    
         if(!toUpdate[i].isMapped() && lastWasMapped && i != 0) {
             // We have just entered a run of unmapped bases. We have to set the
             // left anchor to the position before here.
             leftAnchor = i - 1;
-        } else if(toUpdate[i].isMapped() && !lastWasMapped && leftAnchor != 0) {
+            
+            Log::debug() << "No longer mapped" << std::endl;
+            
+        } else if(toUpdate[i].isMapped() && !lastWasMapped &&
+            leftAnchor != (size_t) -1) {
+            
             // We have just finished a run of unmapped bases. We need to run the
             // searches.
+            
+            Log::debug() << "Newly mapped" << std::endl;
             
             // We should use this base as the right anchor of the credit.
             size_t rightAnchor = i;
@@ -42,6 +57,9 @@ void CreditStrategy::applyCredit(const std::string& query,
 void CreditStrategy::applyCreditBetween(const std::string& query, 
     std::vector<Mapping>& toUpdate, size_t leftAnchor,
     size_t rightAnchor) const {
+    
+    Log::info() << "Applying credit between " << leftAnchor << " and " << 
+        rightAnchor << std::endl;
     
     // How many bases do we want to give credit to?
     size_t unmappedRegionSize = rightAnchor - leftAnchor - 1; 

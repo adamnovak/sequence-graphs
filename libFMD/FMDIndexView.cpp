@@ -10,6 +10,8 @@ FMDIndexView::FMDIndexView(const FMDIndex& index, const GenericBitVector* mask,
         invertedPositions.emplace(kv.second, kv.first);
     }
     
+    Log::debug() << "Made " << invertedPositions.size() <<
+        " inverted positions entries" << std::endl;
 }
 
 int64_t FMDIndexView::getRangeNumber(const FMDPosition& position) const {
@@ -300,6 +302,9 @@ std::vector<size_t> FMDIndexView::getNewRangeNumbers(
 
 std::vector<size_t> FMDIndexView::textPositionToRanges(
     const TextPosition& textPosition) const {
+        
+    Log::debug() << "Searching " << invertedPositions.size() <<
+        " inverted position entries" << std::endl;
         
     // Find the bounding iterators of the range of range numbers belonging to
     // this position.

@@ -57,16 +57,23 @@ void CreditStrategyTests::setUp() {
     }
     ranges->finish(index->getBWTLength());
 
+    // Make an FMDIndexView. The CreditStrategy doesn't take ownership of it,
+    // since it needs to be able to share it with a MappingScheme.
+    view = new FMDIndexView(*index, nullptr, ranges);
+
     // Make the credit applier. Leave the mask empty so everything is masked in,
     // but use our ranges. Don't care at all about what positions are assigned
     // to ranges.
-    credit = new CreditStrategy(FMDIndexView(*index, nullptr, ranges));
+    credit = new CreditStrategy(*view);
 }
 
 
 void CreditStrategyTests::tearDown() {
     // Clean up the credit applier
     delete credit;
+    
+    // And the FMDIndexView
+    delete view;
     
     // Get rid of the temporary index directory
     boost::filesystem::remove_all(tempDir);

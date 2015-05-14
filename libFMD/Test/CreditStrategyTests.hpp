@@ -22,6 +22,10 @@ class CreditStrategyTests : public CppUnit::TestFixture {
     // it up between test cases.
     FMDIndex const* index;
     
+    // Keep a pointer to a view of the index, so we can keep it around while the
+    // CreditStrategy works on it.
+    FMDIndexView* view;
+    
     // And a credit applier
     CreditStrategy* credit;
     
