@@ -1,6 +1,6 @@
 #include "MappingScheme.hpp"
 
-MappingScheme::MappingScheme(const FMDIndexView view): view(std::move(view)),
+MappingScheme::MappingScheme(FMDIndexView&& view): view(std::move(view)),
     stats() {
 
     // Nothing to do!

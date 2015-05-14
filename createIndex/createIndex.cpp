@@ -287,7 +287,7 @@ void saveLevelIndex(
 stPinchThreadSet*
 mergeGreedy(
     const FMDIndex& index,
-    std::function<MappingScheme*(const FMDIndexView&)> mappingSchemeFactory,
+    std::function<MappingScheme*(FMDIndexView&&)> mappingSchemeFactory,
     StatTracker* stats = nullptr
 ) {
 
@@ -330,7 +330,7 @@ mergeGreedy(
             rangesToPositions);
         
         // Allocate a new MappingScheme using the view. 
-        MappingScheme* mappingScheme = mappingSchemeFactory(view);
+        MappingScheme* mappingScheme = mappingSchemeFactory(std::move(view));
             
         // Make the merge scheme we want to use. We choose a mapping-to-second-
         // level-based merge scheme, to which we need to feed the details of the
@@ -646,7 +646,7 @@ main(
     
     if(mergeScheme == "greedy") {
         // Use the greedy merge instead.
-        threadSet = mergeGreedy(index, [&](const FMDIndexView& view) {
+        threadSet = mergeGreedy(index, [&](FMDIndexView&& view) {
         
             // Make a new MappingScheme for this step and return a pointer to
             // it. TODO: would it be better to just make one MappingScheme and
@@ -657,7 +657,8 @@ main(
         
             if(options["mapType"].as<std::string>() == "natural") {
                 // We want a NaturalMappingScheme
-                NaturalMappingScheme* scheme = new NaturalMappingScheme(view);
+                NaturalMappingScheme* scheme = new NaturalMappingScheme(
+                    std::move(view));
                     
                 // Populate it
                 scheme->credit = options.count("credit");
@@ -677,7 +678,8 @@ main(
                 // the forward and reverse versions of merged ranges to agree on
                 // what positions they are assigned when merging, but the view
                 // takes care of that.
-                ZipMappingScheme* scheme = new ZipMappingScheme(view);
+                ZipMappingScheme* scheme = new ZipMappingScheme(
+                    std::move(view));
                 
                 // Set the parameters from the arguments
                 scheme->minContextLength = options["context"].as<size_t>();

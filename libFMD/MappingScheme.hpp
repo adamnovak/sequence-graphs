@@ -18,13 +18,14 @@ class MappingScheme {
 public:
 
     /**
-     * Make a new MappingScheme against the given view of an FMDIndex.
+     * Make a new MappingScheme against the given view of an FMDIndex. Takes the
+     * view for itself.
      *
      * This constructor ought to be inherited by all subclasses with "using".
      * All other parameters of subclasses ought to be optional, with sensible
      * default values, and settable by public field access.
      */
-    MappingScheme(const FMDIndexView index);
+    MappingScheme(FMDIndexView&& index);
 
     // Default copy/move constructors OK    
     MappingScheme(const MappingScheme& other) = default;
