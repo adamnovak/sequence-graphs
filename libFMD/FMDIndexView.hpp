@@ -174,6 +174,13 @@ public:
     }
     
     /**
+     * Given a TextPosition (that is actually used to represent a merged
+     * position), find all the range numbers assigned to it.
+     */
+    std::vector<size_t> textPositionToRanges(
+        const TextPosition& textPosition) const;
+    
+    /**
      * Given that this FMDPosition is unique, get the TextPosition it uniquely
      * maps to.
      */
@@ -252,14 +259,20 @@ public:
      */
     size_t getApproximateNumberOfNewRanges(const FMDPosition& old,
         const FMDPosition& wider) const;
-    
-protected:
+        
     /**
      * Return the index of the range that the forward-strand interval of this
      * FMDPosition is contained in, or -1 if it is not contained in any such
      * interval.
      */
     int64_t getRangeNumber(const FMDPosition& position) const;
+    
+    /**
+     * Make an FMDPosition covering the range with the given number.
+     */
+    FMDPosition getRangeByNumber(size_t rangeNumber) const;
+    
+protected:
     
     /**
      * Return the indices of all of the ranges that the forward-strand interval
@@ -319,6 +332,17 @@ protected:
      * If ranges is null, this must be empty.
      */
     const std::map<size_t, TextPosition> positions;
+    
+    /**
+     * An inverted version of positions above, for finding the list of ranges
+     * associated with any particular TextPosition.
+     *
+     * If ranges is null, this must be empty.
+     *
+     * TODO: Use some sort of compressible thing that doesn't end up storing an
+     * entire BWT's worth or more of info.
+     */
+    std::multimap<TextPosition, size_t> invertedPositions;
 };
 
 #endif

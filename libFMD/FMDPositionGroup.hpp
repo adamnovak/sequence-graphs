@@ -1,9 +1,9 @@
 #ifndef FMDPOSITIONGROUP_HPP
 #define FMDPOSITIONGROUP_HPP
 
-#include <FMDPosition.hpp>
-#include <FMDIndex.hpp>
-#include <FMDIndexView.hpp>
+#include "FMDPosition.hpp"
+#include "FMDIndex.hpp"
+#include "FMDIndexView.hpp"
 #include <vector>
 
 /**
@@ -45,17 +45,17 @@ public:
     /**
      * Are there no non-empty FMDPositions in the group?
      */
-    bool isEmpty();
+    bool isEmpty() const;
     
     /**
      * Are all non-empty FMDPositions selecting the exact same graph position?
      */
-    bool isUnique();
+    bool isUnique() const;
     
     /**
      * Get the unique TextPosition selected. isUnique() must be true.
      */
-    TextPosition getTextPosition();
+    TextPosition getTextPosition() const;
     
 protected:
 

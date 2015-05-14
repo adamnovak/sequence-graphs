@@ -3,10 +3,13 @@
 FMDIndexView::FMDIndexView(const FMDIndex& index, const GenericBitVector* mask,
     const GenericBitVector* ranges,
     const std::map<size_t, TextPosition> positions): index(index), mask(mask),
-    ranges(ranges), positions(std::move(positions)) {
+    ranges(ranges), positions(std::move(positions)), invertedPositions() {
     
+    for(const auto& kv : this->positions) {
+        // We have to invert positions ourselves.
+        invertedPositions.emplace(kv.second, kv.first);
+    }
     
-    // Nothing to do!
 }
 
 int64_t FMDIndexView::getRangeNumber(const FMDPosition& position) const {
@@ -106,6 +109,21 @@ int64_t FMDIndexView::getRangeNumber(const FMDPosition& position) const {
             return -1;
         }
     }
+}
+
+FMDPosition FMDIndexView::getRangeByNumber(size_t rangeNumber) const {
+    // Select the 1 at the start of the range
+    auto start = getRanges()->select(rangeNumber);
+    // Select the 1 after the end of the range, and then move back 1 to be
+    // inclusive.
+    auto end = getRanges()->select(rangeNumber + 1) - 1;
+    
+    // How far do we have to move from the start to find the end?
+    auto difference = end - start;
+    
+    // Make a new FMDPosition with just the forward interval and return it.
+    return FMDPosition(start, 0, difference);
+    
 }
 
 std::vector<size_t> FMDIndexView::getRangeNumbers(
@@ -280,6 +298,28 @@ std::vector<size_t> FMDIndexView::getNewRangeNumbers(
     return leftRanges;
 }
 
+std::vector<size_t> FMDIndexView::textPositionToRanges(
+    const TextPosition& textPosition) const {
+        
+    // Find the bounding iterators of the range of range numbers belonging to
+    // this position.
+    auto bounds = invertedPositions.equal_range(textPosition);
+    
+    // We're going to fill up this vector with the results.
+    std::vector<size_t> toReturn;
+    
+    for(auto kvIterator = bounds.first; kvIterator != bounds.second;
+        ++kvIterator) {
+    
+        // For every TextPosition, range number pair that has the key we asked
+        // for, put the range number in the vector.
+        toReturn.push_back((*kvIterator).second);
+    }
+    
+    // Return the result.
+    return toReturn;
+}
+
 size_t FMDIndexView::getApproximateNumberOfRanges(
     const FMDPosition& position) const {
 
@@ -317,7 +357,7 @@ size_t FMDIndexView::getApproximateNumberOfRanges(
             // Cound how many we touch because of that. TODO: Unit test this!
             return endMask - startMask + 1;
         } else {
-            // Count all the BWT positions. COnvert the end offset to an actual
+            // Count all the BWT positions. Convert the end offset to an actual
             // length.
             return position.getEndOffset() + 1;
         }
@@ -343,6 +383,8 @@ size_t FMDIndexView::getApproximateNumberOfNewRanges(const FMDPosition& old,
         getApproximateNumberOfRanges(newRight);
 
 }
+
+
 
 
 

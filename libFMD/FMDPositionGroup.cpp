@@ -80,7 +80,7 @@ void FMDPositionGroup::extendGreedy(char correctCharacter,
 }
 
 
-bool FMDPositionGroup::isEmpty() {
+bool FMDPositionGroup::isEmpty() const {
     for(const auto& positionAndMismatches : positions) {
         // For each interval we contain
         if(!view.isEmpty(positionAndMismatches.first)) {
@@ -93,7 +93,7 @@ bool FMDPositionGroup::isEmpty() {
     return true;
 }
 
-bool FMDPositionGroup::isUnique() {
+bool FMDPositionGroup::isUnique() const {
     for(const auto& positionAndMismatches : positions) {
         // For each interval we contain
         if(view.isAmbiguous(positionAndMismatches.first)) {
@@ -140,7 +140,7 @@ bool FMDPositionGroup::isUnique() {
     return found;
 }
 
-TextPosition FMDPositionGroup::getTextPosition() {
+TextPosition FMDPositionGroup::getTextPosition() const {
     // TODO: Unify with above function, since they differ only in what they
     // return.
 
