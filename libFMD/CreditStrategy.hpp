@@ -13,9 +13,10 @@ class CreditStrategy {
 public:
     
     /**
-     * Make a new CreditStrategy using the given view of an FMDIndex.
+     * Make a new CreditStrategy using the given view of an FMDIndex. Can
+     * optionally start disabled.
      */
-    CreditStrategy(const FMDIndexView& view);
+    CreditStrategy(const FMDIndexView& view, bool enabled = true);
     
     /**
      * Apply credit for mapping the given string, by updating mappings in the
@@ -37,6 +38,11 @@ public:
      * How many mismatches will we tolerate when applying credit?
      */
     size_t maxMismatches = 2;
+    
+    /**
+     * Set to false to not actually do anything.
+     */
+    bool enabled = true;
 
 protected:
 

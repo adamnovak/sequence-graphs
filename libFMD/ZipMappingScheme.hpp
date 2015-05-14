@@ -6,6 +6,7 @@
 #include "IntervalIndex.hpp"
 #include "Log.hpp"
 #include "Matching.hpp"
+#include "CreditStrategy.hpp"
 
 #include <iomanip>
 #include <queue>
@@ -78,6 +79,23 @@ public:
      * question.
      */
     size_t minUniqueStrings = 0;
+    
+    // We need to defien this with a new; otherwise our inhereted constructor
+    // gets deleted, since it can't default-construct the CreditStrategy without
+    // an FMDIndexView.
+private:
+    CreditStrategy* creditPointer = new CreditStrategy(view);
+    
+public:
+    /**
+     * Controls credit application. One might want to set its maxMismatches and
+     * enabled parameters. Starts disabled by default.
+     */
+    CreditStrategy& credit = *creditPointer;
+    
+    inline virtual ~ZipMappingScheme() {
+        delete creditPointer;
+    }
     
 protected:
     

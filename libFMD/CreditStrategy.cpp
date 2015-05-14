@@ -3,12 +3,19 @@
 #include "util.hpp"
 #include "Log.hpp"
 
-CreditStrategy::CreditStrategy(const FMDIndexView& view): view(view) {
+CreditStrategy::CreditStrategy(const FMDIndexView& view, bool enabled): 
+    view(view), enabled(enabled) {
     // Nothing to do!
 }
 
 void CreditStrategy::applyCredit(const std::string& query, 
     std::vector<Mapping>& toUpdate) const {
+
+    if(!enabled) {
+        // We belong to a mapping scheme and someone has disabled us (probably
+        // in response to command-line options). Don't do anything.
+        return;
+    }
 
     // Scan the mappings from left to right to find pairs of mapped positions
     // bordering runs of unmapped positions.
