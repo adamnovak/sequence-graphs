@@ -16,11 +16,16 @@ FMDPositionGroup::FMDPositionGroup(const FMDIndexView& view,
     }
 }
 
-void FMDPositionGroup::extendGreedy(char correctCharacter,
+bool FMDPositionGroup::extendGreedy(char correctCharacter,
     size_t maxMismatches) {
 
     // This will hold all the extensions we find that aren't empty
     std::vector<std::pair<FMDPosition, size_t>> nonemptyExtensions;
+    
+    // Set this to true if we found an exact match, false if we had to use a
+    // mismatch here (and thus, even if we are unique, we shouldn't produce a
+    // mapping).
+    bool exactMatch;
     
     for(const auto& positionAndMismatches : positions) {
         // For each existing FMDPosition
@@ -42,6 +47,9 @@ void FMDPositionGroup::extendGreedy(char correctCharacter,
     if(nonemptyExtensions.size() == 0) {
         // If they are all empty, extend with all the mismatch characters and
         // charge a mismatch each.
+    
+        // We have to use mismatches, if we can find anything at all.
+        exactMatch = false;
     
         for(char base : BASES) {
             if(base == correctCharacter) {
@@ -77,6 +85,8 @@ void FMDPositionGroup::extendGreedy(char correctCharacter,
             std::endl;
         
     } else {
+        // We managed to extend with an exact match.
+        exactMatch = true;
         Log::debug() << "Extended with " << correctCharacter << std::endl;
     }
     
@@ -84,6 +94,9 @@ void FMDPositionGroup::extendGreedy(char correctCharacter,
     positions = std::move(nonemptyExtensions);
     
     Log::debug() << "Have " << positions.size() << " ranges" << std::endl;
+    
+    // Let the caller know if we found the base they wanted or not.
+    return exactMatch;
 
 }
 

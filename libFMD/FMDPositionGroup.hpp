@@ -39,8 +39,11 @@ public:
      * The extension is "greedy" because if it's possible to have a match, it
      * takes the match, even if that would lead it down a path with, overall,
      * more mismatches.
+     *
+     * Returns true if an exact match exists anywhere, and false if a mismatch
+     * had to be used.
      */
-    void extendGreedy(char correctCharacter, size_t maxMismatches);
+    bool extendGreedy(char correctCharacter, size_t maxMismatches);
     
     /**
      * Are there no non-empty FMDPositions in the group?

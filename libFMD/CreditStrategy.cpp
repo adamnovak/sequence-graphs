@@ -159,11 +159,13 @@ void CreditStrategy::breadthFirstSearch(const std::string& query,
         // While it is not empty, and we haven't hit our depth limit (or run off
         // the left edge of the string)
     
-        // Try extending with a character
-        search.extendGreedy(query[queryIndex], maxMismatches);
+        // Try extending with a character. Remember if we found that character or not.
+        bool correctCharacter = search.extendGreedy(query[queryIndex],
+            maxMismatches);
         
-        if(search.isUnique()) {
-            // If we have a unique result, issue a callback.
+        if(correctCharacter && search.isUnique()) {
+            // If we have a unique result, and we actually found the base we
+            // were looking for, issue a callback.
             callback(queryIndex, search.getTextPosition());
         }
         
