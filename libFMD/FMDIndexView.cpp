@@ -5,13 +5,41 @@ FMDIndexView::FMDIndexView(const FMDIndex& index, const GenericBitVector* mask,
     const std::map<size_t, TextPosition> positions): index(index), mask(mask),
     ranges(ranges), positions(std::move(positions)), invertedPositions() {
     
-    for(const auto& kv : this->positions) {
-        // We have to invert positions ourselves.
-        invertedPositions.emplace(kv.second, kv.first);
-    }
+    if(ranges != nullptr) {
+        // We have to deal with ranges.
     
-    Log::debug() << "Made " << invertedPositions.size() <<
-        " inverted positions entries" << std::endl;
+        for(size_t i = 0; i < ranges->rank(ranges->getSize()); i++) {
+            // For each 1 in the ranges bitvector
+            
+            if(positions.count(i) != 0) {
+                // This particular range is marked as owned.
+                
+                // Put in an inverted entry from the owning TextPosition to this
+                // range number.
+                invertedPositions.emplace(positions.at(i), i);
+                
+                Log::debug() << "Range " << i << " explicitly owned by " <<
+                    positions.at(i) << std::endl;
+                
+            } else {
+                // We will use the first index's TextPosition as the owner.
+                
+                // TODO: maybe we can use an inverted sampled suffix array or
+                // something here instead of the full inverted index.
+                
+                TextPosition owner = index.locate(ranges->select(i));
+                
+                invertedPositions.emplace(owner, i);
+                
+                Log::debug() << "Range " << i << " implicitly owned by " <<
+                    owner << std::endl;
+            }
+        }
+    
+        Log::debug() << "Made " << invertedPositions.size() <<
+            " inverted positions entries" << std::endl;
+            
+    }
 }
 
 int64_t FMDIndexView::getRangeNumber(const FMDPosition& position) const {

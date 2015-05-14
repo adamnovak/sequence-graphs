@@ -52,14 +52,26 @@ void CreditStrategyTests::setUp() {
     // Declare every 2 adjacent positions to be a range (since everything
     // appears twice in the input).
     ranges = new GenericBitVector();
+    // We need to keep track of the range owners.
+    std::map<size_t, TextPosition> rangeOwners;
     for(size_t i = 0; i < index->getBWTLength(); i += 2) {
+        // Set every other bit
         ranges->addBit(i);
+        
+        Log::debug() << index->locate(i) << " should own " << i/2 << std::endl;
+        
+        if(i % 3 == 0) {
+            // And record it owned by the appropriate base. Only do this for
+            // some ranges, because it's the exact same thing as the implicit
+            // ownership, and we want to test both.
+            rangeOwners[i/2] = index->locate(i);
+        }
     }
     ranges->finish(index->getBWTLength());
 
     // Make an FMDIndexView. The CreditStrategy doesn't take ownership of it,
     // since it needs to be able to share it with a MappingScheme.
-    view = new FMDIndexView(*index, nullptr, ranges);
+    view = new FMDIndexView(*index, nullptr, ranges, rangeOwners);
 
     // Make the credit applier. Leave the mask empty so everything is masked in,
     // but use our ranges. Don't care at all about what positions are assigned
