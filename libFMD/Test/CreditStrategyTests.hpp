@@ -10,6 +10,7 @@
 class CreditStrategyTests : public CppUnit::TestFixture {
     CPPUNIT_TEST_SUITE(CreditStrategyTests);
     CPPUNIT_TEST(testCredit);
+    CPPUNIT_TEST(testCreditOverMismatches);
     CPPUNIT_TEST_SUITE_END();
     
     // Keep a string saying where to get the haplotypes to test with.
@@ -40,6 +41,7 @@ public:
     void tearDown();
 
     void testCredit();
+    void testCreditOverMismatches();
 };
 
 #endif

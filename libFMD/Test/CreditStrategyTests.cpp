@@ -135,3 +135,52 @@ void CreditStrategyTests::testCredit() {
     }
 }
 
+/**
+ * Make sure credit works over mismatches, but doesn't align the mismatches.
+ */
+void CreditStrategyTests::testCreditOverMismatches() {
+
+    // Grab all of the duplicated contig, with mismatches
+    //                      5 v                   28 v
+    std::string query = "CATGCCTCGGCGATTCGACGCTCATCTGAGACTCT";
+    
+    // Make a vector of mappings saying everything is unmapped.
+    std::vector<Mapping> mappings(query.size(), Mapping());
+    
+    // Map the first base to contig 0, forward strand, base 0.
+    mappings[0] = Mapping(TextPosition(0, 0));
+    // map the last base to contig 0, forward strand, base last
+    mappings[query.size() - 1] = Mapping(TextPosition(0, query.size() - 1));
+
+    // Apply credit and update the mappings
+    credit->applyCredit(query, mappings);
+
+    Log::info() << "Mappings from credit:" << std::endl;
+    for(auto mapping : mappings) {
+        Log::info() << mapping << std::endl;
+    }
+
+    for(size_t i = 0; i < mappings.size(); i++) {
+        if(i == 5 || i == 28) {
+            // These particular bases should be unmapped
+            CPPUNIT_ASSERT(!mappings[i].isMapped());
+        } else {
+    
+            // Make sure all other bases are mapped
+            CPPUNIT_ASSERT(mappings[i].isMapped());
+            
+            // Get where each is mapped
+            auto mappedTo = mappings[i].getLocation();
+            
+            // Make sure it is mapped to the right place on text 0 (contig 0 strand
+            // 0).
+            CPPUNIT_ASSERT_EQUAL((size_t) 0, mappedTo.getText());
+            CPPUNIT_ASSERT_EQUAL(i, mappedTo.getOffset());
+    
+        }
+    
+    }
+    
+}
+
+
