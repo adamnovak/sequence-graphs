@@ -3,13 +3,13 @@ set -e
 
 # runCactus.sh: Run Cactus on all the regions.
 
-for REGION in SMA MHC LRC_KIR; do
+for REGION in SMA MHC LRC_KIR BRCA1 BRCA2; do
     
     # Lower-case it
     REGION_LOWER="${REGION,,}"
     
     # Grab the FASTAs
-    FASTA_FILES=`ls /hive/users/anovak/sgdev/altRegions/${REGION}/*.fa | grep -v graph`
+    FASTA_FILES=`ls altRegions/${REGION}/*.fa`
     
     # Decide on where to put the star tree file
     STAR_FILENAME="${REGION_LOWER}_star.txt"

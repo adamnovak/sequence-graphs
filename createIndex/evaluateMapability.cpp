@@ -392,7 +392,7 @@ main(
                     size_t runEnd = minMatchings[last].start +
                         minMatchings[last].length;
                         
-                    Log::info() << "Successful run " << runStart << " - " <<
+                    Log::debug() << "Successful run " << runStart << " - " <<
                         runEnd << std::endl;
                         
                     // Save this run.
