@@ -35,9 +35,10 @@ public:
         size_t rightAnchor) const;
         
     /**
-     * How many mismatches will we tolerate when applying credit?
+     * How many mismatches will we tolerate when applying credit? By default, we
+     * require exact credit.
      */
-    size_t maxMismatches = 2;
+    size_t maxMismatches = 0;
     
     /**
      * Set to false to not actually do anything.

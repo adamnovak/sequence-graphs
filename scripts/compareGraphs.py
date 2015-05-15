@@ -64,14 +64,21 @@ class GraphGenerationTarget(SchemeUsingTarget):
         # Plan out all the schemes. They all start with map_type. For "natural"
         # schemes, we have map_type, min context, credit, mismatches for credit,
         # min edit distance bound, max edit distance. For "zip" schemes we have
-        # map_type, min context, min edit distance, max range count.
+        # map_type, min context, min edit distance, max range count, credit
+        # mismatches.
         return set([
             # Do zip with min edit distance
-            ("zip", 20, 1, 100),
-            ("zip", 20, 2, 100),
-            ("zip", 20, 3, 100),
-            ("zip", 20, 4, 100),
-            ("zip", 20, 5, 100)
+            ("zip", 20, 1, 100, None),
+            ("zip", 20, 2, 100, None),
+            ("zip", 20, 3, 100, None),
+            ("zip", 20, 4, 100, None),
+            ("zip", 20, 5, 100, None),
+            # And with 2-mismatch credit
+            ("zip", 20, 1, 100, 2),
+            ("zip", 20, 2, 100, 2),
+            ("zip", 20, 3, 100, 2),
+            ("zip", 20, 4, 100, 2),
+            ("zip", 20, 5, 100, 2)
         ])
         
     def run(self):

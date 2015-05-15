@@ -203,20 +203,21 @@ class SchemeUsingTarget(jobTree.scriptTree.target.Target):
             extra_args = []
             
             # Give the scheme a name to stick on our output files
-            scheme_name = "E"
+            scheme_name = ""
             
             if map_type == "natural":
                 # Unpack the parameters.
                 map_type, min_context, credit, mismatch, edit_bound, \
                     edit_max = plan_item
-                    
-                
                 
                 if mismatch:
                     # Add the args and scheme name component for mismatch
                     extra_args.append("--mismatches")
                     extra_args.append("1")
                     scheme_name = "I"
+                else:
+                    scheme_name = "E"
+                    
                 if credit:
                     # Add the args and scheme name component for credit
                     extra_args.append("--credit")
@@ -225,12 +226,26 @@ class SchemeUsingTarget(jobTree.scriptTree.target.Target):
                     # Add an N for no credit
                     scheme_name += "N"
                     
+                scheme_name += map_type
+                    
             elif map_type == "zip":
                 # Unpack the parameters
-                map_type, min_context, edit_bound, range_count = plan_item
-                
+                map_type, min_context, edit_bound, range_count, \
+                    credit_mismatches = plan_item
+                    
+                # Start with just the mapping type.
+                scheme_name += map_type
+                    
+                if credit_mismatches is not None:
+                    # We will do credit with this many mismatches
+                    extra_args.append("--credit")
+                    extra_args.append("--mismatches")
+                    extra_args.append(str(credit_mismatches))
+                    
+                    # Note the number of credit mismatches allowed
+                    scheme_name += "Cmis{}".format(credit_mismatches)
+                    
             # Handle mapping types
-            scheme_name += map_type
             extra_args.append("--mapType")
             extra_args.append(map_type)
             
@@ -252,7 +267,7 @@ class SchemeUsingTarget(jobTree.scriptTree.target.Target):
                     
                     # Mention it in the scheme name
                     scheme_name += "Ed{}".format(edit_bound)
-                
+                    
             if map_type == "natural":
             
                 if edit_max is not None:

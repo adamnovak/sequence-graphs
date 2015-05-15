@@ -144,6 +144,9 @@ void CreditStrategyTests::testCreditOverMismatches() {
     //                      5 v                   28 v
     std::string query = "CATGCCTCGGCGATTCGACGCTCATCTGAGACTCT";
     
+    // Make sure mismatches are on.
+    credit->maxMismatches = 1;
+    
     // Make a vector of mappings saying everything is unmapped.
     std::vector<Mapping> mappings(query.size(), Mapping());
     
