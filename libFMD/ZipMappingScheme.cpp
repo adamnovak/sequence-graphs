@@ -378,6 +378,14 @@ void ZipMappingScheme::map(const std::string& query,
         
     }
     
+    if(credit.enabled) {
+        // If credit isn't disabled, run it. The cannonical check for enabled-
+        // ness is in the CreditStrategy itself, but no point running it if it's
+        // going to do nothing.
+        Log::info() << "Applying credit..." << std::endl;
+        credit.applyCredit(query, filtered);
+    }
+    
     Log::info() << "Sending callbacks..." << std::endl << std::flush;
     for(size_t i = 0; i < filtered.size(); i++) {
         if(filtered[i].isMapped()) {
