@@ -27,7 +27,19 @@ FMDIndexView::FMDIndexView(const FMDIndex& index, const GenericBitVector* mask,
                 // TODO: maybe we can use an inverted sampled suffix array or
                 // something here instead of the full inverted index.
                 
-                TextPosition owner = index.locate(ranges->select(i));
+                // Where does this range start?
+                int64_t rangeStart = ranges->select(i);
+                
+                if(rangeStart >= index.getBWTLength()) {
+                    // Sometimes we put trailing 1s. TODO: figure out where we
+                    // do that and stop it.
+                    
+                    // We know there are no more ranges.
+                    break;
+                }
+                
+                // And what TextPosition is there?
+                TextPosition owner = index.locate(rangeStart);
                 
                 invertedPositions.emplace(owner, i);
                 

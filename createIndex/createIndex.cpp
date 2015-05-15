@@ -687,6 +687,11 @@ main(
                 scheme->maxExtendThrough =
                     options["maxExtendThrough"].as<size_t>();
                 scheme->minUniqueStrings = options["minEditBound"].as<size_t>();
+                
+                // Set up credit
+                scheme->credit.enabled = options.count("credit");
+                scheme->credit.maxMismatches =
+                    options["mismatches"].as<size_t>();
                     
                 return (MappingScheme*) scheme;
             } else {
