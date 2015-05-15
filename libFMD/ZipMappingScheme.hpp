@@ -80,11 +80,15 @@ public:
      */
     size_t minUniqueStrings = 0;
     
-    // We need to defien this with a new; otherwise our inhereted constructor
+    // We need to define this with a new; otherwise our inhereted constructor
     // gets deleted, since it can't default-construct the CreditStrategy without
-    // an FMDIndexView.
+    // an FMDIndexView. This is to work around a compiler bug
+    // <https://gcc.gnu.org/bugzilla/show_bug.cgi?id=62310> which as of 5/14/15
+    // is still open.
+    // TODO: when that is closed, change this all to:
+    // CreditStrategy* credit{view, false};
 private:
-    CreditStrategy* creditPointer = new CreditStrategy(view);
+    CreditStrategy* creditPointer = new CreditStrategy(view, false);
     
 public:
     /**
@@ -93,6 +97,9 @@ public:
      */
     CreditStrategy& credit = *creditPointer;
     
+    /**
+     * Destructor for working around bug in GCC.
+     */
     inline virtual ~ZipMappingScheme() {
         delete creditPointer;
     }
