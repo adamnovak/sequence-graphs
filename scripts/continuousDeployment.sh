@@ -16,7 +16,7 @@ function camelFilename()
     local REGION=$1
     
     # Here is where we pick the scheme to publish
-    echo "output/out3/${REGION}/zipCmis2Min20Ed3Range100.hal"
+    echo "output/out3/${REGION}/zipCmis2Min20Ed2Range100.hal"
 }
 
 function cactusFilename()
@@ -24,7 +24,8 @@ function cactusFilename()
     # Return the filename of the Cactus HAL for the given upper-case region
     local REGION=$1
     
-    echo "cactus/${REGION,,}_work/${REGION,,}_star.hal"
+    # We pull these from Glenn
+    echo "/hive/users/hickey/ga4gh/cactus/output/${REGION,,}_star.hal"
 }
 
 # Where should we save our hal2sg output?
@@ -42,6 +43,7 @@ do
     if [ -e ${CACTUS_HAL} ]
     then
         # It exists.
+        echo "Found Cactus results for ${REGION}"
         
         # Make a cactus directory
         mkdir -p "${REGION_OUT_DIR}/cactus"
@@ -51,7 +53,9 @@ do
         # for some reason?
         hal2sg "${CACTUS_HAL}" "${REGION_OUT_DIR}/cactus/database.fa" \
             "${REGION_OUT_DIR}/cactus/database.sql"
-        
+            
+    else
+        echo "No Cactus results available for ${REGION}"
     fi
     
     # What HAL should Camel have made?
@@ -59,6 +63,7 @@ do
     if [ -e ${CAMEL_HAL} ]
     then
         # It exists
+        echo "Found Camel results for ${REGION}"
         
         # Make a cactus directory
         mkdir -p "${REGION_OUT_DIR}/camel"
@@ -67,6 +72,8 @@ do
         hal2sg "${CAMEL_HAL}" "${REGION_OUT_DIR}/camel/database.fa" \
             "${REGION_OUT_DIR}/camel/database.sql"
     
+    else
+        echo "No Camel results available for ${REGION}"
     fi
 
 done
