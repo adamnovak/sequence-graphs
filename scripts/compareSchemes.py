@@ -87,25 +87,15 @@ class SchemeAssessmentTarget(SchemeUsingTarget):
         # map_type, min context, min edit distance, max range count.
         return set([
             # Natural with flat min thresholds
-            ("natural", 20, False, False, None, None),
-            ("natural", 50, False, False, None, None),
-            ("natural", 100, False, False, None, None),
-            ("natural", 150, False, False, None, None),
-            ("natural", 200, False, False, None, None),
+            #("natural", 20, False, False, None, None),
+            #("natural", 50, False, False, None, None),
+            #("natural", 100, False, False, None, None),
+            #("natural", 150, False, False, None, None),
+            #("natural", 200, False, False, None, None),
             # Do a 5-4-natural scheme with credit. 
             ("natural", None, True, True, 5, 4),
-            # Do zip with min edit distance
-            ("zip", 20, 0, 100),
-            ("zip", 20, 1, 100),
-            ("zip", 20, 2, 100),
-            ("zip", 20, 3, 100),
-            ("zip", 20, 4, 100),
-            ("zip", 20, 5, 100),
-            ("zip", 20, 6, 100),
-            ("zip", 20, 7, 100),
-            ("zip", 20, 8, 100),
-            ("zip", 20, 9, 100),
-            ("zip", 20, 10, 100)
+            # Also 5-3-natural
+            ("natural", None, True, True, 5, 3),
         ])
 
     def run(self):
@@ -117,7 +107,8 @@ class SchemeAssessmentTarget(SchemeUsingTarget):
         
         # Unpack the genome names from the FASTA names. The first one is the
         # reference and the rest are queries.
-        genome_names = [os.path.splitext(fasta)[0] for fasta in self.fasta_list]
+        genome_names = [os.path.splitext(os.path.basename(fasta))[0] \
+            for fasta in self.fasta_list]
         
         # Grab the reference and the queries
         reference_genome = genome_names[0]
