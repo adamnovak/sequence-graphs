@@ -30,8 +30,8 @@ public:
     std::string getNext();
     
     /**
-     * Returns the next FASTA record (header and sequence). May not be called if
-     * hasNext is false.
+     * Returns the next FASTA record (ID and sequence). May not be called if
+     * hasNext is false. Discards the description, if one is present.
      */
     std::pair<std::string, std::string> getNextRecord();
     

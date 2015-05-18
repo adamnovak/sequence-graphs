@@ -65,6 +65,18 @@ std::pair<std::string, std::string> Fasta::getNextRecord() {
         got = stream.get();
     }
     
+    // Find the comma or whitespace that ends the FASTA ID and starts the
+    // description.
+    size_t id_end = header.find_first_of(", \t\v");
+    
+    if(id_end == std::string::npos) {
+        // If there is none, pretend it's after the end.
+        id_end = header.size();
+    }
+    
+    // Pull out the ID from the header
+    std::string id(header.substr(0, id_end));
+    
     // We're going to fill up this string.
     std::string sequence = "";
     
@@ -88,5 +100,5 @@ std::pair<std::string, std::string> Fasta::getNextRecord() {
     }
     
     // Return our built record string.
-    return std::make_pair(header, sequence);
+    return std::make_pair(id, sequence);
 }

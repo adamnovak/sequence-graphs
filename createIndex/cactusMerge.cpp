@@ -458,7 +458,7 @@ main(
             merge.start1 + 1, merge.start2 + 1, merge.length, 
             merge.orientation);
             
-        Log::info() << "Applied merge between threads " << merge.sequence1 << 
+        Log::trace() << "Applied merge between threads " << merge.sequence1 << 
             ":" << merge.start1 << "-" << merge.start1 + merge.length << 
             " and " << merge.sequence2 << ":" << merge.start2 << "-" << 
             merge.start2 + merge.length << " orientation " << 
@@ -495,6 +495,9 @@ main(
         // Open up the FASTA for reading
         Fasta fasta(fastaFiles[fileIndex]);
         
+        Log::info() << "Copying over FASTA records from " <<
+            fastaFiles[fileIndex] << std::endl;
+        
         while(fasta.hasNext()) {
             // Go through all the FASTA records.
             // TODO: assumes FASTA headers have nothing but IDs.
@@ -508,6 +511,7 @@ main(
             if(!eventsToKeep.count(record.first)) {
                 // This event wasn't on the list of events to actually output,
                 // so don't output it.
+                Log::info() << "Skipped event " << record.first << std::endl;
                 continue;
             }
             
