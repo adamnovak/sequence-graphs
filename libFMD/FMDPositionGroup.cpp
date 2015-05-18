@@ -11,8 +11,8 @@ FMDPositionGroup::FMDPositionGroup(const FMDIndexView& view,
     const std::vector<FMDPosition>& startPositions): FMDPositionGroup(view) {
     
     for(const auto& position : startPositions) {
-        // We need to tag all the positions as having 0 mismatches
-        positions.emplace_back(position, 0);
+        // We need to tag all the positions with empty annotations
+        positions.emplace_back(position);
     }
 }
 
@@ -20,18 +20,18 @@ bool FMDPositionGroup::extendGreedy(char correctCharacter,
     size_t maxMismatches) {
 
     // This will hold all the extensions we find that aren't empty
-    std::vector<std::pair<FMDPosition, size_t>> nonemptyExtensions;
+    decltype(positions) nonemptyExtensions;
     
     // Set this to true if we found an exact match, false if we had to use a
     // mismatch here (and thus, even if we are unique, we shouldn't produce a
     // mapping).
     bool exactMatch;
     
-    for(const auto& positionAndMismatches : positions) {
+    for(const auto& annotated : positions) {
         // For each existing FMDPosition
         
         // Pull it out
-        FMDPosition toExtend = positionAndMismatches.first;
+        FMDPosition toExtend = annotated.position;
         
         // Extend it
         view.getIndex().extendLeftOnly(toExtend, correctCharacter);
@@ -39,8 +39,7 @@ bool FMDPositionGroup::extendGreedy(char correctCharacter,
         if(!view.isEmpty(toExtend)) {
             // If we got anything, keep the range (and don't increment the
             // mismatches)
-            nonemptyExtensions.emplace_back(toExtend,
-                positionAndMismatches.second);
+            nonemptyExtensions.emplace_back(toExtend, annotated, false);
         }
     }
     
@@ -57,16 +56,16 @@ bool FMDPositionGroup::extendGreedy(char correctCharacter,
                 continue;
             }
             
-            for(const auto& positionAndMismatches : positions) {
+            for(const auto& annotated : positions) {
                 // Try each position we have as a starting point.
                 
-                if(positionAndMismatches.second >= maxMismatches) {
+                if(annotated.mismatches >= maxMismatches) {
                     // We can't afford another mismatch on this one.
                     continue;
                 }
                 
                 // Pull it out
-                FMDPosition toExtend = positionAndMismatches.first;
+                FMDPosition toExtend = annotated.position;
                 
                 // Extend it
                 view.getIndex().extendLeftOnly(toExtend, base);
@@ -74,8 +73,7 @@ bool FMDPositionGroup::extendGreedy(char correctCharacter,
                 if(!view.isEmpty(toExtend)) {
                     // If we got anything, keep the range (and charge a
                     // mismatch)
-                    nonemptyExtensions.emplace_back(toExtend,
-                        positionAndMismatches.second + 1);
+                    nonemptyExtensions.emplace_back(toExtend, annotated, true);
                 }
             }
             
@@ -102,9 +100,9 @@ bool FMDPositionGroup::extendGreedy(char correctCharacter,
 
 
 bool FMDPositionGroup::isEmpty() const {
-    for(const auto& positionAndMismatches : positions) {
+    for(const auto& annotated : positions) {
         // For each interval we contain
-        if(!view.isEmpty(positionAndMismatches.first)) {
+        if(!view.isEmpty(annotated.position)) {
             // If any is nonempty, we are nonempty
             return false;
         }
@@ -115,9 +113,9 @@ bool FMDPositionGroup::isEmpty() const {
 }
 
 bool FMDPositionGroup::isUnique() const {
-    for(const auto& positionAndMismatches : positions) {
+    for(const auto& annotated : positions) {
         // For each interval we contain
-        if(view.isAmbiguous(positionAndMismatches.first)) {
+        if(view.isAmbiguous(annotated.position)) {
             // If any is ambiguous, we are non-unique
             return false;
         }
@@ -133,9 +131,9 @@ bool FMDPositionGroup::isUnique() const {
     // FMDPosition.
     bool found = false;
     
-    for(const auto& positionAndMismatches : positions) {
+    for(const auto& annotated : positions) {
         // For each position
-        auto position = positionAndMismatches.first;
+        auto position = annotated.position;
         
         if(view.isEmpty(position)) {
             continue;
@@ -165,9 +163,9 @@ TextPosition FMDPositionGroup::getTextPosition() const {
     // TODO: Unify with above function, since they differ only in what they
     // return.
 
-    for(const auto& positionAndMismatches : positions) {
+    for(const auto& annotated : positions) {
         // For each interval we contain
-        if(view.isAmbiguous(positionAndMismatches.first)) {
+        if(view.isAmbiguous(annotated.position)) {
             // If any is ambiguous, we are non-unique
             throw std::runtime_error(
                 "No TextPosition for ambiguous FMDPositionGroup");
@@ -184,9 +182,9 @@ TextPosition FMDPositionGroup::getTextPosition() const {
     // FMDPosition.
     bool found = false;
     
-    for(const auto& positionAndMismatches : positions) {
+    for(const auto& annotated : positions) {
         // For each position
-        auto position = positionAndMismatches.first;
+        auto position = annotated.position;
         
         if(view.isEmpty(position)) {
             continue;
