@@ -18,7 +18,10 @@
  * the unique substrings for each base that the natural mapping scheme finds,
  * but will never map a base that the actual natural to-graph mapping scheme
  * would call as conflicted.
+ *
+ * Works with either an FMDPosition or an FMDPositionGroup as a SearchType.
  */
+template<typename SearchType>
 class ZipMappingScheme: public MappingScheme {
 
 public:
@@ -120,7 +123,7 @@ protected:
             /**
              * What is actually selected still?
              */
-            FMDPosition position;
+            SearchType selection;
             /**
              * How many bases are still searched.
              */
@@ -132,7 +135,7 @@ protected:
              */
             bool setsValid = true;
             /**
-             * What positions are selected in total by the current FMDPosition?
+             * What positions are selected in total by the current search?
              */
             std::set<TextPosition> selected;
             /**
@@ -151,16 +154,16 @@ protected:
              * Start out with an entry reflecting no retraction at all.
              * Fills in the sets if possible.
              */
-            inline SideRetractionEntry(const FMDPosition& unretracted,
+            inline SideRetractionEntry(const SearchType& unretracted,
                 size_t contextLength, const FMDIndexView& view,
-                size_t maxRangeCount): position(unretracted), 
+                size_t maxRangeCount): selection(unretracted), 
                 contextLength(contextLength) {
                 
-                if(position.getApproximateNumberOfRanges(view) <=
+                if(selection.getApproximateNumberOfRanges(view) <=
                     maxRangeCount) {
                 
                     // We can visit everything we have selected
-                    selected = position.getTextPositions(view);
+                    selected = selection.getTextPositions(view);
                     // Copy it all to the newly selected set too.
                     newlySelected = selected;
                     // And say our sets we just made are valid.
@@ -184,14 +187,13 @@ protected:
                 
                 Log::debug() << "Retracting a SideRetractionEntry" << std::endl;
                 
-                // Copy and retract our current FMDPosition
-                FMDPosition retracted = position;
-                size_t retractedContext = view.getIndex().retractRightOnly(
-                    retracted);
+                // Copy and retract our current search
+                SearchType retracted = selection;
+                size_t retractedContext = retracted.retractRightOnly(view);
                 
                 // Make a new entry
                 SideRetractionEntry toReturn;
-                toReturn.position = retracted;
+                toReturn.selection = retracted;
                 toReturn.contextLength = retractedContext;
                 
                 toReturn.setsValid = setsValid;
@@ -201,7 +203,7 @@ protected:
                     
                     size_t newRanges =
                         retracted.getApproximateNumberOfNewRanges(view,
-                        position);
+                        selection);
                         
                     Log::debug() << "Will have " << newRanges <<
                         " new ranges" << std::endl;
@@ -215,7 +217,7 @@ protected:
                         
                         // Go find what is newly selected and save it
                         toReturn.newlySelected = retracted.getNewTextPositions(
-                            view, position);
+                            view, selection);
                             
                         Log::debug() << toReturn.newlySelected.size() <<
                             " new positions found" << std::endl;
@@ -307,8 +309,8 @@ protected:
         /**
          * Initialize the DP table with the first left and right retractions.
          */
-        inline DPTable(const FMDPosition& left, size_t patternLengthLeft,
-            const FMDPosition& right, size_t patternLengthRight,
+        inline DPTable(const SearchType& left, size_t patternLengthLeft,
+            const SearchType& right, size_t patternLengthRight,
             const FMDIndexView& view, size_t maxRangeCount) {
             
             leftRetractions.push_back(SideRetractionEntry(left,
@@ -353,12 +355,12 @@ protected:
     /**
      * Use the inchworm algorithm to find the longest right context present in
      * the reference for each base in the query. Results are in the same order
-     * as the characters in the string, and consist of an FMDPosition of search
-     * results and a context length.
+     * as the characters in the string, and consist of a search and a context
+     * length.
      *
      * If reverse is true, outputs results in its vector in reverse order.
      */
-    std::vector<std::pair<FMDPosition, size_t>> findRightContexts(
+    std::vector<std::pair<SearchType, size_t>> findRightContexts(
         const std::string& query, bool reverse = false) const;
         
     /**
@@ -367,7 +369,7 @@ protected:
      * the base shared with the search result set (which is not used to extend
      * again), and is extended through right to left.
      */
-    bool canExtendThrough(FMDPosition context,
+    bool canExtendThrough(SearchType context,
         const std::string& opposingQuery) const;
         
     /**
@@ -390,8 +392,8 @@ protected:
      * again, and so on, you can do activity selection fairly easily.
      */
     std::vector<size_t> createUniqueContextIndex(
-        const std::vector<std::pair<FMDPosition, size_t>>& leftContexts,
-        const std::vector<std::pair<FMDPosition, size_t>>& rightContexts) const;
+        const std::vector<std::pair<SearchType, size_t>>& leftContexts,
+        const std::vector<std::pair<SearchType, size_t>>& rightContexts) const;
     
     /**
      * Do activity selection using an index from createUniqueContextIndex. Given
@@ -416,18 +418,18 @@ protected:
      * DPTask means that other DPTasks do not need to be executed.
      */
     std::pair<bool, std::set<TextPosition>> exploreRetraction(
-        const DPTable::DPTask& task, DPTable& table, const std::string& query,
-        size_t queryBase) const;
+        const typename DPTable::DPTask& task, DPTable& table,
+        const std::string& query, size_t queryBase) const;
     
     /**
-     * Explore all retractions of the two FMDPositions. Return either an empty
+     * Explore all retractions of the two searches. Return either an empty
      * Mapping (if no explored retraction finds overlapping positions between
      * the two sides), a Mapping with its TextPosition and context lengths set
      * (if we find exactly one such overlap), or a n empty Mapping (if we find
      * multiple overlaps).
      */
-    Mapping exploreRetractions(const FMDPosition& left,
-        size_t patternLengthLeft, const FMDPosition& right,
+    Mapping exploreRetractions(const SearchType& left,
+        size_t patternLengthLeft, const SearchType& right,
         size_t patternLengthRight, const std::string& query,
         size_t queryBase) const;    
     

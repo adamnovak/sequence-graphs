@@ -678,8 +678,8 @@ main(
                 // the forward and reverse versions of merged ranges to agree on
                 // what positions they are assigned when merging, but the view
                 // takes care of that.
-                ZipMappingScheme* scheme = new ZipMappingScheme(
-                    std::move(view));
+                ZipMappingScheme<FMDPosition>* scheme =
+                    new ZipMappingScheme<FMDPosition>(std::move(view));
                 
                 // Set the parameters from the arguments
                 scheme->minContextLength = options["context"].as<size_t>();

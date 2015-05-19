@@ -24,8 +24,9 @@ class ZipMappingSchemeTests : public CppUnit::TestFixture {
     // it up between test cases.
     FMDIndex const* index;
     
-    // Keep a ZipMappingScheme around.
-    ZipMappingScheme* scheme;
+    // Keep a ZipMappingScheme around. We want to try both template
+    // specializations, so we use the base class type for the pointer.
+    MappingScheme* scheme;
     
     // And a ranges bitvector merging some positions
     GenericBitVector* ranges;

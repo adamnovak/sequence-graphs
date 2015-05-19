@@ -67,7 +67,7 @@ bool FMDPositionGroup::extendGreedy(const FMDIndexView& view,
                 FMDPosition toExtend = annotated.position;
                 
                 // Extend it
-                view.getIndex().extendLeftOnly(toExtend, base);
+                toExtend.extendLeftOnly(view, base);
                 
                 if(!toExtend.isEmpty(view)) {
                     // If we got anything, keep the range (and charge a
@@ -98,34 +98,85 @@ bool FMDPositionGroup::extendGreedy(const FMDIndexView& view,
 }
 
 
-void FMDPositionGroup::retractOne(const FMDIndexView& view) {
-    // Make a new collection to hold everything after we retract.
-    decltype(positions) retracted;
-
-    for(auto& annotated : positions) {
-        if(annotated.searchedCharacters == 0) {
-            // We can't retract if it's 0 length (or we don't know how long it
-            // is.
-            throw std::runtime_error("Cannot retract 0-length search.");
+void FMDPositionGroup::extendLeftOnly(const FMDIndexView& view,
+    char character) {
+    
+    // This will hold all the extensions we find that aren't empty
+    decltype(positions) nonemptyExtensions;
+    
+    for(const auto& annotated : positions) {
+        // For each existing FMDPosition
+        
+        // Pull it out
+        FMDPosition toExtend = annotated.position;
+        
+        // Extend it
+        toExtend.extendLeftOnly(view, character);
+        
+        if(!toExtend.isEmpty(view)) {
+            // If we got anything, keep the range (and don't increment the
+            // mismatches)
+            nonemptyExtensions.emplace(toExtend, annotated, false);
         }
-        
-        // Make a copy of the range to retract.
-        FMDPosition toRetract = annotated.position;
-        
-        // Retract exactly one base (assuming we started with a covering
-        // FMDPosition).
-        view.getIndex().retractRightOnly(toRetract,
-            annotated.searchedCharacters - 1);
-            
-        // Call the retraction constructor and stick in this new retracted
-        // range.
-        retracted.emplace(toRetract, annotated, (size_t) 1);
-        
     }
     
-    // Replace our old positions with the new retracted ones.
-    positions = std::move(retracted);
+    // Replace our FMDPositions with the new extended ones.
+    positions = std::move(nonemptyExtensions);
     
+}
+
+void FMDPositionGroup::retractRightOnly(const FMDIndexView& view,
+    size_t newLength) {
+    
+    // This will hold all the retractions we find
+    decltype(positions) retractions;
+    
+    for(const auto& annotated : positions) {
+        // For each existing FMDPosition
+        
+        // Pull it out
+        FMDPosition toRetract = annotated.position;
+        
+        // Retract it
+        toRetract.retractRightOnly(view, newLength);
+        
+        // Call the retraction constructor with the number of bases we
+        // retracted, and stick in this new retracted range.
+        retractions.emplace(toRetract, annotated, 
+            annotated.searchedCharacters - newLength);
+    }
+    
+    // Replace our FMDPositions with the new extended ones.
+    positions = std::move(retractions);
+}
+
+size_t FMDPositionGroup::retractRightOnly(const FMDIndexView& view) {
+
+    // What length do we need to retract to to get something new?
+    size_t newLength = 0;
+    
+    for(const auto& annotated : positions) {
+        // For each existing FMDPosition
+        
+        // Pull it out
+        FMDPosition toRetract = annotated.position;
+        
+        // See how far it needs to retract, and keep it if it stays longer.
+        newLength = std::max(newLength, toRetract.retractRightOnly(view));
+    }
+
+    if(newLength == 0) {
+        // We couldn't get a number out of anything. Maybe we ran out of
+        // FMDPositions?
+        throw std::runtime_error("No retraction possible");
+    }
+
+    // Retract to the longest length that lets us cover anything more.
+    // TODO: We're half as fast as we could be, since we repeat a lot of work.
+    retractRightOnly(view, newLength);
+    
+    // Report how logn we retracted to.
+    return newLength;
 }
 
 bool FMDPositionGroup::isEmpty(const FMDIndexView& view) const {

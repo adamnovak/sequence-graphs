@@ -9,8 +9,97 @@
 
 #include <boost/range/adaptor/reversed.hpp>
 
-std::vector<std::pair<FMDPosition, size_t>> ZipMappingScheme::findRightContexts(
-    const std::string& query, bool reverse) const {
+template<>
+bool ZipMappingScheme<FMDPosition>::canExtendThrough(FMDPosition context,
+    const std::string& opposingQuery) const {
+    
+    Log::debug() << "Trying to extend " << context << " through " << 
+        opposingQuery.size() << " opposing context" << std::endl;
+    stats.add("extendThroughAttampts", 1);
+        
+    // We're going to retract it until it's no longer unique, then go
+    // back and retract it one less.
+    FMDPosition noLongerUnique = context;
+    size_t nonUniqueLength = view.getIndex().retractRightOnly(noLongerUnique);
+    
+    while(noLongerUnique.isUnique(view)) {
+        // It may take multiple retracts because of masks and stuff.
+        nonUniqueLength = view.getIndex().retractRightOnly(noLongerUnique);
+    }
+    
+    // Go back and retract one less (to a length one longer).
+    FMDPosition barelyUnique = context;
+    view.getIndex().retractRightOnly(barelyUnique, nonUniqueLength + 1);
+
+    for(size_t i = opposingQuery.size() - 2; i != (size_t) -1 &&
+        !barelyUnique.isEmpty(view); i--) {
+        // Now go extend through with the opposing string, from right to left.
+        // We skip the rightmost character (the one we are actually in the
+        // process of mapping) because that's already searched, and we keep
+        // going until we run out of results or we make it all the way through.
+        
+        Log::trace() << "Extending with " << opposingQuery[i] << std::endl;
+        
+        view.getIndex().extendLeftOnly(barelyUnique, opposingQuery[i]);
+    }
+    
+    if(!barelyUnique.isEmpty(view)) {
+        // We extended through!
+        stats.add("extendThroughSuccesses", 1);
+        return true;
+    } else {
+        // We didn't get any results upon extending through
+        Log::debug() << "Extension failed" << std::endl;
+        return false;
+    }
+}
+
+template<>
+size_t ZipMappingScheme<FMDPosition>::selectActivities(
+    std::vector<std::pair<size_t, size_t>> ranges) const {
+    
+    stats.add("activitySelectionRuns", 1);
+    
+    // First we have to sort the ranges by end, ascending.
+    std::sort(ranges.begin(), ranges.end(), [](std::pair<size_t, size_t> a,
+        std::pair<size_t, size_t> b) -> bool {
+        
+        // We'll give true if the first range ends before the second.
+        // We also return true if there's a tie but a starts first.
+        return (a.second < b.second) || (a.second == b.second &&
+            a.first < b.first);
+        
+    });
+    
+    // How many non-overlapping things have we found?
+    size_t found = 0;
+    // What's the minimum start time we can accept?
+    size_t nextFree = 0;
+    
+    for(const auto& range : ranges) {
+        Log::trace() << "Have " << range.first << " - " << range.second <<
+            std::endl;
+        // For each range (starting with those that end soonest)...
+        if(range.first >= nextFree) {
+            // Take it if it starts late enough
+            
+            Log::trace() << "Taking " << range.first << " - " << range.second <<
+                std::endl;
+            
+            nextFree = range.second + 1;
+            found++;
+            
+            stats.add("activitiesSelected", 1);
+        }
+    }
+
+    return found;
+}
+
+template<>
+std::vector<std::pair<FMDPosition, size_t>>
+    ZipMappingScheme<FMDPosition>::findRightContexts(const std::string& query,
+    bool reverse) const {
  
     // This will hold the right context of every position.
     std::vector<std::pair<FMDPosition, size_t>> toReturn(query.size());
@@ -66,7 +155,8 @@ std::vector<std::pair<FMDPosition, size_t>> ZipMappingScheme::findRightContexts(
     return toReturn;
 }
 
-std::vector<size_t> ZipMappingScheme::createUniqueContextIndex(
+template<>
+std::vector<size_t> ZipMappingScheme<FMDPosition>::createUniqueContextIndex(
     const std::vector<std::pair<FMDPosition, size_t>>& leftContexts,
     const std::vector<std::pair<FMDPosition, size_t>>& rightContexts) const {
     
@@ -242,8 +332,9 @@ std::vector<size_t> ZipMappingScheme::createUniqueContextIndex(
     return endOfBestActivity;
 }
 
-size_t ZipMappingScheme::selectActivitiesIndexed(size_t start, size_t end,
-    const std::vector<size_t>& index, size_t threshold) const {
+template<>
+size_t ZipMappingScheme<FMDPosition>::selectActivitiesIndexed(size_t start,
+    size_t end, const std::vector<size_t>& index, size_t threshold) const {
     
     // What base are we at?
     size_t position = start;
@@ -276,214 +367,18 @@ size_t ZipMappingScheme::selectActivitiesIndexed(size_t start, size_t end,
     return found;
 }
 
-void ZipMappingScheme::map(const std::string& query,
-    std::function<void(size_t, TextPosition)> callback) const {
-    
-    // Get the right contexts
-    Log::info() << "Looking for right contexts..." << std::endl << std::flush;
-    auto rightContexts = findRightContexts(query, false);
-    
-    // And the left contexts (which is the reverse of the contexts for the
-    // reverse complement, which we can produce in backwards order already).
-    Log::info() << "Flipping query..." << std::endl << std::flush;
-    std::string complement = reverseComplement(query);
-    
-    Log::info() << "Looking for left contexts..." << std::endl << std::flush;
-    auto leftContexts = findRightContexts(complement, true);
-    
-    // This is going to hold, for each query base, the endpoint of the soonest-
-    // ending minimally unique context that starts at or after that base.
-    Log::debug() << "Creating unique context index" << std::endl << std::flush;
-    auto uniqueContextIndex = createUniqueContextIndex(leftContexts,
-        rightContexts);
-    
-    
-    Log::info() << "Exploring retractions..." << std::endl;
-    
-    // We're going to store up all the potential mappings, and then filter them
-    // down. This stores true and the mapped-to TextPosition if a base would map
-    // before filtering, and false and an undefined TextPosition otherwise.
-    std::vector<Mapping> mappings;
-    
-    // For each pair, figure out if the forward and reverse FMDPositions select
-    // one single consistent TextPosition.
-    for(size_t i = 0; i < query.size(); i++) {
-    
-        Log::debug() << "Base " << i << " = " << query[i] << " (+" << 
-            leftContexts[i].second << "|+" << rightContexts[i].second << 
-            ") selects " << leftContexts[i].first << " and " << 
-            rightContexts[i].first << std::endl;
-            
-        // Go look at these two contexts in opposite directions, and all their
-        // (reasonable to think about) retractions, and see whether this base
-        // belongs to 0, 1, or multiple TextPositions.
-        Mapping mapping = exploreRetractions(
-            leftContexts[i].first, leftContexts[i].second,
-            rightContexts[i].first, rightContexts[i].second, query, i);
-        
-        // TODO: If we can't find anything, try retracting a few bases on one or
-        // both sides until we get a shared result.
-        
-        if(mapping.isMapped()) {
-            // We map!
-            Log::debug() << "Index " << i << " maps on " << 
-                mapping.getLeftMaxContext() << " left and " << 
-                mapping.getRightMaxContext() << " right context" << std::endl;
-        } else {
-            // Too few results until we retracted back to too many
-            Log::debug() << "Index " << i << " is not mapped." << std::endl;
-       }
-       // Save the mapping
-       mappings.push_back(mapping);
-        
-    }
-    
-    Log::info() << "Applying filter..." << std::endl << std::flush;
-    
-    // We're going to filter everything first and then do the callbacks.
-    std::vector<Mapping> filtered;
-    
-    for(size_t i = 0; i < mappings.size(); i++) {
-        // Now we have to filter the mappings
-        
-        // Grab the mapping for this query index.
-        const Mapping& mapping = mappings[i];
-        
-        if(!mapping.isMapped()) {
-            // Skip unmapped query bases
-            filtered.push_back(mapping);
-            continue;
-        }
-        
-        // What range of bases are within our left and right MUMs?
-        size_t rangeStart = i - mapping.getLeftMaxContext() + 1;
-        size_t rangeEnd = i + mapping.getRightMaxContext() - 1; // Inclusive
-        
-        // Do activity selection
-        size_t nonOverlapping = selectActivitiesIndexed(rangeStart, rangeEnd,
-            uniqueContextIndex, minUniqueStrings);
-            
-        if(nonOverlapping < minUniqueStrings) {
-            Log::debug() <<
-                "Dropping mapping due to having too few unique strings." <<
-                std::endl;
-            // Report a non-mapping Mapping
-            stats.add("filterFail", 1);
-            filtered.push_back(Mapping());
-        } else {
-            // Report all the mappings that pass.
-            stats.add("filterPass", 1);
-            filtered.push_back(mapping);
-        }
-        
-    }
-    
-    if(credit.enabled) {
-        // If credit isn't disabled, run it. The cannonical check for enabled-
-        // ness is in the CreditStrategy itself, but no point running it if it's
-        // going to do nothing.
-        Log::info() << "Applying credit..." << std::endl;
-        credit.applyCredit(query, filtered);
-    }
-    
-    Log::info() << "Sending callbacks..." << std::endl << std::flush;
-    for(size_t i = 0; i < filtered.size(); i++) {
-        if(filtered[i].isMapped()) {
-            // Send a callback for everything that passed the filter.
-            callback(i, filtered[i].getLocation());
-        }
-    }
-    
-}
+// Forward-declare specialization for mutual recursion of specializations.
+template<>
+Mapping ZipMappingScheme<FMDPosition>::exploreRetractions(
+    const FMDPosition& left, size_t patternLengthLeft, const FMDPosition& right,
+    size_t patternLengthRight, const std::string& query,
+    size_t queryBase) const;
 
-bool ZipMappingScheme::canExtendThrough(FMDPosition context,
-    const std::string& opposingQuery) const {
-    
-    Log::debug() << "Trying to extend " << context << " through " << 
-        opposingQuery.size() << " opposing context" << std::endl;
-    stats.add("extendThroughAttampts", 1);
-        
-    // We're going to retract it until it's no longer unique, then go
-    // back and retract it one less.
-    FMDPosition noLongerUnique = context;
-    size_t nonUniqueLength = view.getIndex().retractRightOnly(noLongerUnique);
-    
-    while(noLongerUnique.isUnique(view)) {
-        // It may take multiple retracts because of masks and stuff.
-        nonUniqueLength = view.getIndex().retractRightOnly(noLongerUnique);
-    }
-    
-    // Go back and retract one less (to a length one longer).
-    FMDPosition barelyUnique = context;
-    view.getIndex().retractRightOnly(barelyUnique, nonUniqueLength + 1);
-
-    for(size_t i = opposingQuery.size() - 2; i != (size_t) -1 &&
-        !barelyUnique.isEmpty(view); i--) {
-        // Now go extend through with the opposing string, from right to left.
-        // We skip the rightmost character (the one we are actually in the
-        // process of mapping) because that's already searched, and we keep
-        // going until we run out of results or we make it all the way through.
-        
-        Log::trace() << "Extending with " << opposingQuery[i] << std::endl;
-        
-        view.getIndex().extendLeftOnly(barelyUnique, opposingQuery[i]);
-    }
-    
-    if(!barelyUnique.isEmpty(view)) {
-        // We extended through!
-        stats.add("extendThroughSuccesses", 1);
-        return true;
-    } else {
-        // We didn't get any results upon extending through
-        Log::debug() << "Extension failed" << std::endl;
-        return false;
-    }
-}
-
-size_t ZipMappingScheme::selectActivities(
-    std::vector<std::pair<size_t, size_t>> ranges) const {
-    
-    stats.add("activitySelectionRuns", 1);
-    
-    // First we have to sort the ranges by end, ascending.
-    std::sort(ranges.begin(), ranges.end(), [](std::pair<size_t, size_t> a,
-        std::pair<size_t, size_t> b) -> bool {
-        
-        // We'll give true if the first range ends before the second.
-        // We also return true if there's a tie but a starts first.
-        return (a.second < b.second) || (a.second == b.second &&
-            a.first < b.first);
-        
-    });
-    
-    // How many non-overlapping things have we found?
-    size_t found = 0;
-    // What's the minimum start time we can accept?
-    size_t nextFree = 0;
-    
-    for(const auto& range : ranges) {
-        Log::trace() << "Have " << range.first << " - " << range.second <<
-            std::endl;
-        // For each range (starting with those that end soonest)...
-        if(range.first >= nextFree) {
-            // Take it if it starts late enough
-            
-            Log::trace() << "Taking " << range.first << " - " << range.second <<
-                std::endl;
-            
-            nextFree = range.second + 1;
-            found++;
-            
-            stats.add("activitiesSelected", 1);
-        }
-    }
-
-    return found;
-}
-
-std::pair<bool, std::set<TextPosition>> ZipMappingScheme::exploreRetraction(
-        const DPTable::DPTask& task, DPTable& table, const std::string& query,
-        size_t queryBase) const {
+template<>
+std::pair<bool, std::set<TextPosition>>
+    ZipMappingScheme<FMDPosition>::exploreRetraction(
+    const typename DPTable::DPTask& task, DPTable& table, const std::string& query,
+    size_t queryBase) const {
     
     // Get the left and right SideRetractionEntries. Also computes any
     // uncomputed retractions and enumerates any sufficiently small sets.
@@ -492,8 +387,8 @@ std::pair<bool, std::set<TextPosition>> ZipMappingScheme::exploreRetraction(
     const DPTable::SideRetractionEntry& right = table.getRetraction(true,
         task.rightIndex, view, maxRangeCount);
     
-    Log::debug() << "Exploring " << left.position << " (" <<
-        left.contextLength << ") left, " << right.position << " (" <<
+    Log::debug() << "Exploring " << left.selection << " (" <<
+        left.contextLength << ") left, " << right.selection << " (" <<
         right.contextLength << ") right" << std::endl;
     
     // How many bases are searched total (accounting for the 1-base central
@@ -516,12 +411,12 @@ std::pair<bool, std::set<TextPosition>> ZipMappingScheme::exploreRetraction(
     bool triedRightExtend = false;
           
     
-    if(left.position.isUnique(view) && right.contextLength < maxExtendThrough) {
+    if(left.selection.isUnique(view) && right.contextLength < maxExtendThrough) {
         
         // We will try extending the left through the right.
         triedLeftExtend = true;
         
-        if(canExtendThrough(left.position, reverseComplement(query.substr(
+        if(canExtendThrough(left.selection, reverseComplement(query.substr(
             queryBase, right.contextLength)))) {
             // We tried to extend the left context through the (reverse
             // complemented) right context and succeeded.
@@ -531,7 +426,7 @@ std::pair<bool, std::set<TextPosition>> ZipMappingScheme::exploreRetraction(
             
             // We can now cheat and return the one-element set of whatever the
             // left context selects, flipped.
-            TextPosition matchedTo = left.position.getTextPosition(view);
+            TextPosition matchedTo = left.selection.getTextPosition(view);
             matchedTo.flip(view.getIndex().getContigLength(
                 matchedTo.getContigNumber()));
             return {true, {matchedTo}};
@@ -541,13 +436,13 @@ std::pair<bool, std::set<TextPosition>> ZipMappingScheme::exploreRetraction(
         
         // If we don't succeed, we still need to check for set overlap.
     }
-    if(right.position.isUnique(view) && left.contextLength < maxExtendThrough) {
+    if(right.selection.isUnique(view) && left.contextLength < maxExtendThrough) {
         // TODO: Don't try this extension if we failed the other direction.
         
         // We will try extending the right through the left.
         triedRightExtend = true;
         
-        if(canExtendThrough(right.position, query.substr(
+        if(canExtendThrough(right.selection, query.substr(
             queryBase - (left.contextLength - 1), left.contextLength))) {
             // We tried to extend the right context through the left context and
             // succeeded
@@ -557,7 +452,7 @@ std::pair<bool, std::set<TextPosition>> ZipMappingScheme::exploreRetraction(
             
             // We can now cheat and return the one-element set of whatever the
             // right context selects.
-            TextPosition matchedTo = right.position.getTextPosition(view);
+            TextPosition matchedTo = right.selection.getTextPosition(view);
             return {true, {matchedTo}};
         } else {
             Log::debug() << "Failed to extend right though left" << std::endl;
@@ -681,7 +576,9 @@ std::pair<bool, std::set<TextPosition>> ZipMappingScheme::exploreRetraction(
         
 }
 
-Mapping ZipMappingScheme::exploreRetractions(
+
+template<>
+Mapping ZipMappingScheme<FMDPosition>::exploreRetractions(
     const FMDPosition& left, size_t patternLengthLeft, const FMDPosition& right,
     size_t patternLengthRight, const std::string& query,
     size_t queryBase) const {
@@ -843,4 +740,125 @@ Mapping ZipMappingScheme::exploreRetractions(
         return Mapping();
     }
 } 
+
+template<>
+void ZipMappingScheme<FMDPosition>::map(const std::string& query,
+    std::function<void(size_t, TextPosition)> callback) const {
+    
+    // Get the right contexts
+    Log::info() << "Looking for right contexts..." << std::endl << std::flush;
+    auto rightContexts = findRightContexts(query, false);
+    
+    // And the left contexts (which is the reverse of the contexts for the
+    // reverse complement, which we can produce in backwards order already).
+    Log::info() << "Flipping query..." << std::endl << std::flush;
+    std::string complement = reverseComplement(query);
+    
+    Log::info() << "Looking for left contexts..." << std::endl << std::flush;
+    auto leftContexts = findRightContexts(complement, true);
+    
+    // This is going to hold, for each query base, the endpoint of the soonest-
+    // ending minimally unique context that starts at or after that base.
+    Log::debug() << "Creating unique context index" << std::endl << std::flush;
+    auto uniqueContextIndex = createUniqueContextIndex(leftContexts,
+        rightContexts);
+    
+    
+    Log::info() << "Exploring retractions..." << std::endl;
+    
+    // We're going to store up all the potential mappings, and then filter them
+    // down. This stores true and the mapped-to TextPosition if a base would map
+    // before filtering, and false and an undefined TextPosition otherwise.
+    std::vector<Mapping> mappings;
+    
+    // For each pair, figure out if the forward and reverse FMDPositions select
+    // one single consistent TextPosition.
+    for(size_t i = 0; i < query.size(); i++) {
+    
+        Log::debug() << "Base " << i << " = " << query[i] << " (+" << 
+            leftContexts[i].second << "|+" << rightContexts[i].second << 
+            ") selects " << leftContexts[i].first << " and " << 
+            rightContexts[i].first << std::endl;
+            
+        // Go look at these two contexts in opposite directions, and all their
+        // (reasonable to think about) retractions, and see whether this base
+        // belongs to 0, 1, or multiple TextPositions.
+        Mapping mapping = exploreRetractions(
+            leftContexts[i].first, leftContexts[i].second,
+            rightContexts[i].first, rightContexts[i].second, query, i);
+        
+        // TODO: If we can't find anything, try retracting a few bases on one or
+        // both sides until we get a shared result.
+        
+        if(mapping.isMapped()) {
+            // We map!
+            Log::debug() << "Index " << i << " maps on " << 
+                mapping.getLeftMaxContext() << " left and " << 
+                mapping.getRightMaxContext() << " right context" << std::endl;
+        } else {
+            // Too few results until we retracted back to too many
+            Log::debug() << "Index " << i << " is not mapped." << std::endl;
+       }
+       // Save the mapping
+       mappings.push_back(mapping);
+        
+    }
+    
+    Log::info() << "Applying filter..." << std::endl << std::flush;
+    
+    // We're going to filter everything first and then do the callbacks.
+    std::vector<Mapping> filtered;
+    
+    for(size_t i = 0; i < mappings.size(); i++) {
+        // Now we have to filter the mappings
+        
+        // Grab the mapping for this query index.
+        const Mapping& mapping = mappings[i];
+        
+        if(!mapping.isMapped()) {
+            // Skip unmapped query bases
+            filtered.push_back(mapping);
+            continue;
+        }
+        
+        // What range of bases are within our left and right MUMs?
+        size_t rangeStart = i - mapping.getLeftMaxContext() + 1;
+        size_t rangeEnd = i + mapping.getRightMaxContext() - 1; // Inclusive
+        
+        // Do activity selection
+        size_t nonOverlapping = selectActivitiesIndexed(rangeStart, rangeEnd,
+            uniqueContextIndex, minUniqueStrings);
+            
+        if(nonOverlapping < minUniqueStrings) {
+            Log::debug() <<
+                "Dropping mapping due to having too few unique strings." <<
+                std::endl;
+            // Report a non-mapping Mapping
+            stats.add("filterFail", 1);
+            filtered.push_back(Mapping());
+        } else {
+            // Report all the mappings that pass.
+            stats.add("filterPass", 1);
+            filtered.push_back(mapping);
+        }
+        
+    }
+    
+    if(credit.enabled) {
+        // If credit isn't disabled, run it. The cannonical check for enabled-
+        // ness is in the CreditStrategy itself, but no point running it if it's
+        // going to do nothing.
+        Log::info() << "Applying credit..." << std::endl;
+        credit.applyCredit(query, filtered);
+    }
+    
+    Log::info() << "Sending callbacks..." << std::endl << std::flush;
+    for(size_t i = 0; i < filtered.size(); i++) {
+        if(filtered[i].isMapped()) {
+            // Send a callback for everything that passed the filter.
+            callback(i, filtered[i].getLocation());
+        }
+    }
+    
+}
 

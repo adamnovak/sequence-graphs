@@ -60,7 +60,8 @@ void ZipMappingSchemeTests::setUp() {
     // Make the mapping scheme. Leave the mask empty so everything is masked in,
     // but use our ranges. Don't care at all about what positions are assigned
     // to ranges.
-    scheme = new ZipMappingScheme(FMDIndexView(*index, nullptr, ranges));
+    scheme = new ZipMappingScheme<FMDPosition>(FMDIndexView(*index, nullptr,
+        ranges));
 }
 
 
@@ -138,7 +139,7 @@ void ZipMappingSchemeTests::testMapWithMask() {
 
     // Turn the genome restriction on, and don't use a merged ranges vector
     delete scheme;
-    scheme = new ZipMappingScheme(FMDIndexView(*index, mask));
+    scheme = new ZipMappingScheme<FMDPosition>(FMDIndexView(*index, mask));
     
     size_t mappedBases = 0;
     scheme->map(query, [&](size_t i, TextPosition mappedTo) {
@@ -176,7 +177,8 @@ void ZipMappingSchemeTests::testMapWithMaskAndRanges() {
 
     // Turn the genome restriction on, and do use the merged ranges vector
     delete scheme;
-    scheme = new ZipMappingScheme(FMDIndexView(*index, mask, ranges));
+    scheme = new ZipMappingScheme<FMDPosition>(FMDIndexView(*index, mask,
+        ranges));
     
     size_t mappedBases = 0;
     scheme->map(query, [&](size_t i, TextPosition mappedTo) {

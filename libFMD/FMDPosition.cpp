@@ -43,6 +43,21 @@ std::ostream& operator<< (std::ostream& o, FMDPosition const& position) {
         position.end_offset);
 }
 
+void FMDPosition::extendLeftOnly(const FMDIndexView& view, char character) {
+    // Just make the index do it. TODO: move functionality.
+    view.getIndex().extendLeftOnly(*this, character);
+}
+
+void FMDPosition::retractRightOnly(const FMDIndexView& view, size_t newLength) {
+    // Just make the index do it. TODO: move functionality.
+    view.getIndex().retractRightOnly(*this, newLength);
+}
+
+size_t FMDPosition::retractRightOnly(const FMDIndexView& view) {
+    // Just make the index do it. TODO: move functionality.
+    return view.getIndex().retractRightOnly(*this);
+}
+
 bool FMDPosition::isEmpty(const FMDIndexView& view) const {
     // Get our forward interval and see if it's empty.
     return view.isEmpty(getForwardStart(), getLength());

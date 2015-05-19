@@ -35,6 +35,9 @@ public:
      * TODO: Look into checking LCP.
      */
     FMDPositionGroup(const std::vector<FMDPosition>& positions);
+    
+    // Default copy constructor/move constructor/destructor/assignment operator
+    // are all OK.
         
     /**
      * Extend all the FMDPositions, using the given view. If there are any
@@ -51,14 +54,22 @@ public:
      */
     bool extendGreedy(const FMDIndexView& view, char correctCharacter,
         size_t maxMismatches);
+        
+    /**
+     * Extend left with no mismatches.
+     */
+    void extendLeftOnly(const FMDIndexView& view, char character);
     
     /**
-     * Retract by a single base, using the given view.
-     *
-     * TODO: work out how to retract the minimum necessary for one FMDPosition
-     * to show more results.
+     * Retract to the given search string length, on the right.
      */
-    void retractOne(const FMDIndexView& view);
+    void retractRightOnly(const FMDIndexView& view, size_t newLength);
+    
+    /**
+     * Retract until more BWT positions are selected. They may not actually be
+     * different merged ranges or masked in.
+     */
+    size_t retractRightOnly(const FMDIndexView& view);
     
     /**
      * Is nothing selected under the given view?

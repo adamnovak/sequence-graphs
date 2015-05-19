@@ -129,6 +129,22 @@ public:
     ////////////////////////////////////////////////////////////////////////////
 
     /**
+     * Extend left with no mismatches.
+     */
+    void extendLeftOnly(const FMDIndexView& view, char character);
+    
+    /**
+     * Retract to the given search string length, on the right.
+     */
+    void retractRightOnly(const FMDIndexView& view, size_t newLength);
+    
+    /**
+     * Retract until more BWT positions are selected. They may not actually be
+     * different merged ranges or masked in.
+     */
+    size_t retractRightOnly(const FMDIndexView& view);
+
+    /**
      * Is nothing selected under the given view?
      */
     bool isEmpty(const FMDIndexView& view) const;
