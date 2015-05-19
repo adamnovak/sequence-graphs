@@ -105,6 +105,11 @@ public:
      * Are two FMDPositions equal?
      */
     bool operator==(const FMDPosition& other) const;
+    
+    /**
+     * Is one FMDPosition less than another (so they can go in a set)?
+     */
+    bool operator<(const FMDPosition& other) const;
 
 
     /**

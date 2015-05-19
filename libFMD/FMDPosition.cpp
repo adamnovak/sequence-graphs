@@ -23,6 +23,17 @@ bool FMDPosition::operator==(const FMDPosition& other) const {
         end_offset == other.end_offset;
 }
 
+bool FMDPosition::operator<(const FMDPosition& other) const {
+    // Compare all the fields like normal didgit places.
+    // TODO: Is there a way to generate this code?
+    return
+        forward_start < other.forward_start ||
+        (forward_start == other.forward_start &&
+        (reverse_start < other.reverse_start ||
+        (reverse_start == other.reverse_start &&
+        end_offset <= other.end_offset)));
+}
+
 std::ostream& operator<< (std::ostream& o, FMDPosition const& position) {
     // Report both the ranges that we represent.
     return o << position.forward_start << "-" << 

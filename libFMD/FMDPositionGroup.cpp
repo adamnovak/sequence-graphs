@@ -12,7 +12,7 @@ FMDPositionGroup::FMDPositionGroup(const FMDIndexView& view,
     
     for(const auto& position : startPositions) {
         // We need to tag all the positions with empty annotations
-        positions.emplace_back(position);
+        positions.emplace(position);
     }
 }
 
@@ -39,7 +39,7 @@ bool FMDPositionGroup::extendGreedy(char correctCharacter,
         if(!view.isEmpty(toExtend)) {
             // If we got anything, keep the range (and don't increment the
             // mismatches)
-            nonemptyExtensions.emplace_back(toExtend, annotated, false);
+            nonemptyExtensions.emplace(toExtend, annotated, false);
         }
     }
     
@@ -73,7 +73,7 @@ bool FMDPositionGroup::extendGreedy(char correctCharacter,
                 if(!view.isEmpty(toExtend)) {
                     // If we got anything, keep the range (and charge a
                     // mismatch)
-                    nonemptyExtensions.emplace_back(toExtend, annotated, true);
+                    nonemptyExtensions.emplace(toExtend, annotated, true);
                 }
             }
             
@@ -98,6 +98,36 @@ bool FMDPositionGroup::extendGreedy(char correctCharacter,
 
 }
 
+
+void FMDPositionGroup::retractOne() {
+    // Make a new collection to hold everything after we retract.
+    decltype(positions) retracted;
+
+    for(auto& annotated : positions) {
+        if(annotated.searchedCharacters == 0) {
+            // We can't retract if it's 0 length (or we don't know how long it
+            // is.
+            throw std::runtime_error("Cannot retract 0-length search.");
+        }
+        
+        // Make a copy of the range to retract.
+        FMDPosition toRetract = annotated.position;
+        
+        // Retract exactly one base (assuming we started with a covering
+        // FMDPosition).
+        view.getIndex().retractRightOnly(toRetract,
+            annotated.searchedCharacters - 1);
+            
+        // Call the retraction constructor and stick in this new retracted
+        // range.
+        retracted.emplace(toRetract, annotated, (size_t) 1);
+        
+    }
+    
+    // Replace our old positions with the new retracted ones.
+    positions = std::move(retracted);
+    
+}
 
 bool FMDPositionGroup::isEmpty() const {
     for(const auto& annotated : positions) {

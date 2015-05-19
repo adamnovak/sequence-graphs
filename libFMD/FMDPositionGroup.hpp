@@ -5,6 +5,7 @@
 #include "FMDIndex.hpp"
 #include "FMDIndexView.hpp"
 #include <vector>
+#include <set>
 #include <deque>
 
 /**
@@ -50,6 +51,14 @@ public:
      * had to be used.
      */
     bool extendGreedy(char correctCharacter, size_t maxMismatches);
+    
+    /**
+     * Retract by a single base.
+     *
+     * TODO: work out how to retract the minimum necessary for one FMDPosition
+     * to show more results.
+     */
+    void retractOne();
     
     /**
      * Are there no non-empty FMDPositions in the group?
@@ -160,12 +169,37 @@ protected:
                 }
             }
         }
+        
+        /**
+         * Equality comparison so this can go in a set.
+         */
+        inline bool operator==(const AnnotatedFMDPosition& other) const {
+            return position == other.position &&
+                mismatches == other.mismatches &&
+                searchedCharacters == other.searchedCharacters;
+            // We don't have to check the offset lists because they are
+            // determined by our other parameters, assuming we have a consistent
+            // history for the group in terms of what was searched.
+        }
+        
+        /**
+         * Order comparison so this can go in a set.
+         */
+        inline bool operator<(const AnnotatedFMDPosition& other) const {
+            return position < other.position || 
+                (position == other.position && (mismatches < other.mismatches ||
+                (mismatches == other.mismatches && searchedCharacters <
+                other.searchedCharacters)));
+            // We don't have to check the offset lists because they are
+            // determined by our other parameters, assuming we have a consistent
+            // history for the group in terms of what was searched.
+        }
     };
 
     /**
      * Holds all the FMDPositions and their mismatch counts.
      */
-    std::vector<AnnotatedFMDPosition> positions;
+    std::set<AnnotatedFMDPosition> positions;
     
     /**
      * We hold a reference to the FMDIndexView (and thus the FMDIndex) that we
