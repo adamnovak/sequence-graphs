@@ -36,6 +36,11 @@ public:
      */
     FMDPosition(int64_t forward_start, int64_t reverse_start, 
         int64_t end_offset);
+        
+    /**
+     * Create an FMDPosition selecting an entire view's index.
+     */
+    FMDPosition(const FMDIndexView& view);
     
     /**
      * Get the forward-strand start position of the range.
@@ -185,7 +190,8 @@ public:
     
     /**
      * Get the new TextPositions selected under the given view, relative to the
-     * given old FMDPosition.
+     * given old FMDPosition. Some of them may have already been selected in the
+     * old FMDPosition.s
      */
     std::set<TextPosition> getNewTextPositions(const FMDIndexView& view,
         const FMDPosition& old) const;

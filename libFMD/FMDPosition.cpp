@@ -11,6 +11,11 @@ FMDPosition::FMDPosition(int64_t forward_start, int64_t reverse_start,
 FMDPosition::FMDPosition(): forward_start(0), reverse_start(0), end_offset(-1) {
 }
 
+FMDPosition::FMDPosition(const FMDIndexView& view): FMDPosition() {
+    // TODO: Don't do this hack with the assignment operator in the constructor.
+    *this = view.getIndex().getCoveringPosition();
+}
+
 FMDPosition FMDPosition::flip() const {
     // Swap the two intervals of the bi-interval
     return FMDPosition(reverse_start, forward_start, end_offset);

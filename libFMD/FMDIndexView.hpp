@@ -218,8 +218,8 @@ public:
      * Find TextPositions for all the BWT positions which were not selected in
      * the old BWT interval but which are selected in the wider one. Note that
      * some of the returned TextPositions may be ones that were already selected
-     * in the old range, if new BWT positions merged into the same TextPositions
-     * are selected.
+     * in the old range (if new BWT positions merged into the same TextPositions
+     * are selected).
      *
      * The wider interval must contain the old interval.
      */

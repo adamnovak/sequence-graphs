@@ -15,6 +15,14 @@ FMDPositionGroup::FMDPositionGroup(
     }
 }
 
+FMDPositionGroup::FMDPositionGroup(
+    const FMDIndexView& view): FMDPositionGroup() {
+    
+    // Start with just one FMDPosition, covering the whole thing.
+    positions.emplace(view);
+    
+}
+
 bool FMDPositionGroup::extendGreedy(const FMDIndexView& view, 
     char correctCharacter, size_t maxMismatches) {
 
@@ -95,6 +103,80 @@ bool FMDPositionGroup::extendGreedy(const FMDIndexView& view,
     // Let the caller know if we found the base they wanted or not.
     return exactMatch;
 
+}
+
+bool FMDPositionGroup::extendFull(const FMDIndexView& view,
+    char correctCharacter, size_t maxMismatches) {
+    
+    // This will hold all the extensions we find that aren't empty
+    decltype(positions) nonemptyExtensions;
+    
+    // Set this to true if we found an exact match, false if we had to use a
+    // mismatch here (and thus, even if we are unique, we shouldn't produce a
+    // mapping).
+    bool exactMatch;
+    
+    for(const auto& annotated : positions) {
+        // For each existing FMDPosition
+        
+        // Pull it out
+        FMDPosition toExtend = annotated.position;
+        
+        // Extend it
+        view.getIndex().extendLeftOnly(toExtend, correctCharacter);
+        
+        if(!toExtend.isEmpty(view)) {
+            // If we got anything, keep the range (and don't increment the
+            // mismatches)
+            nonemptyExtensions.emplace(toExtend, annotated, false);
+        }
+    }
+    
+    // If we found anything, we have an exact match. But keep going with the
+    // inexact ones regardless.
+    exactMatch = (nonemptyExtensions.size() != 0);
+    
+        
+    
+    for(char base : BASES) {
+        if(base == correctCharacter) {
+            // Don't even try the right base, we just did.
+            continue;
+        }
+        
+        for(const auto& annotated : positions) {
+            // Try each position we have as a starting point.
+            
+            if(annotated.mismatches >= maxMismatches) {
+                // We can't afford another mismatch on this one.
+                continue;
+            }
+            
+            // Pull it out
+            FMDPosition toExtend = annotated.position;
+            
+            // Extend it
+            toExtend.extendLeftOnly(view, base);
+            
+            if(!toExtend.isEmpty(view)) {
+                // If we got anything, keep the range (and charge a
+                // mismatch)
+                nonemptyExtensions.emplace(toExtend, annotated, true);
+            }
+        }
+        
+    }
+    
+    Log::debug() << "Extended with all but " << correctCharacter <<
+        std::endl;
+    
+    // Replace our FMDPositions with the new extended ones.
+    positions = std::move(nonemptyExtensions);
+    
+    Log::debug() << "Have " << positions.size() << " ranges" << std::endl;
+    
+    // Let the caller know if we found the base they wanted or not.
+    return exactMatch;
 }
 
 
@@ -289,6 +371,140 @@ TextPosition FMDPositionGroup::getTextPosition(const FMDIndexView& view) const {
     
     // If we found something we're unique. Otherwise we're empty.
     return uniquePlace;
+}
+
+size_t FMDPositionGroup::getApproximateNumberOfRanges(
+    const FMDIndexView& view) const {
+    
+    size_t total = 0;
+    
+    for(const auto& annotated : positions) {
+        // Just sum up over all the intervals we contain.
+        total += annotated.position.getApproximateNumberOfRanges(view);
+    }
+    
+    return total;
+}
+
+size_t FMDPositionGroup::getApproximateNumberOfNewRanges(
+    const FMDIndexView& view, const FMDPositionGroup& old) {
+
+    // How many have we found across all our positions in the group?
+    size_t total = 0;
+
+    // We know intervals won't overlap in either group.
+    
+    // So we can just get the parent starting at or after the start of the
+    // widened interval, using map::lowert_bound.
+
+    // Index the parents
+    std::map<size_t, FMDPosition> oldPositions;
+    
+    for(auto parentAnnotated : old.positions) {
+        // For each position in the old group, pull it out.
+        const auto& parent = parentAnnotated.position;
+        
+        // Put it in the index. Since the FMDPositions won't overlap, we will
+        // never overwrite another one like this.
+        oldPositions[parent.getForwardStart()] = parent;
+    }
+    
+    for(auto newAnnotated : positions) {
+        // For each new position, find the old position that started at or after
+        // this one's start.
+        auto parentIterator = oldPositions.lower_bound(
+            newAnnotated.position.getForwardStart());
+            
+        if(parentIterator == oldPositions.end()) {
+            // Complain if we can't find where a range came from.
+            throw std::runtime_error(
+                "Could not find parent for expanded interval");
+        }
+        
+        // Go work out how many new ranges this expanded range has on top of
+        // this parent. TODO: there may be some inaccuracy if it had multiple
+        // parents. Handle that case and provide a tighter estimate.
+        total += newAnnotated.position.getApproximateNumberOfNewRanges(view,
+            (*parentIterator).second);
+    }
+    
+    return total;
+
+
+}
+    
+std::set<TextPosition> FMDPositionGroup::getTextPositions(
+    const FMDIndexView& view) const {
+
+    // Just loop over all the positions in the group and collect in here.
+    std::set<TextPosition> toReturn;
+    
+    for(const auto& annotated : positions) {
+        // Grab the resulkts from everything in the group.
+        std::set<TextPosition> found = annotated.position.getTextPositions(
+            view);
+            
+        // And stick them in the set. See
+        // <http://bytes.com/topic/c/answers/718481-better-prettier-way-copy-
+        // one-set-another> if you are like me and don't know how to STL at all.
+        std::copy(found.begin(), found.end(), std::inserter(toReturn,
+            toReturn.begin()));
+    }
+    
+    return toReturn;
+}
+
+std::set<TextPosition> FMDPositionGroup::getNewTextPositions(
+    const FMDIndexView& view, const FMDPositionGroup& old) const {
+    
+    // We know intervals won't overlap in either group.
+    
+    // So we can just get the parent starting at or after the start of the
+    // widened interval, using map::lowert_bound.
+    
+    // Just loop over all the positions in the group and collect in here.
+    std::set<TextPosition> toReturn;
+
+    // Index the parents
+    std::map<size_t, FMDPosition> oldPositions;
+    
+    for(auto parentAnnotated : old.positions) {
+        // For each position in the old group, pull it out.
+        const auto& parent = parentAnnotated.position;
+        
+        // Put it in the index. Since the FMDPositions won't overlap, we will
+        // never overwrite another one like this.
+        oldPositions[parent.getForwardStart()] = parent;
+    }
+    
+    for(auto newAnnotated : positions) {
+        // For each new position, find the old position that started at or after
+        // this one's start.
+        auto parentIterator = oldPositions.lower_bound(
+            newAnnotated.position.getForwardStart());
+            
+        if(parentIterator == oldPositions.end()) {
+            // Complain if we can't find where a range came from.
+            throw std::runtime_error(
+                "Could not find parent for expanded interval");
+        }
+        
+        // Go work what new ranges this expanded range has on top of
+        // this parent. TODO: there may be some inaccuracy if it had multiple
+        // parents. Handle that case and provide a tighter estimate.
+        std::set<TextPosition> found = 
+            newAnnotated.position.getNewTextPositions(view,
+                (*parentIterator).second);
+            
+        // And stick them in the set. See
+        // <http://bytes.com/topic/c/answers/718481-better-prettier-way-copy-
+        // one-set-another> if you are like me and don't know how to STL at all.
+        std::copy(found.begin(), found.end(), std::inserter(toReturn,
+            toReturn.begin()));
+    }
+    
+    return toReturn;
+    
 }
 
 

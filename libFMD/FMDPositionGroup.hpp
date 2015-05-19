@@ -32,15 +32,23 @@ public:
      * of characters searched, we won't know how to pick up mismatches
      * correctly.
      *
+     * The intervals must not overlap, and must all correspond to search strings
+     * of the same length if retract is ever going to be used.
+     *
      * TODO: Look into checking LCP.
      */
     FMDPositionGroup(const std::vector<FMDPosition>& positions);
+    
+    /**
+     * Create an FMDPositionGroup selecting an entire view's index.
+     */
+    FMDPositionGroup(const FMDIndexView& view);
     
     // Default copy constructor/move constructor/destructor/assignment operator
     // are all OK.
         
     /**
-     * Extend all the FMDPositions, using the given view. If there are any
+     * Extend all the FMDPositions left, using the given view. If there are any
      * results extending with the correct character, take those. Otherwise,
      * extend with all of the mismatching characters. If any FMDPosition
      * accumulates too many mismatches, drop it.
@@ -53,6 +61,14 @@ public:
      * had to be used.
      */
     bool extendGreedy(const FMDIndexView& view, char correctCharacter,
+        size_t maxMismatches);
+        
+    /**
+     * Extend all FMDPositions left, using the given view. Explores all possible
+     * mismatches, if they yield results and do not end up costing too much
+     * total.
+     */
+    bool extendFull(const FMDIndexView& view, char correctCharacter,
         size_t maxMismatches);
         
     /**
@@ -101,9 +117,11 @@ public:
     /**
      * Provides an overestimate of the number of new ranges selected under the
      * given view, relative to the given old FMDPosition.
+     *
+     * Neither FMDPositionGroup may contain overlapping intervals.
      */
     size_t getApproximateNumberOfNewRanges(const FMDIndexView& view,
-        const FMDPosition& old);
+        const FMDPositionGroup& old);
         
     /**
      * Get the TextPositions selected under the given view.
@@ -112,10 +130,13 @@ public:
     
     /**
      * Get the new TextPositions selected under the given view, relative to the
-     * given old FMDPosition.
+     * given old FMDPositionGroup. Some of these may already have been selected
+     * in the old group.
+     *
+     * Neither FMDPositionGroup may contain overlapping intervals.
      */
     std::set<TextPosition> getNewTextPositions(const FMDIndexView& view,
-        const FMDPosition& old) const;
+        const FMDPositionGroup& old) const;
     
 protected:
 

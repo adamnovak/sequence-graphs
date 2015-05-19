@@ -83,6 +83,12 @@ public:
      */
     size_t minUniqueStrings = 0;
     
+    /**
+     * How many total mismatches may be in both sides together of a base's
+     * unique context? Only used when templated on FMDPositionGroup.
+     */
+    size_t mismatchTolerance = 0;
+    
     // We need to define this with a new; otherwise our inhereted constructor
     // gets deleted, since it can't default-construct the CreditStrategy without
     // an FMDIndexView. This is to work around a compiler bug
@@ -489,7 +495,7 @@ std::vector<std::pair<SearchType, size_t>>
     std::vector<std::pair<SearchType, size_t>> toReturn(query.size());
  
     // Start with everything selected.
-    SearchType results = view.getIndex().getCoveringPosition();
+    SearchType results(view);
     
     // How many characters are currently searched?
     size_t patternLength = 0;
@@ -501,7 +507,7 @@ std::vector<std::pair<SearchType, size_t>>
         
         // We're going to extend left with this new base.
         SearchType extended = results;
-        view.getIndex().extendLeftOnly(extended, query[i]);
+        extended.extendLeftOnly(view, query[i]);
         
         while(extended.isEmpty(view)) {
             // If you couldn't extend, retract until you can. TODO: Assumes we
@@ -510,11 +516,11 @@ std::vector<std::pair<SearchType, size_t>>
             // Retract the character
             SearchType retracted = results;
             // Make sure to drop characters from the total pattern length.
-            view.getIndex().retractRightOnly(retracted, --patternLength);
+            retracted.retractRightOnly(view, --patternLength);
             
             // Try extending again
             extended = retracted;
-            view.getIndex().extendLeftOnly(extended, query[i]);
+            extended.extendLeftOnly(view, query[i]);
             
             // Say that last step we came from retracted.
             results = retracted;
@@ -560,7 +566,7 @@ std::vector<size_t> ZipMappingScheme<SearchType>::createUniqueContextIndex(
         
         while(position.isUnique(view)) {
             // Retract to a point where we may not be unique
-            length = view.getIndex().retractRightOnly(position);
+            length = position.retractRightOnly(view);
             // We know we are unique at 1 more character than that
             minUniqueLength = length + 1;
         }
@@ -590,7 +596,7 @@ std::vector<size_t> ZipMappingScheme<SearchType>::createUniqueContextIndex(
         
         while(position.isUnique(view)) {
             // Retract to a point where we may not be unique
-            length = view.getIndex().retractRightOnly(position);
+            length = position.retractRightOnly(view);
             // We know we are unique at 1 more character than that
             minUniqueLength = length + 1;
         }

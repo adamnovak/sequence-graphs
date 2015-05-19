@@ -194,3 +194,40 @@ void ZipMappingSchemeTests::testMapWithMaskAndRanges() {
     CPPUNIT_ASSERT_EQUAL(query.size(), mappedBases);    
 }
 
+/**
+ * Make sure mapping works with FMDPosiutionGroups, but no mismatches.
+ */
+void ZipMappingSchemeTests::testMapWithGroups() {
+
+    // Grab all of the duplicated contig.
+    std::string query = "CATGCTTCGGCGATTCGACGCTCATCTGCGACTCT";
+
+    // Make a mask for the other of the duplicates
+    auto mask = new GenericBitVector();
+    for(size_t i = 0; i < index->getBWTLength(); i++) {
+        if(index->locate(i).getContigNumber() == 1) {
+            // Only include the second contig
+            mask->addBit(i);
+        }
+    }
+    mask->finish(index->getBWTLength());
+
+    // Turn the genome restriction on, and do use the merged ranges vector
+    delete scheme;
+    scheme = new ZipMappingScheme<FMDPositionGroup>(FMDIndexView(*index, mask,
+        ranges));
+    
+    size_t mappedBases = 0;
+    scheme->map(query, [&](size_t i, TextPosition mappedTo) {
+        // Make sure each base maps in order to text 2 (the one we masked in).
+        CPPUNIT_ASSERT_EQUAL((size_t) 2, mappedTo.getText());
+        CPPUNIT_ASSERT_EQUAL(i, mappedTo.getOffset());
+        mappedBases++;
+    });
+    
+    delete mask;
+    
+    // All of the bases should map
+    CPPUNIT_ASSERT_EQUAL(query.size(), mappedBases);    
+}
+
