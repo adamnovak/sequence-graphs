@@ -1,6 +1,7 @@
 #include <stdexcept>
 
 #include "FMDPosition.hpp"
+#include "FMDIndexView.hpp"
 
 FMDPosition::FMDPosition(int64_t forward_start, int64_t reverse_start,
   int64_t end_offset): forward_start(forward_start), 
@@ -40,4 +41,55 @@ std::ostream& operator<< (std::ostream& o, FMDPosition const& position) {
         (position.forward_start + position.end_offset) << "|" << 
         position.reverse_start << "-" << (position.reverse_start + 
         position.end_offset);
+}
+
+bool FMDPosition::isEmpty(const FMDIndexView& view) const {
+    // Get our forward interval and see if it's empty.
+    return view.isEmpty(getForwardStart(), getLength());
+}
+
+bool FMDPosition::isUnique(const FMDIndexView& view) const {
+    // Get our forward interval and see if it's unique.
+    return view.isUnique(getForwardStart(), getLength());
+}
+
+bool FMDPosition::isAmbiguous(const FMDIndexView& view) const {
+    // Get our forward interval and see if it's ambiguous.
+    return view.isAmbiguous(getForwardStart(), getLength());
+}
+
+TextPosition FMDPosition::getTextPosition(const FMDIndexView& view) const {
+    // Get our text position from our interval
+    return view.getTextPosition(getForwardStart(), getLength());
+}
+
+size_t FMDPosition::getApproximateNumberOfRanges(
+    const FMDIndexView& view) const {
+    
+    // Get our range count from our interval
+    return view.getApproximateNumberOfRanges(getForwardStart(), getLength());
+}
+
+size_t FMDPosition::getApproximateNumberOfNewRanges(const FMDIndexView& view,
+    const FMDPosition& old) {
+    
+    // Get our range count from our interval and the old position's interval.
+    return view.getApproximateNumberOfNewRanges(old.getForwardStart(),
+        old.getLength(), getForwardStart(), getLength());
+}
+    
+std::set<TextPosition> FMDPosition::getTextPositions(
+    const FMDIndexView& view) const {
+    
+    // Get our text positions from our interval
+    return view.getTextPositions(getForwardStart(), getLength());
+}
+
+std::set<TextPosition> FMDPosition::getNewTextPositions(
+    const FMDIndexView& view, const FMDPosition& old) const {
+    
+    // Get our new text positions from our interval and the old position's
+    // interval.
+    return view.getNewTextPositions(old.getForwardStart(),
+        old.getLength(), getForwardStart(), getLength());
 }

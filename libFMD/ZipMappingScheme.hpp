@@ -156,11 +156,11 @@ protected:
                 size_t maxRangeCount): position(unretracted), 
                 contextLength(contextLength) {
                 
-                if(view.getApproximateNumberOfRanges(position) <=
+                if(position.getApproximateNumberOfRanges(view) <=
                     maxRangeCount) {
                 
                     // We can visit everything we have selected
-                    selected = view.getTextPositions(position);
+                    selected = position.getTextPositions(view);
                     // Copy it all to the newly selected set too.
                     newlySelected = selected;
                     // And say our sets we just made are valid.
@@ -199,8 +199,9 @@ protected:
                     // We have sets we can build on, but we need to see if we've
                     // selected too much more stuff.
                     
-                    size_t newRanges = view.getApproximateNumberOfNewRanges(
-                        position, retracted);
+                    size_t newRanges =
+                        retracted.getApproximateNumberOfNewRanges(view,
+                        position);
                         
                     Log::debug() << "Will have " << newRanges <<
                         " new ranges" << std::endl;
@@ -213,8 +214,8 @@ protected:
                         toReturn.selected = selected;
                         
                         // Go find what is newly selected and save it
-                        toReturn.newlySelected = view.getNewTextPositions(
-                            position, retracted);
+                        toReturn.newlySelected = retracted.getNewTextPositions(
+                            view, position);
                             
                         Log::debug() << toReturn.newlySelected.size() <<
                             " new positions found" << std::endl;

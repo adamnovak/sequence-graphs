@@ -30,7 +30,7 @@ std::vector<std::pair<FMDPosition, size_t>> ZipMappingScheme::findRightContexts(
         FMDPosition extended = results;
         view.getIndex().extendLeftOnly(extended, query[i]);
         
-        while(view.isEmpty(extended)) {
+        while(extended.isEmpty(view)) {
             // If you couldn't extend, retract until you can. TODO: Assumes we
             // can find at least one result for any character.
             
@@ -84,7 +84,7 @@ std::vector<size_t> ZipMappingScheme::createUniqueContextIndex(
         // What's the min unique length for this base? We haven't found any yet.
         size_t minUniqueLength = (size_t) -1;
         
-        while(view.isUnique(position)) {
+        while(position.isUnique(view)) {
             // Retract to a point where we may not be unique
             length = view.getIndex().retractRightOnly(position);
             // We know we are unique at 1 more character than that
@@ -100,7 +100,7 @@ std::vector<size_t> ZipMappingScheme::createUniqueContextIndex(
         Log::trace() << "Min left context " <<
             minUniqueLeftContexts.size() - 1 << " is " << minUniqueLength <<
             " vs " << length << " selecting " <<
-            view.getTextPositions(position).size() << std::endl;
+            position.getTextPositions(view).size() << std::endl;
         
     }
     
@@ -114,7 +114,7 @@ std::vector<size_t> ZipMappingScheme::createUniqueContextIndex(
         // What's the min unique length for this base? We haven't found any yet.
         size_t minUniqueLength = (size_t) -1;
         
-        while(view.isUnique(position)) {
+        while(position.isUnique(view)) {
             // Retract to a point where we may not be unique
             length = view.getIndex().retractRightOnly(position);
             // We know we are unique at 1 more character than that
@@ -408,7 +408,7 @@ bool ZipMappingScheme::canExtendThrough(FMDPosition context,
     FMDPosition noLongerUnique = context;
     size_t nonUniqueLength = view.getIndex().retractRightOnly(noLongerUnique);
     
-    while(view.isUnique(noLongerUnique)) {
+    while(noLongerUnique.isUnique(view)) {
         // It may take multiple retracts because of masks and stuff.
         nonUniqueLength = view.getIndex().retractRightOnly(noLongerUnique);
     }
@@ -418,7 +418,7 @@ bool ZipMappingScheme::canExtendThrough(FMDPosition context,
     view.getIndex().retractRightOnly(barelyUnique, nonUniqueLength + 1);
 
     for(size_t i = opposingQuery.size() - 2; i != (size_t) -1 &&
-        !view.isEmpty(barelyUnique); i--) {
+        !barelyUnique.isEmpty(view); i--) {
         // Now go extend through with the opposing string, from right to left.
         // We skip the rightmost character (the one we are actually in the
         // process of mapping) because that's already searched, and we keep
@@ -429,7 +429,7 @@ bool ZipMappingScheme::canExtendThrough(FMDPosition context,
         view.getIndex().extendLeftOnly(barelyUnique, opposingQuery[i]);
     }
     
-    if(!view.isEmpty(barelyUnique)) {
+    if(!barelyUnique.isEmpty(view)) {
         // We extended through!
         stats.add("extendThroughSuccesses", 1);
         return true;
@@ -516,7 +516,7 @@ std::pair<bool, std::set<TextPosition>> ZipMappingScheme::exploreRetraction(
     bool triedRightExtend = false;
           
     
-    if(view.isUnique(left.position) && right.contextLength < maxExtendThrough) {
+    if(left.position.isUnique(view) && right.contextLength < maxExtendThrough) {
         
         // We will try extending the left through the right.
         triedLeftExtend = true;
@@ -531,7 +531,7 @@ std::pair<bool, std::set<TextPosition>> ZipMappingScheme::exploreRetraction(
             
             // We can now cheat and return the one-element set of whatever the
             // left context selects, flipped.
-            TextPosition matchedTo = view.getTextPosition(left.position);
+            TextPosition matchedTo = left.position.getTextPosition(view);
             matchedTo.flip(view.getIndex().getContigLength(
                 matchedTo.getContigNumber()));
             return {true, {matchedTo}};
@@ -541,7 +541,7 @@ std::pair<bool, std::set<TextPosition>> ZipMappingScheme::exploreRetraction(
         
         // If we don't succeed, we still need to check for set overlap.
     }
-    if(view.isUnique(right.position) && left.contextLength < maxExtendThrough) {
+    if(right.position.isUnique(view) && left.contextLength < maxExtendThrough) {
         // TODO: Don't try this extension if we failed the other direction.
         
         // We will try extending the right through the left.
@@ -557,7 +557,7 @@ std::pair<bool, std::set<TextPosition>> ZipMappingScheme::exploreRetraction(
             
             // We can now cheat and return the one-element set of whatever the
             // right context selects.
-            TextPosition matchedTo = view.getTextPosition(right.position);
+            TextPosition matchedTo = right.position.getTextPosition(view);
             return {true, {matchedTo}};
         } else {
             Log::debug() << "Failed to extend right though left" << std::endl;

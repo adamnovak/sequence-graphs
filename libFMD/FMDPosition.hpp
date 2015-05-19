@@ -4,9 +4,14 @@
 #include <iostream>
 #include <algorithm>
 #include <utility>
+#include <set>
 
 #include "GenericBitVector.hpp"
+#include "TextPosition.hpp"
 #include "Log.hpp"
+
+// Forward declaration of FMDPosition
+class FMDIndexView;
 
 /**
  * Represents the state (or result) of an FMD-index search, which is two ranges
@@ -81,7 +86,7 @@ public:
      *
      * Minimum length is 0.
      */
-    inline size_t getLength() {
+    inline size_t getLength() const {
         // Make sure we don't try and return a negative number as a size_t, by
         // maxing against 0 while signed.
         return std::max(end_offset + (int64_t) 1, (int64_t) 0);        
@@ -111,6 +116,56 @@ public:
      */
     bool operator<(const FMDPosition& other) const;
 
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Operations under a view.
+    ////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * Is nothing selected under the viven view?
+     */
+    bool isEmpty(const FMDIndexView& view) const;
+    
+    /**
+     * Is exactly one merged position selected under the given view?
+     */
+    bool isUnique(const FMDIndexView& view) const;
+    
+    /**
+     * Is more than one merged position selected under the given view?
+     */
+    bool isAmbiguous(const FMDIndexView& view) const;
+    
+    /**
+     * Get the unique TextPosition selected under the viven view. isUnique()
+     * must be true.
+     */
+    TextPosition getTextPosition(const FMDIndexView& view) const;
+    
+    /**
+     * Provides an overestimate of the number of ranges selected under the given
+     * view.
+     */
+    size_t getApproximateNumberOfRanges(const FMDIndexView& view) const;
+    
+    /**
+     * Provides an overestimate of the number of new ranges selected under the
+     * given view, relative to the given old FMDPosition.
+     */
+    size_t getApproximateNumberOfNewRanges(const FMDIndexView& view,
+        const FMDPosition& old);
+        
+    /**
+     * Get the TextPositions selected under the given view.
+     */
+    std::set<TextPosition> getTextPositions(const FMDIndexView& view) const;
+    
+    /**
+     * Get the new TextPositions selected under the given view, relative to the
+     * given old FMDPosition.
+     */
+    std::set<TextPosition> getNewTextPositions(const FMDIndexView& view,
+        const FMDPosition& old) const;
 
     /**
      * Provide pretty-printing for FMDPositions. See

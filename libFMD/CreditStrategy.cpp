@@ -146,10 +146,13 @@ void CreditStrategy::breadthFirstSearch(const std::string& query,
     
     for(auto range : ranges) {
         // Each range gets expanded into its covering FMDPosition.
-        startPositions.push_back(view.getRangeByNumber(range));
+        std::pair<size_t, size_t> startAndLength = view.getRangeByNumber(range);
+        startPositions.emplace_back(startAndLength.first, 0,
+            ((int64_t) startAndLength.second) - 1);
         
-        Log::debug() << "Got range " << view.getRangeByNumber(range) <<
-            " as #" << range << std::endl;
+        Log::debug() << "Got range " << startAndLength.first << "-" <<
+            startAndLength.first + startAndLength.second << " as #" << range <<
+            std::endl;
     }
 
     // Make the FMDPositionGroup holding them all

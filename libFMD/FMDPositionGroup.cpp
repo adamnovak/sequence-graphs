@@ -36,7 +36,7 @@ bool FMDPositionGroup::extendGreedy(char correctCharacter,
         // Extend it
         view.getIndex().extendLeftOnly(toExtend, correctCharacter);
         
-        if(!view.isEmpty(toExtend)) {
+        if(!toExtend.isEmpty(view)) {
             // If we got anything, keep the range (and don't increment the
             // mismatches)
             nonemptyExtensions.emplace(toExtend, annotated, false);
@@ -70,7 +70,7 @@ bool FMDPositionGroup::extendGreedy(char correctCharacter,
                 // Extend it
                 view.getIndex().extendLeftOnly(toExtend, base);
                 
-                if(!view.isEmpty(toExtend)) {
+                if(!toExtend.isEmpty(view)) {
                     // If we got anything, keep the range (and charge a
                     // mismatch)
                     nonemptyExtensions.emplace(toExtend, annotated, true);
@@ -132,7 +132,7 @@ void FMDPositionGroup::retractOne() {
 bool FMDPositionGroup::isEmpty() const {
     for(const auto& annotated : positions) {
         // For each interval we contain
-        if(!view.isEmpty(annotated.position)) {
+        if(!annotated.position.isEmpty(view)) {
             // If any is nonempty, we are nonempty
             return false;
         }
@@ -145,7 +145,7 @@ bool FMDPositionGroup::isEmpty() const {
 bool FMDPositionGroup::isUnique() const {
     for(const auto& annotated : positions) {
         // For each interval we contain
-        if(view.isAmbiguous(annotated.position)) {
+        if(annotated.position.isAmbiguous(view)) {
             // If any is ambiguous, we are non-unique
             return false;
         }
@@ -165,14 +165,14 @@ bool FMDPositionGroup::isUnique() const {
         // For each position
         auto position = annotated.position;
         
-        if(view.isEmpty(position)) {
+        if(position.isEmpty(view)) {
             continue;
         }
         
         if(found) {
             // We already have a candidate unique place, so make sure this one
             // matches.
-            if(uniquePlace != view.getTextPosition(position)) {
+            if(uniquePlace != position.getTextPosition(view)) {
                 return false;
             }
         } else {
@@ -181,7 +181,7 @@ bool FMDPositionGroup::isUnique() const {
             // Now we know it's nonempty and unique
             found = true;
             // Figure out where to
-            uniquePlace = view.getTextPosition(position);
+            uniquePlace = position.getTextPosition(view);
         }
     }
     
@@ -195,7 +195,7 @@ TextPosition FMDPositionGroup::getTextPosition() const {
 
     for(const auto& annotated : positions) {
         // For each interval we contain
-        if(view.isAmbiguous(annotated.position)) {
+        if(annotated.position.isAmbiguous(view)) {
             // If any is ambiguous, we are non-unique
             throw std::runtime_error(
                 "No TextPosition for ambiguous FMDPositionGroup");
@@ -216,14 +216,14 @@ TextPosition FMDPositionGroup::getTextPosition() const {
         // For each position
         auto position = annotated.position;
         
-        if(view.isEmpty(position)) {
+        if(position.isEmpty(view)) {
             continue;
         }
         
         if(found) {
             // We already have a candidate unique place, so make sure this one
             // matches.
-            if(uniquePlace != view.getTextPosition(position)) {
+            if(uniquePlace != position.getTextPosition(view)) {
                  throw std::runtime_error(
                     "No TextPosition for ambiguous FMDPositionGroup");
             }
@@ -233,7 +233,7 @@ TextPosition FMDPositionGroup::getTextPosition() const {
             // Now we know it's nonempty and unique
             found = true;
             // Figure out where to
-            uniquePlace = view.getTextPosition(position);
+            uniquePlace = position.getTextPosition(view);
         }
     }
     

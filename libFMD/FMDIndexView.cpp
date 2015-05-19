@@ -54,7 +54,7 @@ FMDIndexView::FMDIndexView(const FMDIndex& index, const GenericBitVector* mask,
     }
 }
 
-int64_t FMDIndexView::getRangeNumber(const FMDPosition& position) const {
+int64_t FMDIndexView::getRangeNumber(size_t start, size_t length) const {
 
     // What's the first index in the BWT that the range would need to cover?
     size_t interval_start;
@@ -91,15 +91,13 @@ int64_t FMDIndexView::getRangeNumber(const FMDPosition& position) const {
         // See what range spans them, if any.
         
         // Find the first 1 at position >= our start. This holds (index, rank-1)
-        auto firstOne = getMask()->valueAfter(position.getForwardStart());
+        auto firstOne = getMask()->valueAfter(start);
         // TODO: What if there is no such 1?
         
         // Find the last 1 at position <= our end. This holds (index, rank-1),
         // or (size, items) if no such 1 exists.
-        auto lastOne = getMask()->valueBefore(position.getForwardStart() +
-            position.getEndOffset());
-        if(lastOne.first > position.getForwardStart() +
-            position.getEndOffset()) {
+        auto lastOne = getMask()->valueBefore(start + length - 1);
+        if(lastOne.first > start + length - 1) {
             
             // We didn't find such a 1. There must be no 1 in our interval and
             // we are thus empty.
@@ -112,11 +110,11 @@ int64_t FMDIndexView::getRangeNumber(const FMDPosition& position) const {
     } else {
         // Fast path; no need to mess about with the mask. Just look at the
         // first and last indices in the BWT interval.
-        interval_start = position.getForwardStart();
-        interval_end = position.getForwardStart() + position.getEndOffset();   
+        interval_start = start;
+        interval_end = start + length - 1;  
     }
 
-    if(interval_end < interval_start || position.getEndOffset() < 0) {
+    if(interval_end < interval_start || length == 0) {
         // Our range is actually empty.
         // TODO: Do we need this check?
         return -1;
@@ -153,23 +151,22 @@ int64_t FMDIndexView::getRangeNumber(const FMDPosition& position) const {
     }
 }
 
-FMDPosition FMDIndexView::getRangeByNumber(size_t rangeNumber) const {
+std::pair<size_t, size_t> FMDIndexView::getRangeByNumber(
+    size_t rangeNumber) const {
+    
     // Select the 1 at the start of the range
     auto start = getRanges()->select(rangeNumber);
     // Select the 1 after the end of the range, and then move back 1 to be
     // inclusive.
-    auto end = getRanges()->select(rangeNumber + 1) - 1;
+    auto afterEnd = getRanges()->select(rangeNumber + 1);
     
-    // How far do we have to move from the start to find the end?
-    auto difference = end - start;
-    
-    // Make a new FMDPosition with just the forward interval and return it.
-    return FMDPosition(start, 0, difference);
+    // Make a new range with and return it.
+    return std::make_pair(start, afterEnd - start);
     
 }
 
-std::vector<size_t> FMDIndexView::getRangeNumbers(
-    const FMDPosition& position) const {
+std::vector<size_t> FMDIndexView::getRangeNumbers(size_t start,
+    size_t length) const {
     
     // TODO: make this use callbacks or something. TODO: Be able to go from
     // TextPosition to reverse complement to range number somehow?
@@ -178,8 +175,8 @@ std::vector<size_t> FMDIndexView::getRangeNumbers(
     // 1 in the mask, each of which will appear once.
     std::vector<size_t> toReturn;
 
-    if(position.getEndOffset() < 0) {
-        // Special case the empty FMDPosition so we don't have to deal with that
+    if(length == 0) {
+        // Special case the empty interval so we don't have to deal with that
         // case later.
         
         // Just skip all this stuff and end up returning our empty vector.
@@ -188,8 +185,7 @@ std::vector<size_t> FMDIndexView::getRangeNumbers(
         // No mask and no ranges to deal with. Return the position number for
         // each selected position.
         
-        for(size_t i = position.getForwardStart(); 
-            i <= position.getForwardStart() + position.getEndOffset(); i++) {
+        for(size_t i = start; i < start + length; i++) {
             // Make an entry for each of the BWT positions
             toReturn.push_back(i);
         }
@@ -200,16 +196,14 @@ std::vector<size_t> FMDIndexView::getRangeNumbers(
     
         // Look up the range that the starting position is in. We have to
         // subtract 1 because the 0th range begins with a 1.
-        int64_t startRange = getRanges()->rank(position.getForwardStart()) - 1;
+        int64_t startRange = getRanges()->rank(start) - 1;
 
         // And the range the end is in
-        int64_t endRange = getRanges()->rank(position.getForwardStart() +
-            position.getEndOffset()) - 1;
+        int64_t endRange = getRanges()->rank(start + length - 1) - 1;
             
-        Log::trace() << "Looking for ranges between " <<
-            position.getForwardStart() << " in range " << startRange << 
-            " which starts at " << getRanges()->select(startRange) <<
-            " and " << position.getForwardStart() + position.getEndOffset() <<
+        Log::trace() << "Looking for ranges between " << start << 
+            " in range " << startRange << " which starts at " << 
+            getRanges()->select(startRange) << " and " << start + length - 1 <<
             " in range " << endRange << " which starts at " << 
             getRanges()->select(endRange) << std::endl;
     
@@ -231,17 +225,16 @@ std::vector<size_t> FMDIndexView::getRangeNumbers(
         
         // Keep track of the left edge of the interval we still need to count
         // the masked-in BWT positions in.
-        size_t left = position.getForwardStart();
+        size_t left = start;
 
-        while(left <= position.getForwardStart() + position.getEndOffset()) {
+        while(left < start + length) {
             // Until the next masked-in position is outside this FMDPosition...
         
             // Find the (index, rank) of the first 1 in the mask that's here or
             // beyond our current position.
             auto nextPosition = getMask()->valueAfter(left);
             
-            if(nextPosition.first <= position.getForwardStart() +
-                position.getEndOffset()) {
+            if(nextPosition.first < start + length) {
                 
                 // This masked-in position is within this FMDPosition. We should
                 // count it.
@@ -265,17 +258,16 @@ std::vector<size_t> FMDIndexView::getRangeNumbers(
 
         // Keep track of the left edge of the interval we still need to count
         // the ranges in.
-        size_t left = position.getForwardStart();
+        size_t left = start;
 
-        while(left <= position.getForwardStart() + position.getEndOffset()) {
+        while(left < start + length) {
             // Until the next range starts outside this FMDPosition...
         
             // Find the (index, rank) of the first 1 in the mask that's here or
             // beyond our current position.
             auto nextPosition = getMask()->valueAfter(left);
             
-            if(nextPosition.first <= position.getForwardStart() +
-                position.getEndOffset()) {
+            if(nextPosition.first < start + length) {
                 
                 // This masked-in position is within this FMDPosition. We should
                 // count its range. Go look at what range that BWT position is
@@ -313,31 +305,32 @@ std::vector<size_t> FMDIndexView::getRangeNumbers(
     return toReturn;
 }
 
-std::vector<size_t> FMDIndexView::getNewRangeNumbers(
-    const FMDPosition& old, const FMDPosition& wider) const {
+std::vector<size_t> FMDIndexView::getNewRangeNumbers(size_t oldStart,
+    size_t oldLength, size_t newStart, size_t newLength) const {
     
-    // We can just make FMDPositions for the new ranges, keeping track of only
-    // the forward intervals.
+    // We can just make the new ranges, keeping track of only the forward
+    // intervals.
     
-    // Make sure to subtract 1 from the length, since a 0 offset means 1 base.
-    FMDPosition newLeft(wider.getForwardStart(), 0, 
-        old.getForwardStart() - wider.getForwardStart() - 1);
-        
-    FMDPosition newRight(old.getForwardStart() + old.getEndOffset() + 1, 0, 
-        wider.getForwardStart() + wider.getEndOffset() - old.getForwardStart() -
-        old.getEndOffset() - 1);
+    // What's the new range on the left?
+    size_t newLeftStart = newStart;
+    size_t newLeftLength = oldStart - newStart;
+
+    // And on the right?
+    size_t newRightStart = oldStart + oldLength;
+    size_t newRightLength = newStart + newLength - oldStart - oldLength;
         
     // Get the answers on each side
-    std::vector<size_t> leftRanges = getRangeNumbers(newLeft);
-    
-    std::vector<size_t> rightRanges = getRangeNumbers(newRight);
+    std::vector<size_t> ranges = getRangeNumbers(newLeftStart,
+        newLeftLength);
+    std::vector<size_t> rightRanges = getRangeNumbers(newRightStart,
+        newRightLength);
     
     // Add the new ranges on the right to the new ranges on the left. See
     // <http://stackoverflow.com/a/201729/402891>
-    leftRanges.insert(leftRanges.end(), rightRanges.begin(), rightRanges.end());
+    ranges.insert(ranges.end(), rightRanges.begin(), rightRanges.end());
         
     // Return them all.
-    return leftRanges;
+    return ranges;
 }
 
 std::vector<size_t> FMDIndexView::textPositionToRanges(
@@ -363,7 +356,7 @@ std::vector<size_t> FMDIndexView::textPositionToRanges(
 }
 
 size_t FMDIndexView::getApproximateNumberOfRanges(
-    const FMDPosition& position) const {
+    size_t start, size_t length) const {
 
     if(getRanges() != nullptr) {
         // We have a ranges vector. Don't worry about the mask, just provide an
@@ -373,11 +366,10 @@ size_t FMDIndexView::getApproximateNumberOfRanges(
         
         // Look up the range that the starting position is in. We have to
         // subtract 1 because the 0th range begins with a 1.
-        int64_t startRange = getRanges()->rank(position.getForwardStart()) - 1;
+        int64_t startRange = getRanges()->rank(start) - 1;
 
         // And the range the end is in
-        int64_t endRange = getRanges()->rank(position.getForwardStart() +
-            position.getEndOffset()) - 1;
+        int64_t endRange = getRanges()->rank(start + length - 1) - 1;
             
         // Return the total number of ranges we overlap
         return endRange - startRange + 1;
@@ -390,39 +382,37 @@ size_t FMDIndexView::getApproximateNumberOfRanges(
             // Count only masked-in positions
             
             // How many masked-in positions exist before we start?
-            int64_t startMask = getMask()->rank(position.getForwardStart());
+            int64_t startMask = getMask()->rank(start);
             
             // And how many exist before we end?            
-            int64_t endMask = getMask()->rank(position.getForwardStart() +
-                position.getEndOffset());
+            int64_t endMask = getMask()->rank(start + length - 1);
                 
             // Cound how many we touch because of that. TODO: Unit test this!
             return endMask - startMask + 1;
         } else {
-            // Count all the BWT positions. Convert the end offset to an actual
-            // length.
-            return position.getEndOffset() + 1;
+            // Count all the BWT positions.
+            return length;
         }
     }
 }
 
-size_t FMDIndexView::getApproximateNumberOfNewRanges(const FMDPosition& old,
-        const FMDPosition& wider) const {
+size_t FMDIndexView::getApproximateNumberOfNewRanges(size_t oldStart,
+    size_t oldLength, size_t newStart, size_t newLength) const {
 
-    // We can just make FMDPositions for the new ranges, keeping track of only
-    // the forward intervals.
+    // We can just make the new ranges, keeping track of only the forward
+    // intervals.
     
-    // Make sure to subtract 1 from the length, since a 0 offset means 1 base.
-    FMDPosition newLeft(wider.getForwardStart(), 0, 
-        old.getForwardStart() - wider.getForwardStart() - 1);
-        
-    FMDPosition newRight(old.getForwardStart() + old.getEndOffset() + 1, 0, 
-        wider.getForwardStart() + wider.getEndOffset() - old.getForwardStart() -
-        old.getEndOffset() - 1);
-        
+    // What's the new range on the left?
+    size_t newLeftStart = newStart;
+    size_t newLeftLength = oldStart - newStart;
+
+    // And on the right?
+    size_t newRightStart = oldStart + oldLength;
+    size_t newRightLength = newStart + newLength - oldStart - oldLength;
+    
     // Sum up the number of ranges on both sides.
-    return getApproximateNumberOfRanges(newLeft) +
-        getApproximateNumberOfRanges(newRight);
+    return getApproximateNumberOfRanges(newLeftStart, newLeftLength) +
+        getApproximateNumberOfRanges(newRightStart, newRightLength);
 
 }
 

@@ -57,28 +57,26 @@ public:
     }
     
     /***************************************************************************
-     * Functions for working with FMDPositions
+     * Functions for working with BWT intervals
      **************************************************************************/
     
     /**
-     * Is an FMDPosition empty under this view?
+     * Is a BWT interval empty under this view?
      */
-    inline bool isEmpty(const FMDPosition& position) const {
-        if(position.getEndOffset() < 0) {
+    inline bool isEmpty(size_t start, size_t length) const {
+        if(length == 0) {
             // It has no BWT positions in it
             return true;
         } else if(getMask() != nullptr) {
             // It has some BWT positions in it, and we have a mask
             
-            // Where's the last position that's in the BWT range? TODO: we use
-            // this pattern so much it should be a method on FMDPosition.
-            size_t endInclusive = position.getForwardStart() + 
-                position.getEndOffset();
+            // Where's the last position that's in the BWT range?
+            size_t endInclusive = start + length - 1;
                 
             // Return true if we *don't* have any 1s in the mask between the
             // interval endpoints.
-            return (getMask()->rank(endInclusive) + 1 - getMask()->rank(
-                position.getForwardStart(), true) <= 0);
+            return (getMask()->rank(endInclusive) + 1 - getMask()->rank(start,
+                true) <= 0);
         } else {
             // It contains BWT positions and we have no mask, so they are all
             // masked in.
@@ -87,33 +85,33 @@ public:
     }
 
     /**
-     * Does this FMDPosition indicate a unique merged position under this view?
+     * Does this BWT interval indicate a unique merged position under this view?
      * This relies on the view not having ranges defined with nothing masked in,
      * and thus can avoid needing to check if multiple merged ranges belong to
      * the same position.
      */
-    inline bool isUnique(const FMDPosition& position) const {
+    inline bool isUnique(size_t start, size_t length) const {
     
-        if(isEmpty(position)) {
+        if(isEmpty(start, length)) {
             // If it's empty, it's not unique.
             return false;
         }
         
         // Return true if we can identify a range number, false otherwise (in
         // which case we span multiple ranges).
-        return getRangeNumber(position) != -1;
+        return getRangeNumber(start, length) != -1;
     
     }
     
     /**
-     * Does an FMDPosition select multiple masked-in positions or merged ranges
+     * Does a BWT interval select multiple masked-in positions or merged ranges
      * under this view?
      */
-    inline bool isAmbiguous(const FMDPosition& position) const {
+    inline bool isAmbiguous(size_t start, size_t length) const {
         
         // If it's not empty and it's not unique, it must have multiple things
         // in it.
-        return !isEmpty(position) && !isUnique(position);
+        return !isEmpty(start, length) && !isUnique(start, length);
     }
     
     /**
@@ -181,26 +179,27 @@ public:
         const TextPosition& textPosition) const;
     
     /**
-     * Given that this FMDPosition is unique, get the TextPosition it uniquely
+     * Given that this BWT interval is unique, get the TextPosition it uniquely
      * maps to.
      */
-    inline TextPosition getTextPosition(const FMDPosition& position) const {
+    inline TextPosition getTextPosition(size_t start, size_t length) const {
         
         // Since we are unique, we know range is not -1. Grab it and immediately
         // make it a TextPosition.
-        return rangeToTextPosition(getRangeNumber(position));
+        return rangeToTextPosition(getRangeNumber(start, length));
         
     }
     
     /**
-     * Get all of the TextPositions that this FMDPosition selects. Automatically
-     * de-duplicates those that might be included through multiple ranges.
+     * Get all of the TextPositions that this BWT interval selects.
+     * Automatically de-duplicates those that might be included through multiple
+     * ranges.
      */
-    inline std::set<TextPosition> getTextPositions(
-        const FMDPosition& position) const {
+    inline std::set<TextPosition> getTextPositions(size_t start,
+        size_t length) const {
         
         // Get all the range numbers we have masked-in positions in.
-        std::vector<size_t> rangeNumbers = getRangeNumbers(position);
+        std::vector<size_t> rangeNumbers = getRangeNumbers(start, length);
         
         // We'll convert the range numbers to text positions and populate this.
         std::set<TextPosition> toReturn;
@@ -217,19 +216,19 @@ public:
     
     /**
      * Find TextPositions for all the BWT positions which were not selected in
-     * the old FMDPosition but which are selected in the wider one. Note that
+     * the old BWT interval but which are selected in the wider one. Note that
      * some of the returned TextPositions may be ones that were already selected
      * in the old range, if new BWT positions merged into the same TextPositions
      * are selected.
      *
-     * The wider FMDPosition must represent a range containing that of the old
-     * FMDPosition.
+     * The wider interval must contain the old interval.
      */
-    inline std::set<TextPosition> getNewTextPositions(
-        const FMDPosition& old, const FMDPosition& wider) const {
+    inline std::set<TextPosition> getNewTextPositions(size_t oldStart,
+        size_t oldLength, size_t newStart, size_t newLength) const {
         
         // Get all the range numbers we found new stuff in.
-        std::vector<size_t> rangeNumbers = getNewRangeNumbers(old, wider);
+        std::vector<size_t> rangeNumbers = getNewRangeNumbers(oldStart,
+            oldLength, newStart, newLength);
         
         // We'll convert the range numbers to text positions and populate this.
         std::set<TextPosition> toReturn;
@@ -246,50 +245,50 @@ public:
     }
     
     /**
-     * Find (approximately) the number of merged ranges selected by an
-     * FMDPosition. Provides an overestimate of the number of items in the set
+     * Find (approximately) the number of merged ranges selected by a BWT
+     * interval. Provides an overestimate of the number of items in the set
      * getTextPositions() will return.
      */
-    size_t getApproximateNumberOfRanges(const FMDPosition& position) const;
+    size_t getApproximateNumberOfRanges(size_t start, size_t length) const;
         
     /**
-     * Find (approximately) the number of merged ranges selected by a new
-     * FMDPosition over an old one. Provides an overestimate of the number of
-     * items in the set getNewTextPositions() will return.
+     * Find (approximately) the number of merged ranges selected by a new BWT
+     * interval over an old one. Provides an overestimate of the number of items
+     * in the set getNewTextPositions() will return.
      */
-    size_t getApproximateNumberOfNewRanges(const FMDPosition& old,
-        const FMDPosition& wider) const;
+    size_t getApproximateNumberOfNewRanges(size_t oldStart, size_t oldLength,
+        size_t newStart, size_t newLength) const;
         
     /**
      * Return the index of the range that the forward-strand interval of this
-     * FMDPosition is contained in, or -1 if it is not contained in any such
+     * BWT interval is contained in, or -1 if it is not contained in any such
      * interval.
      */
-    int64_t getRangeNumber(const FMDPosition& position) const;
+    int64_t getRangeNumber(size_t start, size_t length) const;
     
     /**
-     * Make an FMDPosition covering the range with the given number.
+     * Make a BWT interval covering the range with the given number. Returns
+     * (start, length).
      */
-    FMDPosition getRangeByNumber(size_t rangeNumber) const;
+    std::pair<size_t, size_t> getRangeByNumber(size_t rangeNumber) const;
     
 protected:
     
     /**
      * Return the indices of all of the ranges that the forward-strand interval
-     * of this FMDPosition has masked-in positions in.
+     * of this BWT interval has masked-in positions in.
      */
-    std::vector<size_t> getRangeNumbers(const FMDPosition& position) const;
+    std::vector<size_t> getRangeNumbers(size_t start, size_t length) const;
     
     /**
      * Return the indices of all of the ranges that the forward-strand interval
-     * of the wider FMDPosition has masked-in positions in, in the part of it
+     * of the wider BWT interval has masked-in positions in, in the part of it
      * not overlapped by the old interval.
      *
-     * The wider FMDPosition must represent a range containing that of the old
-     * FMDPosition.
+     * The wider interval must contain the old interval.
      */
-    std::vector<size_t> getNewRangeNumbers(const FMDPosition& old,
-        const FMDPosition& wider) const;
+    std::vector<size_t> getNewRangeNumbers(size_t oldStart, size_t oldLength,
+        size_t newStart, size_t newLength) const;
 
     /**
      * What FMDIndex are we a view of? It must of course outlive us.

@@ -6,7 +6,7 @@
 
 #include "FMDPosition.hpp"
 
-// Forward declaration for circular dependency
+// Forward declaration for circular dependencies
 class FMDIndex;
 
 /**

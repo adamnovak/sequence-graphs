@@ -27,7 +27,7 @@ std::vector<Matching> NaturalMappingScheme::findMaxMatchings(
         FMDPosition extended = results;
         view.getIndex().extendLeftOnly(extended, query[i]);
         
-        if(view.isUnique(results) && view.isEmpty(extended)) {
+        if(results.isUnique(view) && extended.isEmpty(view)) {
             // We are already a maximal unique match and can't extend any more.
             // Report ourselves.
             // Note that we can only ever do this once per left endpoint.
@@ -36,7 +36,7 @@ std::vector<Matching> NaturalMappingScheme::findMaxMatchings(
             // Make a Matching to this chosen place. Make sure we fix the left
             // endpoint in the query as i + 1, since we moved i left already and
             // we want to talk about where it was last loop.
-            auto maxMatching = Matching(i + 1,  view.getTextPosition(results),
+            auto maxMatching = Matching(i + 1,  results.getTextPosition(view),
                 patternLength);
             
             // Send it off
@@ -47,7 +47,7 @@ std::vector<Matching> NaturalMappingScheme::findMaxMatchings(
         }
         
         
-        while(view.isEmpty(extended)) {
+        while(extended.isEmpty(view)) {
             // If you can't extend, retract until you can. TODO: Assumes we
             // can find at least one result for any character.
             
@@ -70,7 +70,7 @@ std::vector<Matching> NaturalMappingScheme::findMaxMatchings(
         patternLength++;
     }
     
-    if(view.isUnique(results)) {
+    if(results.isUnique(view)) {
         Log::info() << "Unique at left edge" << std::endl;
     
         // We are a maximal unique match butted up against the left edge. Report
@@ -78,7 +78,7 @@ std::vector<Matching> NaturalMappingScheme::findMaxMatchings(
         // TODO: don't duplicate this code.
         
         // Make a Matching to this chosen place.
-        auto maxMatching = Matching(0,  view.getTextPosition(results),
+        auto maxMatching = Matching(0,  results.getTextPosition(view),
             patternLength);
         
         // Send it off
@@ -123,7 +123,7 @@ std::vector<Matching>  NaturalMappingScheme::findMinMatchings(
         FMDPosition extended = results;
         view.getIndex().extendLeftOnly(extended, query[i]);
         
-        while(view.isEmpty(extended)) {
+        while(extended.isEmpty(view)) {
             Log::info() << extended << " is empty" << std::endl;
         
             if(patternLength <= 1) {
@@ -163,7 +163,7 @@ std::vector<Matching>  NaturalMappingScheme::findMinMatchings(
         FMDPosition retracted = results;
         view.getIndex().retractRightOnly(retracted, patternLength - 1);
         
-        while(view.isUnique(retracted)) {
+        while(retracted.isUnique(view)) {
             // Retract until we would no longer be unique. Make sure to drop
             // characters from the total pattern length.
             results = retracted;
@@ -171,7 +171,7 @@ std::vector<Matching>  NaturalMappingScheme::findMinMatchings(
             mustRetract = false;
         }
         
-        if(view.isUnique(results) && view.isAmbiguous(retracted) &&
+        if(results.isUnique(view) && retracted.isAmbiguous(view) &&
             !mustRetract) {
             
             // We found a minimally unique match starting at this position and
@@ -179,7 +179,7 @@ std::vector<Matching>  NaturalMappingScheme::findMinMatchings(
             // any text that's selected. It would be a lot of work to go through
             // all the texts available to minimal matches, and we don't really
             // use their locations much anyway.
-            toReturn.push_back(Matching(i,  view.getTextPosition(results),
+            toReturn.push_back(Matching(i,  results.getTextPosition(view),
                 patternLength));
                 
             // We can't find another minimal match until we move the right
