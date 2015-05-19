@@ -13,6 +13,7 @@ class ZipMappingSchemeTests : public CppUnit::TestFixture {
     CPPUNIT_TEST(testMapWithMask);
     CPPUNIT_TEST(testMapWithMaskAndRanges);
     CPPUNIT_TEST(testMapWithGroups);
+    CPPUNIT_TEST(testMapWithMismatches);
     CPPUNIT_TEST_SUITE_END();
     
     // Keep a string saying where to get the haplotypes to test with.
@@ -43,6 +44,7 @@ public:
     void testMapWithMask();
     void testMapWithMaskAndRanges();
     void testMapWithGroups();
+    void testMapWithMismatches();
 };
 
 #endif
