@@ -2,13 +2,12 @@
 
 #include "util.hpp"
 
-FMDPositionGroup::FMDPositionGroup(const FMDIndexView& view): positions(),
-    view(view) {
+FMDPositionGroup::FMDPositionGroup(): positions() {
     // Nothing to do!
 }
 
-FMDPositionGroup::FMDPositionGroup(const FMDIndexView& view,
-    const std::vector<FMDPosition>& startPositions): FMDPositionGroup(view) {
+FMDPositionGroup::FMDPositionGroup(
+    const std::vector<FMDPosition>& startPositions): FMDPositionGroup() {
     
     for(const auto& position : startPositions) {
         // We need to tag all the positions with empty annotations
@@ -16,8 +15,8 @@ FMDPositionGroup::FMDPositionGroup(const FMDIndexView& view,
     }
 }
 
-bool FMDPositionGroup::extendGreedy(char correctCharacter,
-    size_t maxMismatches) {
+bool FMDPositionGroup::extendGreedy(const FMDIndexView& view, 
+    char correctCharacter, size_t maxMismatches) {
 
     // This will hold all the extensions we find that aren't empty
     decltype(positions) nonemptyExtensions;
@@ -99,7 +98,7 @@ bool FMDPositionGroup::extendGreedy(char correctCharacter,
 }
 
 
-void FMDPositionGroup::retractOne() {
+void FMDPositionGroup::retractOne(const FMDIndexView& view) {
     // Make a new collection to hold everything after we retract.
     decltype(positions) retracted;
 
@@ -129,7 +128,7 @@ void FMDPositionGroup::retractOne() {
     
 }
 
-bool FMDPositionGroup::isEmpty() const {
+bool FMDPositionGroup::isEmpty(const FMDIndexView& view) const {
     for(const auto& annotated : positions) {
         // For each interval we contain
         if(!annotated.position.isEmpty(view)) {
@@ -142,7 +141,7 @@ bool FMDPositionGroup::isEmpty() const {
     return true;
 }
 
-bool FMDPositionGroup::isUnique() const {
+bool FMDPositionGroup::isUnique(const FMDIndexView& view) const {
     for(const auto& annotated : positions) {
         // For each interval we contain
         if(annotated.position.isAmbiguous(view)) {
@@ -189,7 +188,7 @@ bool FMDPositionGroup::isUnique() const {
     return found;
 }
 
-TextPosition FMDPositionGroup::getTextPosition() const {
+TextPosition FMDPositionGroup::getTextPosition(const FMDIndexView& view) const {
     // TODO: Unify with above function, since they differ only in what they
     // return.
 

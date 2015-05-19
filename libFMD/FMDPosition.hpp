@@ -117,12 +117,19 @@ public:
     bool operator<(const FMDPosition& other) const;
 
 
+    /**
+     * Provide pretty-printing for FMDPositions. See
+     * <http://www.parashift.com/c++-faq/output-operator.html>
+     */
+    friend std::ostream& operator<< (std::ostream& o, 
+        FMDPosition const& position);
+
     ////////////////////////////////////////////////////////////////////////////
     // Operations under a view.
     ////////////////////////////////////////////////////////////////////////////
 
     /**
-     * Is nothing selected under the viven view?
+     * Is nothing selected under the given view?
      */
     bool isEmpty(const FMDIndexView& view) const;
     
@@ -166,13 +173,6 @@ public:
      */
     std::set<TextPosition> getNewTextPositions(const FMDIndexView& view,
         const FMDPosition& old) const;
-
-    /**
-     * Provide pretty-printing for FMDPositions. See
-     * <http://www.parashift.com/c++-faq/output-operator.html>
-     */
-    friend std::ostream& operator<< (std::ostream& o, 
-        FMDPosition const& position);
 
 protected:
     int64_t forward_start;

@@ -22,9 +22,9 @@ class FMDPositionGroup {
 public:
 
     /**
-     * Start out an empty FMDPositionGroup on the given view of an index.
+     * Start out an empty FMDPositionGroup.
      */
-    FMDPositionGroup(const FMDIndexView& view);
+    FMDPositionGroup();
 
     /**
      * Start out a new FMDPositionGroup containing the given FMDPositions.
@@ -34,14 +34,13 @@ public:
      *
      * TODO: Look into checking LCP.
      */
-    FMDPositionGroup(const FMDIndexView& view,
-        const std::vector<FMDPosition>& positions);
+    FMDPositionGroup(const std::vector<FMDPosition>& positions);
         
     /**
-     * Extend all the FMDPositions. If there are any results extending with the
-     * correct character, take those. Otherwise, extend with all of the
-     * mismatching characters. If any FMDPosition accumulates too many
-     * mismatches, drop it.
+     * Extend all the FMDPositions, using the given view. If there are any
+     * results extending with the correct character, take those. Otherwise,
+     * extend with all of the mismatching characters. If any FMDPosition
+     * accumulates too many mismatches, drop it.
      *
      * The extension is "greedy" because if it's possible to have a match, it
      * takes the match, even if that would lead it down a path with, overall,
@@ -50,30 +49,62 @@ public:
      * Returns true if an exact match exists anywhere, and false if a mismatch
      * had to be used.
      */
-    bool extendGreedy(char correctCharacter, size_t maxMismatches);
+    bool extendGreedy(const FMDIndexView& view, char correctCharacter,
+        size_t maxMismatches);
     
     /**
-     * Retract by a single base.
+     * Retract by a single base, using the given view.
      *
      * TODO: work out how to retract the minimum necessary for one FMDPosition
      * to show more results.
      */
-    void retractOne();
+    void retractOne(const FMDIndexView& view);
     
     /**
-     * Are there no non-empty FMDPositions in the group?
+     * Is nothing selected under the given view?
      */
-    bool isEmpty() const;
+    bool isEmpty(const FMDIndexView& view) const;
     
     /**
-     * Are all non-empty FMDPositions selecting the exact same graph position?
+     * Is exactly one merged position selected under the given view?
      */
-    bool isUnique() const;
+    bool isUnique(const FMDIndexView& view) const;
     
     /**
-     * Get the unique TextPosition selected. isUnique() must be true.
+     * Is more than one merged position selected under the given view?
      */
-    TextPosition getTextPosition() const;
+    bool isAmbiguous(const FMDIndexView& view) const;
+    
+    /**
+     * Get the unique TextPosition selected under the viven view. isUnique()
+     * must be true.
+     */
+    TextPosition getTextPosition(const FMDIndexView& view) const;
+    
+    /**
+     * Provides an overestimate of the number of ranges selected under the given
+     * view.
+     */
+    size_t getApproximateNumberOfRanges(const FMDIndexView& view) const;
+    
+    /**
+     * Provides an overestimate of the number of new ranges selected under the
+     * given view, relative to the given old FMDPosition.
+     */
+    size_t getApproximateNumberOfNewRanges(const FMDIndexView& view,
+        const FMDPosition& old);
+        
+    /**
+     * Get the TextPositions selected under the given view.
+     */
+    std::set<TextPosition> getTextPositions(const FMDIndexView& view) const;
+    
+    /**
+     * Get the new TextPositions selected under the given view, relative to the
+     * given old FMDPosition.
+     */
+    std::set<TextPosition> getNewTextPositions(const FMDIndexView& view,
+        const FMDPosition& old) const;
     
 protected:
 
@@ -200,15 +231,6 @@ protected:
      * Holds all the FMDPositions and their mismatch counts.
      */
     std::set<AnnotatedFMDPosition> positions;
-    
-    /**
-     * We hold a reference to the FMDIndexView (and thus the FMDIndex) that we
-     * work with, so that we can encapsulate the search logic ourselves.
-     */
-    const FMDIndexView& view;
-    
-    
-
 };
 
 #endif

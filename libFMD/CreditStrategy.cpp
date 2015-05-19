@@ -156,27 +156,27 @@ void CreditStrategy::breadthFirstSearch(const std::string& query,
     }
 
     // Make the FMDPositionGroup holding them all
-    FMDPositionGroup search(view, startPositions);
+    FMDPositionGroup search(startPositions);
     
     Log::trace() << "Applying credit from " << queryStart - 1 << " to " << 
         queryStart - maxDepth << std::endl;
     
     for(size_t queryIndex = queryStart - 1; 
         (queryIndex >= queryStart - maxDepth) && 
-        (queryIndex != (size_t) -1) && !search.isEmpty(); 
+        (queryIndex != (size_t) -1) && !search.isEmpty(view); 
         queryIndex--) {
         
         // While it is not empty, and we haven't hit our depth limit (or run off
         // the left edge of the string)
     
         // Try extending with a character. Remember if we found that character or not.
-        bool correctCharacter = search.extendGreedy(query[queryIndex],
+        bool correctCharacter = search.extendGreedy(view, query[queryIndex],
             maxMismatches);
         
-        if(correctCharacter && search.isUnique()) {
+        if(correctCharacter && search.isUnique(view)) {
             // If we have a unique result, and we actually found the base we
             // were looking for, issue a callback.
-            callback(queryIndex, search.getTextPosition());
+            callback(queryIndex, search.getTextPosition(view));
         }
         
     }
