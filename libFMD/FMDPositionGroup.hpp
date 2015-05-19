@@ -88,6 +88,11 @@ public:
     size_t retractRightOnly(const FMDIndexView& view);
     
     /**
+     * How many mismatches are used max by any FMDPosition in the group?
+     */
+    size_t mismatchesUsed() const;
+    
+    /**
      * Is nothing selected under the given view?
      */
     bool isEmpty(const FMDIndexView& view) const;

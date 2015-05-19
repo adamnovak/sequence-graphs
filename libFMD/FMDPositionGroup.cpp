@@ -261,6 +261,19 @@ size_t FMDPositionGroup::retractRightOnly(const FMDIndexView& view) {
     return newLength;
 }
 
+size_t FMDPositionGroup::mismatchesUsed() const {
+    // What't she max mismatches we've observed used?
+    size_t used = 0;
+    
+    for(const auto& annotated : positions) {
+        // Look through all the FMDPositions and get the max number of
+        // mismatches.
+        used = std::max(used, annotated.mismatches);
+    }
+    
+    return used;
+}
+
 bool FMDPositionGroup::isEmpty(const FMDIndexView& view) const {
     for(const auto& annotated : positions) {
         // For each interval we contain
