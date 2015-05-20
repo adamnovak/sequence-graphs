@@ -698,28 +698,34 @@ std::vector<std::pair<FMDPositionGroup, size_t>>
         // far as possible while still having results.
         
         // We're going to extend left with this new base.
-        FMDPositionGroup extended = results;
-        extended.extendFull(view, query[i], mismatchTolerance);
+        FMDPositionGroup extended = results.extendFull(view, query[i],
+            mismatchTolerance);
+            
+        Log::info() << "Did first extension" << std::endl;
         
         while(extended.isEmpty(view)) {
             // If you couldn't extend, retract until you can. TODO: Assumes we
             // can find at least one result for any character.
             
-            // Retract the character
-            FMDPositionGroup retracted = results;
-            // Make sure to drop characters from the total pattern length.
-            retracted.retractRightOnly(view, --patternLength);
+            Log::info() << "Is empty" << std::endl;
+            
+            // Retract the character. Make sure to drop characters from the
+            // total pattern length.
+            FMDPositionGroup retracted = results.retract(view, --patternLength);
             
             // Try extending again
-            extended = retracted;
-            extended.extendFull(view, query[i], mismatchTolerance);
+            extended = results.extendFull(view, query[i],
+                mismatchTolerance);
             
             // Say that last step we came from retracted.
-            results = retracted;
+            results = std::move(retracted);
         }
+        
+        Log::info() << "No longer empty" << std::endl;
         
         // This is what we want to use on the next base. But for this base we
         // have an additional constraint of no mismatch here.
+        // Here we have to do a copy.
         FMDPositionGroup carryForwardResults = extended;
         size_t carryForwardPatternLength = patternLength + 1;
         
@@ -730,22 +736,19 @@ std::vector<std::pair<FMDPositionGroup, size_t>>
             // If you couldn't extend, retract until you can. TODO: Assumes we
             // can find at least one result for any character.
             
-            // Retract the character
-            FMDPositionGroup retracted = results;
-            // Make sure to drop characters from the total pattern length.
-            retracted.retractRightOnly(view, --patternLength);
+            // Retract the character. Make sure to drop characters from the
+            // total pattern length.
+            FMDPositionGroup retracted = results.retract(view, --patternLength);
             
-            // Try extending again
-            extended = retracted;
-            extended.extendFull(view, query[i], mismatchTolerance);
-            extended.dropMismatchesHere();
+            // Try extending again, disallowing mismatches.
+            extended = retracted.extendExact(view, query[i]);
             
             // Say that last step we came from retracted.
-            results = retracted;
+            results = std::move(retracted);
         }
     
         // We successfully extended (if only with the base itself).
-        results = extended;
+        results = std::move(extended);
         // Increment the pattern length since we did actually extend by 1. 
         patternLength++;
         
@@ -755,12 +758,12 @@ std::vector<std::pair<FMDPositionGroup, size_t>>
         // Save the search results to the appropriate location, depending on if
         // we want to reverse the results or not.
         toReturn[reverse ? toReturn.size() - i - 1 : i] = std::make_pair(
-            results, patternLength);
+            std::move(results), patternLength);
             
         // Now wind back to before applying the constraint. TODO: this is
         // awkward.
-        results = carryForwardResults;
-        patternLength = carryForwardPatternLength;
+        results = std::move(carryForwardResults);
+        patternLength = std::move(carryForwardPatternLength);
     }
 
     // Now we have inchwormed all the way from right to left, retracting only

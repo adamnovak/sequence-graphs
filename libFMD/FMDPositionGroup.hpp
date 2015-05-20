@@ -67,9 +67,20 @@ public:
      * Extend all FMDPositions left, using the given view. Explores all possible
      * mismatches, if they yield results and do not end up costing too much
      * total.
+     *
+     * Returns an FMDPositionGroup produced by the extension.
      */
-    bool extendFull(const FMDIndexView& view, char correctCharacter,
-        size_t maxMismatches);
+    FMDPositionGroup extendFull(const FMDIndexView& view,
+        char correctCharacter, size_t maxMismatches) const;
+        
+    /**
+     * Extend all FMDPositions left, using the given view. Only tries a perfect
+     * match.
+     *
+     * Returns an FMDPositionGroup produced by the extension.
+     */
+    FMDPositionGroup extendExact(const FMDIndexView& view,
+        char correctCharacter) const;
         
     /**
      * Drop FMDPositions that have a mismatch on the most recently added base.
@@ -91,6 +102,12 @@ public:
      * different merged ranges or masked in.
      */
     size_t retractRightOnly(const FMDIndexView& view);
+    
+    /**
+     * Retract, creating a new FMDPositionGroup.
+     */
+    FMDPositionGroup retract(const FMDIndexView& view,
+        size_t newLength) const;
     
     /**
      * How many mismatches are used max by any FMDPosition in the group?
@@ -296,6 +313,11 @@ protected:
             // history for the group in terms of what was searched.
         }
     };
+
+    /**
+     * Create a new FMDPositionGroup from a set of annotated positions.
+     */
+    FMDPositionGroup(std::set<AnnotatedFMDPosition>&& startPositions);
 
     /**
      * Holds all the FMDPositions and their mismatch counts.

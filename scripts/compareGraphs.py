@@ -68,17 +68,23 @@ class GraphGenerationTarget(SchemeUsingTarget):
         # mismatches.
         return set([
             # Do zip with min edit distance
-            ("zip", 20, 1, 100, None),
-            ("zip", 20, 2, 100, None),
-            ("zip", 20, 3, 100, None),
-            ("zip", 20, 4, 100, None),
-            ("zip", 20, 5, 100, None),
+            ("zip", 20, 1, None, 100, None),
+            ("zip", 20, 2, None, 100, None),
+            ("zip", 20, 3, None, 100, None),
+            ("zip", 20, 4, None, 100, None),
+            ("zip", 20, 5, None, 100, None),
             # And with 2-mismatch credit
-            ("zip", 20, 1, 100, 2),
-            ("zip", 20, 2, 100, 2),
-            ("zip", 20, 3, 100, 2),
-            ("zip", 20, 4, 100, 2),
-            ("zip", 20, 5, 100, 2)
+            ("zip", 20, 1, None, 100, 2),
+            ("zip", 20, 2, None, 100, 2),
+            ("zip", 20, 3, None, 100, 2),
+            ("zip", 20, 4, None, 100, 2),
+            ("zip", 20, 5, None, 100, 2),
+            # And with 1-mismatch tolerance and credit
+            ("zip", 20, 1, 1, 100, 2),
+            ("zip", 20, 2, 1, 100, 2),
+            ("zip", 20, 3, 1, 100, 2),
+            ("zip", 20, 4, 1, 100, 2),
+            ("zip", 20, 5, 1, 100, 2)
         ])
         
     def run(self):

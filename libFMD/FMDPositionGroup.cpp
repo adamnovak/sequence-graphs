@@ -16,6 +16,13 @@ FMDPositionGroup::FMDPositionGroup(
 }
 
 FMDPositionGroup::FMDPositionGroup(
+    std::set<AnnotatedFMDPosition>&& startPositions):
+    positions(std::move(startPositions)) {
+    
+    // Nothing to do!
+}
+
+FMDPositionGroup::FMDPositionGroup(
     const FMDIndexView& view): FMDPositionGroup() {
     
     // Start with just one FMDPosition, covering the whole thing.
@@ -105,8 +112,8 @@ bool FMDPositionGroup::extendGreedy(const FMDIndexView& view,
 
 }
 
-bool FMDPositionGroup::extendFull(const FMDIndexView& view,
-    char correctCharacter, size_t maxMismatches) {
+FMDPositionGroup FMDPositionGroup::extendFull(const FMDIndexView& view,
+    char correctCharacter, size_t maxMismatches) const {
     
     // This will hold all the extensions we find that aren't empty
     decltype(positions) nonemptyExtensions;
@@ -186,13 +193,48 @@ bool FMDPositionGroup::extendFull(const FMDIndexView& view,
             correctCharacter << std::endl;
     }
     
-    // Replace our FMDPositions with the new extended ones.
-    positions = std::move(nonemptyExtensions);
     
-    Log::debug() << "Have " << positions.size() << " ranges" << std::endl;
+    Log::debug() << "Have " << nonemptyExtensions.size() << " ranges" <<
+        std::endl;
     
-    // Let the caller know if we found the base they wanted or not.
-    return exactMatch;
+    // Wrap the set up and move it out
+    return FMDPositionGroup(std::move(nonemptyExtensions));
+}
+
+FMDPositionGroup FMDPositionGroup::extendExact(const FMDIndexView& view,
+    char correctCharacter) const {
+    
+    // This will hold all the extensions we find that aren't empty
+    decltype(positions) nonemptyExtensions;
+    
+    for(const auto& annotated : positions) {
+        // For each existing FMDPosition
+        
+        // Pull it out
+        FMDPosition toExtend = annotated.position;
+        
+        // Extend it
+        view.getIndex().extendLeftOnly(toExtend, correctCharacter);
+        
+        if(!toExtend.isEmpty(view)) {
+            // If we got anything, keep the range (and don't increment the
+            // mismatches)
+            nonemptyExtensions.emplace(toExtend, annotated, false);
+        }
+    }
+    
+    if(nonemptyExtensions.size() != 0) {
+        Log::debug() << "Extended with " << correctCharacter << std::endl;
+    } else {
+        Log::debug() << "Failed to extend with " << correctCharacter << 
+            std::endl;
+    }
+    
+    Log::debug() << "Have " << nonemptyExtensions.size() << " ranges" <<
+        std::endl;
+    
+    // Wrap the set up and move it out
+    return FMDPositionGroup(std::move(nonemptyExtensions));
 }
 
 void FMDPositionGroup::dropMismatchesHere() {
@@ -272,6 +314,30 @@ void FMDPositionGroup::retractRightOnly(const FMDIndexView& view,
     
     // Replace our FMDPositions with the new extended ones.
     positions = std::move(retractions);
+}
+
+FMDPositionGroup FMDPositionGroup::retract(const FMDIndexView& view,
+    size_t newLength) const {
+    
+    // This will hold all the retractions we find
+    decltype(positions) retractions;
+    
+    for(const auto& annotated : positions) {
+        // For each existing FMDPosition
+        
+        // Pull it out
+        FMDPosition toRetract = annotated.position;
+        
+        // Retract it
+        toRetract.retractRightOnly(view, newLength);
+        
+        // Call the retraction constructor with the number of bases we
+        // retracted to, and stick in this new retracted range.
+        retractions.emplace(toRetract, annotated, newLength);
+    }
+    
+    // Replace our FMDPositions with the new extended ones.
+    return FMDPositionGroup(std::move(retractions));
 }
 
 size_t FMDPositionGroup::retractRightOnly(const FMDIndexView& view) {

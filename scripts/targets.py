@@ -230,7 +230,7 @@ class SchemeUsingTarget(jobTree.scriptTree.target.Target):
                     
             elif map_type == "zip":
                 # Unpack the parameters
-                map_type, min_context, edit_bound, range_count, \
+                map_type, min_context, edit_bound, edit_max, range_count, \
                     credit_mismatches = plan_item
                     
                 # Start with just the mapping type.
@@ -258,26 +258,25 @@ class SchemeUsingTarget(jobTree.scriptTree.target.Target):
                 scheme_name += "Min{}".format(min_context)
                 
             if edit_bound is not None:
-                    # For the natural mapping scheme, don't map on a maximum
-                    # unique match run unless we can get a lower bound on its
-                    # edit distance from all other reference locations that
-                    # is at least this high.
-                    extra_args.append("--minEditBound")
-                    extra_args.append(str(edit_bound))
+                # For the natural mapping scheme, don't map on a maximum
+                # unique match run unless we can get a lower bound on its
+                # edit distance from all other reference locations that
+                # is at least this high.
+                extra_args.append("--minEditBound")
+                extra_args.append(str(edit_bound))
+                
+                # Mention it in the scheme name
+                scheme_name += "Ed{}".format(edit_bound)
                     
-                    # Mention it in the scheme name
-                    scheme_name += "Ed{}".format(edit_bound)
-                    
-            if map_type == "natural":
             
-                if edit_max is not None:
-                    # For the natural mapping scheme, allow this many mismatches
-                    # in maximal unique match runs.
-                    extra_args.append("--maxEditDistance")
-                    extra_args.append(str(edit_max))
-                    
-                    # Mention it in the scheme name
-                    scheme_name += "Mis{}".format(edit_max)
+            if edit_max is not None:
+                # Allow this many mismatches in maximal unique match runs (or
+                # contexts for the zip scheme).
+                extra_args.append("--maxEditDistance")
+                extra_args.append(str(edit_max))
+                
+                # Mention it in the scheme name
+                scheme_name += "Mis{}".format(edit_max)
                     
             if map_type == "zip":
                 
