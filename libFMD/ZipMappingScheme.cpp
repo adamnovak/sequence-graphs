@@ -701,13 +701,9 @@ std::vector<std::pair<FMDPositionGroup, size_t>>
         FMDPositionGroup extended = results.extendFull(view, query[i],
             mismatchTolerance);
             
-        Log::info() << "Did first extension" << std::endl;
-        
         while(extended.isEmpty(view)) {
             // If you couldn't extend, retract until you can. TODO: Assumes we
             // can find at least one result for any character.
-            
-            Log::info() << "Is empty" << std::endl;
             
             // Retract the character. Make sure to drop characters from the
             // total pattern length.
@@ -720,8 +716,6 @@ std::vector<std::pair<FMDPositionGroup, size_t>>
             // Say that last step we came from retracted.
             results = std::move(retracted);
         }
-        
-        Log::info() << "No longer empty" << std::endl;
         
         // This is what we want to use on the next base. But for this base we
         // have an additional constraint of no mismatch here.
