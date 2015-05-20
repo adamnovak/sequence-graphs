@@ -3,6 +3,8 @@
 
 #include <thread>
 
+#define SINGLE_THREAD
+
 /**
  * Defines a class that wraps std::thread. Was used to fix up itimers for geprof
  * compatibility, but I can't work out how to forward rvalue references through

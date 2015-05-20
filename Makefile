@@ -18,5 +18,5 @@ libsuffixtools:
 	$(MAKE) -C libsuffixtools 
 	
 check:
-	cd libsuffixtools && make check
-	cd libFMD && make check
+	cd libsuffixtools && $(MAKE) check
+	cd libFMD && $(MAKE) check

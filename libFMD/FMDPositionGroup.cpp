@@ -266,9 +266,8 @@ void FMDPositionGroup::retractRightOnly(const FMDIndexView& view,
         toRetract.retractRightOnly(view, newLength);
         
         // Call the retraction constructor with the number of bases we
-        // retracted, and stick in this new retracted range.
-        retractions.emplace(toRetract, annotated, 
-            annotated.searchedCharacters - newLength);
+        // retracted to, and stick in this new retracted range.
+        retractions.emplace(toRetract, annotated, newLength);
     }
     
     // Replace our FMDPositions with the new extended ones.

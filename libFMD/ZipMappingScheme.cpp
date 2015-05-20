@@ -418,48 +418,135 @@ std::pair<bool, std::set<TextPosition>>
     if(canTouchResults) {
         // We have properly populated sets for both sides.
         
-        // How many mismatches are used by this combined context?
+        // How many mismatches are used by this combined context? We know there
+        // won't be a mismatch at the base in question, so we don't have to
+        // worry about double-counting there.
         size_t mismatchesUsed = left.selection.mismatchesUsed() +
             right.selection.mismatchesUsed();
         
         if(mismatchesUsed <= mismatchTolerance) {
         
-            Log::debug() << "Only " << mismatchesUsed << 
-                " mismatches; comparing entire result sets." << std::endl;
+            // How many mismatches did we use in our parent?
+            // TODO: Just remember this.
+            size_t lastMismatchesUsed = (size_t) -1;
+                
+            if(task.retractedRight && task.rightIndex > 0) {
+                // Our parent had this left and a different right. Figure out
+                // how many mismatches it used.
+                lastMismatchesUsed = left.selection.mismatchesUsed() + 
+                    table.getRetraction(true, task.rightIndex - 1, view,
+                    maxRangeCount).selection.mismatchesUsed();
+            } else if(!task.retractedRight && task.leftIndex > 0) {
+                // Our parent had this right and a different left. Figure out
+                // how many mismatches it used.
+                lastMismatchesUsed = right.selection.mismatchesUsed() + 
+                    table.getRetraction(false, task.leftIndex - 1, view,
+                    maxRangeCount).selection.mismatchesUsed();
+            }
         
-            // We can accept overlaps because not too many mismatches are used.
-            
-            // TODO: For now we can just bang the selected sets against each
-            // other, and ignore the newly selected sets. In the future we need
-            // to be able to work out if we just dropped enough mismatches.
-            
-            // This is going to hold the TextPositiuons in both sets, in right
+            // This is going to hold the TextPositions in both sets, in right
             // orientation.
             std::set<TextPosition> shared;
+        
+            if(lastMismatchesUsed > mismatchTolerance) {
+                // This is the first retraction that has few enough mismatches.
+        
+                Log::debug() << "Only " << mismatchesUsed << 
+                    " mismatches, down from from " << lastMismatchesUsed << 
+                    " mismatches; comparing entire result sets." << std::endl;
             
-            // TODO: scan the smaller set always?
-            for(auto result : left.selected) {
-                    
-                // Flip each result around and see if it is in the opposing set
-                TextPosition flipped = result;
-                flipped.flip(view.getIndex().getContigLength(
-                    flipped.getContigNumber()));
-                    
-                if(right.selected.count(flipped)) {
-                    // We found it!
-                    
-                    // We're going through left contexts, so insert the flipped
-                    // version.
-                    shared.insert(flipped);
-                    
-                    if(shared.size() > 1) {
+                // We can accept overlaps because not too many mismatches are
+                // used.
+                
+                // TODO: For now we can just bang the selected sets against each
+                // other, and ignore the newly selected sets. In the future we
+                // need to be able to work out if we just dropped enough
+                // mismatches.
+                
+                // TODO: scan the smaller set always?
+                for(auto result : left.selected) {
                         
-                        Log::debug() << "Found multiple shared new results" <<
-                            std::endl;
+                    // Flip each result around and see if it is in the opposing
+                    // set
+                    TextPosition flipped = result;
+                    flipped.flip(view.getIndex().getContigLength(
+                        flipped.getContigNumber()));
+                        
+                    if(right.selected.count(flipped)) {
+                        // We found it!
+                        
+                        // We're going through left contexts, so insert the
+                        // flipped version.
+                        shared.insert(flipped);
+                        
+                        if(shared.size() > 1) {
+                            
+                            Log::debug() <<
+                                "Found multiple shared new results" <<
+                                std::endl;
+                        
+                            // We can short circuit now because we found
+                            // multiple shared TextPositions.
+                            return {true, shared};
+                        }
+                    }
+                }
+            } else {
+                // We have few enough mismatches, but we did before, too. Only
+                // check the new results.
+                
+                // TODO: share code
+                
+                // Note that root tasks will have equal selected and newlySelected sets
+                // on each side, so we can handle them fairly simply.
+                
+                // If we retracted on the right, use the old positions from the
+                // left. Otherwise (if we retracted on the left or are a root),
+                // use the old positions from the right
+                const std::set<TextPosition>& oldPositions = 
+                    task.retractedRight ? left.selected : right.selected;
                     
-                        // We can short circuit now because we found multiple
-                        // shared TextPositions.
-                        return {true, shared};
+                // If we retracted on the right, bang the new right positions
+                // against the old positions. Otherwise bang the new left
+                // positions.
+                const std::set<TextPosition>& newPositions =
+                    task.retractedRight ? right.newlySelected :
+                    left.newlySelected;
+                    
+                Log::debug() << "Comparing " << newPositions.size() <<
+                    " new positions against " << oldPositions.size() << 
+                    " old ones" << std::endl;
+                
+                // TODO: scan the smaller set always?
+                for(auto result : newPositions) {
+                        
+                    // Flip each result around and see if it is in the opposing
+                    // set
+                    TextPosition flipped = result;
+                    flipped.flip(view.getIndex().getContigLength(
+                        flipped.getContigNumber()));
+                        
+                    if(oldPositions.count(flipped)) {
+                        // We found it!
+                        if(task.retractedRight) {
+                            // We're going through right contexts.
+                            shared.insert(result);
+                        } else {
+                            // We're going through left contexts, so insert the
+                            // flipped version.
+                            shared.insert(flipped);
+                        }
+                        
+                        if(shared.size() > 1) {
+                            
+                            Log::debug() <<
+                                "Found multiple shared new results" <<
+                                std::endl;
+                        
+                            // We can short circuit now because we found
+                            // multiple shared TextPositions.
+                            return {true, shared};
+                        }
                     }
                 }
             }
@@ -476,9 +563,7 @@ std::pair<bool, std::set<TextPosition>>
                 return {true, shared};
             }
         
-            Log::debug() << "Could look at result sets but found no overlap" <<
-                std::endl;
-            
+            Log::debug() << "Found no overlap" << std::endl;
         } else {
             // We used too many mismatches to accept an overlap. Try after
             // retracting.
