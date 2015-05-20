@@ -72,6 +72,11 @@ public:
         size_t maxMismatches);
         
     /**
+     * Drop FMDPositions that have a mismatch on the most recently added base.
+     */
+    void dropMismatchesHere();
+        
+    /**
      * Extend left with no mismatches.
      */
     void extendLeftOnly(const FMDIndexView& view, char character);
@@ -142,6 +147,13 @@ public:
      */
     std::set<TextPosition> getNewTextPositions(const FMDIndexView& view,
         const FMDPositionGroup& old) const;
+        
+    /**
+     * Provide pretty-printing for FMDPositionGroups. See
+     * <http://www.parashift.com/c++-faq/output-operator.html>
+     */
+    friend std::ostream& operator<< (std::ostream& o, 
+        FMDPositionGroup const& group);
     
 protected:
 
@@ -195,11 +207,19 @@ protected:
             if(isMismatch) {
                 // We added a mismatch at the left.
                 if(mismatchOffsets.size() > 0) { 
-                    // We come after a mismatch that's already there. After
-                    // removing it, how many more characters would we need to
-                    // retract to remove this one?
-                    mismatchOffsets.push_back(searchedCharacters -
-                        mismatchOffsets.back());
+                    // We come after a mismatch that's already there.
+                    
+                    // Where is it in the space of the search string? TODO: Make
+                    // this not do an O(n) scan every time we add a mismatch.
+                    // Maybe move back to the absolute-positions-and-offset
+                    // model?
+                    size_t lastMismatchIndex = std::accumulate(
+                        mismatchOffsets.begin(), mismatchOffsets.end(), 0);
+                    
+                    // After removing it, how many more characters would we need
+                    // to retract to remove this one?
+                    mismatchOffsets.push_back(searchedCharacters - 
+                        lastMismatchIndex);
                 } else {
                     // There are no mismatches before this new one. How many
                     // characters would we have to retract to remove it?

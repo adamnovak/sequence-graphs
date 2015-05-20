@@ -259,6 +259,9 @@ void ZipMappingSchemeTests::testMapWithMismatches() {
     // Allow for mismatches.
     ((ZipMappingScheme<FMDPositionGroup>*) scheme)->mismatchTolerance = 1;
     
+    // But require some nearby pins
+    ((ZipMappingScheme<FMDPositionGroup>*) scheme)->minUniqueStrings = 2;
+    
     size_t mappedBases = 0;
     scheme->map(query, [&](size_t i, TextPosition mappedTo) {
         // Make sure mismatched bases do not map.

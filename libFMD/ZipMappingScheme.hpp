@@ -77,9 +77,7 @@ public:
     
     /**
      * How many unique non-overlapping one-sided MUSes need to be in the one-
-     * sided MUMs of a base for that base to map? TODO: these sould be non-
-     * overlapping, and restricted to the range of bases used to map the base in
-     * question.
+     * sided MUMs of a base for that base to map?
      */
     size_t minUniqueStrings = 0;
     
@@ -487,65 +485,6 @@ size_t ZipMappingScheme<SearchType>::selectActivities(
 }
 
 template<typename SearchType>
-std::vector<std::pair<SearchType, size_t>>
-    ZipMappingScheme<SearchType>::findRightContexts(const std::string& query,
-    bool reverse) const {
- 
-    // This will hold the right context of every position.
-    std::vector<std::pair<SearchType, size_t>> toReturn(query.size());
- 
-    // Start with everything selected.
-    SearchType results(view);
-    
-    // How many characters are currently searched?
-    size_t patternLength = 0;
-    
-    for(size_t i = query.size() - 1; i != (size_t) -1; i--) {
-        // For each position in the query from right to left, we're going to
-        // inchworm along and get the search that is extended out right as
-        // far as possible while still having results.
-        
-        // We're going to extend left with this new base.
-        SearchType extended = results;
-        extended.extendLeftOnly(view, query[i]);
-        
-        while(extended.isEmpty(view)) {
-            // If you couldn't extend, retract until you can. TODO: Assumes we
-            // can find at least one result for any character.
-            
-            // Retract the character
-            SearchType retracted = results;
-            // Make sure to drop characters from the total pattern length.
-            retracted.retractRightOnly(view, --patternLength);
-            
-            // Try extending again
-            extended = retracted;
-            extended.extendLeftOnly(view, query[i]);
-            
-            // Say that last step we came from retracted.
-            results = retracted;
-        }
-    
-        // We successfully extended (if only with the base itself).
-        results = extended;
-        // Increment the pattern length since we did actually extedn by 1. 
-        patternLength++;
-        
-        Log::trace() << "Index " << i << " has " << query[i] << " + " << 
-            patternLength - 1 << " selecting " << results << std::endl;
-        
-        // Save the search results to the appropriate location, depending on if
-        // we want to reverse the results or not.
-        toReturn[reverse ? toReturn.size() - i - 1 : i] = std::make_pair(
-            results, patternLength);
-    }
-
-    // Now we have inchwormed all the way from right to left, retracting only
-    // when necessary. Return all the results.    
-    return toReturn;
-}
-
-template<typename SearchType>
 std::vector<size_t> ZipMappingScheme<SearchType>::createUniqueContextIndex(
     const std::vector<std::pair<SearchType, size_t>>& leftContexts,
     const std::vector<std::pair<SearchType, size_t>>& rightContexts) const {
@@ -906,7 +845,7 @@ Mapping ZipMappingScheme<SearchType>::exploreRetractions(
     }
     
     Log::debug() << "Found " << found.size() << " locations" << std::endl;
-    Log::debug() << "Used" << maxLeftContext << ", " << maxRightContext <<
+    Log::debug() << "Used " << maxLeftContext << ", " << maxRightContext <<
         " context" << std::endl;
         
     if(found.size() == 1) {
@@ -972,9 +911,7 @@ void ZipMappingScheme<SearchType>::map(const std::string& query,
         
         if(mapping.isMapped()) {
             // We map!
-            Log::debug() << "Index " << i << " maps on " << 
-                mapping.getLeftMaxContext() << " left and " << 
-                mapping.getRightMaxContext() << " right context" << std::endl;
+            Log::debug() << "Index " << i << " maps to " << mapping << std::endl;
         } else {
             // Too few results until we retracted back to too many
             Log::debug() << "Index " << i << " is not mapped." << std::endl;
@@ -1011,8 +948,8 @@ void ZipMappingScheme<SearchType>::map(const std::string& query,
             
         if(nonOverlapping < minUniqueStrings) {
             Log::debug() <<
-                "Dropping mapping due to having too few unique strings." <<
-                std::endl;
+                "Dropping mapping " << i <<
+                " due to having too few unique strings." << std::endl;
             // Report a non-mapping Mapping
             stats.add("filterFail", 1);
             filtered.push_back(Mapping());

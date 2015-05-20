@@ -136,6 +136,15 @@ bool FMDPositionGroup::extendFull(const FMDIndexView& view,
     // inexact ones regardless.
     exactMatch = (nonemptyExtensions.size() != 0);
     
+    if(exactMatch) {
+        Log::debug() << "Extended with " << correctCharacter << std::endl;
+    } else {
+        Log::debug() << "Failed to extend with " << correctCharacter << 
+            std::endl;
+    }
+    
+    // How many exact matches do we have?
+    size_t exactMatchCount = nonemptyExtensions.size();
         
     
     for(char base : BASES) {
@@ -167,8 +176,15 @@ bool FMDPositionGroup::extendFull(const FMDIndexView& view,
         
     }
     
-    Log::debug() << "Extended with all but " << correctCharacter <<
-        std::endl;
+    if(nonemptyExtensions.size() > exactMatchCount) {
+        // We found some mismatch results
+        Log::debug() << "Extended with all but " << correctCharacter <<
+            std::endl;
+    } else {
+        // We didn't find any mismatch results
+        Log::debug() << "Failed to extend with anything besides " <<
+            correctCharacter << std::endl;
+    }
     
     // Replace our FMDPositions with the new extended ones.
     positions = std::move(nonemptyExtensions);
@@ -179,6 +195,33 @@ bool FMDPositionGroup::extendFull(const FMDIndexView& view,
     return exactMatch;
 }
 
+void FMDPositionGroup::dropMismatchesHere() {
+    // This will hold all the things that match here
+    decltype(positions) matchHere;
+    
+    for(const auto& annotated : positions) {
+        // For each existing FMDPosition
+        
+        // Sum up the offsets between mismatches. If there is a mismatch at the
+        // most recent character, this will equal the search length.
+        size_t lastMismatchIndex = std::accumulate(
+            annotated.mismatchOffsets.begin(), annotated.mismatchOffsets.end(),
+            0);
+        
+        if(lastMismatchIndex == annotated.searchedCharacters) {
+            // There's a mismatch at the most recent character. Drop this range.
+            Log::debug() << "Dropping " << annotated.position << 
+                " due to mismatch" << std::endl;
+        } else {
+            // Keep the range
+            Log::debug() << "Keeping " << annotated.position << std::endl;
+            matchHere.insert(annotated);
+        }
+    }
+    
+    // Replace positions with the filtered version
+    positions = std::move(matchHere);
+}
 
 void FMDPositionGroup::extendLeftOnly(const FMDIndexView& view,
     char character) {
@@ -520,6 +563,15 @@ std::set<TextPosition> FMDPositionGroup::getNewTextPositions(
     
 }
 
+std::ostream& operator<< (std::ostream& o, FMDPositionGroup const& group) {
+    if(group.positions.size() == 0) {
+        return o << "<empty group>";
+    } else if(group.positions.size() == 1) {
+        return o << (*group.positions.begin()).position;
+    } else {
+        return o << "<" << group.positions.size() << "-interval group>";
+    }
+}
 
 
 

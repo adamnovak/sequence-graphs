@@ -320,6 +320,10 @@ std::pair<bool, std::set<TextPosition>>
         false, task.leftIndex, view, maxRangeCount);
     const typename DPTable::SideRetractionEntry& right = table.getRetraction(
         true, task.rightIndex, view, maxRangeCount);
+        
+    Log::debug() << "Exploring " << left.selection << " (" <<
+        left.contextLength << ") left, " << right.selection << " (" <<
+        right.contextLength << ") right" << std::endl;
     
     // We need to look at the searches in both directions at this level of
     // retraction, and determine if they can agree. They can only agree if they
@@ -421,7 +425,7 @@ std::pair<bool, std::set<TextPosition>>
         if(mismatchesUsed <= mismatchTolerance) {
         
             Log::debug() << "Only " << mismatchesUsed << 
-                " mismatches; compoaring entire result sets." << std::endl;
+                " mismatches; comparing entire result sets." << std::endl;
         
             // We can accept overlaps because not too many mismatches are used.
             
@@ -521,6 +525,155 @@ std::pair<bool, std::set<TextPosition>>
     // no overlaps.
     return {canTouchResults, {}};
         
+}
+
+template<>
+std::vector<std::pair<FMDPosition, size_t>>
+    ZipMappingScheme<FMDPosition>::findRightContexts(const std::string& query,
+    bool reverse) const {
+ 
+    // This will hold the right context of every position.
+    std::vector<std::pair<FMDPosition, size_t>> toReturn(query.size());
+ 
+    // Start with everything selected.
+    FMDPosition results(view);
+    
+    // How many characters are currently searched?
+    size_t patternLength = 0;
+    
+    for(size_t i = query.size() - 1; i != (size_t) -1; i--) {
+        // For each position in the query from right to left, we're going to
+        // inchworm along and get the search that is extended out right as
+        // far as possible while still having results.
+        
+        // We're going to extend left with this new base.
+        FMDPosition extended = results;
+        extended.extendLeftOnly(view, query[i]);
+        
+        while(extended.isEmpty(view)) {
+            // If you couldn't extend, retract until you can. TODO: Assumes we
+            // can find at least one result for any character.
+            
+            // Retract the character
+            FMDPosition retracted = results;
+            // Make sure to drop characters from the total pattern length.
+            retracted.retractRightOnly(view, --patternLength);
+            
+            // Try extending again
+            extended = retracted;
+            extended.extendLeftOnly(view, query[i]);
+            
+            // Say that last step we came from retracted.
+            results = retracted;
+        }
+    
+        // We successfully extended (if only with the base itself).
+        results = extended;
+        // Increment the pattern length since we did actually extedn by 1. 
+        patternLength++;
+        
+        Log::trace() << "Index " << i << " has " << query[i] << " + " << 
+            patternLength - 1 << " selecting " << results << std::endl;
+        
+        // Save the search results to the appropriate location, depending on if
+        // we want to reverse the results or not.
+        toReturn[reverse ? toReturn.size() - i - 1 : i] = std::make_pair(
+            results, patternLength);
+    }
+
+    // Now we have inchwormed all the way from right to left, retracting only
+    // when necessary. Return all the results.    
+    return toReturn;
+}
+
+template<>
+std::vector<std::pair<FMDPositionGroup, size_t>>
+    ZipMappingScheme<FMDPositionGroup>::findRightContexts(
+    const std::string& query, bool reverse) const {
+ 
+    // This will hold the right context of every position.
+    std::vector<std::pair<FMDPositionGroup, size_t>> toReturn(query.size());
+ 
+    // Start with everything selected.
+    FMDPositionGroup results(view);
+    
+    // How many characters are currently searched?
+    size_t patternLength = 0;
+    
+    for(size_t i = query.size() - 1; i != (size_t) -1; i--) {
+        // For each position in the query from right to left, we're going to
+        // inchworm along and get the search that is extended out right as
+        // far as possible while still having results.
+        
+        // We're going to extend left with this new base.
+        FMDPositionGroup extended = results;
+        extended.extendFull(view, query[i], mismatchTolerance);
+        
+        while(extended.isEmpty(view)) {
+            // If you couldn't extend, retract until you can. TODO: Assumes we
+            // can find at least one result for any character.
+            
+            // Retract the character
+            FMDPositionGroup retracted = results;
+            // Make sure to drop characters from the total pattern length.
+            retracted.retractRightOnly(view, --patternLength);
+            
+            // Try extending again
+            extended = retracted;
+            extended.extendFull(view, query[i], mismatchTolerance);
+            
+            // Say that last step we came from retracted.
+            results = retracted;
+        }
+        
+        // This is what we want to use on the next base. But for this base we
+        // have an additional constraint of no mismatch here.
+        FMDPositionGroup carryForwardResults = extended;
+        size_t carryForwardPatternLength = patternLength + 1;
+        
+        // Apply that constraint
+        extended.dropMismatchesHere();
+        
+        while(extended.isEmpty(view)) {
+            // If you couldn't extend, retract until you can. TODO: Assumes we
+            // can find at least one result for any character.
+            
+            // Retract the character
+            FMDPositionGroup retracted = results;
+            // Make sure to drop characters from the total pattern length.
+            retracted.retractRightOnly(view, --patternLength);
+            
+            // Try extending again
+            extended = retracted;
+            extended.extendFull(view, query[i], mismatchTolerance);
+            extended.dropMismatchesHere();
+            
+            // Say that last step we came from retracted.
+            results = retracted;
+        }
+    
+        // We successfully extended (if only with the base itself).
+        results = extended;
+        // Increment the pattern length since we did actually extend by 1. 
+        patternLength++;
+        
+        Log::trace() << "Index " << i << " has " << query[i] << " + " << 
+            patternLength - 1 << " selecting " << results << std::endl;
+        
+        // Save the search results to the appropriate location, depending on if
+        // we want to reverse the results or not.
+        toReturn[reverse ? toReturn.size() - i - 1 : i] = std::make_pair(
+            results, patternLength);
+            
+        // Now wind back to before applying the constraint. TODO: this is
+        // awkward.
+        results = carryForwardResults;
+        patternLength = carryForwardPatternLength;
+    }
+
+    // Now we have inchwormed all the way from right to left, retracting only
+    // when necessary. Return all the results.    
+    return toReturn;
 }
 
 

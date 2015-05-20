@@ -18,7 +18,7 @@ FMDIndexView::FMDIndexView(const FMDIndex& index, const GenericBitVector* mask,
                 // range number.
                 invertedPositions.emplace(positions.at(i), i);
                 
-                Log::debug() << "Range " << i << " explicitly owned by " <<
+                Log::trace() << "Range " << i << " explicitly owned by " <<
                     positions.at(i) << std::endl;
                 
             } else {
@@ -43,7 +43,7 @@ FMDIndexView::FMDIndexView(const FMDIndex& index, const GenericBitVector* mask,
                 
                 invertedPositions.emplace(owner, i);
                 
-                Log::debug() << "Range " << i << " implicitly owned by " <<
+                Log::trace() << "Range " << i << " implicitly owned by " <<
                     owner << std::endl;
             }
         }
