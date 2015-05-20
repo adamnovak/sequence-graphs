@@ -53,7 +53,9 @@ void CreditStrategy::applyCredit(const std::string& query,
             size_t rightAnchor = i;
             
             // Actually go and apply the credit between those mapped bases.
-            applyCreditBetween(query, toUpdate, leftAnchor, rightAnchor);
+            applyCreditBetween(query.substr(leftAnchor,
+                rightAnchor - leftAnchor + 1), leftAnchor, toUpdate, leftAnchor,
+                rightAnchor);
         }
         
         // Remember the state of the last base we saw.        
@@ -61,8 +63,8 @@ void CreditStrategy::applyCredit(const std::string& query,
     }
 }
 
-void CreditStrategy::applyCreditBetween(const std::string& query, 
-    std::vector<Mapping>& toUpdate, size_t leftAnchor,
+void CreditStrategy::applyCreditBetween(const std::string& querySubstring, 
+    size_t queryOffset, std::vector<Mapping>& toUpdate, size_t leftAnchor,
     size_t rightAnchor) const {
     
     Log::info() << "Applying credit between " << leftAnchor << " and " << 
@@ -70,6 +72,12 @@ void CreditStrategy::applyCreditBetween(const std::string& query,
     
     // How many bases do we want to give credit to?
     size_t unmappedRegionSize = rightAnchor - leftAnchor - 1; 
+    
+    if(querySubstring.size() != unmappedRegionSize + 2) {
+        // Complain we didn't get the right query substring.
+        throw std::runtime_error("Query substring must include the whole "
+            "bubble and two anchor bases.");
+    }
     
     // Make a vector of unmapped mappings for credit from the left.
     std::vector<Mapping> leftMappings(unmappedRegionSize, Mapping());
@@ -80,18 +88,19 @@ void CreditStrategy::applyCreditBetween(const std::string& query,
     // find too many mismatches.
     
     // Do the right-side search
-    breadthFirstSearch(query, rightAnchor, toUpdate[rightAnchor].getLocation(), 
-        unmappedRegionSize, [&](size_t index, TextPosition mappedTo) {
+    breadthFirstSearch(querySubstring, querySubstring.size() - 1, 
+        toUpdate[rightAnchor].getLocation(), unmappedRegionSize, 
+        [&](size_t index, TextPosition mappedTo) {
         
-        // Save every mapping as coming from the right-side search. Make sure to
-        // convert from global to bubble-local coordinates.
-        rightMappings[index - (leftAnchor + 1)] = Mapping(mappedTo);
+        // Save every mapping as coming from the right-side search. Convert from
+        // query substring coordinates to bubble coordinates.
+        rightMappings[index - 1] = Mapping(mappedTo);
     
     });
     
     // Flip the query around. TODO: do this efficiently by using a special DNA
     // string type or soemthing.
-    std::string rcQuery = reverseComplement(query);
+    std::string rcQuery = reverseComplement(querySubstring);
     
     // Get the left starting position, flipped around.
     TextPosition leftFlipped = toUpdate[leftAnchor].getLocation();
@@ -100,7 +109,7 @@ void CreditStrategy::applyCreditBetween(const std::string& query,
         leftFlipped.getContigNumber()));
     
     // Do the left-side search
-    breadthFirstSearch(rcQuery, rcQuery.size() - leftAnchor - 1, leftFlipped, 
+    breadthFirstSearch(rcQuery, rcQuery.size() - 1, leftFlipped, 
         unmappedRegionSize, [&](size_t index, TextPosition mappedTo) {
         
         // Flip around again
@@ -109,8 +118,8 @@ void CreditStrategy::applyCreditBetween(const std::string& query,
             mappedTo.getContigNumber()));
         
         // Save every mapping as coming from the left-side search. Make sure to
-        // convert from global to bubble-local coordinates.
-        leftMappings[index - (leftAnchor + 1)] = Mapping(mappedTo);
+        // convert from query substring to bubble-local coordinates.
+        leftMappings[index - 1] = Mapping(mappedTo);
     
     });
     

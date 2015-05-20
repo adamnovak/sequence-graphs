@@ -26,12 +26,12 @@ public:
         std::vector<Mapping>& toUpdate) const;
     
     /**
-     * Apply credit for mapping the given string, by updating mappings in the
-     * given vector of mappings between the specified mapped positions flanking
-     * an unmapped region.
+     * Apply credit for mapping the given substring of the query, at the given
+     * offset, by updating mappings in the given vector of mappings between the
+     * specified mapped positions flanking an unmapped region.
      */
-    void applyCreditBetween(const std::string& query,
-        std::vector<Mapping>& toUpdate, size_t leftAnchor,
+    void applyCreditBetween(const std::string& querySubstring,
+        size_t queryOffest, std::vector<Mapping>& toUpdate, size_t leftAnchor,
         size_t rightAnchor) const;
         
     /**
