@@ -678,8 +678,8 @@ main(
                 // the forward and reverse versions of merged ranges to agree on
                 // what positions they are assigned when merging, but the view
                 // takes care of that.
-                ZipMappingScheme<FMDPosition>* scheme =
-                    new ZipMappingScheme<FMDPosition>(std::move(view));
+                ZipMappingScheme<FMDPositionGroup>* scheme =
+                    new ZipMappingScheme<FMDPositionGroup>(std::move(view));
                 
                 // Set the parameters from the arguments
                 scheme->minContextLength = options["context"].as<size_t>();
@@ -687,11 +687,15 @@ main(
                 scheme->maxExtendThrough =
                     options["maxExtendThrough"].as<size_t>();
                 scheme->minUniqueStrings = options["minEditBound"].as<size_t>();
+                scheme->mismatchTolerance = options[
+                    "maxEditDistance"].as<size_t>();
                 
                 // Set up credit
                 scheme->credit.enabled = options.count("credit");
                 scheme->credit.maxMismatches =
                     options["mismatches"].as<size_t>();
+                    
+                
                     
                 return (MappingScheme*) scheme;
             } else {
