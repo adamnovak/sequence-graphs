@@ -224,9 +224,6 @@ protected:
                     Log::trace() << "Inserting mismatch at offset " << 
                         searchedCharacters - lastMismatchIndex << std::endl;
                         
-                    if(mismatchOffsets.back() > 10000) {
-                        throw std::runtime_error("Overflow");
-                    }
                 } else {
                     // There are no mismatches before this new one. How many
                     // characters would we have to retract to remove it?
@@ -234,10 +231,6 @@ protected:
                     
                     Log::trace() << "Inserting first mismatch at offset " << 
                         searchedCharacters << std::endl;
-                        
-                    if(mismatchOffsets.back() > 10000) {
-                        throw std::runtime_error("Overflow");
-                    }
                 }
             }
             
@@ -263,10 +256,6 @@ protected:
                     ", mismatchOffsets.front(): " << mismatchOffsets.front() <<
                     std::endl;
                     
-                if(mismatchOffsets.front() > 10000) {
-                    throw std::runtime_error("Overflow in loop");
-                }
-            
                 if(mismatchOffsets.front() > droppedLength) {
                     // If there were more than this many characters left to the
                     // next mismatch, just charge for them.
@@ -280,9 +269,6 @@ protected:
                 }
             }
             
-            if(mismatchOffsets.size() > 0 && mismatchOffsets.front() > 10000) {
-                throw std::runtime_error("Overflow out of loop");
-            }
         }
         
         /**

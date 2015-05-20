@@ -500,7 +500,8 @@ main(
                 
             }
             
-            Log::output() << minContextLengths.size() << " lengths" << std::endl;
+            Log::output() << minContextLengths.size() << " lengths" <<
+                std::endl;
             
             for(size_t contextLength : minContextLengths) {
                 // Output the final length at each base, one per line.

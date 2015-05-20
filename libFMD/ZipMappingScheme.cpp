@@ -451,9 +451,16 @@ std::pair<bool, std::set<TextPosition>>
             if(lastMismatchesUsed > mismatchTolerance) {
                 // This is the first retraction that has few enough mismatches.
         
-                Log::debug() << "Only " << mismatchesUsed << 
-                    " mismatches, down from from " << lastMismatchesUsed << 
-                    " mismatches; comparing entire result sets." << std::endl;
+                if(lastMismatchesUsed == -1) {
+                    Log::debug() << "Only " << mismatchesUsed << 
+                        " mismatches; comparing entire result sets." <<
+                        std::endl;
+                } else {
+                    Log::debug() << "Only " << mismatchesUsed << 
+                        " mismatches, down from from " << lastMismatchesUsed << 
+                        " mismatches; comparing entire result sets." <<
+                        std::endl;
+                }
             
                 // We can accept overlaps because not too many mismatches are
                 // used.
