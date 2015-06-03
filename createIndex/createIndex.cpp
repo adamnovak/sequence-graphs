@@ -678,26 +678,55 @@ main(
                 // the forward and reverse versions of merged ranges to agree on
                 // what positions they are assigned when merging, but the view
                 // takes care of that.
-                ZipMappingScheme<FMDPositionGroup>* scheme =
-                    new ZipMappingScheme<FMDPositionGroup>(std::move(view));
                 
-                // Set the parameters from the arguments
-                scheme->minContextLength = options["context"].as<size_t>();
-                scheme->maxRangeCount = options["maxRangeCount"].as<size_t>();
-                scheme->maxExtendThrough =
-                    options["maxExtendThrough"].as<size_t>();
-                scheme->minUniqueStrings = options["minEditBound"].as<size_t>();
-                scheme->mismatchTolerance = options[
-                    "maxEditDistance"].as<size_t>();
+                if(options["maxEditDistance"].as<size_t>() > 0) {
                 
-                // Set up credit
-                scheme->credit.enabled = options.count("credit");
-                scheme->credit.maxMismatches =
-                    options["mismatches"].as<size_t>();
+                    // Use mismatch tolerance
                     
-                
+                    ZipMappingScheme<FMDPositionGroup>* scheme =
+                        new ZipMappingScheme<FMDPositionGroup>(std::move(view));
                     
-                return (MappingScheme*) scheme;
+                    // Set the parameters from the arguments
+                    scheme->minContextLength = options["context"].as<size_t>();
+                    scheme->maxRangeCount = 
+                        options["maxRangeCount"].as<size_t>();
+                    scheme->maxExtendThrough =
+                        options["maxExtendThrough"].as<size_t>();
+                    scheme->minUniqueStrings =
+                        options["minEditBound"].as<size_t>();
+                    scheme->mismatchTolerance =
+                        options["maxEditDistance"].as<size_t>();
+                    
+                    // Set up credit
+                    scheme->credit.enabled = options.count("credit");
+                    scheme->credit.maxMismatches =
+                        options["mismatches"].as<size_t>();
+                    
+                    return (MappingScheme*) scheme;
+                
+                } else {
+                
+                    // Use mismatch tolerance
+                    ZipMappingScheme<FMDPosition>* scheme =
+                        new ZipMappingScheme<FMDPosition>(std::move(view));
+                    
+                    // Set the parameters from the arguments
+                    scheme->minContextLength = options["context"].as<size_t>();
+                    scheme->maxRangeCount = 
+                        options["maxRangeCount"].as<size_t>();
+                    scheme->maxExtendThrough =
+                        options["maxExtendThrough"].as<size_t>();
+                    scheme->minUniqueStrings =
+                        options["minEditBound"].as<size_t>();
+                    
+                    // Set up credit
+                    scheme->credit.enabled = options.count("credit");
+                    scheme->credit.maxMismatches =
+                        options["mismatches"].as<size_t>();
+                    
+                    return (MappingScheme*) scheme;
+                    
+                }
             } else {
                 // They asked for a mapping scheme we don't have.
                 throw std::runtime_error("Invalid mapping scheme: " +
