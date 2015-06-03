@@ -642,9 +642,18 @@ class AlignmentComparisonTarget(jobTree.scriptTree.target.Target):
         # Now parse the XML output down to the statistics we actually want.
         tree = ElementTree.parse(xml_filename)
         
-        # Grab the nodes with the aggregate results for each direction
-        stats = tree.findall(
-            "./homologyTests/aggregateResults/all")
+        # We need to find, in each direction, the results for "ref" (or whatever
+        # our reference name is) and "aggregate". There wull be one in each
+        # direction.
+        # TODO: Make ref specifiable
+        stats = tree.findall("./homologyTests/homologyPairTests/homologyTest["
+            "(@sequenceA='ref' and @sequenceB='aggregate') or "
+            "(@sequenceB='ref' and @sequenceA='aggregate')]"
+            "/aggregateResults/all")
+            
+        if len(stats) != 2:
+            # We need there to be exactly two of these.
+            raise RuntimeError("Wrong number of homology tests found!")
             
         # Grab and parse the averages. There should be two.
         averages = [float(stat.attrib["average"]) for stat in stats]

@@ -1043,7 +1043,7 @@ writeLastGraph(
     
     // Write each block and each single segment as a node, named with some ID.
 
-    // We need signed IDs for these poitners.
+    // We need signed IDs for these pointers.
     std::map<void*, int64_t> blockSegmentIds;
     
     // Start scanning the threadset again

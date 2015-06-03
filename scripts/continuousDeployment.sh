@@ -52,7 +52,7 @@ do
         # --refGenome ref and --noAncestors, but apparently those aren't allowed
         # for some reason?
         hal2sg "${CACTUS_HAL}" "${REGION_OUT_DIR}/cactus/database.fa" \
-            "${REGION_OUT_DIR}/cactus/database.sql"
+            "${REGION_OUT_DIR}/cactus/database.sql" --onlySequenceNames
             
     else
         echo "No Cactus results available for ${REGION}"
@@ -70,7 +70,7 @@ do
         
         # Fill it up with the generated database
         hal2sg "${CAMEL_HAL}" "${REGION_OUT_DIR}/camel/database.fa" \
-            "${REGION_OUT_DIR}/camel/database.sql"
+            "${REGION_OUT_DIR}/camel/database.sql" --onlySequenceNames
     
     else
         echo "No Camel results available for ${REGION}"

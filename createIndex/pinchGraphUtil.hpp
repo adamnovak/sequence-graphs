@@ -182,6 +182,27 @@ writeAlignmentFasta(
  *
  * Takes the thread set, and a file to save to.
  *
+ * The format begins with a tab-separated header line.
+ *
+ * <node count>\t<sequences (always 0)>\t<kmer length used (always 0)>\t<unknown
+ * (always 0)>
+ *
+ * It then has NODE stanzas for each segment/node in the graph.
+ *
+ * NODE\t<ID>\t<length>\t<total bp merged into node>
+ * <forward sequence of combined kmers for node>
+ * <reverse sequence of combined kmers for node>
+ *
+ * Note that if k were nonzero, these sequences wouldn't be expected to be
+ * proper reverse complements of each other. Also note that they are always
+ * output as all Ns at the moment.
+ *
+ * Finally, there are ARC lines, between node IDs. The IDs are negated to
+ * indicate the "wrong" sides of the relevant nodes (left side as the first
+ * node, or right side as the second).
+ *
+ * ARC\t<(-)node 1>\t<(-)node 2>
+ *
  * TODO: needs a way to get the sequence bases.
  */
 void
