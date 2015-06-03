@@ -80,11 +80,11 @@ class GraphGenerationTarget(SchemeUsingTarget):
             ("zip", 20, 4, None, 100, 2),
             ("zip", 20, 5, None, 100, 2),
             # And with 1-mismatch tolerance and credit
-            ("zip", 20, 1, 1, 100, 2),
-            ("zip", 20, 2, 1, 100, 2),
-            ("zip", 20, 3, 1, 100, 2),
-            ("zip", 20, 4, 1, 100, 2),
-            ("zip", 20, 5, 1, 100, 2)
+            #("zip", 20, 1, 1, 100, 2),
+            #("zip", 20, 2, 1, 100, 2),
+            #("zip", 20, 3, 1, 100, 2),
+            #("zip", 20, 4, 1, 100, 2),
+            #("zip", 20, 5, 1, 100, 2)
         ])
         
     def run(self):
