@@ -643,13 +643,12 @@ class AlignmentComparisonTarget(jobTree.scriptTree.target.Target):
         tree = ElementTree.parse(xml_filename)
         
         # We need to find, in each direction, the results for "ref" (or whatever
-        # our reference name is) and "aggregate". There wull be one in each
-        # direction.
-        # TODO: Make ref specifiable
-        stats = tree.findall("./homologyTests/homologyPairTests/homologyTest["
-            "(@sequenceA='ref' and @sequenceB='aggregate') or "
-            "(@sequenceB='ref' and @sequenceA='aggregate')]"
-            "/aggregateResults/all")
+        # our reference name is) and "aggregate". There will be one in each
+        # direction. Note that ElementTree doesn't let you use an and in the
+        # brackets; you have to have two sets of brackets. TODO: Make ref
+        # specifiable
+        stats = tree.findall("./homologyTests/homologyPairTests/homologyTest"
+            "[@sequenceA='ref'][@sequenceB='aggregate']/aggregateResults/all")
             
         if len(stats) != 2:
             # We need there to be exactly two of these.
