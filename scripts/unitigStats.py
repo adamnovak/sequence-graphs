@@ -26,7 +26,7 @@ Note that the + line for qualities will not contain the same header information.
 """
 
 import argparse, sys, os, os.path, random, subprocess, shutil, itertools, glob
-import doctest, zlib
+import doctest, zlib, time
 
 import Bio.SeqIO
 
@@ -141,6 +141,10 @@ def parse_mag(stream):
     """
     Yield MAG records from the given (possibly compressed) FASTQ stream.
     
+    Yields records of the form [[left end id, right end id], read count,
+    [[left end overlap end, left end overlap length], ...], 
+    [[right end overlap end, right end overlap length], ...], sequence]
+    
     """
     
     for fastq_record in Bio.SeqIO.parse(stream, "fastq"):
@@ -149,6 +153,33 @@ def parse_mag(stream):
         # Parse the header line
         parts = fastq_record.description.split("\t")
         
+        # Parse the ends
+        parts[0] = [int(end_id) for end_id in parts[0].split(":")]
+        
+        # Parse the read count
+        parts[1] = int(parts[1])
+        
+        # Parse the overlaps
+        for i in xrange(2,4):
+            # We have left end and right end overlaps we want to treat the same
+            # way
+            if parts[i] == ".":
+                # This means no overlaps
+                parts[i] = []
+            else:
+                # There are some overlaps
+                
+                # Grab the ;-terminated overlaps
+                overlaps = parts[i].split(";")[:-1]
+                
+                # Split each overlap on the comma, and int the parts
+                parts[i] = [[int(x) for x in overlap.split(",")]
+                    for overlap in overlaps]
+                    
+        # Stick in the sequence
+        parts.append(fastq_record.seq)
+        
+        # We've filled in the fields here, so we can spit this out.
         yield parts
     
 def main(args):
@@ -164,8 +195,33 @@ def main(args):
     
     options = parse_args(args) # This holds the nicely-parsed options object
     
+    # We want the average unitig length, so we need to track these totals.
+    total_length = 0
+    total_unitigs = 0
+    
+    # We want to know how fast we read stuff
+    last_time = time.clock()
+    # How many records per reporting period?
+    interval = 1000
+    
     for record in parse_mag(TransparentUnzip(options.in_file)):
-        print(record)
+        # Add each unitig to the totals
+        total_unitigs += 1
+        total_length += len(record[4])
+        
+        if total_unitigs % interval == 0:
+            # We should print status
+            
+            # What time is it? How long have we been working?
+            now_time = time.clock()
+            elapsed = now_time - last_time
+            last_time = now_time
+        
+            print("Processed {} unitigs, {} per second".format(total_unitigs,
+                interval / elapsed))
+        
+    print("Average unitig length: {}".format(total_length / 
+        float(total_unitigs)))
     
 
 if __name__ == "__main__" :
