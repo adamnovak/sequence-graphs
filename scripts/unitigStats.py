@@ -87,28 +87,20 @@ class TransparentUnzip(object):
         Return the next line with trailing "/n", or "" if there is no next line.
         """
         
-        print("Buffered: {} bytes".format(len(self.line_buffer)))
-        
         # See if we have a line to spit out
         newline_index = self.line_buffer.find("\n")
         
         if newline_index == -1:
             # No line is in the buffer
-            print("No line")
-            
             # Go get more data from the stream (in 16 k blocks)
             compressed = self.stream.read(16 * 2 ** 10)
             
-            #print("Compressed: {}".format(compressed))
-            
             if compressed == "":
-                print("No compressed data")
                 if self.decompressor is not None:
                     # No mor einput data; flush out the output data.
                     self.line_buffer += self.decompressor.flush()
                     self.decompressor = None
                     # Spit out a line from that
-                    print("Flushed decompressor")
                     return self.readline()
                 
                 # We didn't find a newline, and there's no more data, and
@@ -129,9 +121,6 @@ class TransparentUnzip(object):
                 # compressed.
                 decompressed = compressed
             
-            print("Got {} bytes compressed, {} bytes expanded".format(
-                len(compressed), len(decompressed)))
-            
             # Stick it in the buffer
             self.line_buffer += decompressed
             
@@ -139,7 +128,6 @@ class TransparentUnzip(object):
             return self.readline()
         
         else:
-            print("Returning line")
             # We have a line. Grab it.
             line = self.line_buffer[0:newline_index + 1]
             
