@@ -363,8 +363,6 @@ def process_overlaps(overlaps, longest_overlap, novel_sequence_side,
         # If there are none on this end we'll just skip the whole loop
     
         if not sides_by_endpoint.has_key(endpoint):
-            print("Cound not register overlap to nonexistent endpoint "
-                "{}".format(endpoint))
             # Skip all the overlaps with things that don't exist yet.
             continue 
             
@@ -400,16 +398,12 @@ def get_merged_side(longest_overlap, novel_sequence_side, in_from_endpoint,
     if longest_overlap[1] == 0:
         # No bases are overlapped
         
-        print("{} bp in is on new sequence".format(in_from_endpoint))
-        
         # We're counting from the end of the novel sequence, and we need to wind
         # it inwards.
         return novel_sequence_side.add_local_offset(-in_from_endpoint)
     elif longest_overlap[1] <= in_from_endpoint:
         # We need to be in the newly added sequence, because we are further in
         # than the longest overlap.
-        
-        print("{} bp in is on new sequence".format(in_from_endpoint))
         
         # We need to walk in the difference between the longest overlap and the
         # offset we wanted.
@@ -419,9 +413,6 @@ def get_merged_side(longest_overlap, novel_sequence_side, in_from_endpoint,
         # We want a distance in from the endpoint less than the longest overlap,
         # so the answer is going to be in the sequence that provided the longest
         # overlap.
-    
-        print("{} bp in is merged to sequence {}".format(in_from_endpoint,
-            sides_by_endpoint[longest_overlap[0]].sequence_id))
     
         # How many bases do we have to go into the sequence we are joining
         # onto?
@@ -492,10 +483,6 @@ def main(args):
         
         # There is any novel sequence here
         graph.add_sequence(sequence_id, sequence_length)
-        
-        print("Sequence {} = {}:{} has {} bp novel, {} bp left overlap, "
-            "{} bp right overlap".format(sequence_id, ends[0], ends[1],
-            sequence_length, max_left_overlap[1], max_right_overlap[1]))
         
         # Define the sequence left and right Sides
         sequence_left_side = Side(sequence_id, 0, False)
