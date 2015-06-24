@@ -50,7 +50,7 @@ def parse_args(args):
         formatter_class=argparse.RawDescriptionHelpFormatter)
     
     # General options
-    parser.add_argument("in_file", type=argparse.FileType("r"),
+    parser.add_argument("in_file", nargs="?", type=argparse.FileType("r"),
         default=sys.stdin,
         help="MAG-format file of the unitig graph to read")
     
@@ -82,6 +82,10 @@ class TransparentUnzip(object):
         # We need to do lines ourselves, so we need to keep a buffer
         self.line_buffer = ""
         
+        # Track out throughput
+        self.compressed_bytes = 0
+        self.uncompressed_bytes = 0
+        
     def readline(self):
         """
         Return the next line with trailing "/n", or "" if there is no next line.
@@ -94,6 +98,9 @@ class TransparentUnzip(object):
             # No line is in the buffer
             # Go get more data from the stream (in 16 k blocks)
             compressed = self.stream.read(16 * 2 ** 10)
+            
+            # Track the amount read
+            self.compressed_bytes += len(compressed)
             
             if compressed == "":
                 if self.decompressor is not None:
@@ -108,6 +115,9 @@ class TransparentUnzip(object):
                 line = self.line_buffer
                 # Clear the buffer so next time we return "" as desired.
                 self.line_buffer = ""
+                
+                # Track the uncompressed bytes
+                self.uncompressed_bytes += len(line)
                 
                 return line
                 
@@ -134,8 +144,26 @@ class TransparentUnzip(object):
             # Pop it off
             self.line_buffer = self.line_buffer[newline_index + 1:]
             
+            # Track the uncompressed bytes
+            self.uncompressed_bytes += len(line)
+            
             # Return it
             return line
+            
+    def start_stats(self):
+        """
+        Reset byte stat tracking
+        """
+        
+        self.compressed_bytes = 0
+        self.uncompressed_bytes = 0
+        
+    def get_stats(self):
+        """
+        Return the number of compressed, uncompressed bytes processed.
+        """
+        
+        return self.compressed_bytes, self.uncompressed_bytes        
         
 def parse_mag(stream):
     """
@@ -181,6 +209,109 @@ def parse_mag(stream):
         
         # We've filled in the fields here, so we can spit this out.
         yield parts
+
+class Sequence(object):
+    """
+    Represents a piece of sequence in a side graph.
+    
+    """
+    
+    def __init__(self, sequence_id, length):
+        """
+        Make a new sequence with the given ID of the given length.
+        """
+        
+        # Save the arguments
+        self.id = sequence_id
+        self.length = length
+   
+class Side(object):
+    """
+    Represents an oriented position on a Sequence.
+    """
+    
+    def __init__(self, sequence_id, offset, is_right):
+        """
+        Make a new Position on the given Sequence, at the given base offset, and
+        either on the left or right face of that base as specified.
+        
+        """
+        
+        # Save the arguments
+        self.sequence_id = sequence_id
+        self.offset = offset
+        self.is_right = is_right
+        
+class Join(object):
+    """
+    Represents an adjacency between two Sides.
+    """
+    
+    def __init__(self, side1, side2):
+        """
+        Make a new Join between the given Sides.
+        
+        """
+        
+        # Make a set of the sides.
+        self.sides = set([side1, side2])
+        
+class SideGraph(object):
+    """
+    Represents a side graph composed of sequences and joins.
+    """
+    
+    def __init__(self):
+        """
+        Make a new empty side graph.
+        """
+        
+        # Hold sequences by ID
+        self.sequences = {}
+        
+        # Hold joins indexed by each of their sequences
+        self.joins_by_sequence = collections.defaultdict(list)
+    
+    def add_sequence(self, sequence_id, length):
+        """
+        Add a new sequence to the graph.
+        
+        """
+        
+        # Make and add the sequence
+        self.sequences[sequence_id] = Sequence(sequence_id, length)
+        
+    def add_join(self, side1, side2):
+        """
+        Add a join between the two given sides.
+        
+        """
+        
+        # Make the join
+        join = Join(side1, side2)
+        
+        # Insert it in the list under the sequence IDs
+        self.joins_by_sequence[side1.sequence_id].append(join)
+        self.joins_by_sequence[side2.sequence_id].append(join)
+        
+def get_max_overlap(overlaps, sides_by_endpoint):
+    """
+    Get the max overlap form any of the (endpoint, overlap) pairs that
+    corresponds to an existing sequence.
+    """
+    
+    # The max is of course no overlap to start
+    max_overlap = 0
+    
+    for endpoint, overlap in overlaps:
+        # For every overlap instance, we have to see if it's to a thing we have
+        # already.
+        if sides_by_endpoint.has_key(endpoint):
+            # This is to an existing sequence.
+            max_overlap = max(max_overlap, overlap)
+            
+    return max_overlap
+    
     
 def main(args):
     """
@@ -199,15 +330,70 @@ def main(args):
     total_length = 0
     total_unitigs = 0
     
+    # We need to build a side graph in memory.
+    graph = SideGraph()
+    
+    # Keep track of MAG endpoint numbers. This maps endpoint numbers to where
+    # they fall in the graph. It's not necessary to keep more than one, because
+    # when you come along overlapping an endpoint, we just need a Join from that
+    # endpoint to the part of your sequence not doing any overlap.
+    sides_by_endpoint = {}
+    
     # We want to know how fast we read stuff
     last_time = time.clock()
     # How many records per reporting period?
-    interval = 1000
+    interval = 10000
     
-    for record in parse_mag(TransparentUnzip(options.in_file)):
+    # Grab a handle to this so we can track bytes
+    expander = TransparentUnzip(options.in_file)
+    expander.start_stats()
+    
+    for ends, _, left_overlaps, right_overlaps, seq in parse_mag(expander):
+        # Unpack each unitig
+        
         # Add each unitig to the totals
         total_unitigs += 1
-        total_length += len(record[4])
+        total_length += len(seq)
+        
+        # Compute how much of its sequence is not overlapped with existing
+        # nodes.
+        max_left_overlap = max_overlap(left_overlaps, sides_by_endpoint)
+        max_right_overlap = max_overlap(right_overlaps, sides_by_endpoint)
+        
+        # Add in the novel sequence
+        sequence_id = total_unitigs
+        sequence_length = len(seq) - max_left_overlap - max_right_overlap
+        if sequence_length > 0:
+            # There is any novel sequence here
+            graph.add_sequence(sequence_id, sequence_length)
+            
+            # Define the sequence left and right Sides
+            sequence_left = Side(sequence_id, 0, False)
+            sequence_right = Side(sequence_id, sequence_length - 1, True)
+        
+        # Add in the joins for the overlaps.
+        for endpoint, overlap in left_overlaps:
+            # First the left ones
+            if overlap == max_left_overlap:
+                # This is easy, it goes to the end of our sequence
+                graph.add_join(sides_by_endpoint[endpoint], sequence_left)
+            else:
+                # Translate all the shorter ones to Sides on the sequence
+                # associated with the longer overlap, by walking the Side for
+                # the most overlapped endpoint inwards by the difference in
+                # overlap.
+                raise "TODO"
+                
+        for endpoint, overlap in right_overlaps:
+            # Then the right ones
+            if overlap == max_right_overlap:
+                # This is easy, it goes to the end of our sequence
+                graph.add_join(sides_by_endpoint[endpoint], sequence_right)
+            else:
+                raise "TODO"
+                
+        # Add the Sides for the endpoints of this sequence
+        
         
         if total_unitigs % interval == 0:
             # We should print status
@@ -216,9 +402,16 @@ def main(args):
             now_time = time.clock()
             elapsed = now_time - last_time
             last_time = now_time
+            
+            # How many bytes did we process
+            compressed_bytes, uncompressed_bytes = expander.get_stats()
+            expander.start_stats()
         
-            print("Processed {} unitigs, {} per second".format(total_unitigs,
-                interval / elapsed))
+            print("Processed {} unitigs, {:.2f} per second, "
+                "{:.2f} kbps/{:.2f} kbps".format(
+                total_unitigs, interval / elapsed,
+                compressed_bytes / elapsed / 1000,
+                uncompressed_bytes / elapsed / 1000))
         
     print("Average unitig length: {}".format(total_length / 
         float(total_unitigs)))
