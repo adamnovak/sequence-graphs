@@ -77,7 +77,7 @@ class TransparentUnzip(object):
         
         # Make a decompressor with the accept a gzip header flag.
         # See <http://stackoverflow.com/a/22311297/402891>
-        self.decompressor = zlib.decompressobj(zlib.MAX_WBITS | 0x20)
+        self.decompressor = zlib.decompressobj(zlib.MAX_WBITS + 16)
         
         # We need to do lines ourselves, so we need to keep a buffer
         self.line_buffer = ""
@@ -121,8 +121,13 @@ class TransparentUnzip(object):
                 
             # Otherwise we found more data
             
-            # Decompress each block if needed
-            decompressed = self.decompressor.decompress(compressed)
+            try:
+                # Decompress each block if needed
+                decompressed = self.decompressor.decompress(compressed)
+            except zlib.error:
+                # Just skip decompressing; it's probably not actually
+                # compressed.
+                decompressed = compressed
             
             print("Got {} bytes compressed, {} bytes expanded".format(
                 len(compressed), len(decompressed)))
