@@ -63,54 +63,87 @@ def parse_args(args):
 class TransparentUnzip(object):
     """
     A class that represents a transparently-un-gzipping stream.
+    
+    Right now only supports readline
     """
     
     def __init__(self, stream):
         """
         Encapsulate the given stream in an unzipper.
         """
-    
-def transparent_unzip(stream):
-    """
-    Un-gzip a stream, if necessary, and yield the lines from it.
-    """
-    
-    # Make a decompressor with the accept a gzip header flag.
-    # See <http://stackoverflow.com/a/22311297/402891>
-    decompressor = zlib.decompressobj(zlib.MAX_WBITS | 0x20)
-    
-    # Because gzip chunks may not actually have anything to do with line
-    # boundaries, we need to do our own line splitting. Which means we need a
-    # line buffer. See <https://gist.github.com/beaufour/4205533>
-    line_buffer = ""
-    
-    while True:
+        
+        # Keep the stream
+        self.stream = stream
+        
+        # Make a decompressor with the accept a gzip header flag.
+        # See <http://stackoverflow.com/a/22311297/402891>
+        self.decompressor = zlib.decompressobj(zlib.MAX_WBITS | 0x20)
+        
+        # We need to do lines ourselves, so we need to keep a buffer
+        self.line_buffer = ""
+        
+    def readline(self):
+        """
+        Return the next line with trailing "/n", or "" if there is no next line.
+        """
+        
+        print("Buffered: {} bytes".format(len(self.line_buffer)))
+        
         # See if we have a line to spit out
-        newline_index = line_buffer.find("\n")
+        newline_index = self.line_buffer.find("\n")
         
         if newline_index == -1:
+            # No line is in the buffer
+            print("No line")
+            
             # Go get more data from the stream (in 16 k blocks)
-            compressed = stream.read(16 * 2 ** 10)
+            compressed = self.stream.read(16 * 2 ** 10)
+            
+            #print("Compressed: {}".format(compressed))
             
             if compressed == "":
-                # We didn't find a newline, and there's no more data.
-                # Yield what we have and quit.
-                yield line_buffer
-                break
+                print("No compressed data")
+                if self.decompressor is not None:
+                    # No mor einput data; flush out the output data.
+                    self.line_buffer += self.decompressor.flush()
+                    self.decompressor = None
+                    # Spit out a line from that
+                    print("Flushed decompressor")
+                    return self.readline()
+                
+                # We didn't find a newline, and there's no more data, and
+                # nothing to flush. Take what we have (with no trailing \n)
+                line = self.line_buffer
+                # Clear the buffer so next time we return "" as desired.
+                self.line_buffer = ""
+                
+                return line
+                
+            # Otherwise we found more data
             
             # Decompress each block if needed
-            decompressed = decompressor.decompress(compressed)
+            decompressed = self.decompressor.decompress(compressed)
+            
+            print("Got {} bytes compressed, {} bytes expanded".format(
+                len(compressed), len(decompressed)))
             
             # Stick it in the buffer
-            line_buffer += decompressed
+            self.line_buffer += decompressed
+            
+            # Try again
+            return self.readline()
         
         else:
-            # We have a line. Yield it.
-            yield line_buffer[0:newline_index + 1]
+            print("Returning line")
+            # We have a line. Grab it.
+            line = self.line_buffer[0:newline_index + 1]
             
             # Pop it off
-            line_buffer = line_buffer[newline_index + 1:]
-    
+            self.line_buffer = self.line_buffer[newline_index + 1:]
+            
+            # Return it
+            return line
+        
 def parse_mag(stream):
     """
     Yield MAG records from the given (possibly compressed) FASTQ stream.
@@ -138,8 +171,8 @@ def main(args):
     
     options = parse_args(args) # This holds the nicely-parsed options object
     
-    for record in parse_mag(transparent_unzip(options.in_file)):
-        print record
+    for record in parse_mag(TransparentUnzip(options.in_file)):
+        print(record)
     
 
 if __name__ == "__main__" :
