@@ -29,8 +29,7 @@ import argparse, sys, os, os.path, random, subprocess, shutil, itertools, glob
 import doctest, zlib, time, collections, hashlib
 
 import Bio.SeqIO
-import Bio.SeqRecord
-import sqlite3
+import networkx
 
 
 def parse_args(args):
@@ -52,13 +51,9 @@ def parse_args(args):
         formatter_class=argparse.RawDescriptionHelpFormatter)
     
     # General options
-    parser.add_argument("--in_file", type=argparse.FileType("r"),
+    parser.add_argument("in_file", type=argparse.FileType("r"),
         default=sys.stdin,
         help="MAG-format file of the unitig graph to read")
-    parser.add_argument("database",
-        help="Database filename to write")
-    parser.add_argument("fasta",
-        help="FASTA filename to write")
     
     # The command line arguments start with the program name, which we don't
     # want to treat as an argument for argparse. So we remove it.
@@ -215,391 +210,6 @@ def parse_mag(stream):
         
         # We've filled in the fields here, so we can spit this out.
         yield parts
-
-class Sequence(object):
-    """
-    Represents a piece of sequence in a side graph.
-    
-    """
-    
-    def __init__(self, sequence_id, length):
-        """
-        Make a new sequence with the given ID of the given length.
-        """
-        
-        # Save the arguments
-        self.id = sequence_id
-        self.length = length
-   
-class Side(object):
-    """
-    Represents an oriented position on a Sequence.
-    """
-    
-    def __init__(self, sequence_id, offset, is_right):
-        """
-        Make a new Position on the given Sequence, at the given base offset, and
-        either on the left or right face of that base as specified.
-        
-        """
-        
-        # Save the arguments
-        self.sequence_id = sequence_id
-        self.offset = offset
-        self.is_right = is_right
-        
-    def add_local_offset(self, offset):
-        """
-        Produce a new Side by moving this Side the specified number of bases
-        outward along its strand.
-        """
-        
-        if not self.is_right:
-            # If we're a left side, outward is negative. 
-            offset = -offset
-        
-        return Side(self.sequence_id, self.offset + offset, self.is_right)
-        
-    def flip(self):
-        """
-        Produce a new Side for the opposite side of this Side's base.
-        """
-        
-        return Side(self.sequence_id, self.offset, not self.is_right)
-        
-    def __repr__(self):
-        """
-        Return a string representation of this Side.
-        """
-        
-        return "Side({}, {}, {})".format(self.sequence_id, self.offset,
-            self.is_right)
-            
-    def __lt__(self, other):
-        """
-        Return ture if this Side is less than the other one, and false
-        otherwise.
-        """
-        
-        if self.sequence_id < other.sequence_id:
-            return True
-        if self.sequence_id > other.sequence_id:
-            return False
-        
-        # IDs must be equal    
-        
-        if self.offset < other.offset:
-            return True
-        if self.offset > other.offset:
-            return False
-            
-        # Offsets must be equal
-            
-        if self.is_right < other.is_right:
-            return True
-        if self.is_right > other.is_right:
-            return False
-            
-        # Must be equal
-        return False
-        
-class Join(object):
-    """
-    Represents an adjacency between two Sides.
-    """
-    
-    def __init__(self, side1, side2):
-        """
-        Make a new Join between the given Sides.
-        
-        """
-        
-        # Make a set of the sides.
-        self.sides = set([side1, side2])
-        
-class SideGraph(object):
-    """
-    Represents a side graph composed of sequences and joins.
-    """
-    
-    def __init__(self):
-        """
-        Make a new empty side graph.
-        """
-        
-        # Hold sequences by ID
-        self.sequences = {}
-        
-        # Hold joins indexed by each of their sequences
-        self.joins_by_sequence = collections.defaultdict(list)
-    
-    def add_sequence(self, sequence_id, length, sequence):
-        """
-        Add a new sequence to the graph. Takes the ID, the length, and the
-        bases (as a BioPython Seq object).
-        
-        """
-        
-        # Make and add the sequence
-        self.sequences[sequence_id] = Sequence(sequence_id, length)
-        
-    def add_join(self, side1, side2):
-        """
-        Add a join between the two given sides.
-        
-        """
-        
-        # Make the join
-        join = Join(side1, side2)
-        
-        print("Joining {} to {}".format(side1, side2))
-        
-        # Insert it in the list under the sequence IDs
-        self.joins_by_sequence[side1.sequence_id].append(join)
-        self.joins_by_sequence[side2.sequence_id].append(join)
-        
-class DatabaseSideGraph(object):
-    """
-    A side graph backed by a database.
-    
-    TODO: just pull in the GA4GH server code?
-    """
-    
-    def __init__(self, database_filename, fasta_filename):
-        """
-        Make a new side graph, writing to the given sqlite database and FASTA
-        file.
-        
-        TODO: reading.
-        """
-        
-        try:
-            # Delete the database
-            os.unlink(database_filename)
-        except OSError:
-            # It might not exist
-            pass
-        
-        # Connect to the database
-        self.database = sqlite3.connect(database_filename)
-        
-        # Open the FASTA file for writing
-        self.fasta = open(fasta_filename, "w")
-        
-        # Set up the database. Copied from Maciek's schema
-        self.database.executescript("""
-        CREATE TABLE FASTA (ID INTEGER PRIMARY KEY,
-	        fastaURI TEXT NOT NULL);
-        --
-        --
-        -- Sequences and joins - basis of graph topology
-        --
-        CREATE TABLE Sequence (ID INTEGER PRIMARY KEY,
-	        fastaID INTEGER NOT NULL REFERENCES FASTA(ID), -- the FASTA file that contains this sequence's bases.
-	        sequenceRecordName TEXT NOT NULL, -- access to the sequence bases in the FASTA file ONLY.
-	        md5checksum TEXT NOT NULL, -- checksum of the base sequence as found in the FASTA record.
-	        length INTEGER NOT NULL); -- length of the base sequence as found in the FASTA record.
-        --
-        --
-        CREATE TABLE GraphJoin (ID INTEGER PRIMARY KEY,
-	        --
-	        -- by convention, side1 < side2 in the lexicographic ordering defined by (sequenceID, position, forward).
-	        --
-	        side1SequenceID INTEGER NOT NULL REFERENCES Sequence(ID),
-	        side1Position INTEGER NOT NULL, -- 0 based indexing, counting from 5' end of sequence.
-	        side1StrandIsForward BOOLEAN NOT NULL, -- true if this side joins to 5' end of the base
-	        -- 
-	        side2SequenceID INTEGER NOT NULL REFERENCES Sequence(ID),
-	        side2Position INTEGER NOT NULL,
-	        side2StrandIsForward BOOLEAN NOT NULL);
-        """)
-        
-        # Add a FASTA file entry for our FASTA
-        self.database.execute("INSERT INTO FASTA VALUES (0, ?);", (
-            fasta_filename,))
-        
-    
-    def add_sequence(self, sequence_id, length, sequence):
-        """
-        Add a new sequence to the graph. Takes the ID, the length, and the
-        bases (as a BioPython Seq object).
-        
-        Sequence ID must be an int.
-        
-        """
-        
-        #print("Adding {} length {}".format(sequence_id, length))
-        
-        # Slap an ID on the sequence and write it to the FASTA
-        Bio.SeqIO.write(Bio.SeqRecord.SeqRecord(sequence, str(sequence_id)),
-            self.fasta, "fasta")
-        
-        # Hash the sequence
-        hasher = hashlib.md5()
-        hasher.update(str(sequence))
-        md5sum = hasher.hexdigest()
-        
-        
-        # Put it in the database, pointing to FASTA 0
-        self.database.execute("INSERT INTO Sequence VALUES (?, 0, ?, ?, ?);",
-            (sequence_id, str(sequence_id), md5sum, len(sequence))) 
-        
-        
-    def add_join(self, side1, side2):
-        """
-        Add a join between the two given sides.
-        
-        """
-        
-        #print("Adding {} -- {}".format(side1, side2))
-        
-        if side1 > side2:
-            # Flip around
-            side1, side2 = side2, side1
-        
-        # Stick it in the database. Don't put a primary key; we will get one for
-        # free.
-        self.database.execute("INSERT INTO GraphJoin(side1SequenceID, "
-            "side1Position, side1StrandIsForward, side2SequenceID, "
-            "side2Position, side2StrandIsForward) VALUES (?, ?, ?, ?, ?, ?);",
-            (side1.sequence_id, side1.offset, not side1.is_right,
-            side2.sequence_id, side2.offset, not side2.is_right))
-            
-        
-def get_max_overlap(overlaps, sides_by_endpoint):
-    """
-    Get the max overlap form any of the (endpoint, overlap) pairs that
-    corresponds to an existing sequence. Returns (endpoint, overlap). If there
-    is no such overlap, returns (None, 0).
-    """
-    
-    # The max is of course no overlap to start
-    best = (None, 0)
-    
-    for endpoint, overlap in overlaps:
-        # For every overlap instance, we have to see if it's to a thing we have
-        # already.
-        if sides_by_endpoint.has_key(endpoint):
-            # This is to an existing sequence.
-            
-            if best[0] is None or best[1] < overlap:
-                # We have a new best pair
-                best = (endpoint, overlap)
-            
-    return best
-
-
-def process_overlaps(overlaps, longest_overlap, novel_sequence_side,
-    sides_by_endpoint, graph):
-    """
-    Given a set of overlap (endpoint, length) tuples, the tuple out of these
-    that is the longest while still pointing to an endpoint registered in the
-    endpoint-to-sides dict, the Side of the newly added sequence that joins
-    directly to that maximally-overlapping endpoint, the endpoints-to-sides
-    dict, and the graph we are building, make all the joins in the graph to
-    express the overlaps to endpoints that have been created already.
-    
-    """
-    
-    for endpoint, overlap in overlaps:
-        # For all the overlaps...
-        # If there are none on this end we'll just skip the whole loop
-    
-        if not sides_by_endpoint.has_key(endpoint):
-            # Skip all the overlaps with things that don't exist yet.
-            continue 
-            
-        # How many bases do we have to go into the sequence we are joining
-        # onto by the longest overlap?
-        overlap_offset = longest_overlap[1] - overlap
-        
-        if(overlap_offset == 0 and novel_sequence_side is None):
-            # We can't connect here if there is no novel sequence.
-            print("Skipping join from end {} to non-existent novel "
-                "sequence".format(endpoint))
-            continue
-        
-        # Get the side we should be welding to at the distance into the newly
-        # added record for this overlap.
-        stand_in_side = get_merged_side(longest_overlap, novel_sequence_side,
-            overlap, sides_by_endpoint)
-        
-        # Attach to it
-        graph.add_join(sides_by_endpoint[endpoint], stand_in_side)
-        
-    # Now we have added joins to the end of the novel sequence for all the
-    # longest overlaps, and to the designated merged-into sequence for shorter
-    # overlaps.
-    
-def get_merged_side(longest_overlap, novel_sequence_side, in_from_endpoint,
-    sides_by_endpoint):
-    """
-    Given the longest overlap (endpoint, overlap) tuple for the appropriate end
-    of an added sequence, the end Side of the added novel sequence for that end,
-    the distance in from the endpoint of the record that produced the novel
-    sequence, and the endpoint-to-side dict, get the outward-faceing Side for
-    the given distance in from the *endpoint* of the record that produced the
-    newly added sequence (even if that Side is on a base that has been merged in
-    elsewhere due to the longer overlap).
-    
-    """
-    
-    if longest_overlap[1] == 0:
-        # No bases are overlapped
-        
-        # We're counting from the end of the novel sequence, and we need to wind
-        # it inwards.
-        return novel_sequence_side.add_local_offset(-in_from_endpoint)
-        
-        # TODO: Is it required that we have novel sequence here? Or maybe it was
-        # all eaten by the other overlap.
-    elif longest_overlap[1] == in_from_endpoint:
-        # We have to connect up to the thing the longest overlap is connected up
-        # to.
-        
-        if novel_sequence_side is None:
-            # We would have to go find the opposing overlap (assuming there is
-            # one) and go join up in there. We'll just skip it and hope that the
-            # transitive overlap is properly represented.
-            raise Exception("Can't attach to the opposing overlap")
-        else:
-            # We do have a novel sequence, so we know what to attach to.
-            return novel_sequence_side
-        
-    elif longest_overlap[1] < in_from_endpoint:
-        # We need to be in the newly added sequence, because we are further in
-        # than the longest overlap.
-        
-        if novel_sequence_side is None:
-            # We have no novel sequence. This is a problem.
-            raise Exception("Can't attach inside the nonexistent novel "
-                "sequence")
-        
-        else:
-            # We have some novel sequence, and this is in it.
-            
-            # We need to walk in the difference between the longest overlap and
-            # the offset we wanted.
-            return novel_sequence_side.add_local_offset(longest_overlap[1] -
-                in_from_endpoint)
-    else:
-        # We want a distance in from the endpoint less than the longest overlap,
-        # so the answer is going to be in the sequence that provided the longest
-        # overlap.
-    
-        # How many bases do we have to go into the sequence we are joining
-        # onto?
-        overlap_offset = longest_overlap[1] - in_from_endpoint
-        
-        # We need to go one or more bases into the sequence we
-        # overlapped onto.
-        
-        # This Side stands in for the Side that we wanted to attach to, which is
-        # off the end of the new Sequence. First we flip the Side we officially
-        # merged to, and then (having counted switching to it as a base) we walk
-        # in the remainder of the offset.
-        return sides_by_endpoint[longest_overlap[0]].flip().add_local_offset(
-            overlap_offset - 1)
     
 def main(args):
     """
@@ -618,14 +228,8 @@ def main(args):
     total_length = 0
     total_unitigs = 0
     
-    # We need to build a side graph in a database.
-    graph = DatabaseSideGraph(options.database, options.fasta)
-    
-    # Keep track of MAG endpoint numbers. This maps endpoint numbers to where
-    # they fall in the graph. It's not necessary to keep more than one, because
-    # when you come along overlapping an endpoint, we just need a Join from that
-    # endpoint to the part of your sequence not doing any overlap.
-    sides_by_endpoint = {}
+    # Let's build an overlap graph between ends
+    graph = networkx.Graph()
     
     # We want to know how fast we read stuff
     last_time = time.clock()
@@ -642,6 +246,23 @@ def main(args):
         # Add each unitig to the totals
         total_unitigs += 1
         total_length += len(seq)
+        
+        # Add the sequence edge to the graph, annotating it with properties
+        graph.add_edge(ends[0], ends[1], {"type": "sequence", 
+            "length": len(seq)})
+            
+        # Add the overlap edges
+        for destination, length in left_overlaps:
+            # Each of the left overlaps connects to the left end.
+            # This edge may already exist, from the other side.
+            graph.add_edge(destination, ends[0], {"type": "overlap",
+                "length": length})
+                
+        for destination, length in right_overlaps:
+            # Each of the right overlaps connects to the right end.
+            # This edge may already exist, from the other side.
+            graph.add_edge(destination, ends[1], {"type": "overlap",
+                "length": length})
         
         if total_unitigs % interval == 0:
             # We should print status
@@ -661,97 +282,35 @@ def main(args):
                 compressed_bytes / elapsed / 1000,
                 uncompressed_bytes / elapsed / 1000))
                 
-        continue
-        
-        # Find the longest overlap on each side with existing sequence
-        max_left_overlap = get_max_overlap(left_overlaps, sides_by_endpoint)
-        max_right_overlap = get_max_overlap(right_overlaps, sides_by_endpoint)
-        
-        # Add in the novel sequence
-        sequence_id = total_unitigs
-        sequence_length = len(seq) - max_left_overlap[1] - max_right_overlap[1]
-        if sequence_length <= 0:
-            # There is so mauch overlap that there is no novel sequence at all.
-            
-            print("No novel sequence for {}:{} length {} overlapping {} "
-                "and {}".format(ends[0], ends[1], len(seq), left_overlaps,
-                right_overlaps))
-            
-            # We'll still do joins for all the overlaps. Except the selected
-            # longest overlaps get no joins. TODO: if overlap onto this sequence
-            # implies an overlap between those sequences, make that join. For
-            # now we just assume that that implied overlap is already accounted
-            # for explicitly in the input.
-            
-            # First fill out the sides for the endpoints
-            
-            # Side for left endpoint is either so far into the left
-            # overlapping sequence, or the end of the right overlapping sequence
-            # if there is no left one.
-            if max_left_overlap[0] is None:
-                # The right overlaps all the way to the left end
-                sides_by_endpoint[ends[0]] = sides_by_endpoint[
-                    max_right_overlap[0]]
-            else:
-                # The left overlaps in, so we take its end, flip it around, and
-                # scoot it back (accounting for it being the first base
-                # already).
-                sides_by_endpoint[ends[0]] = sides_by_endpoint[
-                    max_left_overlap[0]].flip().add_local_offset(
-                    max_left_overlap[1] - 1)
-                    
-            # Ditto for the right endpoint
-            if max_right_overlap[0] is None:
-                # The left overlaps all the way to the right end
-                sides_by_endpoint[ends[1]] = sides_by_endpoint[
-                    max_left_overlap[0]]
-            else:
-                # The right overlaps in, so we take its end, flip it around, and
-                # scoot it back (accounting for it being the first base
-                # already).
-                sides_by_endpoint[ends[1]] = sides_by_endpoint[
-                    max_right_overlap[0]].flip().add_local_offset(
-                    max_right_overlap[1] - 1)
-            
-            # Do the joins for all the left overlaps
-            process_overlaps(left_overlaps, max_left_overlap, None,
-                sides_by_endpoint, graph)
-            # And the right ones
-            process_overlaps(right_overlaps, max_right_overlap, None,
-                sides_by_endpoint, graph)
-                
-            
-        else:
-        
-            # There is some novel sequence here. Make a sequence with that
-            # sequence data.
-            graph.add_sequence(sequence_id, sequence_length, 
-                seq[max_left_overlap[1]:len(seq) - max_right_overlap[1]])
-            
-            # Define the sequence left and right Sides
-            sequence_left_side = Side(sequence_id, 0, False)
-            sequence_right_side = Side(sequence_id, sequence_length - 1, True)
-                
-            # Do the joins for all the left overlaps
-            process_overlaps(left_overlaps, max_left_overlap,
-                sequence_left_side, sides_by_endpoint, graph)
-            # And the right ones
-            process_overlaps(right_overlaps, max_right_overlap,
-                sequence_right_side, sides_by_endpoint, graph)
-                           
-            # Add the Sides for the endpoints of this sequence. They probably
-            # got merged in, if we had an overlap on either side. Just look 0 in
-            # from
-            sides_by_endpoint[ends[0]] = get_merged_side(max_left_overlap,
-                sequence_left_side, 0, sides_by_endpoint)
-            sides_by_endpoint[ends[1]] = get_merged_side(max_right_overlap,
-                sequence_right_side, 0, sides_by_endpoint)
-        
-        
-        
         
     print("Average unitig length: {}".format(total_length / 
         float(total_unitigs)))
+        
+    # Count all the overlaps
+    total_overlaps = 0
+    for (node1, node2, data) in graph.edges_iter():
+        # Check each edge
+        
+        if data["type"] == "overlap":
+            # And count the overlaps
+            total_overlaps += 1
+            
+    print("{} overlaps among {} sequences".format(total_overlaps,
+        total_unitigs))
+        
+    # Now do the connected components
+    print("Connected components: {}".format(
+        networkx.number_connected_components(graph)))
+        
+    # Throw out the sequences and ask that question again.
+    # First we need to make a list (so we aren't iterating while removing)
+    bad_edges = [(u, v) for (u, v, data) in
+        graph.edges_iter() if data["type"] == "sequence"]
+        
+    graph.remove_edges_from(bad_edges)
+    
+    print("Overlap-connected components: {}".format(
+        networkx.number_connected_components(graph)))
     
 
 if __name__ == "__main__" :
