@@ -373,6 +373,13 @@ class DatabaseSideGraph(object):
         TODO: reading.
         """
         
+        try:
+            # Delete the database
+            os.unlink(database_filename)
+        except OSError:
+            # It might not exist
+            pass
+        
         # Connect to the database
         self.database = sqlite3.connect(database_filename)
         
@@ -421,6 +428,8 @@ class DatabaseSideGraph(object):
         
         """
         
+        #print("Adding {} length {}".format(sequence_id, length))
+        
         # Slap an ID on the sequence and write it to the FASTA
         Bio.SeqIO.write(Bio.SeqRecord.SeqRecord(sequence, str(sequence_id)),
             self.fasta, "fasta")
@@ -441,6 +450,8 @@ class DatabaseSideGraph(object):
         Add a join between the two given sides.
         
         """
+        
+        #print("Adding {} -- {}".format(side1, side2))
         
         if side1 > side2:
             # Flip around
@@ -502,6 +513,12 @@ def process_overlaps(overlaps, longest_overlap, novel_sequence_side,
         # onto by the longest overlap?
         overlap_offset = longest_overlap[1] - overlap
         
+        if(overlap_offset == 0 and novel_sequence_side is None):
+            # We can't connect here if there is no novel sequence.
+            print("Skipping join from end {} to non-existent novel "
+                "sequence".format(endpoint))
+            continue
+        
         # Get the side we should be welding to at the distance into the newly
         # added record for this overlap.
         stand_in_side = get_merged_side(longest_overlap, novel_sequence_side,
@@ -533,14 +550,38 @@ def get_merged_side(longest_overlap, novel_sequence_side, in_from_endpoint,
         # We're counting from the end of the novel sequence, and we need to wind
         # it inwards.
         return novel_sequence_side.add_local_offset(-in_from_endpoint)
-    elif longest_overlap[1] <= in_from_endpoint:
+        
+        # TODO: Is it required that we have novel sequence here? Or maybe it was
+        # all eaten by the other overlap.
+    elif longest_overlap[1] == in_from_endpoint:
+        # We have to connect up to the thing the longest overlap is connected up
+        # to.
+        
+        if novel_sequence_side is None:
+            # We would have to go find the opposing overlap (assuming there is
+            # one) and go join up in there. We'll just skip it and hope that the
+            # transitive overlap is properly represented.
+            raise Exception("Can't attach to the opposing overlap")
+        else:
+            # We do have a novel sequence, so we know what to attach to.
+            return novel_sequence_side
+        
+    elif longest_overlap[1] < in_from_endpoint:
         # We need to be in the newly added sequence, because we are further in
         # than the longest overlap.
         
-        # We need to walk in the difference between the longest overlap and the
-        # offset we wanted.
-        return novel_sequence_side.add_local_offset(longest_overlap[1] -
-            in_from_endpoint)
+        if novel_sequence_side is None:
+            # We have no novel sequence. This is a problem.
+            raise Exception("Can't attach inside the nonexistent novel "
+                "sequence")
+        
+        else:
+            # We have some novel sequence, and this is in it.
+            
+            # We need to walk in the difference between the longest overlap and
+            # the offset we wanted.
+            return novel_sequence_side.add_local_offset(longest_overlap[1] -
+                in_from_endpoint)
     else:
         # We want a distance in from the endpoint less than the longest overlap,
         # so the answer is going to be in the sequence that provided the longest
@@ -602,41 +643,6 @@ def main(args):
         total_unitigs += 1
         total_length += len(seq)
         
-        # Find the longest overlap on each side with existing sequence
-        max_left_overlap = get_max_overlap(left_overlaps, sides_by_endpoint)
-        max_right_overlap = get_max_overlap(right_overlaps, sides_by_endpoint)
-        
-        # Add in the novel sequence
-        sequence_id = total_unitigs
-        sequence_length = len(seq) - max_left_overlap[1] - max_right_overlap[1]
-        if sequence_length == 0:
-            # TODO: Figure out how to handle this
-            raise Exception("Sequences can't be all overlap.")
-        
-        # There is any novel sequence here. Make a sequence with that sequence
-        # data.
-        graph.add_sequence(sequence_id, sequence_length, 
-            seq[max_left_overlap[1]:len(seq) - max_right_overlap[1]])
-        
-        # Define the sequence left and right Sides
-        sequence_left_side = Side(sequence_id, 0, False)
-        sequence_right_side = Side(sequence_id, sequence_length - 1, True)
-            
-        # Do the joins for all the left overlaps
-        process_overlaps(left_overlaps, max_left_overlap, sequence_left_side,
-            sides_by_endpoint, graph)
-        # And the right ones
-        process_overlaps(right_overlaps, max_right_overlap, sequence_right_side,
-            sides_by_endpoint, graph)
-                       
-        # Add the Sides for the endpoints of this sequence. They probably got
-        # merged in, if we had an overlap on either side. Just look 0 in from 
-        sides_by_endpoint[ends[0]] = get_merged_side(max_left_overlap,
-            sequence_left_side, 0, sides_by_endpoint)
-        sides_by_endpoint[ends[1]] = get_merged_side(max_right_overlap,
-            sequence_right_side, 0, sides_by_endpoint)
-        
-        
         if total_unitigs % interval == 0:
             # We should print status
             
@@ -654,6 +660,95 @@ def main(args):
                 total_unitigs, interval / elapsed,
                 compressed_bytes / elapsed / 1000,
                 uncompressed_bytes / elapsed / 1000))
+                
+        continue
+        
+        # Find the longest overlap on each side with existing sequence
+        max_left_overlap = get_max_overlap(left_overlaps, sides_by_endpoint)
+        max_right_overlap = get_max_overlap(right_overlaps, sides_by_endpoint)
+        
+        # Add in the novel sequence
+        sequence_id = total_unitigs
+        sequence_length = len(seq) - max_left_overlap[1] - max_right_overlap[1]
+        if sequence_length <= 0:
+            # There is so mauch overlap that there is no novel sequence at all.
+            
+            print("No novel sequence for {}:{} length {} overlapping {} "
+                "and {}".format(ends[0], ends[1], len(seq), left_overlaps,
+                right_overlaps))
+            
+            # We'll still do joins for all the overlaps. Except the selected
+            # longest overlaps get no joins. TODO: if overlap onto this sequence
+            # implies an overlap between those sequences, make that join. For
+            # now we just assume that that implied overlap is already accounted
+            # for explicitly in the input.
+            
+            # First fill out the sides for the endpoints
+            
+            # Side for left endpoint is either so far into the left
+            # overlapping sequence, or the end of the right overlapping sequence
+            # if there is no left one.
+            if max_left_overlap[0] is None:
+                # The right overlaps all the way to the left end
+                sides_by_endpoint[ends[0]] = sides_by_endpoint[
+                    max_right_overlap[0]]
+            else:
+                # The left overlaps in, so we take its end, flip it around, and
+                # scoot it back (accounting for it being the first base
+                # already).
+                sides_by_endpoint[ends[0]] = sides_by_endpoint[
+                    max_left_overlap[0]].flip().add_local_offset(
+                    max_left_overlap[1] - 1)
+                    
+            # Ditto for the right endpoint
+            if max_right_overlap[0] is None:
+                # The left overlaps all the way to the right end
+                sides_by_endpoint[ends[1]] = sides_by_endpoint[
+                    max_left_overlap[0]]
+            else:
+                # The right overlaps in, so we take its end, flip it around, and
+                # scoot it back (accounting for it being the first base
+                # already).
+                sides_by_endpoint[ends[1]] = sides_by_endpoint[
+                    max_right_overlap[0]].flip().add_local_offset(
+                    max_right_overlap[1] - 1)
+            
+            # Do the joins for all the left overlaps
+            process_overlaps(left_overlaps, max_left_overlap, None,
+                sides_by_endpoint, graph)
+            # And the right ones
+            process_overlaps(right_overlaps, max_right_overlap, None,
+                sides_by_endpoint, graph)
+                
+            
+        else:
+        
+            # There is some novel sequence here. Make a sequence with that
+            # sequence data.
+            graph.add_sequence(sequence_id, sequence_length, 
+                seq[max_left_overlap[1]:len(seq) - max_right_overlap[1]])
+            
+            # Define the sequence left and right Sides
+            sequence_left_side = Side(sequence_id, 0, False)
+            sequence_right_side = Side(sequence_id, sequence_length - 1, True)
+                
+            # Do the joins for all the left overlaps
+            process_overlaps(left_overlaps, max_left_overlap,
+                sequence_left_side, sides_by_endpoint, graph)
+            # And the right ones
+            process_overlaps(right_overlaps, max_right_overlap,
+                sequence_right_side, sides_by_endpoint, graph)
+                           
+            # Add the Sides for the endpoints of this sequence. They probably
+            # got merged in, if we had an overlap on either side. Just look 0 in
+            # from
+            sides_by_endpoint[ends[0]] = get_merged_side(max_left_overlap,
+                sequence_left_side, 0, sides_by_endpoint)
+            sides_by_endpoint[ends[1]] = get_merged_side(max_right_overlap,
+                sequence_right_side, 0, sides_by_endpoint)
+        
+        
+        
         
     print("Average unitig length: {}".format(total_length / 
         float(total_unitigs)))
