@@ -1,7 +1,7 @@
 #!/usr/bin/env python2.7
 """
-unitigStats.py: Read a (possibly gzipped) unitig .mag file, and report some
-statistics about it.
+unitigStats.py: Read a (possibly gzipped) unitig .mag file, put it in a
+database, and report some statistics about it.
 
 MAG format is a variant of FASTQ format, with specially formatted header lines
 and quality scores.
@@ -26,9 +26,11 @@ Note that the + line for qualities will not contain the same header information.
 """
 
 import argparse, sys, os, os.path, random, subprocess, shutil, itertools, glob
-import doctest, zlib, time, collections
+import doctest, zlib, time, collections, hashlib
 
 import Bio.SeqIO
+import Bio.SeqRecord
+import sqlite3
 
 
 def parse_args(args):
@@ -50,9 +52,13 @@ def parse_args(args):
         formatter_class=argparse.RawDescriptionHelpFormatter)
     
     # General options
-    parser.add_argument("in_file", nargs="?", type=argparse.FileType("r"),
+    parser.add_argument("--in_file", type=argparse.FileType("r"),
         default=sys.stdin,
         help="MAG-format file of the unitig graph to read")
+    parser.add_argument("database",
+        help="Database filename to write")
+    parser.add_argument("fasta",
+        help="FASTA filename to write")
     
     # The command line arguments start with the program name, which we don't
     # want to treat as an argument for argparse. So we remove it.
@@ -268,6 +274,34 @@ class Side(object):
         
         return "Side({}, {}, {})".format(self.sequence_id, self.offset,
             self.is_right)
+            
+    def __lt__(self, other):
+        """
+        Return ture if this Side is less than the other one, and false
+        otherwise.
+        """
+        
+        if self.sequence_id < other.sequence_id:
+            return True
+        if self.sequence_id > other.sequence_id:
+            return False
+        
+        # IDs must be equal    
+        
+        if self.offset < other.offset:
+            return True
+        if self.offset > other.offset:
+            return False
+            
+        # Offsets must be equal
+            
+        if self.is_right < other.is_right:
+            return True
+        if self.is_right > other.is_right:
+            return False
+            
+        # Must be equal
+        return False
         
 class Join(object):
     """
@@ -299,9 +333,10 @@ class SideGraph(object):
         # Hold joins indexed by each of their sequences
         self.joins_by_sequence = collections.defaultdict(list)
     
-    def add_sequence(self, sequence_id, length):
+    def add_sequence(self, sequence_id, length, sequence):
         """
-        Add a new sequence to the graph.
+        Add a new sequence to the graph. Takes the ID, the length, and the
+        bases (as a BioPython Seq object).
         
         """
         
@@ -322,6 +357,103 @@ class SideGraph(object):
         # Insert it in the list under the sequence IDs
         self.joins_by_sequence[side1.sequence_id].append(join)
         self.joins_by_sequence[side2.sequence_id].append(join)
+        
+class DatabaseSideGraph(object):
+    """
+    A side graph backed by a database.
+    
+    TODO: just pull in the GA4GH server code?
+    """
+    
+    def __init__(self, database_filename, fasta_filename):
+        """
+        Make a new side graph, writing to the given sqlite database and FASTA
+        file.
+        
+        TODO: reading.
+        """
+        
+        # Connect to the database
+        self.database = sqlite3.connect(database_filename)
+        
+        # Open the FASTA file for writing
+        self.fasta = open(fasta_filename, "w")
+        
+        # Set up the database. Copied from Maciek's schema
+        self.database.executescript("""
+        CREATE TABLE FASTA (ID INTEGER PRIMARY KEY,
+	        fastaURI TEXT NOT NULL);
+        --
+        --
+        -- Sequences and joins - basis of graph topology
+        --
+        CREATE TABLE Sequence (ID INTEGER PRIMARY KEY,
+	        fastaID INTEGER NOT NULL REFERENCES FASTA(ID), -- the FASTA file that contains this sequence's bases.
+	        sequenceRecordName TEXT NOT NULL, -- access to the sequence bases in the FASTA file ONLY.
+	        md5checksum TEXT NOT NULL, -- checksum of the base sequence as found in the FASTA record.
+	        length INTEGER NOT NULL); -- length of the base sequence as found in the FASTA record.
+        --
+        --
+        CREATE TABLE GraphJoin (ID INTEGER PRIMARY KEY,
+	        --
+	        -- by convention, side1 < side2 in the lexicographic ordering defined by (sequenceID, position, forward).
+	        --
+	        side1SequenceID INTEGER NOT NULL REFERENCES Sequence(ID),
+	        side1Position INTEGER NOT NULL, -- 0 based indexing, counting from 5' end of sequence.
+	        side1StrandIsForward BOOLEAN NOT NULL, -- true if this side joins to 5' end of the base
+	        -- 
+	        side2SequenceID INTEGER NOT NULL REFERENCES Sequence(ID),
+	        side2Position INTEGER NOT NULL,
+	        side2StrandIsForward BOOLEAN NOT NULL);
+        """)
+        
+        # Add a FASTA file entry for our FASTA
+        self.database.execute("INSERT INTO FASTA VALUES (0, ?);", (
+            fasta_filename,))
+        
+    
+    def add_sequence(self, sequence_id, length, sequence):
+        """
+        Add a new sequence to the graph. Takes the ID, the length, and the
+        bases (as a BioPython Seq object).
+        
+        Sequence ID must be an int.
+        
+        """
+        
+        # Slap an ID on the sequence and write it to the FASTA
+        Bio.SeqIO.write(Bio.SeqRecord.SeqRecord(sequence, str(sequence_id)),
+            self.fasta, "fasta")
+        
+        # Hash the sequence
+        hasher = hashlib.md5()
+        hasher.update(str(sequence))
+        md5sum = hasher.hexdigest()
+        
+        
+        # Put it in the database, pointing to FASTA 0
+        self.database.execute("INSERT INTO Sequence VALUES (?, 0, ?, ?, ?);",
+            (sequence_id, str(sequence_id), md5sum, len(sequence))) 
+        
+        
+    def add_join(self, side1, side2):
+        """
+        Add a join between the two given sides.
+        
+        """
+        
+        if side1 > side2:
+            # Flip around
+            side1, side2 = side2, side1
+        
+        # Stick it in the database. Don't put a primary key; we will get one for
+        # free.
+        self.database.execute("INSERT INTO GraphJoin(side1SequenceID, "
+            "side1Position, side1StrandIsForward, side2SequenceID, "
+            "side2Position, side2StrandIsForward) VALUES (?, ?, ?, ?, ?, ?);",
+            (side1.sequence_id, side1.offset, not side1.is_right,
+            side2.sequence_id, side2.offset, not side2.is_right))
+            
         
 def get_max_overlap(overlaps, sides_by_endpoint):
     """
@@ -445,8 +577,8 @@ def main(args):
     total_length = 0
     total_unitigs = 0
     
-    # We need to build a side graph in memory.
-    graph = SideGraph()
+    # We need to build a side graph in a database.
+    graph = DatabaseSideGraph(options.database, options.fasta)
     
     # Keep track of MAG endpoint numbers. This maps endpoint numbers to where
     # they fall in the graph. It's not necessary to keep more than one, because
@@ -481,8 +613,10 @@ def main(args):
             # TODO: Figure out how to handle this
             raise Exception("Sequences can't be all overlap.")
         
-        # There is any novel sequence here
-        graph.add_sequence(sequence_id, sequence_length)
+        # There is any novel sequence here. Make a sequence with that sequence
+        # data.
+        graph.add_sequence(sequence_id, sequence_length, 
+            seq[max_left_overlap[1]:len(seq) - max_right_overlap[1]])
         
         # Define the sequence left and right Sides
         sequence_left_side = Side(sequence_id, 0, False)
