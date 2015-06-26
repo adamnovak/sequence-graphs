@@ -276,8 +276,9 @@ def main(args):
             compressed_bytes, uncompressed_bytes = expander.get_stats()
             expander.start_stats()
         
-            print("Processed {} unitigs, {:.2f} per second, "
-                "{:.2f} kbps/{:.2f} kbps".format(
+            
+            sys.stderr.write("Processed {} unitigs, {:.2f} per second, "
+                "{:.2f} kbps/{:.2f} kbps\n".format(
                 total_unitigs, interval / elapsed,
                 compressed_bytes / elapsed / 1000,
                 uncompressed_bytes / elapsed / 1000))
@@ -288,7 +289,7 @@ def main(args):
         
     # Count all the overlaps
     total_overlaps = 0
-    for (node1, node2, data) in graph.edges_iter():
+    for (node1, node2, data) in graph.edges_iter(data=True):
         # Check each edge
         
         if data["type"] == "overlap":
@@ -305,7 +306,7 @@ def main(args):
     # Throw out the sequences and ask that question again.
     # First we need to make a list (so we aren't iterating while removing)
     bad_edges = [(u, v) for (u, v, data) in
-        graph.edges_iter() if data["type"] == "sequence"]
+        graph.edges_iter(data=True) if data["type"] == "sequence"]
         
     graph.remove_edges_from(bad_edges)
     
