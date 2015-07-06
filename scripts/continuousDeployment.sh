@@ -5,7 +5,7 @@
 
 # TODO: make this script re-do the servers, maybe by keying into the AWS commands?
 
-set -e
+set -ex
 
 # What regions do we look at?
 REGIONS="SMA MHC LRC_KIR BRCA1 BRCA2"
@@ -25,7 +25,7 @@ function cactusFilename()
     local REGION=$1
     
     # We pull these from Glenn
-    echo "/hive/users/hickey/ga4gh/cactus/output/${REGION,,}_star.hal"
+    echo "/cluster/home/hickey/ga4gh/cactus/results/${REGION}/${REGION,,}_star.hal"
 }
 
 # Where should we save our hal2sg output?
@@ -52,7 +52,8 @@ do
         # --refGenome ref and --noAncestors, but apparently those aren't allowed
         # for some reason?
         hal2sg "${CACTUS_HAL}" "${REGION_OUT_DIR}/cactus/database.fa" \
-            "${REGION_OUT_DIR}/cactus/database.sql" --onlySequenceNames
+            "${REGION_OUT_DIR}/cactus/database.sql" --onlySequenceNames \
+            --refGenome ref --noAncestors
             
     else
         echo "No Cactus results available for ${REGION}"
@@ -70,7 +71,8 @@ do
         
         # Fill it up with the generated database
         hal2sg "${CAMEL_HAL}" "${REGION_OUT_DIR}/camel/database.fa" \
-            "${REGION_OUT_DIR}/camel/database.sql" --onlySequenceNames
+            "${REGION_OUT_DIR}/camel/database.sql" --onlySequenceNames \
+            --refGenome ref --noAncestors
     
     else
         echo "No Camel results available for ${REGION}"
