@@ -193,7 +193,7 @@ do
     CATEGORY_OPTS+=("--categories" "ICnaturalHam${HAMMING_CLEARANCE}")
     
     # And label
-    LABEL_OPTS+=("--category_labels" "\$\\beta^\\prime=0\$")
+    LABEL_OPTS+=("--category_labels" "\$\\alpha^\\prime=${HAMMING_CLEARANCE}\$ \$\\beta^\\prime=0\$")
     
     for HAMMING_DISTANCE in $(seq 1 $((HAMMING_CLEARANCE - 1)))
     do
@@ -202,7 +202,7 @@ do
         
         # Add and label a category for this number of mismatches
         CATEGORY_OPTS+=("ICnaturalHam${HAMMING_CLEARANCE}Mis${HAMMING_DISTANCE}")
-        LABEL_OPTS+=("\$\\beta^\\prime=${HAMMING_DISTANCE}\$")
+        LABEL_OPTS+=("\$\\alpha^\\prime=${HAMMING_CLEARANCE}\$ \$\\beta^\\prime=${HAMMING_DISTANCE}\$")
     done
 done
     
@@ -246,7 +246,7 @@ GRC_AVERAGE=$(echo ${TOTAL_COVERAGE} / ${TOTAL_GENOMES} | bc -l)
 echo "GRC average coverage: ${GRC_AVERAGE}"
     
 boxplot.py "${TSV}" \
-    --x_label "Scheme Parameter (Min Length/Tolerance)" \
+    --x_label "Scheme Parameter (Min Length or Clearance and Tolerance)" \
     --y_label "Portion Aligned to Reference" \
     --title "Coverage vs. Mapping Scheme" \
     "${GROUPING_OPTS[@]}" "${CATEGORY_OPTS[@]}" "${LABEL_OPTS[@]}" \
